@@ -1,0 +1,29 @@
+<?php
+/**
+ * NWS BBS Poster Configuration
+ * 
+ * Copy this file to nws-config.php and edit the values below.
+ * The nws-bbs-post.php script will load these settings automatically.
+ */
+
+return [
+    // BBS Connection Settings
+    'bbs_host' => 'localhost',      // BPQ telnet host
+    'bbs_port' => 8010,             // BPQ telnet port
+    'bbs_user' => 'SYSOP',          // BBS login username
+    'bbs_pass' => 'password',       // BBS login password
+    
+    // BBS Application Name (as shown in node list)
+    // This is what to type to connect from the node to the BBS
+    // Examples: 'BBS', 'AUGBBS', 'K1AJD-7', etc.
+    'bbs_alias' => 'BBS',
+    
+    // Message Settings
+    'from_call' => 'N0CALL',        // Your callsign
+    'to_addr' => 'WX@ALLUS',        // Destination address
+    
+    // System Settings
+    'timeout' => 30,                // Connection timeout in seconds
+    'enabled' => true,              // Set to true to enable posting
+    'log_file' => '/var/log/nws-bbs-post.log'
+];

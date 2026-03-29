@@ -1,0 +1,13 @@
+# ARSSYSTEM — allow www-data to run read-only system tools for firewall-api.php and system-audit-api.php
+# Deploy with: sudo visudo -f /etc/sudoers.d/www-data-tools
+# Then verify: sudo visudo -c
+
+www-data ALL=(ALL) NOPASSWD: /sbin/iptables -L INPUT -n --line-numbers -v
+www-data ALL=(ALL) NOPASSWD: /sbin/iptables -L -n --line-numbers -v
+www-data ALL=(ALL) NOPASSWD: /usr/sbin/iptables -L INPUT -n --line-numbers -v
+www-data ALL=(ALL) NOPASSWD: /usr/sbin/fail2ban-client status
+www-data ALL=(ALL) NOPASSWD: /usr/sbin/fail2ban-client status sshd
+www-data ALL=(ALL) NOPASSWD: /bin/ss -tlnp
+www-data ALL=(ALL) NOPASSWD: /usr/bin/apt list --upgradable
+www-data ALL=(ALL) NOPASSWD: /bin/systemctl list-units --type=service --state=active
+www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t

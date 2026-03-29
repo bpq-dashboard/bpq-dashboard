@@ -1,0 +1,18 @@
+[Unit]
+Description=NWS Weather Alert Monitor for BPQ BBS
+Documentation=https://github.com/k1ajd/bpq-dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nws-monitor.sh --daemon
+Restart=always
+RestartSec=30
+
+# Logging
+StandardOutput=append:/var/log/nws-monitor.log
+StandardError=append:/var/log/nws-monitor.log
+
+[Install]
+WantedBy=multi-user.target

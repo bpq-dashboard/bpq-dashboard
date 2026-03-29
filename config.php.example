@@ -1,0 +1,144 @@
+<?php
+/**
+ * BPQ Dashboard Configuration
+ * Version: 1.4.0
+ * 
+ * SETUP INSTRUCTIONS:
+ * 1. Copy this file to config.php
+ * 2. Edit the values below for your station
+ * 3. IMPORTANT: Change the BBS password!
+ * 
+ * SECURITY MODES:
+ *   'local'  - Full access, no restrictions (default - for LAN use)
+ *   'public' - Read-only, rate limited (for internet exposure)
+ */
+
+return [
+    // =========================================================================
+    // SECURITY MODE
+    // =========================================================================
+    // 'local'  = Full features, suitable for home network
+    // 'public' = Read-only, rate-limited, for internet-facing installations
+    'security_mode' => 'local',
+    
+    // =========================================================================
+    // YOUR STATION INFORMATION
+    // =========================================================================
+    'station' => [
+        'callsign'  => 'N0CALL',        // Your callsign (e.g., 'W1AW')
+        'latitude'  => 0.0,              // Your latitude (e.g., 41.7147)
+        'longitude' => 0.0,              // Your longitude (e.g., -72.7272)
+        'grid'      => 'AA00aa',         // Your grid square (e.g., 'FN31pr')
+    ],
+    
+    // =========================================================================
+    // BBS CONNECTION SETTINGS
+    // =========================================================================
+    'bbs' => [
+        'host'    => 'localhost',        // BPQ telnet host (usually localhost)
+        'port'    => 8010,               // BPQ telnet port (check your BPQ config)
+        'user'    => 'SYSOP',            // BBS username
+        'pass'    => 'CHANGEME',         // ⚠️ CHANGE THIS TO YOUR BBS PASSWORD!
+        'alias'   => 'bbs',              // Command to enter BBS (usually 'bbs' or 'b')
+        'timeout' => 30,                 // Connection timeout in seconds
+    ],
+    
+    // =========================================================================
+    // FILE PATHS
+    // =========================================================================
+    // These paths are relative to the dashboard directory
+    // Adjust if your BPQ logs are in a different location
+    'paths' => [
+        'logs'     => './logs/',         // BPQ log files directory
+        'data'     => './data/',         // Data files (callsign DB, RTT data)
+        'wx'       => './wx/',           // Weather alert data
+        'scripts'  => './scripts/',      // Helper scripts
+    ],
+    
+    // =========================================================================
+    // LOG FILE SETTINGS
+    // =========================================================================
+    // Configure which log files to read
+    'logs' => [
+        'bbs_pattern'    => 'log_%s_BBS.txt',      // %s = YYMMDD
+        'vara_pattern'   => 'log_%s_VARA.txt',     // %s = YYMMDD
+        'tcp_pattern'    => 'log_%s_TCP.txt',      // %s = YYMMDD
+        'cms_pattern'    => 'CMSAccess%s.txt',     // %s = YYYYMMDD
+        'vara_file'      => '',                     // VARA session log (e.g. 'k1ajd.vara') — auto-detected if blank
+        'days_to_load'   => 30,                    // How many days of logs to load
+        'datalog_timezone' => '',                    // Timezone of the PC that writes DataLog CSVs
+                                                     // Leave EMPTY if your DataLog software writes UTC timestamps (most common)
+                                                     // Only set if DataLog writes LOCAL time and server runs in a different timezone
+                                                     // Examples: 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles'
+    ],
+    
+    // =========================================================================
+    // FEATURES
+    // =========================================================================
+    // Enable or disable specific features
+    // In 'public' mode, write features are automatically disabled
+    'features' => [
+        'bbs_read'       => true,        // View BBS messages
+        'bbs_write'      => true,        // Send/delete BBS messages
+        'bbs_bulletins'  => true,        // Download bulletins
+        'nws_alerts'     => true,        // View NWS weather alerts
+        'nws_post'       => true,        // Post weather alerts to BBS
+        'rf_connections' => true,        // RF connection analytics
+        'system_logs'    => true,        // System log viewer
+        'traffic_stats'  => true,        // Traffic statistics
+        'email_monitor'  => true,        // Email/TCP monitoring
+        'test_endpoint'  => false,       // API test endpoint (disable in production)
+    ],
+    
+    // =========================================================================
+    // RATE LIMITING (for public mode)
+    // =========================================================================
+    'rate_limit' => [
+        'enabled'             => false,  // Auto-enabled in public mode
+        'requests_per_minute' => 30,     // Max API requests per minute per IP
+        'burst_limit'         => 10,     // Max rapid requests allowed
+    ],
+    
+    // =========================================================================
+    // CORS SETTINGS (for public mode)
+    // =========================================================================
+    'cors' => [
+        'allow_all'       => true,       // true = allow any origin (local mode)
+        'allowed_origins' => [           // Whitelist when allow_all is false
+            // 'https://yourdomain.com',
+            // 'https://www.yourdomain.com',
+        ],
+    ],
+    
+    // =========================================================================
+    // NWS WEATHER SETTINGS
+    // =========================================================================
+    'nws' => [
+        'default_regions'    => ['ALL'], // Default regions: SR, CR, ER, WR, AR, PR, ALL
+        'default_types'      => ['tornado', 'severe', 'winter'],
+        'auto_refresh'       => true,
+        'refresh_interval'   => 60000,   // Milliseconds (60000 = 1 minute)
+        'post_destination'   => 'WX@ALLUS',  // Default BBS destination for alerts
+    ],
+    
+    // =========================================================================
+    // UI PREFERENCES
+    // =========================================================================
+    'ui' => [
+        'theme'              => 'auto',  // 'light', 'dark', or 'auto'
+        'default_msg_count'  => 20,      // Messages to show by default
+        'max_msg_count'      => 100,     // Maximum messages allowed
+        'refresh_interval'   => 60000,   // Dashboard refresh (milliseconds)
+        'show_version'       => true,    // Show version in header
+    ],
+    
+    // =========================================================================
+    // LOGGING
+    // =========================================================================
+    'logging' => [
+        'enabled'    => true,
+        'file'       => './logs/dashboard.log',  // Dashboard activity log
+        'max_size'   => 5242880,                 // Max log size (5MB)
+        'level'      => 'info',                  // 'debug', 'info', 'warning', 'error'
+    ],
+];
