@@ -1,0 +1,3772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BPQ BBS System Logs v1.5.0</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Preconnect for faster CDN loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* Loading skeleton animation */
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
+        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        /* Modern gradient background */
+        body {
+            background: #f3f4f6;
+            min-height: 100vh;
+            
+            
+            
+            
+        }
+        
+        /* Glass-morphism effect for main container */
+        .glass-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        /* Modern stat cards with gradient borders */
+        .stat-card {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--card-gradient-start), var(--card-gradient-end));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Card gradient variables */
+        .card-blue { --card-gradient-start: #3b82f6; --card-gradient-end: #2563eb; }
+        .card-green { --card-gradient-start: #10b981; --card-gradient-end: #059669; }
+        .card-purple { --card-gradient-start: #8b5cf6; --card-gradient-end: #7c3aed; }
+        .card-orange { --card-gradient-start: #f59e0b; --card-gradient-end: #d97706; }
+        .card-red { --card-gradient-start: #ef4444; --card-gradient-end: #dc2626; }
+        
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .glass-container { border-radius: 12px; }
+            .stat-card { padding: 0.75rem !important; }
+            .stat-card .text-5xl { font-size: 1.5rem !important; }
+            .hide-mobile { display: none !important; }
+        }
+        
+        /* Modern navigation */
+        .nav-link {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 80%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 0 4px 4px 0;
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::before {
+            width: 4px;
+        }
+        .nav-link.active::before {
+            width: 4px;
+        }
+        .nav-link:hover {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
+            padding-left: 1.25rem;
+        }
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.2) 0%, transparent 100%);
+            font-weight: 600;
+        }
+        
+        /* Modern log container with neon theme */
+        .log-entry {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.6;
+            transition: background-color 0.2s ease;
+        }
+        .log-entry:hover {
+            background-color: rgba(79, 193, 255, 0.1);
+        }
+        .log-container {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        /* Custom scrollbar */
+        .log-container::-webkit-scrollbar {
+            width: 10px;
+        }
+        .log-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        .log-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #667eea #e5e7eb; }
+        
+        /* Neon colors for log entries */
+        .log-time { color: #4ec9b0; text-shadow: 0 0 5px rgba(78, 201, 176, 0.5); }
+        .log-callsign { color: #ffd700; font-weight: bold; text-shadow: 0 0 5px rgba(255, 215, 0, 0.3); }
+        .log-connect { color: #4fc1ff; text-shadow: 0 0 5px rgba(79, 193, 255, 0.5); }
+        .log-disconnect { color: #ff6b9d; text-shadow: 0 0 5px rgba(255, 107, 157, 0.5); }
+        .log-message { color: #ce9178; }
+        .log-error { color: #ff5555; text-shadow: 0 0 8px rgba(255, 85, 85, 0.6); }
+        .log-info { color: #50fa7b; }
+        
+        /* Animated status indicator */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success { 
+            background-color: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+        }
+        .status-error { 
+            background-color: #ef4444;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+        }
+        .status-loading { 
+            background-color: #f59e0b;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.1);
+            }
+        }
+        
+        /* Fade-in animation for cards */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fade-in {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        /* Gradient text for header */
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Modern button styling */
+        .modern-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .modern-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s ease;
+        }
+        .modern-button:hover::before {
+            left: 100%;
+        }
+        .modern-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        /* Modern select/dropdown */
+        select {
+            background: white;
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+        select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            outline: none;
+        }
+        
+        /* Chart container styling */
+        .chart-container {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+        .chart-container:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+    <style id="bpq-dark-mode">
+    /* Dark Mode — auto-detects OS preference, manual toggle in nav */
+    [data-theme="dark"] { background: #111827 !important; color-scheme: dark; }
+    [data-theme="dark"] body { background: #111827 !important; color: #e5e7eb !important; }
+    [data-theme="dark"] .glass-container { background: rgba(31,41,55,0.95) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; border: 1px solid rgba(75,85,99,0.4); }
+    /* Backgrounds */
+    [data-theme="dark"] [class~="bg-white"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-50"] { background-color: #1a2332 !important; }
+    [data-theme="dark"] [class~="bg-gray-100"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-200"] { background-color: #374151 !important; }
+    [data-theme="dark"] [class~="bg-gray-300"] { background-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="bg-green-50"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-green-100"] { background-color: #065f46 !important; }
+    [data-theme="dark"] [class~="bg-blue-50"] { background-color: #1e3a5f !important; }
+    [data-theme="dark"] [class~="bg-blue-100"] { background-color: #1e40af !important; }
+    [data-theme="dark"] [class~="bg-purple-50"] { background-color: #2e1065 !important; }
+    [data-theme="dark"] [class~="bg-purple-100"] { background-color: #3b0764 !important; }
+    [data-theme="dark"] [class~="bg-red-50"] { background-color: #450a0a !important; }
+    [data-theme="dark"] [class~="bg-red-100"] { background-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="bg-amber-50"] { background-color: #451a03 !important; }
+    [data-theme="dark"] [class~="bg-amber-100"] { background-color: #78350f !important; }
+    [data-theme="dark"] [class~="bg-orange-50"] { background-color: #431407 !important; }
+    [data-theme="dark"] [class~="bg-orange-100"] { background-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="bg-emerald-50"] { background-color: #022c22 !important; }
+    [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
+    [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
+    [data-theme="dark"] [class~="bg-sky-200"] { background-color: #0369a1 !important; }
+    [data-theme="dark"] [class~="bg-cyan-50"] { background-color: #083344 !important; }
+    /* Stat card gradients */
+    [data-theme="dark"] [class*="from-green-50"] { background-image: linear-gradient(to bottom right, #064e3b, #065f46) !important; }
+    [data-theme="dark"] [class*="from-blue-50"] { background-image: linear-gradient(to bottom right, #1e3a5f, #1e40af) !important; }
+    [data-theme="dark"] [class*="from-purple-50"] { background-image: linear-gradient(to bottom right, #2e1065, #4c1d95) !important; }
+    [data-theme="dark"] [class*="from-red-50"] { background-image: linear-gradient(to bottom right, #450a0a, #7f1d1d) !important; }
+    [data-theme="dark"] [class*="from-orange-50"] { background-image: linear-gradient(to bottom right, #431407, #7c2d12) !important; }
+    [data-theme="dark"] [class*="from-amber-50"] { background-image: linear-gradient(to bottom right, #451a03, #78350f) !important; }
+    [data-theme="dark"] [class*="from-emerald-50"] { background-image: linear-gradient(to bottom right, #022c22, #064e3b) !important; }
+    [data-theme="dark"] [class*="from-sky-50"] { background-image: linear-gradient(to bottom right, #0c4a6e, #075985) !important; }
+    [data-theme="dark"] [class*="from-cyan-50"] { background-image: linear-gradient(to bottom right, #083344, #155e75) !important; }
+    /* Text colors */
+    [data-theme="dark"] [class~="text-gray-900"] { color: #f3f4f6 !important; }
+    [data-theme="dark"] [class~="text-gray-800"] { color: #e5e7eb !important; }
+    [data-theme="dark"] [class~="text-gray-700"] { color: #d1d5db !important; }
+    [data-theme="dark"] [class~="text-gray-600"] { color: #9ca3af !important; }
+    [data-theme="dark"] [class~="text-gray-500"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-gray-400"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-green-600"] { color: #34d399 !important; }
+    [data-theme="dark"] [class~="text-green-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-green-800"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-blue-600"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-700"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-800"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-purple-600"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-700"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-800"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-red-600"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-700"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-800"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-orange-600"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-orange-700"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-amber-600"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-amber-700"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-yellow-600"] { color: #fde047 !important; }
+    [data-theme="dark"] [class~="text-sky-700"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-sky-800"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-emerald-600"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-emerald-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-cyan-600"] { color: #67e8f9 !important; }
+    /* Borders */
+    [data-theme="dark"] [class~="border-gray-200"] { border-color: #374151 !important; }
+    [data-theme="dark"] [class~="border-gray-300"] { border-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="border-green-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-blue-200"] { border-color: #1e40af !important; }
+    [data-theme="dark"] [class~="border-purple-100"] { border-color: #4c1d95 !important; }
+    [data-theme="dark"] [class~="border-purple-200"] { border-color: #5b21b6 !important; }
+    [data-theme="dark"] [class~="border-red-200"] { border-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="border-amber-200"] { border-color: #78350f !important; }
+    [data-theme="dark"] [class~="border-orange-200"] { border-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="border-emerald-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-sky-200"] { border-color: #0369a1 !important; }
+    /* Forms */
+    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] input::placeholder { color: #6b7280 !important; }
+    /* Tables */
+    [data-theme="dark"] thead { background-color: #1f2937 !important; }
+    [data-theme="dark"] th { color: #d1d5db !important; }
+    [data-theme="dark"] tr:hover { background-color: rgba(55,65,81,0.5) !important; }
+    /* Log viewer */
+    [data-theme="dark"] .log-entry { color: #d1d5db; }
+    [data-theme="dark"] .log-connect { color: #6ee7b7 !important; }
+    [data-theme="dark"] .log-disconnect { color: #fca5a5 !important; }
+    [data-theme="dark"] .log-message { color: #93c5fd !important; }
+    [data-theme="dark"] .log-error { color: #f87171 !important; }
+    /* Nav */
+    [data-theme="dark"] #navLocalClock { background-color: #374151 !important; color: #d1d5db !important; }
+    [data-theme="dark"] .gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #93c5fd 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+    /* Buttons */
+    [data-theme="dark"] .modern-button { background: linear-gradient(135deg, #7c3aed, #2563eb) !important; }
+    /* Leaflet */
+    [data-theme="dark"] .leaflet-control-zoom a { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] .leaflet-popup-content-wrapper, [data-theme="dark"] .leaflet-popup-tip { background-color: #1f2937 !important; color: #e5e7eb !important; }
+    /* Scrollbar */
+    [data-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+    [data-theme="dark"] ::-webkit-scrollbar-track { background: #1f2937; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    /* Toggle */
+    .dark-mode-toggle { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.5rem; border: none; background: transparent; font-size: 1.1rem; line-height: 1; transition: transform 0.3s ease; }
+    .dark-mode-toggle:hover { transform: scale(1.2); }
+    /* Skeleton */
+    [data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%) !important; background-size: 200% 100%; }
+    /* Modals */
+    [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Modern Navigation with gradient -->
+    <nav class="glass-container mx-2 sm:mx-4 mt-2 sm:mt-4 mb-4 sm:mb-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-8 py-3 sm:py-5">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0">
+                <h2 class="text-lg sm:text-2xl font-bold gradient-text">📡 BPQ Dashboard</h2>
+                <div class="flex items-center gap-2 font-mono text-xs sm:text-sm" id="navClocks">
+                    <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold tracking-wider" id="navUtcClock" title="UTC / Zulu">--:--:-- Z</span>
+                    <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gray-200 text-gray-700 font-semibold tracking-wider" id="navLocalClock" title="Local time">--:--:-- L</span>
+                    <button id="darkModeToggle" class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
+                </div>
+                <div class="flex gap-1 sm:gap-2 flex-wrap justify-center">
+                    <a href="bpq-rf-connections.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">RF</a>
+                    <a href="bpq-traffic.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Traffic</a>
+                    <a href="bpq-system-logs.html" class="px-2 sm:px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium text-xs sm:text-sm">System</a>
+                    <a href="bpq-connect-log.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Connects</a>
+                <a href="bpq-email-monitor.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Messages</a>
+                    <a href="bbs-messages.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">BBS</a>
+                    <a href="nws-dashboard.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Weather</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-2 sm:p-4 lg:p-8">
+        <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
+            <!-- Header -->
+            <div class="mb-6 sm:mb-10">
+                <div class="flex flex-col lg:flex-row justify-between items-center gap-4">
+                    <div class="text-center flex-1">
+                        <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
+                            <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">System Logs</h1>
+                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.0</span>
+                        </div>
+                        <p class="text-gray-600 text-sm sm:text-lg">Real-time event monitoring</p>
+                        <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
+                    </div>
+                    <div class="w-full sm:w-auto">
+                        <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-100 shadow-lg">
+                            <div class="flex items-center mb-2 sm:mb-3">
+                                <span id="statusIndicator" class="status-indicator status-loading"></span>
+                                <span id="statusText" class="text-xs sm:text-sm text-gray-700 font-medium">Loading data...</span>
+                            </div>
+                            <p id="lastUpdate" class="text-xs text-gray-500 mb-2 sm:mb-3"></p>
+                            <button onclick="refreshData()" class="modern-button w-full text-white font-semibold py-2 sm:py-2.5 px-4 sm:px-6 rounded-lg text-xs sm:text-sm shadow-md">
+                                🔄 Refresh
+                            </button>
+                            <div class="mt-2 flex gap-1">
+                                <button id="range1d" onclick="setTimeRange(1)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">1D</button>
+                                <button id="range7d" onclick="setTimeRange(7)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white">7D</button>
+                                <button id="range30d" onclick="setTimeRange(30)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">30D</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- No Data Warning (hidden by default, shown when no log files found) -->
+            <div id="noDataWarning" class="hidden mb-6 p-4 sm:p-6 bg-amber-50 border-2 border-amber-200 rounded-xl text-center"></div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-5 mb-6 sm:mb-10 animate-fade-in">
+                <div class="stat-card card-green bg-gradient-to-br from-green-50 to-green-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-green-200 shadow-lg">
+                    <div class="text-green-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Connections</div>
+                    <div id="totalConnections" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
+                    <div class="text-sm text-gray-600 space-y-1">
+                        <div class="font-medium">Successful</div>
+                    </div>
+                </div>
+                <div class="stat-card card-purple bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-purple-200 shadow-lg cursor-pointer" onclick="showAllStationsModal()">
+                    <div class="text-purple-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Active Stations</div>
+                    <div id="activeStations" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
+                    <div class="text-xs sm:text-sm text-gray-600">Unique calls</div>
+                    <div class="text-xs text-gray-500 mt-2 hidden sm:block">Click to view all →</div>
+                </div>
+                <div class="stat-card card-orange bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-orange-200 shadow-lg">
+                    <div class="text-orange-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Messages</div>
+                    <div id="totalMessages" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
+                    <div class="text-xs sm:text-sm text-gray-600 space-y-1">
+                        <div>Total Processed</div>
+                        <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-orange-200">
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-500">Forwarded:</span>
+                                <span id="messagesForwarded" class="text-xs sm:text-sm font-semibold text-blue-600">0</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-500">Received:</span>
+                                <span id="messagesReceived" class="text-xs sm:text-sm font-semibold text-green-600">0</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mt-2 pt-2 border-t border-orange-200">
+                            <span class="text-xs text-gray-500">Rejected (BID):</span>
+                            <span id="rejectedMessages" class="text-xs font-semibold text-red-600">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card card-red bg-gradient-to-br from-red-50 to-red-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-red-200 shadow-lg">
+                    <div class="text-red-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Errors</div>
+                    <div id="errorCount" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
+                    <div class="text-xs sm:text-sm text-gray-600 space-y-1">
+                        <div class="grid grid-cols-2 gap-1 sm:gap-2 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-red-200">
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-500">RF Fail:</span>
+                                <span id="rfFailures" class="text-xs sm:text-sm font-semibold text-orange-600">0</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-500">Node Lost:</span>
+                                <span id="nodeDisappeared" class="text-xs sm:text-sm font-semibold text-yellow-600">0</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1 sm:gap-2 mt-1 pt-1 border-t border-red-200">
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-500">Protocol:</span>
+                                <span id="protocolErrors" class="text-xs sm:text-sm font-semibold text-purple-600">0</span>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-500">Other:</span>
+                                <span id="otherErrors" class="text-xs sm:text-sm font-semibold text-gray-600">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card card-cyan bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-cyan-200 shadow-lg">
+                    <div class="text-cyan-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">RMS Services</div>
+                    <div id="rmsConnections" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
+                    <div class="text-xs sm:text-sm text-gray-600">CMS Connections</div>
+                    <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-cyan-200">
+                        <div class="flex justify-between"><span>Bytes Sent:</span><span id="rmsBytesSent" class="font-semibold text-green-600">0</span></div>
+                        <div class="flex justify-between"><span>Bytes Recv:</span><span id="rmsBytesRecv" class="font-semibold text-blue-600">0</span></div>
+                        <div id="rmsLoginFailed" class="flex justify-between hidden"><span>Login Fail:</span><span class="font-semibold text-red-600">0</span></div>
+                    </div>
+                    <div id="rmsStationsList" class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-cyan-200 max-h-24 overflow-y-auto custom-scrollbar pr-4"></div>
+                </div>
+                <div class="stat-card card-blue bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-blue-200 shadow-lg">
+                    <div class="text-blue-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">BPQ Email Server</div>
+                    <div id="tcpSessions" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
+                    <div class="text-xs sm:text-sm text-gray-600">Total Sessions</div>
+                    <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-blue-200">
+                        <div class="flex justify-between"><span>POP3:</span><span id="tcpPOP3" class="font-semibold text-green-600">0</span></div>
+                        <div class="flex justify-between"><span>SMTP:</span><span id="tcpSMTP" class="font-semibold text-blue-600">0</span></div>
+                        <div class="flex justify-between"><span>NNTP:</span><span id="tcpNNTP" class="font-semibold text-purple-600">0</span></div>
+                        <div class="flex justify-between border-t border-blue-100 pt-1 mt-1"><span>Auth Fail:</span><span id="tcpAuthFail" class="font-semibold text-red-600">0</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Internet Connected Stations Card -->
+            <div class="mb-6 sm:mb-10 animate-fade-in">
+                <div class="stat-card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200 shadow-lg">
+                    <div class="text-indigo-700 text-xs sm:text-sm font-bold mb-2 sm:mb-3 uppercase tracking-wide">🌐 Internet Connected Stations</div>
+                    <div id="internetStationsList" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
+                        <div class="text-gray-400 text-center py-2">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+                <div class="bg-gray-50 rounded-lg p-3 sm:p-6 border border-gray-200 shadow-sm">
+                    <h2 class="text-base sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Hourly Activity (UTC)</h2>
+                    <canvas id="hourlyActivityChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
+                        <h2 class="text-lg sm:text-2xl font-bold gradient-text">Event Distribution</h2>
+                        <span id="eventTotalDisplay" class="text-xs sm:text-sm text-gray-500 font-medium">Total: 0</span>
+                    </div>
+                    <canvas id="eventTypesChart"></canvas>
+                    <!-- Legend -->
+                    <div class="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6">
+                        <div class="text-center p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
+                            <div class="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded mx-auto mb-1 sm:mb-2"></div>
+                            <div class="text-xs text-gray-600 font-medium">Conn</div>
+                            <div id="legend-connections" class="font-bold text-xs sm:text-sm text-gray-900 mt-1">0</div>
+                        </div>
+                        <div class="text-center p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <div class="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded mx-auto mb-1 sm:mb-2"></div>
+                            <div class="text-xs text-gray-600 font-medium">Msgs</div>
+                            <div id="legend-messages" class="font-bold text-xs sm:text-sm text-gray-900 mt-1">0</div>
+                        </div>
+                        <div class="text-center p-2 sm:p-3 bg-red-50 rounded-lg border border-red-200 cursor-pointer hover:bg-red-100 transition-colors" onclick="toggleErrorDetails()">
+                            <div class="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded mx-auto mb-1 sm:mb-2"></div>
+                            <div class="text-xs text-gray-600 font-medium">Errors ▼</div>
+                            <div id="legend-errors" class="font-bold text-xs sm:text-sm text-gray-900 mt-1">0</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detailed Error Breakdown Panel -->
+                    <div id="errorDetailsPanel" class="hidden mt-4 p-4 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border-2 border-red-200">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-red-700 text-sm">📊 Error Breakdown</h3>
+                            <button onclick="toggleErrorDetails()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+                        </div>
+                        
+                        <!-- Error Categories Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs sm:text-sm">
+                                <thead>
+                                    <tr class="bg-red-100">
+                                        <th class="text-left px-2 py-1 font-semibold text-red-800">Error Type</th>
+                                        <th class="text-right px-2 py-1 font-semibold text-red-800">Count</th>
+                                        <th class="text-right px-2 py-1 font-semibold text-red-800">%</th>
+                                        <th class="px-2 py-1 font-semibold text-red-800">Distribution</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="errorBreakdownTable">
+                                    <tr><td colspan="4" class="text-center py-2 text-gray-500">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Recent Errors List -->
+                        <div class="mt-4 pt-3 border-t border-red-200">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="font-semibold text-red-700 text-xs">Recent Errors (Last 10)</h4>
+                                <button onclick="filterToErrors()" class="text-xs text-purple-600 hover:text-purple-800 underline">View All in Log</button>
+                            </div>
+                            <div id="recentErrorsList" class="space-y-1 max-h-40 overflow-y-auto custom-scrollbar text-xs font-mono">
+                                <div class="text-gray-500">No errors recorded</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Log Viewer -->
+            <div class="bg-gray-50 rounded-lg p-3 sm:p-6 border border-gray-200 shadow-sm mb-4 sm:mb-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
+                    <h2 class="text-base sm:text-xl font-bold text-gray-900">Live Log Viewer</h2>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <input type="text" id="callsignSearch" placeholder="Search callsign..." 
+                               class="border border-gray-300 rounded px-2 sm:px-3 py-1 text-xs sm:text-sm w-28 sm:w-36 uppercase"
+                               onkeyup="if(event.key==='Enter')applyFilters()" oninput="this.value=this.value.toUpperCase()">
+                        <select id="logFilter" class="border border-gray-300 rounded px-2 sm:px-3 py-1 text-xs sm:text-sm">
+                            <option value="all">All Events</option>
+                            <option value="connect">Connections</option>
+                            <option value="disconnect">Disconnects</option>
+                            <option value="message">Messages</option>
+                            <option value="error">Errors</option>
+                        </select>
+                        <select id="dateFilter" class="border border-gray-300 rounded px-2 sm:px-3 py-1 text-xs sm:text-sm">
+                            <option value="all">All Dates</option>
+                            <option value="today">Today</option>
+                            <option value="last2">Last 2 Days</option>
+                            <option value="last3">Last 3 Days</option>
+                            <option value="last7">Last 7 Days</option>
+                            <option value="last14">Last 14 Days</option>
+                            <option value="last30">Last 30 Days</option>
+                        </select>
+                        <button onclick="applyFilters()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs sm:text-sm">
+                            Search
+                        </button>
+                        <button onclick="generatePDFReport()" id="pdfReportBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs sm:text-sm flex items-center gap-1" title="Generate PDF report for current search/filter">
+                            📄 PDF Report
+                        </button>
+                        <button onclick="refreshData()" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs sm:text-sm">
+                            ↻
+                        </button>
+                    </div>
+                </div>
+                <!-- Search Results Summary -->
+                <div id="searchSummary" class="hidden mb-3 p-2 bg-purple-50 border border-purple-200 rounded-lg text-sm">
+                    <span class="font-semibold text-purple-700">Search Results:</span>
+                    <span id="searchSummaryText" class="text-purple-600"></span>
+                    <button onclick="clearSearch()" class="ml-2 text-purple-500 hover:text-purple-700 underline text-xs">Clear Search</button>
+                </div>
+                <div class="log-container rounded p-4" id="logContainer">
+                    <div class="text-center text-gray-500 py-8">Loading logs...</div>
+                </div>
+            </div>
+
+            <!-- Top Stations -->
+            <div class="bg-gray-50 rounded-lg p-6 border border-gray-200 shadow-sm">
+                <h2 class="text-xl font-bold text-gray-900 mb-4">Most Active Stations</h2>
+                <div id="topStationsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Populated dynamically -->
+                    <div class="col-span-3 text-center text-gray-500 py-8">Loading station data...</div>
+                </div>
+            </div>
+
+            <!-- MHeard Stations Card -->
+            <div class="mt-6 sm:mt-10">
+                <div class="bg-gradient-to-br from-emerald-50 to-teal-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-emerald-200 shadow-lg">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
+                        <div class="text-emerald-700 text-xs sm:text-sm font-bold uppercase">📻 Latest MHeard Stations</div>
+                        <div class="flex gap-2 items-center">
+                            <span id="mheardStatus" class="text-xs text-gray-500">Loading...</span>
+                            <button onclick="loadMHeardData()" class="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-colors">↻ Refresh</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Port Tabs -->
+                    <div class="flex flex-wrap gap-1 mb-3 border-b border-emerald-200 pb-2">
+                        <button onclick="showMHeardPort(1)" id="mhPortBtn1" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-emerald-500 text-white">Telnet Server</button>
+                        <button onclick="showMHeardPort(2)" id="mhPortBtn2" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300">Internet</button>
+                        <button onclick="showMHeardPort(3)" id="mhPortBtn3" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300">VARA HF</button>
+                        <button onclick="showMHeardPort(4)" id="mhPortBtn4" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300">ARDOP</button>
+                    </div>
+                    
+                    <!-- Port Content Areas -->
+                    <div id="mheardPort1" class="mheard-port-content">
+                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
+                            <table class="w-full text-xs">
+                                <thead class="bg-emerald-100 sticky top-0">
+                                    <tr>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
+                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
+                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mheardList1" class="divide-y divide-emerald-100">
+                                    <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="mheardPort2" class="mheard-port-content hidden">
+                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
+                            <table class="w-full text-xs">
+                                <thead class="bg-emerald-100 sticky top-0">
+                                    <tr>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
+                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
+                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mheardList2" class="divide-y divide-emerald-100">
+                                    <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="mheardPort3" class="mheard-port-content hidden">
+                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
+                            <table class="w-full text-xs">
+                                <thead class="bg-emerald-100 sticky top-0">
+                                    <tr>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
+                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
+                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Grid</th>
+                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Freq (MHz)</th>
+                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mheardList3" class="divide-y divide-emerald-100">
+                                    <tr><td colspan="6" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="mheardPort4" class="mheard-port-content hidden">
+                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
+                            <table class="w-full text-xs">
+                                <thead class="bg-emerald-100 sticky top-0">
+                                    <tr>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
+                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
+                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
+                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Grid</th>
+                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Freq (MHz)</th>
+                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mheardList4" class="divide-y divide-emerald-100">
+                                    <tr><td colspan="6" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Port Statistics -->
+                    <div class="mt-3 pt-3 border-t border-emerald-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div class="text-center">
+                            <span class="text-emerald-600 font-bold" id="mhCount1">0</span>
+                            <span class="text-gray-500"> Telnet</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-emerald-600 font-bold" id="mhCount2">0</span>
+                            <span class="text-gray-500"> Internet</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-emerald-600 font-bold" id="mhCount3">0</span>
+                            <span class="text-gray-500"> VARA HF</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-emerald-600 font-bold" id="mhCount4">0</span>
+                            <span class="text-gray-500"> ARDOP</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Known Stations Routing Card -->
+            <div class="mt-6 sm:mt-10">
+                <div class="bg-gradient-to-br from-sky-50 to-blue-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-sky-200 shadow-lg">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
+                        <div class="text-sky-700 text-xs sm:text-sm font-bold uppercase">🗺️ Known Stations Routing Table</div>
+                        <div class="flex gap-2 items-center">
+                            <span id="rtKnownStatus" class="text-xs text-gray-500">Loading...</span>
+                            <button onclick="loadRTKnownData()" class="px-2 py-1 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded transition-colors">↻ Refresh</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Search and Filter -->
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <input type="text" id="rtKnownSearch" placeholder="Search callsign..." 
+                               onkeyup="filterRTKnown()" 
+                               class="flex-1 min-w-[150px] px-3 py-1 text-xs border border-sky-200 rounded focus:outline-none focus:border-sky-400">
+                        <select id="rtKnownFilter" onchange="filterRTKnown()" class="px-2 py-1 text-xs border border-sky-200 rounded focus:outline-none focus:border-sky-400">
+                            <option value="all">All Stations</option>
+                            <option value="24h">Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                            <option value="stale">Stale (30+ days)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Stations Table -->
+                    <div class="overflow-x-auto custom-scrollbar" style="max-height: 350px;">
+                        <table class="w-full text-xs">
+                            <thead class="bg-sky-100 sticky top-0">
+                                <tr>
+                                    <th class="px-2 py-1 text-left font-semibold text-sky-800 cursor-pointer hover:bg-sky-200" onclick="sortRTKnown('callsign')">
+                                        Callsign <span id="rtSortCall" class="text-sky-400">▼</span>
+                                    </th>
+                                    <th class="px-2 py-1 text-left font-semibold text-sky-800 cursor-pointer hover:bg-sky-200" onclick="sortRTKnown('time')">
+                                        Last Seen (UTC) <span id="rtSortTime" class="text-sky-400"></span>
+                                    </th>
+                                    <th class="px-2 py-1 text-center font-semibold text-sky-800">Age</th>
+                                    <th class="px-2 py-1 text-center font-semibold text-sky-800">Region</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rtKnownList" class="divide-y divide-sky-100">
+                                <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Statistics -->
+                    <div class="mt-3 pt-3 border-t border-sky-200 grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                        <div class="text-center">
+                            <span class="text-sky-600 font-bold" id="rtTotalCount">0</span>
+                            <span class="text-gray-500"> Total</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-green-600 font-bold" id="rtRecentCount">0</span>
+                            <span class="text-gray-500"> &lt;24h</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-yellow-600 font-bold" id="rtWeekCount">0</span>
+                            <span class="text-gray-500"> &lt;7d</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-orange-600 font-bold" id="rtMonthCount">0</span>
+                            <span class="text-gray-500"> &lt;30d</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-gray-500 font-bold" id="rtStaleCount">0</span>
+                            <span class="text-gray-500"> Stale</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================================
+        // CONFIGURATION
+        // ===================================
+        
+        // Data loading mode: 'live' or 'embedded'
+        const DATA_MODE = 'live';  // Set to 'live' to read from server, 'embedded' to use sample data
+        
+        // Live server configuration
+        const LOG_FILE_BASE_URL = './logs/';  // Base URL for BPQ log files
+        const RMS_LOG_BASE_URL = '/logs/';  // CMSAccess logs — served via nginx /logs/ location block
+        
+        // BBS log file format: log_YYMMDD_BBS.txt
+        // Set to your specific file, e.g., 'log_260102_BBS.txt'
+        // Leave EMPTY to auto-load all available log files from the past 30 days
+        const BBS_LOG_FILE = '';  // Empty = load all files, or specify single file like 'log_260102_BBS.txt'
+        
+        // Generate log file list for past 3 years (log_YYMMDD_BBS.txt format)
+        const LOG_FILES = [];
+        
+        // Time range selection (in days)
+        let selectedDays = 7;  // Default to 7 days
+        
+        // RMS/CMS Access logs storage
+        let rmsLogs = [];  // Raw logs with date info: { date: Date, lines: [] }
+        let rmsStats = { connections: 0, stations: {} };
+        
+        function generateLogFileList() {
+            const files = [];
+            
+            // Use UTC dates since BPQ32 rotates logs at 00:00 UTC
+            const now = new Date();
+            const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const oneYearAgo = new Date(todayUTC);
+            oneYearAgo.setUTCDate(todayUTC.getUTCDate() - 365);  // Past 365 days (1 year)
+            
+            // Generate daily log files for past year using UTC dates
+            for (let d = new Date(oneYearAgo); d <= todayUTC; d.setUTCDate(d.getUTCDate() + 1)) {
+                const yy = String(d.getUTCFullYear()).substring(2);  // Last 2 digits of year
+                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const dd = String(d.getUTCDate()).padStart(2, '0');
+                const filename = `log_${yy}${mm}${dd}_BBS.txt`;  // log_250105_BBS.txt
+                files.push(filename);
+            }
+            
+            return files;
+        }
+        
+        // Generate CMSAccess log file list (CMSAccess_YYYYMMDD.log format)
+        function generateRMSLogFileList() {
+            const files = [];
+            const now = new Date();
+            const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const daysBack = new Date(todayUTC);
+            daysBack.setUTCDate(todayUTC.getUTCDate() - 35);  // Past 35 days (covers 30-day max range + buffer)
+            
+            for (let d = new Date(daysBack); d <= todayUTC; d.setUTCDate(d.getUTCDate() + 1)) {
+                const yyyy = String(d.getUTCFullYear());
+                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const dd = String(d.getUTCDate()).padStart(2, '0');
+                const filename = `CMSAccess_${yyyy}${mm}${dd}.log`;
+                files.push({ filename, date: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())) });
+            }
+            return files;
+        }
+        
+        // Generate TCP log file list (log_YYMMDD_TCP.txt format)
+        function generateTCPLogFileList() {
+            const files = [];
+            const now = new Date();
+            const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            const daysBack = new Date(todayUTC);
+            daysBack.setUTCDate(todayUTC.getUTCDate() - 35);  // Past 35 days (covers 30-day max range + buffer)
+            
+            for (let d = new Date(daysBack); d <= todayUTC; d.setUTCDate(d.getUTCDate() + 1)) {
+                const yy = String(d.getUTCFullYear()).substring(2);
+                const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const dd = String(d.getUTCDate()).padStart(2, '0');
+                const filename = `log_${yy}${mm}${dd}_TCP.txt`;
+                files.push(filename);
+            }
+            return files;
+        }
+        
+        // TCP logs storage
+        let tcpLogs = [];
+        let tcpStats = { sessions: 0, pop3: 0, smtp: 0, nntp: 0, authFail: 0 };
+        
+        // Internet-connected stations tracking
+        let internetStations = {};  // { callsign: { lastConnect: Date, count: number } }
+        
+        // RTT data from nodesrtt.txt
+        let nodesRTT = {};  // { callsign: { rtt: number, frames: number } }
+        
+        // Or manually specify log files:
+        // const LOG_FILES = [
+        //     'log_250105_BBS.txt',   // January 5, 2025
+        //     'log_250104_BBS.txt',   // January 4, 2025
+        //     'log_250103_BBS.txt',   // January 3, 2025
+        //     // ... add your files ...
+        // ];
+        
+        
+        // Maximum number of log entries to LOAD for statistics
+        const MAX_LOG_ENTRIES_TO_LOAD = 100000;  // Load up to 100,000 entries for accurate stats
+        
+        // Maximum number of log entries to DISPLAY in viewer
+        const MAX_LOG_ENTRIES_TO_DISPLAY = 10000;  // Display last 10,000 entries in viewer (increased from 2000)
+        
+        // Auto-refresh interval (milliseconds)
+        const AUTO_REFRESH_INTERVAL = 300000;  // 5 minutes
+        
+        // ===================================
+        // DATA LOADING AND PARSING
+        // ===================================
+        
+        let allLogs = [];  // All loaded logs (for filtering)
+        let allLogsComplete = [];  // Complete set before any trimming (for stats)
+        let currentEventFilter = 'all';
+        let currentDateFilter = 'all';
+        let currentCallsignSearch = '';
+        
+        let recentErrors = [];  // Store recent error lines for display
+        
+        let stats = {
+            totalEvents: 0,
+            connections: 0,
+            messages: 0,
+            messagesForwarded: 0,  // Messages forwarded (outgoing)
+            messagesReceived: 0,   // Messages received (incoming)
+            messagesRejected: 0,
+            errors: 0,
+            rfFailures: 0,  // RF connection failures (Port in use)
+            nodeDisappeared: 0,  // Node disappeared errors
+            protocolErrors: 0,  // Protocol errors
+            otherErrors: 0,  // Other errors
+            timeoutErrors: 0,  // Timeout errors
+            connectFailures: 0,  // Connection failures
+            varaBitRates: [],  // Array to store VARA BitRate values
+            avgVaraBitRate: 0,  // Average VARA BitRate
+            topStations: {},
+            stationDetails: {}
+        };
+        
+        let allDates = [];  // Store all unique dates before trimming
+        
+        async function loadSystemLogs() {
+            allLogs = [];
+            
+            try {
+                if (DATA_MODE === 'live') {
+                    let filesLoaded = 0;
+                    let totalLines = 0;
+                    let filesAttempted = 0;
+                    let filesMissing = 0;
+                    
+                    // Try loading single BBS log file first (if specified)
+                    if (BBS_LOG_FILE && BBS_LOG_FILE.length > 0) {
+                        try {
+                            const url = LOG_FILE_BASE_URL + BBS_LOG_FILE + '?t=' + new Date().getTime();
+                            const response = await fetch(url);
+                            
+                            if (response.ok) {
+                                const content = await response.text();
+                                const lines = content.trim().split('\n').filter(line => line.trim().length > 0);
+                                
+                                allLogs.push(...lines);
+                                totalLines = lines.length;
+                                filesLoaded = 1;
+                                
+                            } else {
+                            }
+                        } catch (err) {
+                        }
+                    }
+                    
+                    // If main file not loaded, try daily log files (log_YYMMDD_BBS.txt)
+                    if (filesLoaded === 0) {
+                        const filesToLoad = LOG_FILES.length > 0 ? LOG_FILES : generateLogFileList();
+                        
+                        // OPTIMIZED: Load files in parallel batches (10 at a time)
+                        const BATCH_SIZE = 10;
+                        const reversedFiles = filesToLoad.slice().reverse(); // Most recent first
+                        
+                        for (let i = 0; i < reversedFiles.length && filesLoaded < 365 && totalLines < MAX_LOG_ENTRIES_TO_LOAD; i += BATCH_SIZE) {
+                            const batch = reversedFiles.slice(i, i + BATCH_SIZE);
+                            
+                            // Fetch all files in batch simultaneously
+                            const batchPromises = batch.map(async (filename) => {
+                                filesAttempted++;
+                                try {
+                                    const url = LOG_FILE_BASE_URL + filename + '?t=' + Date.now();
+                                    const response = await fetch(url);
+                                    if (response.ok) {
+                                        const content = await response.text();
+                                        const lines = content.trim().split('\n').filter(line => line.trim().length > 0);
+                                        if (lines.length > 0) {
+                                            return { filename, lines };
+                                        }
+                                    }
+                                } catch (err) { }
+                                filesMissing++;
+                                return null;
+                            });
+                            
+                            const batchResults = await Promise.all(batchPromises);
+                            
+                            // Process successful results
+                            for (const result of batchResults) {
+                                if (result && totalLines < MAX_LOG_ENTRIES_TO_LOAD) {
+                                    allLogs.push(...result.lines);
+                                    totalLines += result.lines.length;
+                                    filesLoaded++;
+                                }
+                            }
+                            
+                            // Progress update
+                            updateStatus('loading', `Loading logs... ${filesLoaded} files, ${totalLines.toLocaleString()} entries`);
+                        }
+                        
+                        
+                        if (filesLoaded > 0) {
+                        }
+                    }
+                    
+                    if (filesLoaded === 0) {
+                        console.warn('⚠️  No log files found on server!');
+                        console.warn('Expected format: log_YYMMDD_BBS.txt (e.g., log_250106_BBS.txt)');
+                        console.warn('Check that files exist in:', LOG_FILE_BASE_URL);
+                        console.warn('Check BBS_LOG_FILE setting:', BBS_LOG_FILE);
+                        console.warn('Falling back to embedded sample data...');
+                        updateStatus('error', `No log files found`);
+                        
+                        // Show warning panel
+                        const now = new Date();
+                        const yy = String(now.getUTCFullYear()).slice(-2);
+                        const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+                        const dd = String(now.getUTCDate()).padStart(2, '0');
+                        
+                        const warningDiv = document.getElementById('noDataWarning');
+                        warningDiv.innerHTML = 
+                            '<div class="text-amber-500 text-2xl mb-2">⚠️</div>' +
+                            '<div class="text-gray-600 font-semibold mb-2">No BBS Log Files Found</div>' +
+                            '<div class="text-gray-400 text-xs leading-relaxed">' +
+                            'This page requires BPQ32 daily BBS log files to display system activity.<br><br>' +
+                            '<span class="text-gray-500 font-semibold">Required files:</span><br>' +
+                            '<span class="font-mono font-semibold text-purple-600">log_YYMMDD_BBS.txt</span> — BBS activity logs<br>' +
+                            '<span class="font-mono font-semibold text-purple-600">MHSave.txt</span> — MHeard stations (optional)<br>' +
+                            '<span class="font-mono font-semibold text-purple-600">RTKnown.txt</span> — Routing table (optional)<br><br>' +
+                            '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br>' +
+                            '<span class="text-gray-500 font-semibold">Example:</span> <span class="font-mono text-gray-500">logs/log_' + yy + mm + dd + '_BBS.txt</span><br><br>' +
+                            'BPQ32 generates these files daily.<br>' +
+                            'Ensure they are being synced to the dashboard <span class="font-mono font-semibold">logs/</span> folder.' +
+                            '</div>';
+                        warningDiv.classList.remove('hidden');
+                        
+                        allLogs = sampleLogs.trim().split('\n').filter(line => line.trim().length > 0);
+                    } else {
+                        // Hide warning if files were found
+                        document.getElementById('noDataWarning').classList.add('hidden');
+                    }
+                    
+                } else {
+                    // Use embedded sample data
+                    allLogs = sampleLogs.trim().split('\n').filter(line => line.trim().length > 0);
+                }
+                
+                // Sort all logs chronologically (oldest to newest)
+                
+                allLogs.sort((a, b) => {
+                    // Extract timestamp from log format: YYMMDD HH:MM:SS
+                    const extractTimestamp = (line) => {
+                        const match = line.match(/^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})/);
+                        if (match) {
+                            const [, yymmdd, hh, mm, ss] = match;
+                            // Convert YYMMDD to sortable number
+                            // Add time for sub-day sorting
+                            return parseInt(yymmdd + hh + mm + ss);
+                        }
+                        return 0;
+                    };
+                    
+                    return extractTimestamp(a) - extractTimestamp(b);
+                });
+                
+                
+                if (allLogs.length > 0) {
+                    const firstLog = allLogs[0].substring(0, 17);
+                    const lastLog = allLogs[allLogs.length - 1].substring(0, 17);
+                }
+                
+                // Store ACTUAL total count
+                const actualTotalEvents = allLogs.length;
+                
+                // Parse all logs for accurate statistics
+                parseLogStats();
+                
+                // Load Nodes RTT data
+                await loadNodesRTT();
+                
+                // Update Internet Stations card
+                updateInternetStationsCard();
+                
+                // Load RMS/CMS Access logs
+                await loadRMSLogs();
+                
+                // Load TCP Service logs
+                await loadTCPLogs();
+                
+                // DON'T trim allLogs here - let displayLogs() handle trimming after filtering
+                
+                // Display logs in viewer (will apply filters and trim)
+                displayLogs();
+                
+                const statusMsg = actualTotalEvents === 0 ? 
+                    'No log data available' : 
+                    `Loaded ${actualTotalEvents.toLocaleString()} log entries (${DATA_MODE} mode)`;
+                updateStatus(actualTotalEvents === 0 ? 'error' : 'success', statusMsg);
+                
+            } catch (error) {
+                console.error('Error loading logs:', error);
+                updateStatus('error', error.message);
+            }
+        }
+        
+        // Load and parse RMS/CMS Access logs
+        async function loadRMSLogs() {
+            rmsLogs = [];
+            rmsStats = { connections: 0, stations: {}, bytesSent: 0, bytesReceived: 0 };
+            
+            const rmsFiles = generateRMSLogFileList();
+            
+            // OPTIMIZED: Fetch all files in parallel
+            const fetchPromises = rmsFiles.map(async (fileInfo) => {
+                try {
+                    const url = RMS_LOG_BASE_URL + fileInfo.filename + '?t=' + Date.now();
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const content = await response.text();
+                        const lines = content.trim().split('\n').filter(line => line.trim().length > 0);
+                        return { date: fileInfo.date, lines };
+                    }
+                } catch (err) { }
+                return null;
+            });
+            
+            const results = await Promise.all(fetchPromises);
+            let filesLoaded = 0;
+            
+            for (const result of results) {
+                if (result && result.lines.length > 0) {
+                    rmsLogs.push(result);
+                    filesLoaded++;
+                }
+            }
+            
+            if (filesLoaded === 0) {
+                console.warn('⚠️ No CMSAccess log files found!');
+                console.warn('Expected format: CMSAccess_YYYYMMDD.log (e.g., CMSAccess_20260108.log)');
+                console.warn('Make sure CMSAccess logs are in:', RMS_LOG_BASE_URL);
+            }
+            
+            // Parse RMS logs (will be filtered by selectedDays)
+            parseRMSLogs();
+            updateRMSCard();
+        }
+        
+        function parseRMSLogs() {
+            rmsStats = { connections: 0, stations: {}, bytesSent: 0, bytesReceived: 0, loginFailed: 0 };
+            
+            // Calculate cutoff date based on selectedDays.
+            // Subtract (selectedDays - 1) so "1D" = today only, "7D" = last 7 days, "30D" = last 30 days.
+            // Files are UTC-midnight-dated so this gives the correct inclusive range.
+            const now = new Date();
+            const cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            cutoffDate.setUTCDate(cutoffDate.getUTCDate() - selectedDays);
+            
+            
+            let totalLines = 0;
+            
+            // Parse CMSAccess log format, filtering by date
+            console.log(`RMS parse: selectedDays=${selectedDays}, cutoffDate=${cutoffDate.toISOString()}, rmsLogs count=${rmsLogs.length}`);
+            let includedFiles = 0;
+            for (const logFile of rmsLogs) {
+                // Skip files outside the selected date range
+                if (logFile.date <= cutoffDate) {
+                    console.log(`RMS SKIP: file date=${logFile.date.toISOString()} <= cutoff=${cutoffDate.toISOString()}`);
+                    continue;
+                }
+                console.log(`RMS INCLUDE: file date=${logFile.date.toISOString()}, lines=${logFile.lines.length}`);
+                includedFiles++;
+                
+                for (const line of logFile.lines) {
+                    totalLines++;
+                    
+                    // Match "Connected to CMS" lines: "00:28:09 10 K1AJD-7 Connected to CMS"
+                    const connMatch = line.match(/^\d{2}:\d{2}:\d{2}\s+\d+\s+([A-Z0-9-]+)\s+Connected to CMS/i);
+                    if (connMatch) {
+                        const callsign = connMatch[1].replace(/-\d+$/, '');  // Remove SSID
+                        rmsStats.connections++;
+                        if (!rmsStats.stations[callsign]) {
+                            rmsStats.stations[callsign] = { connections: 0, bytesSent: 0, bytesReceived: 0 };
+                        }
+                        rmsStats.stations[callsign].connections++;
+                    }
+                    
+                    // Match "Disconnected" lines for bytes: "Disconnected. Bytes Sent = 95 Bytes Received 54 Time 1 Seconds"
+                    const bytesMatch = line.match(/Disconnected\.\s+Bytes Sent = (\d+)\s+Bytes Received (\d+)/i);
+                    if (bytesMatch) {
+                        rmsStats.bytesSent += parseInt(bytesMatch[1]);
+                        rmsStats.bytesReceived += parseInt(bytesMatch[2]);
+                    }
+                    
+                    // Match login failures
+                    if (line.includes('Login failed')) {
+                        rmsStats.loginFailed++;
+                    }
+                }
+            }
+            
+            if (rmsStats.loginFailed > 0) {
+            }
+        }
+        
+        function updateRMSCard() {
+            document.getElementById('rmsConnections').textContent = rmsStats.connections;
+            
+            // Format bytes
+            const formatBytes = (bytes) => {
+                if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+                if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                return bytes + ' B';
+            };
+            
+            document.getElementById('rmsBytesSent').textContent = formatBytes(rmsStats.bytesSent);
+            document.getElementById('rmsBytesRecv').textContent = formatBytes(rmsStats.bytesReceived);
+            
+            // Show login failures if any
+            const loginFailEl = document.getElementById('rmsLoginFailed');
+            if (rmsStats.loginFailed > 0) {
+                loginFailEl.classList.remove('hidden');
+                loginFailEl.querySelector('span:last-child').textContent = rmsStats.loginFailed;
+            } else {
+                loginFailEl.classList.add('hidden');
+            }
+            
+            const stationsList = document.getElementById('rmsStationsList');
+            const sortedStations = Object.entries(rmsStats.stations)
+                .sort((a, b) => b[1].connections - a[1].connections);
+            
+            if (sortedStations.length > 0) {
+                stationsList.innerHTML = sortedStations.map(([call, data]) => 
+                    `<div class="flex justify-between py-0.5">
+                        <span class="font-semibold text-cyan-700">${call}</span>
+                        <span class="text-gray-600">${data.connections}</span>
+                    </div>`
+                ).join('');
+            } else {
+                stationsList.innerHTML = '<div class="text-gray-400 text-center">No RMS data</div>';
+            }
+        }
+        
+        // Load and parse TCP logs
+        async function loadTCPLogs() {
+            tcpLogs = [];
+            tcpStats = { sessions: 0, pop3: 0, smtp: 0, nntp: 0, authFail: 0 };
+            
+            const tcpFiles = generateTCPLogFileList();
+            
+            // OPTIMIZED: Fetch all files in parallel
+            const fetchPromises = tcpFiles.map(async (filename) => {
+                try {
+                    const url = LOG_FILE_BASE_URL + filename + '?t=' + Date.now();
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const content = await response.text();
+                        return content.trim().split('\n').filter(line => line.trim().length > 0);
+                    }
+                } catch (err) { }
+                return null;
+            });
+            
+            const results = await Promise.all(fetchPromises);
+            let filesLoaded = 0;
+            
+            for (const lines of results) {
+                if (lines && lines.length > 0) {
+                    tcpLogs = tcpLogs.concat(lines);
+                    filesLoaded++;
+                }
+            }
+            
+            
+            // Parse TCP logs
+            parseTCPLogs();
+            updateTCPCard();
+        }
+        
+        function parseTCPLogs() {
+            tcpStats = { sessions: 0, pop3: 0, smtp: 0, nntp: 0, authFail: 0 };
+            
+            // Calculate cutoff date based on selectedDays (use UTC since BPQ logs are UTC)
+            const now = new Date();
+            const cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            cutoffDate.setUTCDate(cutoffDate.getUTCDate() - selectedDays);
+            
+            // Convert cutoff to YYMMDD format for direct string comparison
+            const cutoffYY = String(cutoffDate.getUTCFullYear()).substring(2);
+            const cutoffMM = String(cutoffDate.getUTCMonth() + 1).padStart(2, '0');
+            const cutoffDD = String(cutoffDate.getUTCDate()).padStart(2, '0');
+            const cutoffYYMMDD = cutoffYY + cutoffMM + cutoffDD;
+            
+            for (const line of tcpLogs) {
+                // Filter by date - TCP logs also start with YYMMDD
+                const dateMatch = line.match(/^(\d{6})/);
+                if (dateMatch) {
+                    const yymmdd = dateMatch[1];
+                    if (yymmdd < cutoffYYMMDD) {
+                        continue; // Skip logs older than cutoff
+                    }
+                }
+                
+                // Match incoming POP3 connections
+                if (line.includes('Incoming POP3 Connect')) {
+                    tcpStats.pop3++;
+                    tcpStats.sessions++;
+                }
+                
+                // Match incoming SMTP connections
+                if (line.includes('Incoming SMTP Connect')) {
+                    tcpStats.smtp++;
+                    tcpStats.sessions++;
+                }
+                
+                // Match incoming NNTP connections
+                if (line.includes('Incoming NNTP Connect')) {
+                    tcpStats.nntp++;
+                    tcpStats.sessions++;
+                }
+                
+                // Match authentication failures (530 Authentication required or -ERR Authentication failed)
+                if (line.includes('530 Authentication required') || line.includes('Authentication failed')) {
+                    tcpStats.authFail++;
+                }
+            }
+            
+        }
+        
+        function updateTCPCard() {
+            document.getElementById('tcpSessions').textContent = tcpStats.sessions;
+            document.getElementById('tcpPOP3').textContent = tcpStats.pop3;
+            document.getElementById('tcpSMTP').textContent = tcpStats.smtp;
+            document.getElementById('tcpNNTP').textContent = tcpStats.nntp;
+            document.getElementById('tcpAuthFail').textContent = tcpStats.authFail;
+        }
+        
+        // Load and parse nodesrtt.txt for RTT data
+        async function loadNodesRTT() {
+            nodesRTT = {};
+            
+            try {
+                const response = await fetch('./logs/nodesrtt.txt');
+                if (!response.ok) {
+                    return;
+                }
+                
+                const content = await response.text();
+                const lines = content.replace(/\r/g, '').split('\n');
+                
+                // Parse RTT data - format: "CALLSIGN RTT=X.XX Frames = N B N"
+                // or "NODENAME:CALLSIGN RTT=X.XX Frames = N B N"
+                for (const line of lines) {
+                    const rttMatch = line.match(/^([A-Z0-9:/-]+)\s+RTT=([0-9.]+)\s+Frames\s*=\s*(\d+)/i);
+                    if (rttMatch) {
+                        let [, nodeCall, rtt, frames] = rttMatch;
+                        
+                        // Extract callsign from node:callsign format
+                        if (nodeCall.includes(':')) {
+                            nodeCall = nodeCall.split(':')[1];
+                        }
+                        
+                        // Remove SSID for matching
+                        const baseCall = nodeCall.replace(/-\d+$/, '');
+                        
+                        nodesRTT[baseCall] = {
+                            rtt: parseFloat(rtt),
+                            frames: parseInt(frames),
+                            fullCall: nodeCall
+                        };
+                    }
+                }
+                
+                
+            } catch (error) {
+            }
+        }
+        
+        function updateInternetStationsCard() {
+            const container = document.getElementById('internetStationsList');
+            
+            // Sort by last connection time (most recent first)
+            const sortedStations = Object.entries(internetStations)
+                .sort((a, b) => b[1].lastConnect - a[1].lastConnect);
+            
+            if (sortedStations.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 text-center py-2 col-span-full">No internet connections found</div>';
+                return;
+            }
+            
+            const hubHtml = sortedStations.map(([callsign, data]) => {
+                const now = new Date();
+                const diffMs = now - data.lastConnect;
+                const diffHours = diffMs / (1000 * 60 * 60);
+                const diffDays = diffHours / 24;
+                
+                // Format as date and time in UTC
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                const mon = months[data.lastConnect.getUTCMonth()];
+                const day = data.lastConnect.getUTCDate();
+                const hh = String(data.lastConnect.getUTCHours()).padStart(2, '0');
+                const mm = String(data.lastConnect.getUTCMinutes()).padStart(2, '0');
+                const timeStr = `${mon} ${day} ${hh}:${mm}Z`;
+                
+                // Status color based on recency
+                let statusClass;
+                if (diffHours < 24) {
+                    statusClass = 'bg-green-100 border-green-300 text-green-800';
+                } else if (diffDays < 7) {
+                    statusClass = 'bg-yellow-100 border-yellow-300 text-yellow-800';
+                } else {
+                    statusClass = 'bg-gray-100 border-gray-300 text-gray-600';
+                }
+                
+                // Get RTT data if available
+                const rttData = nodesRTT[callsign];
+                const rttStr = rttData ? `${rttData.rtt.toFixed(1)}ms` : '';
+                
+                return `
+                    <div class="p-2 rounded-lg border ${statusClass}">
+                        <div class="font-bold text-sm">${callsign}</div>
+                        <div class="text-xs">${timeStr}</div>
+                        <div class="flex items-center justify-between gap-1 mt-1">
+                            <span class="text-xs font-semibold">${data.count}x</span>
+                            ${rttStr ? `<span class="text-xs font-semibold text-blue-600">${rttStr}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = hubHtml;
+        }
+        
+        function parseLogStats() {
+            // Reset internet stations tracking
+            internetStations = {};
+            
+            stats = {
+                totalEvents: allLogs.length,
+                connections: 0,
+                messages: 0,
+                messagesForwarded: 0,
+                messagesReceived: 0,
+                messagesRejected: 0,
+                errors: 0,
+                rfFailures: 0,
+                nodeDisappeared: 0,
+                protocolErrors: 0,
+                otherErrors: 0,
+                timeoutErrors: 0,
+                connectFailures: 0,
+                varaBitRates: [],
+                avgVaraBitRate: 0,
+                topStations: {},
+                stationDetails: {}
+            };
+            
+            // Clear recent errors
+            recentErrors = [];
+            
+            // Calculate cutoff date based on selectedDays (use UTC midnight since BPQ logs are UTC)
+            const now = new Date();
+            const cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            cutoffDate.setUTCDate(cutoffDate.getUTCDate() - selectedDays);
+            
+            // Convert cutoff to YYMMDD format for direct string comparison
+            const cutoffYY = String(cutoffDate.getUTCFullYear()).substring(2);
+            const cutoffMM = String(cutoffDate.getUTCMonth() + 1).padStart(2, '0');
+            const cutoffDD = String(cutoffDate.getUTCDate()).padStart(2, '0');
+            const cutoffYYMMDD = cutoffYY + cutoffMM + cutoffDD;
+            
+            
+            // Extract all unique dates BEFORE trimming for display
+            const uniqueDates = new Set();
+            
+            // Filter logs by date range using simple string comparison (YYMMDD format)
+            const filteredLogs = allLogs.filter(line => {
+                const dateMatch = line.match(/^(\d{6})/);
+                if (dateMatch) {
+                    const yymmdd = dateMatch[1];
+                    // Direct string comparison works for YYMMDD format
+                    return yymmdd >= cutoffYYMMDD;
+                }
+                return false;
+            });
+            
+            
+            // Update total events to filtered count
+            stats.totalEvents = filteredLogs.length;
+            
+            filteredLogs.forEach(line => {
+                // Extract date from log line (YYMMDD at start)
+                const dateMatch = line.match(/^(\d{6})/);
+                if (dateMatch) {
+                    const yymmdd = dateMatch[1];
+                    const yy = yymmdd.substring(0, 2);
+                    const mm = yymmdd.substring(2, 4);
+                    const dd = yymmdd.substring(4, 6);
+                    
+                    // Convert YY to YYYY (handle 20XX properly)
+                    const yyyy = '20' + yy;
+                    const fullDate = yyyy + mm + dd;
+                    uniqueDates.add(fullDate);
+                }
+                
+                // Count successful outgoing connections only (*** CONNECTED)
+                // Don't count incoming connections
+                if (line.includes('*** CONNECTED')) {
+                    stats.connections++;
+                }
+                
+                // Count messages by message number (Msg XXXXX)
+                // Only count lines that have an actual message number
+                // Format: "Msg " followed by digits
+                const msgMatch = line.match(/Msg\s+(\d+)/i);
+                if (msgMatch) {
+                    const msgNumber = msgMatch[1];
+                    stats.messages++;
+                    
+                    // Debug: Log first 20 messages with their direction indicators
+                    if (stats.messages <= 20) {
+                        const gtIndex = line.indexOf('>');
+                        const ltIndex = line.indexOf('<');
+                    }
+                    
+                    // Determine if forwarded (outgoing) or received (incoming)
+                    // Method 1: Check for > or < symbols (traditional BBS format)
+                    // Method 2: Check for keywords regardless of ? | symbols
+                    
+                    let isForwarded = false;
+                    let isReceived = false;
+                    let detectionMethod = '';
+                    
+                    const lowerLine = line.toLowerCase();
+                    
+                    // Method 1: Symbol detection (traditional)
+                    if (line.includes('>')) {
+                        isForwarded = true;
+                        detectionMethod = 'symbol >';
+                    } else if (line.includes('<')) {
+                        isReceived = true;
+                        detectionMethod = 'symbol <';
+                    }
+                    // Method 2: Keyword detection (works with ? and | lines)
+                    else {
+                        // SPECIAL CASE: "Routing Trace To K1AJD" means RECEIVED (message coming TO us)
+                        if ((lowerLine.includes('routing trace to k1ajd') || 
+                             lowerLine.includes('trace to k1ajd') ||
+                             lowerLine.includes('routing to k1ajd'))) {
+                            isReceived = true;
+                            detectionMethod = 'routing TO K1AJD (received)';
+                            if (stats.messagesReceived < 5) {
+                            }
+                        }
+                        // Forwarded keywords - look for "to" direction indicators (but NOT to K1AJD)
+                        else if (lowerLine.includes('forwarding') || 
+                            lowerLine.includes('forward to') ||
+                            lowerLine.includes('routing to') ||
+                            lowerLine.includes('route to') ||
+                            lowerLine.includes('trace to') ||
+                            lowerLine.includes('sending to') ||
+                            lowerLine.includes('sent to') ||
+                            (lowerLine.includes(' to ') && (lowerLine.includes('via') || lowerLine.includes('routing')))) {
+                            isForwarded = true;
+                            detectionMethod = 'keyword TO/forwarding';
+                            
+                            // Debug which keyword matched
+                            if (stats.messagesForwarded < 5) {
+                            }
+                        }
+                        // Received keywords - look for "from" direction indicators
+                        else if (lowerLine.includes('received from') || 
+                                 (lowerLine.includes('from ') && lowerLine.includes('msg')) ||
+                                 lowerLine.includes('arrived from') ||
+                                 lowerLine.includes('incoming from')) {
+                            isReceived = true;
+                            detectionMethod = 'keyword FROM/received';
+                        }
+                    }
+                    
+                    if (isForwarded) {
+                        stats.messagesForwarded++;
+                        if (stats.messagesForwarded <= 20) {
+                        }
+                    } else if (isReceived) {
+                        stats.messagesReceived++;
+                        if (stats.messagesReceived <= 20) {
+                        }
+                    } else {
+                        if (stats.messages <= 20) {
+                        }
+                    }
+                    // Note: Lines with "?" or "|" are routing/info, but can still be classified by keywords
+                }
+                
+                // Count rejected messages (BID)
+                // Primary detection: "Rejected By Bid" or "Rejected by BID"
+                if (line.includes('Rejected By Bid') || 
+                    line.includes('Rejected by Bid') || 
+                    line.includes('Rejected By BID') || 
+                    line.includes('Rejected by BID') ||
+                    line.includes('rejected by bid') ||
+                    line.includes('REJECTED BY BID')) {
+                    stats.messagesRejected++;
+                    // Debug: Log first 10 rejections to verify pattern
+                    if (stats.messagesRejected <= 10) {
+                    }
+                }
+                
+                // Count errors and categorize them
+                if (line.includes('Error') || line.includes('error') || line.includes('ERROR') ||
+                    line.includes('Timeout') || line.includes('timeout') || line.includes('TIMEOUT') ||
+                    line.includes('Failed') || line.includes('failed') || line.includes('FAILED')) {
+                    stats.errors++;
+                    
+                    // Store recent errors (keep last 50)
+                    if (recentErrors.length >= 50) recentErrors.shift();
+                    recentErrors.push(line);
+                    
+                    // Categorize error types
+                    if (line.includes('Port in use') || line.includes('port in use') || 
+                        line.includes('PORT IN USE') || line.includes('Port In Use')) {
+                        stats.rfFailures++;
+                    } else if (line.includes('has disappeared') || line.includes('disappeared')) {
+                        stats.nodeDisappeared++;
+                    } else if (line.includes('Protocol Error') || line.includes('protocol error') ||
+                               line.includes('Invalid Binary') || line.includes('Invalid Block')) {
+                        stats.protocolErrors++;
+                    } else if (line.includes('Timeout') || line.includes('timeout') || line.includes('TIMEOUT') ||
+                               line.includes('timed out') || line.includes('Timed Out')) {
+                        stats.timeoutErrors++;
+                    } else if (line.includes('Connect Failed') || line.includes('connect failed') ||
+                               line.includes('Connection Failed') || line.includes('Failed to connect') ||
+                               line.includes('No response') || line.includes('Busy')) {
+                        stats.connectFailures++;
+                    } else {
+                        stats.otherErrors++;
+                        // Log other errors to help identify new categories
+                        if (stats.otherErrors <= 10) {
+                        }
+                    }
+                }
+                
+                // Extract VARA BitRate
+                // Specific format: "VARA} BITRATE (x)  88 bps" (note: can have multiple spaces)
+                // Where x is a mode number and 88 is the bitrate (can be 2, 3, or 4 digits)
+                if ((line.includes('VARA}') || line.includes('VARA)')) && 
+                    (line.toUpperCase().includes('BITRATE'))) {
+                    
+                    let bitRate = null;
+                    let detectionMethod = '';
+                    
+                    // Pattern 1: "VARA} BITRATE (x) 88 bps" (YOUR EXACT FORMAT!)
+                    // Most flexible: allows ANY whitespace between elements
+                    let match = line.match(/VARA[})]\s+BITRATE\s+\(\d+\)\s+(\d{1,5})\s+bps/i);
+                    if (match) {
+                        bitRate = parseInt(match[1]);
+                        detectionMethod = 'VARA} BITRATE (x) XX bps';
+                    }
+                    
+                    // Pattern 1b: Try without case sensitivity on 'bps'
+                    if (!bitRate) {
+                        match = line.match(/VARA[})]\s+BITRATE\s+\(\d+\)\s+(\d{1,5})\s+BPS/i);
+                        if (match) {
+                            bitRate = parseInt(match[1]);
+                            detectionMethod = 'VARA} BITRATE (x) XX BPS';
+                        }
+                    }
+                    
+                    // Pattern 2: "VARA} BITRATE (x) 88" without "bps"
+                    if (!bitRate) {
+                        match = line.match(/VARA[})]\s+BITRATE\s+\(\d+\)\s+(\d{1,5})/i);
+                        if (match) {
+                            bitRate = parseInt(match[1]);
+                            detectionMethod = 'VARA} BITRATE (x) XX';
+                        }
+                    }
+                    
+                    // Pattern 3: Just look for number followed by "bps" in VARA} BITRATE lines
+                    if (!bitRate) {
+                        match = line.match(/(\d{1,5})\s+bps/i);
+                        if (match) {
+                            bitRate = parseInt(match[1]);
+                            detectionMethod = 'XX bps';
+                        }
+                    }
+                    
+                    // Pattern 4: "BITRATE" followed by number (with parentheses and spaces)
+                    if (!bitRate) {
+                        match = line.match(/BITRATE\s+\(\d+\)\s+(\d{1,5})/i);
+                        if (match) {
+                            bitRate = parseInt(match[1]);
+                            detectionMethod = 'BITRATE (x) XX';
+                        }
+                    }
+                    
+                    // Validate and store
+                    // VARA bitrates can range from 18 bps (ultra-slow mode) to 100000+ bps (VARA FM)
+                    if (bitRate && bitRate >= 18 && bitRate <= 100000) {
+                        stats.varaBitRates.push(bitRate);
+                        // Debug: Log first 20 VARA BitRates
+                        if (stats.varaBitRates.length <= 20) {
+                        }
+                    } else if (stats.varaBitRates.length < 5) {
+                        // Debug: Show why this VARA} BITRATE line didn't work
+                        if (bitRate) {
+                        } else {
+                        }
+                    }
+                } else if ((line.includes('VARA}') || line.includes('VARA)')) && stats.varaBitRates.length < 3) {
+                    // Debug: Show VARA} lines without BITRATE (first 3 only)
+                }
+                
+                // Extract callsign and count events
+                const callsignMatch = line.match(/[|<>?]([A-Z0-9-]+)\s/);
+                if (callsignMatch) {
+                    const callsign = callsignMatch[1];
+                    
+                    // Count total events
+                    stats.topStations[callsign] = (stats.topStations[callsign] || 0) + 1;
+                    
+                    // Initialize detailed stats if needed
+                    if (!stats.stationDetails[callsign]) {
+                        stats.stationDetails[callsign] = {
+                            events: 0,
+                            connections: 0,
+                            messagesRx: 0,
+                            messagesTx: 0
+                        };
+                    }
+                    
+                    stats.stationDetails[callsign].events++;
+                    
+                    // Count successful connections for this station
+                    if (line.includes('*** CONNECTED')) {
+                        stats.stationDetails[callsign].connections++;
+                    }
+                    
+                    // Count messages - determine direction
+                    if (line.includes('Msg ')) {
+                        // Try to determine if message is incoming or outgoing
+                        // Format examples:
+                        // >CALLSIGN  Msg 1234 ... (outgoing)
+                        // <CALLSIGN  Msg 1234 ... (incoming)
+                        // ?CALLSIGN  Msg 1234 ... (routing/info)
+                        
+                        if (line.includes('>')) {
+                            stats.stationDetails[callsign].messagesTx++;
+                        } else if (line.includes('<') || line.includes('?')) {
+                            stats.stationDetails[callsign].messagesRx++;
+                        } else {
+                            // Default to Rx if direction unclear
+                            stats.stationDetails[callsign].messagesRx++;
+                        }
+                    }
+                }
+                
+                // Track Internet-connected stations (Incoming Connect without Freq = not RF)
+                const internetMatch = line.match(/^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+\|([A-Z0-9-]+)\s+Incoming Connect from ([A-Z0-9-]+)(?!.*Freq)/i);
+                if (internetMatch && !line.includes('Freq')) {
+                    const [, dateStr, hh, mm, ss, stationCall, fromCall] = internetMatch;
+                    const callsign = fromCall.replace(/-\d+$/, '');  // Remove SSID for grouping
+                    
+                    // Parse date
+                    const year = 2000 + parseInt(dateStr.substring(0, 2));
+                    const month = parseInt(dateStr.substring(2, 4)) - 1;
+                    const day = parseInt(dateStr.substring(4, 6));
+                    const connTime = new Date(year, month, day, parseInt(hh), parseInt(mm), parseInt(ss));
+                    
+                    if (!internetStations[callsign]) {
+                        internetStations[callsign] = { lastConnect: connTime, count: 0 };
+                    }
+                    internetStations[callsign].count++;
+                    if (connTime > internetStations[callsign].lastConnect) {
+                        internetStations[callsign].lastConnect = connTime;
+                    }
+                }
+            });
+            
+            // Calculate average VARA BitRate
+            if (stats.varaBitRates.length > 0) {
+                const sum = stats.varaBitRates.reduce((acc, rate) => acc + rate, 0);
+                stats.avgVaraBitRate = Math.round(sum / stats.varaBitRates.length);
+            } else {
+                stats.avgVaraBitRate = 0;
+            }
+            
+            
+            // Update stat cards - explicitly get elements and update
+            const totalConnEl = document.getElementById('totalConnections');
+            const totalMsgEl = document.getElementById('totalMessages');
+            const fwdEl = document.getElementById('messagesForwarded');
+            const rcvEl = document.getElementById('messagesReceived');
+            const rejEl = document.getElementById('rejectedMessages');
+            const errEl = document.getElementById('errorCount');
+            
+            if (totalConnEl) {
+                totalConnEl.textContent = stats.connections.toLocaleString();
+            } else {
+                console.error('Element totalConnections not found!');
+            }
+            
+            if (totalMsgEl) {
+                totalMsgEl.textContent = stats.messages.toLocaleString();
+            }
+            if (fwdEl) {
+                fwdEl.textContent = stats.messagesForwarded.toLocaleString();
+            }
+            if (rcvEl) {
+                rcvEl.textContent = stats.messagesReceived.toLocaleString();
+            }
+            if (rejEl) {
+                rejEl.textContent = stats.messagesRejected.toLocaleString();
+            }
+            if (errEl) {
+                errEl.textContent = stats.errors.toLocaleString();
+            }
+            
+            document.getElementById('rfFailures').textContent = stats.rfFailures.toLocaleString();
+            document.getElementById('nodeDisappeared').textContent = stats.nodeDisappeared.toLocaleString();
+            document.getElementById('protocolErrors').textContent = stats.protocolErrors.toLocaleString();
+            document.getElementById('otherErrors').textContent = stats.otherErrors.toLocaleString();
+            
+            // Update error details panel if it's visible
+            const errorPanel = document.getElementById('errorDetailsPanel');
+            if (errorPanel && !errorPanel.classList.contains('hidden')) {
+                updateErrorBreakdown();
+                updateRecentErrorsList();
+            }
+            
+            
+            // Log message statistics
+            
+            const unclassified = stats.messages - stats.messagesForwarded - stats.messagesReceived;
+            
+            if (stats.messages > 0) {
+                const forwardedPct = (stats.messagesForwarded / stats.messages * 100).toFixed(2);
+                const receivedPct = (stats.messagesReceived / stats.messages * 100).toFixed(2);
+                const rejectionRate = (stats.messagesRejected / stats.messages * 100).toFixed(2);
+                const unclassifiedPct = (unclassified / stats.messages * 100).toFixed(2);
+            } else {
+            }
+            
+            if (stats.messagesForwarded === 0 && stats.messagesReceived === 0 && stats.messages > 0) {
+            }
+            
+            // Log error statistics
+            if (stats.errors > 0) {
+                const rfFailureRate = (stats.rfFailures / stats.errors * 100).toFixed(2);
+            }
+            
+            // Log VARA BitRate statistics
+            if (stats.varaBitRates.length > 0) {
+                const minRate = Math.min(...stats.varaBitRates);
+                const maxRate = Math.max(...stats.varaBitRates);
+            } else {
+            }
+            
+            // Update active stations count
+            const stationCount = Object.keys(stats.topStations).length;
+            document.getElementById('activeStations').textContent = stationCount.toLocaleString();
+            
+            // Update date range to show the filtered range
+            if (filteredLogs.length > 0) {
+                // Extract dates from filtered logs (not allLogs)
+                const firstLog = filteredLogs[0];
+                const lastLog = filteredLogs[filteredLogs.length - 1];
+                
+                const firstDateMatch = firstLog.match(/^(\d{6})/);
+                const lastDateMatch = lastLog.match(/^(\d{6})/);
+                
+                if (firstDateMatch && lastDateMatch) {
+                    const formatDate = (yymmdd) => {
+                        const yy = yymmdd.substring(0, 2);
+                        const mm = yymmdd.substring(2, 4);
+                        const dd = yymmdd.substring(4, 6);
+                        return `${mm}/${dd}/20${yy}`;
+                    };
+                    
+                    const firstDate = formatDate(firstDateMatch[1]);
+                    const lastDate = formatDate(lastDateMatch[1]);
+                    
+                    let rangeText = firstDate === lastDate ? firstDate : `${firstDate} - ${lastDate}`;
+                    rangeText += ` (${selectedDays}D)`;
+                    document.getElementById('dateRange').textContent = rangeText;
+                } else {
+                    document.getElementById('dateRange').textContent = `Last ${selectedDays} days`;
+                }
+            } else {
+                document.getElementById('dateRange').textContent = `No data (${selectedDays}D)`;
+            }
+            
+            // Update top stations
+            const sortedStations = Object.entries(stats.topStations)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+            
+            
+            // Save all unique dates for date filter (before logs get trimmed for display)
+            allDates = Array.from(uniqueDates).sort().reverse();
+            if (allDates.length > 0) {
+                if (allDates.length <= 10) {
+                } else {
+                }
+            }
+            
+            // Display top stations
+            updateTopStations(sortedStations);
+            
+            // Update charts with actual data
+            updateHourlyActivityChart();
+            updateEventTypesChart();
+        }
+        
+        function updateEventTypesChart() {
+            
+            const eventCounts = {
+                connections: stats.connections,
+                messages: stats.messages,
+                errors: stats.errors
+            };
+            
+            
+            // Update the chart
+            if (window.eventTypesChart) {
+                window.eventTypesChart.data.datasets[0].data = [
+                    eventCounts.connections,
+                    eventCounts.messages,
+                    eventCounts.errors
+                ];
+                window.eventTypesChart.update();
+            } else {
+                console.warn('Event Types chart not initialized yet');
+            }
+            
+            // Update total display
+            const totalDisplay = document.getElementById('eventTotalDisplay');
+            if (totalDisplay) {
+                const totalTracked = stats.connections + stats.messages + stats.errors;
+                totalDisplay.textContent = `Tracked: ${totalTracked.toLocaleString()} events`;
+            }
+            
+            // Update legend
+            const legendConnections = document.getElementById('legend-connections');
+            const legendMessages = document.getElementById('legend-messages');
+            const legendErrors = document.getElementById('legend-errors');
+            
+            if (legendConnections) legendConnections.textContent = eventCounts.connections.toLocaleString();
+            if (legendMessages) legendMessages.textContent = eventCounts.messages.toLocaleString();
+            if (legendErrors) legendErrors.textContent = eventCounts.errors.toLocaleString();
+        }
+        
+        function updateHourlyActivityChart() {
+            // Calculate hourly stats from logs filtered by selectedDays (UTC hours 00-23)
+            const hourlyStats = {};
+            
+            // Initialize all 24 hours
+            for (let h = 0; h < 24; h++) {
+                const hourKey = String(h).padStart(2, '0');
+                hourlyStats[hourKey] = {
+                    connections: 0,
+                    messages: 0,
+                    events: 0
+                };
+            }
+            
+            // Calculate cutoff date based on selectedDays (use UTC)
+            const now = new Date();
+            const cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            cutoffDate.setUTCDate(cutoffDate.getUTCDate() - selectedDays);
+            const cutoffYY = String(cutoffDate.getUTCFullYear()).substring(2);
+            const cutoffMM = String(cutoffDate.getUTCMonth() + 1).padStart(2, '0');
+            const cutoffDD = String(cutoffDate.getUTCDate()).padStart(2, '0');
+            const cutoffYYMMDD = cutoffYY + cutoffMM + cutoffDD;
+            
+            allLogs.forEach(line => {
+                // Extract date and time (YYMMDD HH:MM:SS)
+                const match = line.match(/^(\d{6})\s+(\d{2}):\d{2}:\d{2}/);
+                if (match) {
+                    const yymmdd = match[1];
+                    const hour = match[2];
+                    
+                    // Filter by date range
+                    if (yymmdd < cutoffYYMMDD) return;
+                    
+                    if (hourlyStats[hour]) {
+                        hourlyStats[hour].events++;
+                        
+                        // Count successful connections only
+                        if (line.includes('*** CONNECTED')) {
+                            hourlyStats[hour].connections++;
+                        }
+                        
+                        // Count messages (only lines with Msg XXXXX)
+                        if (line.match(/Msg\s+\d+/i)) {
+                            hourlyStats[hour].messages++;
+                        }
+                    }
+                }
+            });
+            
+            // Prepare chart data - hours 00Z through 23Z
+            const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+            const labels = hours.map(h => h + 'Z');
+            const connectionsData = hours.map(h => hourlyStats[h].connections);
+            const messagesData = hours.map(h => hourlyStats[h].messages);
+            
+            // Update the chart
+            if (window.hourlyActivityChart) {
+                window.hourlyActivityChart.data.labels = labels;
+                window.hourlyActivityChart.data.datasets[0].data = connectionsData;
+                window.hourlyActivityChart.data.datasets[1].data = messagesData;
+                window.hourlyActivityChart.update();
+            } else {
+                console.warn('Hourly Activity chart not initialized yet');
+            }
+        }
+        
+        function updateTopStations(sortedStations) {
+            const container = document.getElementById('topStationsContainer');
+            
+            if (!container) {
+                console.error('Top stations container not found!');
+                return;
+            }
+            
+            if (!sortedStations || sortedStations.length === 0) {
+                container.innerHTML = '<div class="col-span-3 text-center text-gray-500 py-4">No station data available</div>';
+                return;
+            }
+            
+            // Colors for top 5 stations
+            const colors = [
+                { text: 'blue-600', bg: 'blue-100', border: 'blue-200' },
+                { text: 'green-600', bg: 'green-100', border: 'green-200' },
+                { text: 'purple-600', bg: 'purple-100', border: 'purple-200' },
+                { text: 'orange-600', bg: 'orange-100', border: 'orange-200' },
+                { text: 'pink-600', bg: 'pink-100', border: 'pink-200' }
+            ];
+            
+            container.innerHTML = '';
+            
+            sortedStations.forEach((station, index) => {
+                const [callsign, count] = station;
+                const color = colors[index] || colors[4];
+                const details = stats.stationDetails[callsign] || { 
+                    events: count, 
+                    connections: 0, 
+                    messagesRx: 0, 
+                    messagesTx: 0 
+                };
+                
+                const card = document.createElement('div');
+                card.className = `bg-white rounded-lg p-4 border-2 border-${color.border} hover:shadow-lg transition-shadow`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xl font-bold text-${color.text}">${callsign}</span>
+                        <span class="bg-${color.bg} text-${color.text} px-2 py-1 rounded text-xs font-semibold">
+                            #${index + 1}
+                        </span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Connections:</span>
+                            <span class="font-semibold text-gray-900">${details.connections.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between text-sm border-t border-gray-200 pt-2">
+                            <span class="text-gray-600">Messages Rx:</span>
+                            <span class="font-semibold text-green-700">${details.messagesRx.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Messages Tx:</span>
+                            <span class="font-semibold text-blue-700">${details.messagesTx.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between text-sm font-bold border-t border-gray-200 pt-2">
+                            <span class="text-gray-700">Total Messages:</span>
+                            <span class="text-gray-900">${(details.messagesRx + details.messagesTx).toLocaleString()}</span>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+            
+        }
+        
+        function displayLogs() {
+            const container = document.getElementById('logContainer');
+            
+            if (!container) {
+                console.error('Log container element not found!');
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            if (allLogs.length === 0) {
+                container.innerHTML = '<div class="log-entry text-gray-500">No log entries available. Logs will appear here when BPQ log files are loaded from the server.</div>';
+                return;
+            }
+            
+            // Filter logs based on current filters
+            let filteredLogs = allLogs.slice(); // Copy array
+            
+            // Apply date filter
+            if (currentDateFilter !== 'all') {
+                const now = new Date();
+                const todayStr = now.toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
+                
+                let daysBack = 0;
+                let specificDate = null;
+                
+                // Parse filter value
+                if (currentDateFilter === 'today') {
+                    daysBack = 0;
+                } else if (currentDateFilter === 'last2') {
+                    daysBack = 1;
+                } else if (currentDateFilter === 'last3') {
+                    daysBack = 2;
+                } else if (currentDateFilter === 'last7') {
+                    daysBack = 6;
+                } else if (currentDateFilter === 'last14') {
+                    daysBack = 13;
+                } else if (currentDateFilter === 'last30') {
+                    daysBack = 29;
+                } else if (currentDateFilter.match(/^\d{8}$/)) {
+                    // Specific date YYYYMMDD
+                    specificDate = currentDateFilter;
+                }
+                
+                if (specificDate) {
+                    // Filter to specific date
+                    filteredLogs = filteredLogs.filter(line => {
+                        const match = line.match(/^(\d{6})/);
+                        if (match) {
+                            const yymmdd = match[1];
+                            const fullDate = '20' + yymmdd.substring(0, 2) + yymmdd.substring(2, 4) + yymmdd.substring(4, 6);
+                            return fullDate === specificDate;
+                        }
+                        return false;
+                    });
+                } else {
+                    // Filter to date range
+                    const cutoffDate = new Date(now);
+                    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+                    cutoffDate.setHours(0, 0, 0, 0);
+                    
+                    filteredLogs = filteredLogs.filter(line => {
+                        const match = line.match(/^(\d{6})/);
+                        if (match) {
+                            const yymmdd = match[1];
+                            const yy = parseInt(yymmdd.substring(0, 2));
+                            const mm = parseInt(yymmdd.substring(2, 4)) - 1; // 0-indexed
+                            const dd = parseInt(yymmdd.substring(4, 6));
+                            const logDate = new Date(2000 + yy, mm, dd);
+                            return logDate >= cutoffDate;
+                        }
+                        return false;
+                    });
+                }
+            }
+            
+            // Apply event type filter
+            if (currentEventFilter !== 'all') {
+                filteredLogs = filteredLogs.filter(line => {
+                    switch (currentEventFilter) {
+                        case 'connect':
+                            return line.includes('CONNECTED') || line.includes('Connecting') || line.includes('Incoming Connect');
+                        case 'disconnect':
+                            return line.includes('Disconnected');
+                        case 'message':
+                            return line.match(/Msg\s+\d+/i);
+                        case 'error':
+                            return line.includes('Error') || line.includes('error') || line.includes('ERROR');
+                        default:
+                            return true;
+                    }
+                });
+            }
+            
+            // Apply callsign search filter
+            if (currentCallsignSearch && currentCallsignSearch.length > 0) {
+                const searchTerm = currentCallsignSearch.toUpperCase();
+                filteredLogs = filteredLogs.filter(line => line.toUpperCase().includes(searchTerm));
+            }
+            
+            // Update search summary
+            updateSearchSummary(filteredLogs.length);
+            
+            if (filteredLogs.length === 0) {
+                container.innerHTML = '<div class="log-entry text-gray-500">No log entries match the current filters.</div>';
+                return;
+            }
+            
+            // Determine if viewing a specific single day (YYYYMMDD format or 'today')
+            const isSingleDayView = currentDateFilter === 'today' || currentDateFilter.match(/^\d{8}$/);
+            
+            // NOW trim filtered logs for display (keep most recent)
+            // For single day view, show ALL entries for that day (no limit)
+            // For multi-day views, apply the display limit
+            let logsToDisplay = filteredLogs;
+            let isTruncated = false;
+            if (!isSingleDayView && filteredLogs.length > MAX_LOG_ENTRIES_TO_DISPLAY) {
+                logsToDisplay = filteredLogs.slice(-MAX_LOG_ENTRIES_TO_DISPLAY);
+                isTruncated = true;
+            }
+            
+            // Display most recent entries first (logs already sorted oldest to newest)
+            logsToDisplay = logsToDisplay.slice().reverse();  // Reverse to show newest first
+            
+            // Show count header
+            const countDiv = document.createElement('div');
+            countDiv.className = 'log-entry text-xs text-gray-500 bg-gray-100 p-2 mb-2 rounded sticky top-0';
+            let countText = `Showing ${logsToDisplay.length.toLocaleString()} entries`;
+            if (isTruncated) {
+                countText += ` (of ${filteredLogs.length.toLocaleString()} matching)`;
+            } else if (isSingleDayView) {
+                countText += ` (full day)`;
+            }
+            if (currentDateFilter !== 'all') {
+                let filterLabel = currentDateFilter;
+                if (currentDateFilter === 'today') {
+                    filterLabel = 'Today';
+                } else if (currentDateFilter.match(/^\d{8}$/)) {
+                    // Format YYYYMMDD as readable date
+                    const y = currentDateFilter.substring(0, 4);
+                    const m = parseInt(currentDateFilter.substring(4, 6));
+                    const d = parseInt(currentDateFilter.substring(6, 8));
+                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    filterLabel = `${months[m-1]} ${d}, ${y}`;
+                } else {
+                    filterLabel = currentDateFilter.replace('last', 'Last ');
+                }
+                countText += ` | Filter: ${filterLabel}`;
+            }
+            if (currentEventFilter !== 'all') {
+                countText += ` | Type: ${currentEventFilter}`;
+            }
+            countDiv.textContent = countText;
+            
+            // Build all log HTML in one pass, then set innerHTML once (avoids DOM thrashing)
+            const escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            const logHtml = logsToDisplay.map(line => {
+                if (!line || line.trim().length === 0) return '';
+                
+                let extraClass = '';
+                if (line.includes('CONNECTED')) {
+                    extraClass = ' log-connect';
+                } else if (line.includes('Disconnected')) {
+                    extraClass = ' log-disconnect';
+                } else if (line.includes('Msg ')) {
+                    extraClass = ' log-message';
+                } else if (line.includes('Error') || line.includes('error')) {
+                    extraClass = ' log-error';
+                }
+                
+                return `<div class="log-entry${extraClass}">${escapeHtml(line)}</div>`;
+            }).join('');
+            
+            container.innerHTML = countDiv.outerHTML + logHtml;
+            
+        }
+        
+        function updateStatus(type, message) {
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            
+            indicator.className = 'status-indicator';
+            if (type === 'success') {
+                indicator.classList.add('status-success');
+            } else if (type === 'error') {
+                indicator.classList.add('status-error');
+            } else {
+                indicator.classList.add('status-loading');
+            }
+            
+            text.textContent = message;
+            
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = 
+                `Last updated: ${now.toUTCString().slice(17, 25)} UTC`;
+        }
+        
+        function refreshData() {
+            updateStatus('loading', 'Refreshing logs...');
+            loadSystemLogs().then(() => {
+                populateDateFilter();
+                displayLogs();  // Make sure to refresh the log viewer
+            });
+        }
+        
+        // Set time range for RMS and other date-filtered stats
+        function setTimeRange(days) {
+            selectedDays = days;
+            
+            // Update button states
+            document.getElementById('range1d').className = days === 1 ? 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white' : 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700';
+            document.getElementById('range7d').className = days === 7 ? 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white' : 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700';
+            document.getElementById('range30d').className = days === 30 ? 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white' : 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700';
+            
+            // Re-parse main log stats with new date filter (updates BPQ Email Server stats, charts, etc.)
+            if (allLogs.length > 0) {
+                parseLogStats();
+            }
+            
+            // Re-parse RMS logs with new date filter
+            if (rmsLogs.length > 0) {
+                parseRMSLogs();
+                updateRMSCard();
+            }
+            
+            // Re-parse TCP logs with new date filter if needed
+            if (tcpLogs.length > 0) {
+                parseTCPLogs();
+                updateTCPCard();
+            }
+            
+            // Also update the charts
+            updateHourlyActivityChart();
+            updateEventTypesChart();
+        }
+        
+        // Track current UTC date for midnight rotation detection
+        let lastUTCDate = new Date().toISOString().split('T')[0];
+        
+        // Check if UTC date has changed (midnight rotation)
+        function checkMidnightRotation() {
+            const currentUTCDate = new Date().toISOString().split('T')[0];
+            if (currentUTCDate !== lastUTCDate) {
+                lastUTCDate = currentUTCDate;
+                return true;
+            }
+            return false;
+        }
+        
+        // Auto-refresh setup
+        function setupAutoRefresh() {
+            if (DATA_MODE === 'live') {
+                setInterval(async () => {
+                    // Check for UTC midnight - if date changed, regenerate log file list
+                    if (checkMidnightRotation()) {
+                        // Clear cached data for fresh load
+                        allLogs = [];
+                        allDates = [];
+                        rmsLogs = [];
+                        tcpLogs = [];
+                    }
+                    
+                    await loadSystemLogs();
+                    populateDateFilter();
+                    displayLogs();  // Refresh the log viewer
+                }, AUTO_REFRESH_INTERVAL);
+                
+                // Also check more frequently near midnight UTC
+                setupMidnightCheck();
+            }
+        }
+        
+        // Setup a check that runs more frequently near UTC midnight
+        function setupMidnightCheck() {
+            setInterval(() => {
+                const now = new Date();
+                const minutesToMidnightUTC = (24 * 60) - (now.getUTCHours() * 60 + now.getUTCMinutes());
+                
+                // If within 2 minutes of midnight, check every 10 seconds
+                if (minutesToMidnightUTC <= 2 || minutesToMidnightUTC >= (24 * 60 - 2)) {
+                    if (checkMidnightRotation()) {
+                        allLogs = [];
+                        allDates = [];
+                        rmsLogs = [];
+                        tcpLogs = [];
+                        loadSystemLogs().then(() => {
+                            populateDateFilter();
+                            displayLogs();
+                        });
+                    }
+                }
+            }, 10000); // Check every 10 seconds
+        }
+        
+        // Populate date filter dropdown with available dates
+        function populateDateFilter() {
+            const dateFilter = document.getElementById('dateFilter');
+            if (!dateFilter) {
+                console.error('Date filter element not found!');
+                return;
+            }
+            
+            // Preserve the multi-day range options and add specific dates
+            let html = `
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="last2">Last 2 Days</option>
+                <option value="last3">Last 3 Days</option>
+                <option value="last7">Last 7 Days</option>
+                <option value="last14">Last 14 Days</option>
+                <option value="last30">Last 30 Days</option>
+            `;
+            
+            if (allDates.length > 0) {
+                html += '<option disabled>──────────</option>';
+                
+                // Add individual date options (allDates already sorted newest first)
+                allDates.slice(0, 30).forEach(dateStr => {  // Limit to 30 dates
+                    const yyyy = dateStr.substring(0, 4);
+                    const mm = dateStr.substring(4, 6);
+                    const dd = dateStr.substring(6, 8);
+                    html += `<option value="${dateStr}">${mm}/${dd}/${yyyy}</option>`;
+                });
+            }
+            
+            dateFilter.innerHTML = html;
+        }
+        
+        // Setup filter event listeners
+        function setupFilters() {
+            const logFilter = document.getElementById('logFilter');
+            const dateFilter = document.getElementById('dateFilter');
+            
+            if (logFilter) {
+                logFilter.addEventListener('change', function() {
+                    currentEventFilter = this.value;
+                    displayLogs();
+                });
+            }
+            
+            if (dateFilter) {
+                dateFilter.addEventListener('change', function() {
+                    currentDateFilter = this.value;
+                    displayLogs();
+                });
+            }
+        }
+        
+        // Apply all filters including callsign search
+        function applyFilters() {
+            const callsignInput = document.getElementById('callsignSearch');
+            currentCallsignSearch = callsignInput ? callsignInput.value.trim().toUpperCase() : '';
+            currentEventFilter = document.getElementById('logFilter').value;
+            currentDateFilter = document.getElementById('dateFilter').value;
+            displayLogs();
+        }
+        
+        // Clear the callsign search
+        function clearSearch() {
+            const callsignInput = document.getElementById('callsignSearch');
+            if (callsignInput) callsignInput.value = '';
+            currentCallsignSearch = '';
+            document.getElementById('searchSummary').classList.add('hidden');
+            displayLogs();
+        }
+        
+        // Update the search summary display
+        function updateSearchSummary(resultCount) {
+            const summaryDiv = document.getElementById('searchSummary');
+            const summaryText = document.getElementById('searchSummaryText');
+            
+            if (currentCallsignSearch && currentCallsignSearch.length > 0) {
+                const eventLabel = currentEventFilter === 'all' ? 'all events' : currentEventFilter + 's';
+                const dateLabel = currentDateFilter === 'all' ? 'all dates' : currentDateFilter.replace('last', 'last ').replace('today', 'today');
+                summaryText.textContent = `${resultCount} entries for "${currentCallsignSearch}" (${eventLabel}, ${dateLabel})`;
+                summaryDiv.classList.remove('hidden');
+            } else {
+                summaryDiv.classList.add('hidden');
+            }
+        }
+        
+        // Store filtered logs for PDF report
+        let lastFilteredLogs = [];
+        
+        // Generate PDF Report
+        function generatePDFReport() {
+            if (typeof window.jspdf === 'undefined') {
+                alert('PDF library not loaded. Please refresh the page and try again.');
+                return;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            
+            // Get current filter settings
+            const callsign = currentCallsignSearch || 'ALL';
+            const eventType = currentEventFilter === 'all' ? 'All Events' : 
+                             currentEventFilter.charAt(0).toUpperCase() + currentEventFilter.slice(1) + 's';
+            const dateRange = currentDateFilter === 'all' ? 'All Dates' : 
+                             currentDateFilter.replace('last', 'Last ').replace('today', 'Today');
+            
+            // Get filtered logs (re-apply filters to get the data)
+            let filteredLogs = allLogs.slice();
+            
+            // Apply date filter
+            if (currentDateFilter !== 'all') {
+                const now = new Date();
+                let daysBack = 0;
+                let specificDate = null;
+                
+                if (currentDateFilter === 'today') daysBack = 0;
+                else if (currentDateFilter === 'last2') daysBack = 1;
+                else if (currentDateFilter === 'last3') daysBack = 2;
+                else if (currentDateFilter === 'last7') daysBack = 6;
+                else if (currentDateFilter === 'last14') daysBack = 13;
+                else if (currentDateFilter === 'last30') daysBack = 29;
+                else if (currentDateFilter.match(/^\d{8}$/)) specificDate = currentDateFilter;
+                
+                if (specificDate) {
+                    filteredLogs = filteredLogs.filter(line => {
+                        const match = line.match(/^(\d{6})/);
+                        if (match) {
+                            const yymmdd = match[1];
+                            const fullDate = '20' + yymmdd.substring(0, 2) + yymmdd.substring(2, 4) + yymmdd.substring(4, 6);
+                            return fullDate === specificDate;
+                        }
+                        return false;
+                    });
+                } else {
+                    const cutoffDate = new Date(now);
+                    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+                    cutoffDate.setHours(0, 0, 0, 0);
+                    
+                    filteredLogs = filteredLogs.filter(line => {
+                        const match = line.match(/^(\d{6})/);
+                        if (match) {
+                            const yymmdd = match[1];
+                            const yy = parseInt(yymmdd.substring(0, 2));
+                            const mm = parseInt(yymmdd.substring(2, 4)) - 1;
+                            const dd = parseInt(yymmdd.substring(4, 6));
+                            const logDate = new Date(2000 + yy, mm, dd);
+                            return logDate >= cutoffDate;
+                        }
+                        return false;
+                    });
+                }
+            }
+            
+            // Apply event type filter
+            if (currentEventFilter !== 'all') {
+                filteredLogs = filteredLogs.filter(line => {
+                    switch (currentEventFilter) {
+                        case 'connect': return line.includes('CONNECTED') || line.includes('Connecting') || line.includes('Incoming Connect');
+                        case 'disconnect': return line.includes('Disconnected');
+                        case 'message': return line.match(/Msg\s+\d+/i);
+                        case 'error': return line.includes('Error') || line.includes('error') || line.includes('ERROR');
+                        default: return true;
+                    }
+                });
+            }
+            
+            // Apply callsign filter
+            if (currentCallsignSearch && currentCallsignSearch.length > 0) {
+                const searchTerm = currentCallsignSearch.toUpperCase();
+                filteredLogs = filteredLogs.filter(line => line.toUpperCase().includes(searchTerm));
+            }
+            
+            if (filteredLogs.length === 0) {
+                alert('No log entries match the current filters. Nothing to export.');
+                return;
+            }
+            
+            // Calculate statistics for the report
+            let connects = 0, disconnects = 0, messages = 0, errors = 0;
+            filteredLogs.forEach(line => {
+                if (line.includes('CONNECTED') || line.includes('Connecting') || line.includes('Incoming Connect')) connects++;
+                if (line.includes('Disconnected')) disconnects++;
+                if (line.match(/Msg\s+\d+/i)) messages++;
+                if (line.includes('Error') || line.includes('error') || line.includes('ERROR')) errors++;
+            });
+            
+            // Create PDF
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 15;
+            let y = margin;
+            
+            // Title
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.text('BPQ System Log Report', pageWidth / 2, y, { align: 'center' });
+            y += 10;
+            
+            // Subtitle with callsign if searching
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'normal');
+            if (currentCallsignSearch) {
+                doc.text(`Station: ${currentCallsignSearch}`, pageWidth / 2, y, { align: 'center' });
+                y += 7;
+            }
+            
+            // Report metadata
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, y, { align: 'center' });
+            y += 5;
+            doc.text(`Filter: ${eventType} | Date Range: ${dateRange}`, pageWidth / 2, y, { align: 'center' });
+            y += 10;
+            
+            // Statistics box
+            doc.setDrawColor(102, 126, 234);
+            doc.setFillColor(245, 247, 255);
+            doc.roundedRect(margin, y, pageWidth - 2 * margin, 25, 3, 3, 'FD');
+            
+            doc.setTextColor(0);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            y += 8;
+            doc.text('Summary Statistics', margin + 5, y);
+            y += 7;
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Total Entries: ${filteredLogs.length}    |    Connections: ${connects}    |    Disconnects: ${disconnects}    |    Messages: ${messages}    |    Errors: ${errors}`, margin + 5, y);
+            y += 15;
+            
+            // Log entries header
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Log Entries', margin, y);
+            y += 7;
+            
+            // Log entries
+            doc.setFontSize(7);
+            doc.setFont('courier', 'normal');
+            const lineHeight = 3.5;
+            const maxLinesPerPage = Math.floor((pageHeight - y - margin) / lineHeight);
+            
+            // Limit to most recent 500 entries for PDF (to keep file size reasonable)
+            const logsForPDF = filteredLogs.slice(-500);
+            if (filteredLogs.length > 500) {
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text(`(Showing most recent 500 of ${filteredLogs.length} entries)`, margin, y);
+                y += 5;
+                doc.setFont('courier', 'normal');
+                doc.setTextColor(0);
+            }
+            
+            let lineCount = 0;
+            for (const line of logsForPDF) {
+                if (y > pageHeight - margin - 10) {
+                    doc.addPage();
+                    y = margin;
+                    // Add header on new page
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(150);
+                    doc.text(`BPQ Log Report - ${callsign} - Page ${doc.getNumberOfPages()}`, margin, y);
+                    y += 7;
+                    doc.setFont('courier', 'normal');
+                    doc.setFontSize(7);
+                    doc.setTextColor(0);
+                }
+                
+                // Truncate long lines
+                const maxChars = 120;
+                const displayLine = line.length > maxChars ? line.substring(0, maxChars) + '...' : line;
+                
+                // Color code based on event type
+                if (line.includes('CONNECTED') || line.includes('Connecting')) {
+                    doc.setTextColor(34, 139, 34); // Green
+                } else if (line.includes('Disconnected')) {
+                    doc.setTextColor(70, 130, 180); // Steel blue
+                } else if (line.match(/Msg\s+\d+/i)) {
+                    doc.setTextColor(138, 43, 226); // Purple
+                } else if (line.includes('Error') || line.includes('error')) {
+                    doc.setTextColor(220, 20, 60); // Crimson
+                } else {
+                    doc.setTextColor(60, 60, 60); // Dark gray
+                }
+                
+                doc.text(displayLine, margin, y);
+                y += lineHeight;
+                lineCount++;
+            }
+            
+            // Footer on last page
+            doc.setTextColor(150);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`BPQ Dashboard v1.5.0 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            
+            // Generate filename
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const filename = currentCallsignSearch 
+                ? `BPQ-Log-${currentCallsignSearch}-${dateStr}.pdf`
+                : `BPQ-Log-Report-${dateStr}.pdf`;
+            
+            // Save PDF
+            doc.save(filename);
+            
+            // Show success message
+            const summaryDiv = document.getElementById('searchSummary');
+            const origText = document.getElementById('searchSummaryText').textContent;
+            document.getElementById('searchSummaryText').innerHTML = `<span class="text-green-600">✓ PDF saved as ${filename}</span>`;
+            summaryDiv.classList.remove('hidden');
+            setTimeout(() => {
+                if (currentCallsignSearch) {
+                    document.getElementById('searchSummaryText').textContent = origText;
+                } else {
+                    summaryDiv.classList.add('hidden');
+                }
+            }, 3000);
+        }
+        
+        // =============================================================================
+        // ERROR DETAILS PANEL FUNCTIONS
+        // =============================================================================
+        
+        function toggleErrorDetails() {
+            const panel = document.getElementById('errorDetailsPanel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) {
+                updateErrorBreakdown();
+                updateRecentErrorsList();
+            }
+        }
+        
+        function updateErrorBreakdown() {
+            const tbody = document.getElementById('errorBreakdownTable');
+            const total = stats.errors || 1; // Prevent division by zero
+            
+            const errorTypes = [
+                { name: 'RF Failures (Port in Use)', count: stats.rfFailures, color: 'bg-orange-500' },
+                { name: 'Node Disappeared', count: stats.nodeDisappeared, color: 'bg-yellow-500' },
+                { name: 'Protocol Errors', count: stats.protocolErrors, color: 'bg-purple-500' },
+                { name: 'Timeouts', count: stats.timeoutErrors, color: 'bg-blue-500' },
+                { name: 'Connect Failures', count: stats.connectFailures, color: 'bg-red-500' },
+                { name: 'Other Errors', count: stats.otherErrors, color: 'bg-gray-500' }
+            ];
+            
+            // Sort by count descending
+            errorTypes.sort((a, b) => b.count - a.count);
+            
+            if (stats.errors === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-green-600 font-semibold">✓ No errors recorded</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = errorTypes.map(et => {
+                const pct = ((et.count / total) * 100).toFixed(1);
+                const barWidth = Math.max(1, (et.count / total) * 100);
+                return `<tr class="hover:bg-red-50">
+                    <td class="px-2 py-1.5 font-medium text-gray-700">${et.name}</td>
+                    <td class="px-2 py-1.5 text-right font-bold text-gray-900">${et.count.toLocaleString()}</td>
+                    <td class="px-2 py-1.5 text-right text-gray-600">${pct}%</td>
+                    <td class="px-2 py-1.5">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="${et.color} h-2 rounded-full" style="width: ${barWidth}%"></div>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+            
+            // Add total row
+            tbody.innerHTML += `<tr class="bg-red-100 font-bold">
+                <td class="px-2 py-1.5 text-red-800">TOTAL ERRORS</td>
+                <td class="px-2 py-1.5 text-right text-red-900">${stats.errors.toLocaleString()}</td>
+                <td class="px-2 py-1.5 text-right text-red-800">100%</td>
+                <td class="px-2 py-1.5"></td>
+            </tr>`;
+        }
+        
+        function updateRecentErrorsList() {
+            const container = document.getElementById('recentErrorsList');
+            
+            if (recentErrors.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 italic">No errors recorded in current data</div>';
+                return;
+            }
+            
+            // Show last 10 errors, most recent first
+            const recent = recentErrors.slice(-10).reverse();
+            
+            container.innerHTML = recent.map(line => {
+                // Determine error color
+                let colorClass = 'text-gray-600';
+                if (line.includes('Port in use')) colorClass = 'text-orange-600';
+                else if (line.includes('disappeared')) colorClass = 'text-yellow-600';
+                else if (line.includes('Protocol') || line.includes('Invalid')) colorClass = 'text-purple-600';
+                else if (line.includes('Timeout') || line.includes('timeout')) colorClass = 'text-blue-600';
+                else if (line.includes('Failed') || line.includes('failed')) colorClass = 'text-red-600';
+                
+                // Truncate long lines
+                const displayLine = line.length > 100 ? line.substring(0, 100) + '...' : line;
+                
+                return `<div class="p-1.5 bg-white rounded border border-red-100 ${colorClass} hover:bg-red-50 cursor-pointer" 
+                            onclick="searchForError('${line.replace(/'/g, "\\'").substring(0, 50)}')"
+                            title="${line.replace(/"/g, '&quot;')}">${displayLine}</div>`;
+            }).join('');
+        }
+        
+        function searchForError(errorText) {
+            // Extract a searchable term from the error
+            const match = errorText.match(/[A-Z0-9]{3,10}(-\d+)?/);
+            if (match) {
+                document.getElementById('callsignSearch').value = match[0];
+                document.getElementById('logFilter').value = 'error';
+                applyFilters();
+            }
+        }
+        
+        function filterToErrors() {
+            document.getElementById('callsignSearch').value = '';
+            document.getElementById('logFilter').value = 'error';
+            applyFilters();
+            // Scroll to log viewer
+            document.getElementById('logContainer').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // =============================================================================
+        // ALL STATIONS MODAL FUNCTIONS
+        // =============================================================================
+        
+        let currentStationsSort = { column: 'connections', ascending: false };
+        let allStationsData = [];
+        
+        function showAllStationsModal() {
+            
+            // Prepare stations data
+            allStationsData = [];
+            
+            for (const [callsign, count] of Object.entries(stats.topStations)) {
+                const details = stats.stationDetails[callsign] || {
+                    events: count,
+                    connections: 0,
+                    messagesRx: 0,
+                    messagesTx: 0
+                };
+                
+                const stationData = {
+                    callsign: callsign,
+                    events: details.events,
+                    connections: details.connections,
+                    messagesRx: details.messagesRx,
+                    messagesTx: details.messagesTx,
+                    totalMessages: details.messagesRx + details.messagesTx
+                };
+                
+                allStationsData.push(stationData);
+            }
+            
+            if (allStationsData.length > 0) {
+            }
+            
+            // Sort by connections (default)
+            currentStationsSort = { column: 'connections', ascending: false };
+            sortStationsData();
+            
+            // Populate table
+            populateStationsTable();
+            
+            // Show modal
+            document.getElementById('allStationsModal').classList.remove('hidden');
+            
+            // Clear search box
+            document.getElementById('stationSearchBox').value = '';
+            
+        }
+        
+        function closeAllStationsModal() {
+            document.getElementById('allStationsModal').classList.add('hidden');
+        }
+        
+        function sortStationsTable(column) {
+            // Toggle sort direction if same column
+            if (currentStationsSort.column === column) {
+                currentStationsSort.ascending = !currentStationsSort.ascending;
+            } else {
+                currentStationsSort.column = column;
+                currentStationsSort.ascending = false; // Default to descending
+            }
+            
+            sortStationsData();
+            populateStationsTable();
+            updateSortIndicators();
+        }
+        
+        function sortStationsData() {
+            const col = currentStationsSort.column;
+            const asc = currentStationsSort.ascending;
+            
+            allStationsData.sort((a, b) => {
+                let valA = a[col];
+                let valB = b[col];
+                
+                // String comparison for callsign
+                if (col === 'callsign') {
+                    valA = valA.toString();
+                    valB = valB.toString();
+                    return asc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                
+                // Numeric comparison for all other columns
+                return asc ? valA - valB : valB - valA;
+            });
+        }
+        
+        function updateSortIndicators() {
+            // Clear all indicators
+            ['callsign', 'connections', 'messagesRx', 'messagesTx', 'totalMessages'].forEach(col => {
+                const elem = document.getElementById(`sort-${col}`);
+                if (elem) elem.textContent = '↕';
+            });
+            
+            // Set current indicator
+            const currentElem = document.getElementById(`sort-${currentStationsSort.column}`);
+            if (currentElem) {
+                currentElem.textContent = currentStationsSort.ascending ? '↑' : '↓';
+            }
+        }
+        
+        function populateStationsTable() {
+            const tbody = document.getElementById('stationsTableBody');
+            const searchTerm = document.getElementById('stationSearchBox').value.toUpperCase();
+            
+            // Filter data if search term exists
+            let displayData = allStationsData;
+            if (searchTerm) {
+                displayData = allStationsData.filter(station => 
+                    station.callsign.includes(searchTerm)
+                );
+            }
+            
+            // Generate table rows
+            let html = '';
+            displayData.forEach((station, index) => {
+                if (index < 3) {
+                }
+                const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                
+                // Build callsign cell explicitly
+                const callsignCell = station.callsign || 'UNKNOWN';
+                
+                html += `
+                    <tr class="${rowClass} hover:bg-purple-50">
+                        <td class="px-4 py-2 font-bold text-purple-700" style="min-width: 100px;">${callsignCell}</td>
+                        <td class="px-4 py-2 text-right">${station.connections.toLocaleString()}</td>
+                        <td class="px-4 py-2 text-right">
+                            <span class="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                ${station.messagesRx.toLocaleString()}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-right">
+                            <span class="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                                ${station.messagesTx.toLocaleString()}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-right font-semibold">${station.totalMessages.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+            
+            
+            
+            if (displayData.length === 0) {
+                html = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            No stations found matching "${searchTerm}"
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            tbody.innerHTML = html;
+            
+            if (tbody.querySelector('tr')) {
+                const firstRow = tbody.querySelector('tr');
+                const firstCell = firstRow.querySelector('td:first-child');
+            }
+            
+            // Update summary
+            const summary = searchTerm 
+                ? `Showing ${displayData.length} of ${allStationsData.length} stations`
+                : `Showing all ${allStationsData.length} stations`;
+            document.getElementById('stationsTableSummary').textContent = summary;
+            
+            updateSortIndicators();
+        }
+        
+        function filterStationsTable() {
+            populateStationsTable();
+        }
+        
+        // Close modal when clicking outside
+        window.addEventListener('click', (event) => {
+            const modal = document.getElementById('allStationsModal');
+            if (event.target === modal) {
+                closeAllStationsModal();
+            }
+        });
+        
+        // Close modal with Escape key
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('allStationsModal');
+                if (!modal.classList.contains('hidden')) {
+                    closeAllStationsModal();
+                }
+            }
+        });
+        
+        // =============================================================================
+        // END ALL STATIONS MODAL FUNCTIONS
+        // =============================================================================
+        
+        // =========================================================================
+        // MHeard Station Functions
+        // =========================================================================
+        
+        const MHEARD_FILE = './logs/MHSave.txt';
+        let mheardData = { 1: [], 2: [], 3: [], 4: [] };
+        let currentMHPort = 1;
+        
+        // Band color lookup for MHeard RF port display
+        const BAND_COLORS = {
+            '160m': '#8b5cf6', '80m': '#6366f1', '60m': '#3b82f6', '40m': '#0ea5e9',
+            '30m': '#14b8a6', '20m': '#22c55e', '17m': '#84cc16', '15m': '#eab308',
+            '12m': '#f97316', '10m': '#ef4444'
+        };
+        function getBandColor(b) { return BAND_COLORS[b] || '#6b7280'; }
+        
+        async function loadMHeardData() {
+            const statusEl = document.getElementById('mheardStatus');
+            statusEl.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch(MHEARD_FILE + '?t=' + Date.now());
+                if (!response.ok) {
+                    throw new Error('MHSave.txt not found');
+                }
+                
+                const text = await response.text();
+                mheardData = parseMHeardFile(text);
+                
+                for (let port = 1; port <= 4; port++) {
+                    document.getElementById(`mhCount${port}`).textContent = mheardData[port].length;
+                }
+                
+                renderMHeardPort(currentMHPort);
+                
+                const now = new Date();
+                statusEl.textContent = `Updated ${now.toLocaleTimeString()}`;
+                
+            } catch (error) {
+                console.error('Error loading MHeard data:', error);
+                statusEl.textContent = 'File not found';
+                
+                for (let port = 1; port <= 4; port++) {
+                    const tbody = document.getElementById(`mheardList${port}`);
+                    const cols = (port >= 3) ? 6 : 4;
+                    tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center py-4 text-gray-400">MHSave.txt not found in logs folder</td></tr>`;
+                    document.getElementById(`mhCount${port}`).textContent = '0';
+                }
+            }
+        }
+        
+        function parseMHeardFile(text) {
+            const data = { 1: [], 2: [], 3: [], 4: [] };
+            let currentPort = 0;
+            
+            const lines = text.split('\n');
+            
+            for (const line of lines) {
+                const trimmed = line.trim();
+                
+                const portMatch = trimmed.match(/^Port:(\d+)/);
+                if (portMatch) {
+                    currentPort = parseInt(portMatch[1]);
+                    continue;
+                }
+                
+                if (!trimmed || currentPort < 1 || currentPort > 4) continue;
+                
+                const match = trimmed.match(/^(\d+)\s+(\d+)\s+(\S+)\s+([+!])?\s*(\w{3})\s+(\d{1,2})\s+(\d{1,2}:\d{2}:\d{2})\s+\|([^|]*)\|(.*)$/);
+                
+                if (match) {
+                    const [_, timestamp, bytes, callsign, status, month, day, timeStr, grid, freq] = match;
+                    
+                    const entry = {
+                        timestamp: parseInt(timestamp),
+                        bytes: parseInt(bytes),
+                        callsign: callsign.trim(),
+                        connected: status === '+',
+                        failed: status === '!',
+                        noStatus: !status,
+                        dateStr: `${month} ${day}`,
+                        timeStr: timeStr,
+                        grid: grid || '',
+                        freq: freq ? parseFloat(freq) : null
+                    };
+                    
+                    const year = new Date().getUTCFullYear();
+                    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+                    const monthNum = months[month] !== undefined ? months[month] : 0;
+                    const dayNum = parseInt(day);
+                    const timeParts = timeStr.split(':');
+                    
+                    entry.date = new Date(Date.UTC(year, monthNum, dayNum, 
+                        parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2])));
+                    
+                    if (entry.date > new Date()) {
+                        entry.date = new Date(Date.UTC(year - 1, monthNum, dayNum,
+                            parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2])));
+                    }
+                    
+                    data[currentPort].push(entry);
+                }
+            }
+            
+            return data;
+        }
+        
+        function showMHeardPort(port) {
+            currentMHPort = port;
+            
+            for (let p = 1; p <= 4; p++) {
+                const btn = document.getElementById(`mhPortBtn${p}`);
+                btn.className = p === port
+                    ? 'mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-emerald-500 text-white'
+                    : 'mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+                document.getElementById(`mheardPort${p}`).classList.toggle('hidden', p !== port);
+            }
+            
+            renderMHeardPort(port);
+        }
+        
+        function renderMHeardPort(port) {
+            const tbody = document.getElementById(`mheardList${port}`);
+            const entries = mheardData[port] || [];
+            
+            if (entries.length === 0) {
+                const cols = (port >= 3) ? 6 : 4;
+                tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center py-4 text-gray-400">No stations heard on this port</td></tr>`;
+                return;
+            }
+            
+            const sorted = [...entries].sort((a, b) => b.timestamp - a.timestamp);
+            
+            if (port >= 3) {
+                tbody.innerHTML = sorted.map(entry => {
+                    const statusIcon = entry.connected ? '✅' : (entry.failed ? '❌' : '⚪');
+                    const statusTitle = entry.connected ? 'Connected' : (entry.failed ? 'Failed/Heard' : 'Heard');
+                    const freqStr = entry.freq ? entry.freq.toFixed(4) : '-';
+                    const band = entry.freq ? getBandFromFreq(entry.freq) : '';
+                    const bandColor = band ? getBandColor(band) : '#888';
+                    const gridStr = entry.grid || '-';
+                    const dtStr = formatMHeardDate(entry.date);
+                    
+                    return `
+                        <tr class="hover:bg-emerald-50">
+                            <td class="px-2 py-1 font-mono font-semibold text-emerald-700">${entry.callsign}</td>
+                            <td class="px-2 py-1 text-gray-600 text-xs">${dtStr}</td>
+                            <td class="px-2 py-1 text-right text-gray-600">${formatBytes(entry.bytes)}</td>
+                            <td class="px-2 py-1 text-center font-mono text-gray-500">${gridStr}</td>
+                            <td class="px-2 py-1 text-right">
+                                ${band ? `<span class="px-1 py-0.5 rounded text-white text-xs" style="background:${bandColor}">${band}</span>` : ''}
+                                <span class="text-gray-600 ml-1">${freqStr}</span>
+                            </td>
+                            <td class="px-2 py-1 text-center" title="${statusTitle}">${statusIcon}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                tbody.innerHTML = sorted.map(entry => {
+                    const statusIcon = entry.connected ? '✅' : (entry.failed ? '❌' : '⚪');
+                    const statusTitle = entry.connected ? 'Connected' : (entry.failed ? 'Failed' : 'Heard');
+                    const dtStr = formatMHeardDate(entry.date);
+                    
+                    return `
+                        <tr class="hover:bg-emerald-50">
+                            <td class="px-2 py-1 font-mono font-semibold text-emerald-700">${entry.callsign}</td>
+                            <td class="px-2 py-1 text-gray-600 text-xs">${dtStr}</td>
+                            <td class="px-2 py-1 text-right text-gray-600">${formatBytes(entry.bytes)}</td>
+                            <td class="px-2 py-1 text-center" title="${statusTitle}">${statusIcon}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+        
+        function getBandFromFreq(freqMHz) {
+            if (freqMHz >= 1.8 && freqMHz <= 2.0) return '160m';
+            if (freqMHz >= 3.5 && freqMHz <= 4.0) return '80m';
+            if (freqMHz >= 5.3 && freqMHz <= 5.4) return '60m';
+            if (freqMHz >= 7.0 && freqMHz <= 7.3) return '40m';
+            if (freqMHz >= 10.1 && freqMHz <= 10.15) return '30m';
+            if (freqMHz >= 14.0 && freqMHz <= 14.35) return '20m';
+            if (freqMHz >= 18.068 && freqMHz <= 18.168) return '17m';
+            if (freqMHz >= 21.0 && freqMHz <= 21.45) return '15m';
+            if (freqMHz >= 24.89 && freqMHz <= 24.99) return '12m';
+            if (freqMHz >= 28.0 && freqMHz <= 29.7) return '10m';
+            return '';
+        }
+        
+        function formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+        
+        function formatMHeardDate(date) {
+            if (!date || isNaN(date.getTime())) return '-';
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const mon = months[date.getUTCMonth()];
+            const dd = date.getUTCDate();
+            const hh = String(date.getUTCHours()).padStart(2, '0');
+            const mm = String(date.getUTCMinutes()).padStart(2, '0');
+            const ss = String(date.getUTCSeconds()).padStart(2, '0');
+            return `${mon} ${dd} ${hh}:${mm}:${ss}z`;
+        }
+
+        // =========================================================================
+        // Known Stations Routing Table Functions
+        // =========================================================================
+        
+        const RTKNOWN_FILE = './logs/RTKnown.txt';
+        let rtKnownData = [];
+        let rtKnownFiltered = [];
+        let rtKnownSortField = 'callsign';
+        let rtKnownSortAsc = true;
+        
+        async function loadRTKnownData() {
+            const statusEl = document.getElementById('rtKnownStatus');
+            statusEl.textContent = 'Loading...';
+            
+            try {
+                const url = RTKNOWN_FILE + '?t=' + Date.now();
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error('RTKnown.txt not found (HTTP ' + response.status + ')');
+                }
+                
+                const text = await response.text();
+                
+                rtKnownData = parseRTKnownFile(text);
+                
+                updateRTKnownStats();
+                filterRTKnown();
+                
+                const now = new Date();
+                statusEl.textContent = `Updated ${now.toLocaleTimeString()}`;
+                
+            } catch (error) {
+                console.error('loadRTKnownData: Error:', error);
+                statusEl.textContent = 'File not found';
+                document.getElementById('rtKnownList').innerHTML = 
+                    '<tr><td colspan="4" class="text-center py-4 text-gray-400">RTKnown.txt not found in logs folder. Check that file exists at: ' + RTKNOWN_FILE + '</td></tr>';
+                document.getElementById('rtTotalCount').textContent = '0';
+            }
+        }
+        
+        function parseRTKnownFile(text) {
+            const data = [];
+            const lines = text.split('\n');
+            
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                
+                const match = trimmed.match(/^(\S+)\s+(\d+)$/);
+                if (match) {
+                    const [_, callsign, timestamp] = match;
+                    if (!callsign || callsign.length < 2) continue;
+                    
+                    const date = new Date(parseInt(timestamp) * 1000);
+                    const region = getRegionFromCallsign(callsign);
+                    
+                    data.push({
+                        callsign: callsign,
+                        timestamp: parseInt(timestamp),
+                        date: date,
+                        region: region
+                    });
+                }
+            }
+            
+            return data;
+        }
+        
+        function getRegionFromCallsign(callsign) {
+            const base = callsign.replace(/-\d+$/, '').toUpperCase();
+            
+            if (/^(K|W|N|AA|AB|AC|AD|AE|AF|AG|AH|AI|AJ|AK|AL|KA|KB|KC|KD|KE|KF|KG|KH|KI|KJ|KK|KL|KM|KN|KO|KP|KQ|KR|KS|KT|KU|KV|KW|KX|KY|KZ|NA|NB|NC|ND|NE|NF|NG|NH|NI|NJ|NK|NL|NM|NN|NO|NP|NQ|NR|NS|NT|NU|NV|NW|NX|NY|NZ|WA|WB|WC|WD|WE|WF|WG|WH|WI|WJ|WK|WL|WM|WN|WO|WP|WQ|WR|WS|WT|WU|WV|WW|WX|WY|WZ)/.test(base)) return '🇺🇸 USA';
+            if (/^(VE|VA|VY|VO|CF|CG|CI|CJ|CK|VA|VE|VY)/.test(base)) return '🇨🇦 Canada';
+            if (/^(G|M|2E|2D|2M)/.test(base)) return '🇬🇧 UK';
+            if (/^(VK)/.test(base)) return '🇦🇺 Australia';
+            if (/^(ZL)/.test(base)) return '🇳🇿 New Zealand';
+            if (/^(PA|PB|PC|PD|PE|PH|PI)/.test(base)) return '🇳🇱 Netherlands';
+            if (/^(DL|DA|DB|DC|DD|DE|DF|DG|DH|DI|DJ|DK|DM|DN|DO|DP|DQ|DR)/.test(base)) return '🇩🇪 Germany';
+            if (/^(F)/.test(base)) return '🇫🇷 France';
+            if (/^(I|IK|IW|IZ|IU)/.test(base)) return '🇮🇹 Italy';
+            if (/^(EA|EB|EC|ED|EE|EF|EG|EH)/.test(base)) return '🇪🇸 Spain';
+            if (/^(CT|CQ|CR|CS)/.test(base)) return '🇵🇹 Portugal';
+            if (/^(ON|OR)/.test(base)) return '🇧🇪 Belgium';
+            if (/^(HB)/.test(base)) return '🇨🇭 Switzerland';
+            if (/^(OE)/.test(base)) return '🇦🇹 Austria';
+            if (/^(SM|SA|SB|SC|SD|SE|SF|SG|SH|SI|SJ|SK|SL)/.test(base)) return '🇸🇪 Sweden';
+            if (/^(LA|LB|LC|LD|LE|LF|LG|LH|LI|LJ|LK|LL|LM|LN)/.test(base)) return '🇳🇴 Norway';
+            if (/^(OH|OF|OG|OI)/.test(base)) return '🇫🇮 Finland';
+            if (/^(OZ)/.test(base)) return '🇩🇰 Denmark';
+            if (/^(EI|EJ)/.test(base)) return '🇮🇪 Ireland';
+            if (/^(GM|GS|MM|MS|2M)/.test(base)) return '🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scotland';
+            if (/^(GW|MW|2W)/.test(base)) return '🏴󠁧󠁢󠁷󠁬󠁳󠁿 Wales';
+            if (/^(PY|PP|PQ|PR|PS|PT|PU|PV|PW|PX|ZV|ZW|ZX|ZY|ZZ)/.test(base)) return '🇧🇷 Brazil';
+            if (/^(LU|LO|LP|LQ|LR|LS|LT|LV|LW|AY|AZ)/.test(base)) return '🇦🇷 Argentina';
+            if (/^(JA|JE|JF|JG|JH|JI|JJ|JK|JL|JM|JN|JO|JP|JQ|JR|JS|7J|7K|7L|7M|7N|8J|8K|8L|8M|8N)/.test(base)) return '🇯🇵 Japan';
+            if (/^(HL|DS|DT|6K|6L|6M|6N)/.test(base)) return '🇰🇷 S. Korea';
+            if (/^(SV|SW|SX|SY|SZ)/.test(base)) return '🇬🇷 Greece';
+            if (/^(YO|YP|YQ|YR)/.test(base)) return '🇷🇴 Romania';
+            if (/^(OK|OL)/.test(base)) return '🇨🇿 Czechia';
+            if (/^(SP|SN|SO|SQ|3Z)/.test(base)) return '🇵🇱 Poland';
+            if (/^(HA|HG)/.test(base)) return '🇭🇺 Hungary';
+            if (/^(9A)/.test(base)) return '🇭🇷 Croatia';
+            if (/^(R|RA|RB|RC|RD|RE|RF|RG|RJ|RK|RL|RM|RN|RO|RQ|RR|RS|RT|RU|RV|RW|RX|RY|RZ|UA|UB|UC|UD|UE|UF|UG|UH|UI)/.test(base)) return '🇷🇺 Russia';
+            if (/^(KP4|NP4|WP4)/.test(base)) return '🇵🇷 Puerto Rico';
+            if (/^(XE|XA|XB|XC|XD|XF|4A|4B|4C)/.test(base)) return '🇲🇽 Mexico';
+            
+            return '🌍 Other';
+        }
+        
+        function updateRTKnownStats() {
+            const now = Date.now();
+            const day = 24 * 60 * 60 * 1000;
+            
+            let recent = 0, week = 0, month = 0, stale = 0;
+            
+            for (const entry of rtKnownData) {
+                const age = now - entry.date.getTime();
+                if (age < day) recent++;
+                else if (age < 7 * day) week++;
+                else if (age < 30 * day) month++;
+                else stale++;
+            }
+            
+            document.getElementById('rtTotalCount').textContent = rtKnownData.length;
+            document.getElementById('rtRecentCount').textContent = recent;
+            document.getElementById('rtWeekCount').textContent = week;
+            document.getElementById('rtMonthCount').textContent = month;
+            document.getElementById('rtStaleCount').textContent = stale;
+        }
+        
+        function filterRTKnown() {
+            const searchTerm = document.getElementById('rtKnownSearch').value.toUpperCase();
+            const filterVal = document.getElementById('rtKnownFilter').value;
+            const now = Date.now();
+            const day = 24 * 60 * 60 * 1000;
+            
+            rtKnownFiltered = rtKnownData.filter(entry => {
+                if (searchTerm && !entry.callsign.toUpperCase().includes(searchTerm)) return false;
+                const age = now - entry.date.getTime();
+                switch (filterVal) {
+                    case '24h': return age < day;
+                    case '7d': return age < 7 * day;
+                    case '30d': return age < 30 * day;
+                    case 'stale': return age >= 30 * day;
+                    default: return true;
+                }
+            });
+            
+            sortRTKnownData();
+            renderRTKnown();
+        }
+        
+        function sortRTKnown(field) {
+            if (rtKnownSortField === field) {
+                rtKnownSortAsc = !rtKnownSortAsc;
+            } else {
+                rtKnownSortField = field;
+                rtKnownSortAsc = true;
+            }
+            
+            document.getElementById('rtSortCall').textContent = rtKnownSortField === 'callsign' ? (rtKnownSortAsc ? '▲' : '▼') : '';
+            document.getElementById('rtSortTime').textContent = rtKnownSortField === 'time' ? (rtKnownSortAsc ? '▲' : '▼') : '';
+            
+            sortRTKnownData();
+            renderRTKnown();
+        }
+        
+        function sortRTKnownData() {
+            rtKnownFiltered.sort((a, b) => {
+                let cmp;
+                if (rtKnownSortField === 'callsign') {
+                    cmp = a.callsign.localeCompare(b.callsign);
+                } else {
+                    cmp = b.timestamp - a.timestamp;
+                }
+                return rtKnownSortAsc ? cmp : -cmp;
+            });
+        }
+        
+        function renderRTKnown() {
+            const tbody = document.getElementById('rtKnownList');
+            
+            if (rtKnownFiltered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">No stations match filter</td></tr>';
+                return;
+            }
+            
+            const now = Date.now();
+            const day = 24 * 60 * 60 * 1000;
+            
+            const html = rtKnownFiltered.map(entry => {
+                const age = now - entry.date.getTime();
+                let ageClass, ageText;
+                
+                if (age < day) {
+                    ageClass = 'text-green-600 font-semibold';
+                    ageText = '< 24h';
+                } else if (age < 7 * day) {
+                    ageClass = 'text-yellow-600';
+                    ageText = '< 7d';
+                } else if (age < 30 * day) {
+                    ageClass = 'text-orange-600';
+                    ageText = '< 30d';
+                } else {
+                    ageClass = 'text-gray-400';
+                    const days = Math.floor(age / day);
+                    ageText = days > 365 ? `${Math.floor(days/365)}y` : `${days}d`;
+                }
+                
+                const dtStr = formatMHeardDate(entry.date);
+                
+                return `
+                    <tr class="hover:bg-sky-50">
+                        <td class="px-2 py-1 font-mono font-semibold text-sky-700">${entry.callsign}</td>
+                        <td class="px-2 py-1 text-gray-600 text-xs">${dtStr}</td>
+                        <td class="px-2 py-1 text-center ${ageClass}">${ageText}</td>
+                        <td class="px-2 py-1 text-center text-xs">${entry.region}</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            tbody.innerHTML = html;
+        }
+
+        // =============================================================================
+        // Initialize
+        // =============================================================================
+        
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            
+            // Initialize charts FIRST
+            const hourlyCtx = document.getElementById('hourlyActivityChart');
+            // Generate hour labels 00Z-23Z
+            const hourLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + 'Z');
+            window.hourlyActivityChart = new Chart(hourlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: hourLabels,
+                    datasets: [
+                        {
+                            label: 'Connections Made',
+                            data: Array(24).fill(0),
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                        },
+                        {
+                            label: 'Messages',
+                            data: Array(24).fill(0),
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    animation: false, // Disabled for performance
+                    scales: {
+                        x: { stacked: false },
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+            
+            const eventCtx = document.getElementById('eventTypesChart');
+            window.eventTypesChart = new Chart(eventCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Connections', 'Messages', 'Errors'],
+                    datasets: [{
+                        label: 'Event Count',
+                        data: [1, 1, 1],  // Placeholder
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)',   // Green - Connections
+                            'rgba(59, 130, 246, 0.8)',   // Blue - Messages
+                            'rgba(239, 68, 68, 0.8)'     // Red - Errors
+                        ],
+                        borderColor: [
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(59, 130, 246, 1)',
+                            'rgba(239, 68, 68, 1)'
+                        ],
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        barThickness: 40
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',  // Horizontal bars
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    animation: false, // Disabled for performance
+                    plugins: {
+                        legend: { 
+                            display: false 
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.x;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${value.toLocaleString()} events (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                },
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12,
+                                    weight: '600'
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            updateStatus('loading', 'Loading system logs...');
+            
+            // Setup filter event listeners
+            setupFilters();
+            
+            // Load logs (will populate charts and date filter after loading)
+            loadSystemLogs().then(() => {
+                populateDateFilter();
+            });
+            
+            // Setup auto-refresh
+            setupAutoRefresh();
+            
+            // Load MHeard and Known Stations data
+            loadMHeardData();
+            loadRTKnownData();
+            setInterval(loadMHeardData, 300000);   // Refresh MHeard every 5 minutes
+            setInterval(loadRTKnownData, 300000);  // Refresh RTKnown every 5 minutes
+        });
+        
+        // ===================================
+        // EMBEDDED SAMPLE DATA (for offline mode)
+        // ===================================
+        
+        // Sample log data (first 100 lines from recent logs)
+        const sampleLogs = `251227 00:01:43 |KK4DIV    Connecting to BBS KK4DIV
+251227 00:01:43 <KK4DIV    *** CONNECTED 
+251227 00:01:43 ?KK4DIV    Script MSGTYPES B5000 P5000 T5000
+251227 00:01:43 ?KK4DIV    Nothing to do - quitting
+251227 00:01:43 |KK4DIV    KK4DIV Disconnected
+251227 00:03:45 |KA3VSP    Connecting to BBS KA3VSP
+251227 00:03:45 <KA3VSP    *** CONNECTED 
+251227 00:03:45 ?KA3VSP    Script MSGTYPES B5000 P5000 T5000
+251227 00:03:45 ?KA3VSP    Nothing to do - quitting
+251227 00:03:45 |KA3VSP    KA3VSP Disconnected
+251227 00:04:19 |KE4QCM    Connecting to BBS KE4QCM
+251227 00:04:20 <KE4QCM    *** CONNECTED 
+251227 00:04:22 >KE4QCM    [BPQ-6.0.25.13-B2FIHJM$]
+251227 00:04:23 |KE4QCM    KE4QCM Disconnected
+251227 00:10:02 |RMS       Connecting to BBS RMS
+251227 00:10:02 <RMS       *** CONNECTED 
+251227 00:10:03 <RMS       *** K1AJD-7 Connected to CMS
+251227 00:10:10 |RMS       RMS Disconnected
+251227 00:23:38 |N3HYM     Incoming Connect from N3HYM
+251227 00:23:42 |VE3CGR-1  Incoming Connect from VE3CGR
+251227 00:23:52 ?VE3CGR-1  Msg 7978 Routing Trace To KEPS Via AMSAT
+251227 00:24:15 |VE3CGR-1  VE3CGR Disconnected
+251227 01:15:23 |KK4DIV    Connecting to BBS KK4DIV
+251227 01:15:23 <KK4DIV    *** CONNECTED 
+251227 01:15:23 |KK4DIV    KK4DIV Disconnected
+251227 02:30:45 |N4SFL     Incoming Connect from N4SFL
+251227 02:30:45 <N4SFL     *** CONNECTED 
+251227 02:30:52 |N4SFL     N4SFL Disconnected
+251227 03:45:12 |KE0GB     Connecting to BBS KE0GB
+251227 03:45:12 <KE0GB     *** CONNECTED 
+251227 03:45:12 |KE0GB     KE0GB Disconnected
+251227 05:20:33 |GB7BED    Incoming Connect from GB7BED
+251227 05:20:33 <GB7BED    *** CONNECTED 
+251227 05:20:45 ?GB7BED    Msg 7985 Routing complete
+251227 05:21:02 |GB7BED    GB7BED Disconnected`;
+
+    // Nav bar clock
+    (function updateNavClocks(){var n=new Date(),u=String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0'),l=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'),a=document.getElementById('navUtcClock'),b=document.getElementById('navLocalClock');if(a)a.textContent=u+' Z';if(b)b.textContent=l+' L';setTimeout(updateNavClocks,1000-n.getMilliseconds())})();
+
+
+    </script>
+    
+    <!-- All Stations Modal -->
+    <div id="allStationsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center pb-3 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-900">All Active Stations</h3>
+                <button onclick="closeAllStationsModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="mt-4">
+                <!-- Search Box -->
+                <div class="mb-4">
+                    <input type="text" id="stationSearchBox" placeholder="Search callsigns..." 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                           onkeyup="filterStationsTable()">
+                </div>
+                
+                <!-- Stations Table -->
+                <div class="overflow-auto max-h-96">
+                    <table class="w-full text-sm text-left table-fixed">
+                        <colgroup>
+                            <col style="width: 25%;">
+                            <col style="width: 18.75%;">
+                            <col style="width: 18.75%;">
+                            <col style="width: 18.75%;">
+                            <col style="width: 18.75%;">
+                        </colgroup>
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3 cursor-pointer hover:bg-gray-200" onclick="sortStationsTable('callsign')">
+                                    Callsign <span id="sort-callsign">↕</span>
+                                </th>
+                                <th class="px-4 py-3 cursor-pointer hover:bg-gray-200 text-right" onclick="sortStationsTable('connections')">
+                                    Connections <span id="sort-connections">↕</span>
+                                </th>
+                                <th class="px-4 py-3 cursor-pointer hover:bg-gray-200 text-right" onclick="sortStationsTable('messagesRx')">
+                                    Msgs Rx <span id="sort-messagesRx">↕</span>
+                                </th>
+                                <th class="px-4 py-3 cursor-pointer hover:bg-gray-200 text-right" onclick="sortStationsTable('messagesTx')">
+                                    Msgs Tx <span id="sort-messagesTx">↕</span>
+                                </th>
+                                <th class="px-4 py-3 cursor-pointer hover:bg-gray-200 text-right" onclick="sortStationsTable('totalMessages')">
+                                    Total Msgs <span id="sort-totalMessages">↕</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="stationsTableBody" class="divide-y divide-gray-200">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Summary -->
+                <div class="mt-4 pt-3 border-t border-gray-200 text-sm text-gray-600">
+                    <span id="stationsTableSummary">Loading...</span>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="flex justify-end pt-3 border-t border-gray-200 mt-4">
+                <button onclick="closeAllStationsModal()" 
+                        class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
+    </script>
+<script src="shared/settings-modal.js"></script>
+</body>
+</html>

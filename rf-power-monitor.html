@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RF Power Monitor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(34, 197, 94, 0.5); } 50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8); } }
+        .transmitting { animation: pulse-glow 0.5s ease-in-out infinite; border-color: #22c55e !important; }
+        .gauge-container { position: relative; width: 200px; height: 110px; margin: 0 auto; }
+        .gauge-bg { position: absolute; width: 200px; height: 100px; border-radius: 100px 100px 0 0; background: linear-gradient(90deg, #22c55e 0%, #eab308 50%, #ef4444 100%); }
+        .gauge-mask { position: absolute; width: 160px; height: 80px; background: #1f2937; border-radius: 80px 80px 0 0; top: 20px; left: 20px; }
+        .gauge-needle { position: absolute; width: 4px; height: 70px; background: white; bottom: 0; left: 98px; transform-origin: bottom center; transition: transform 0.3s ease-out; border-radius: 2px; }
+        .gauge-center { position: absolute; width: 16px; height: 16px; background: white; border-radius: 50%; bottom: -8px; left: 92px; }
+        .swr-bar { transition: width 0.3s ease-out; }
+        .heatmap-cell { transition: all 0.2s ease; }
+        .heatmap-cell:hover { transform: scale(1.1); z-index: 10; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #374151; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 3px; }
+        .tab-active { background: linear-gradient(to bottom, #3b82f6, #2563eb); color: white; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500">⚡ RF Power Monitor</h1>
+                <p id="dateRange" class="text-gray-400 text-sm">Loading transmitter power data...</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="navClocks" class="flex items-center gap-2 font-mono text-xs sm:text-sm">
+                    <span id="navUtcClock" class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold tracking-wider" title="UTC / Zulu">--:--:-- Z</span>
+                    <span id="navLocalClock" class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gray-700 text-gray-300 font-semibold tracking-wider" title="Local time">--:--:-- L</span>
+                </div>
+                <div id="statusIndicator" class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span id="statusText" class="text-sm text-gray-300">Loading...</span>
+                    <span id="dataSourceBadge" class="text-xs px-2 py-0.5 rounded-full hidden"></span>
+                </div>
+                <!-- Data Range Selector -->
+                <div class="flex bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+                    <button id="range1d" onclick="setDataRange(1)" class="range-btn px-3 py-2 text-sm font-semibold bg-blue-600 text-white transition-colors">1 Day</button>
+                    <button id="range7d" onclick="setDataRange(7)" class="range-btn px-3 py-2 text-sm font-semibold text-gray-400 hover:bg-gray-700 transition-colors">7 Days</button>
+                    <button id="range30d" onclick="setDataRange(30)" class="range-btn px-3 py-2 text-sm font-semibold text-gray-400 hover:bg-gray-700 transition-colors">30 Days</button>
+                </div>
+                <input type="file" id="fileInput" accept=".txt,.csv" multiple class="hidden">
+                <button onclick="document.getElementById('fileInput').click()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors">📂 Load</button>
+            </div>
+        </div>
+
+        <!-- Channel Cards - 2 Channels -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <!-- Channel 1 -->
+            <div id="channel1Card" class="bg-gray-800 rounded-xl p-4 border-2 border-gray-700 transition-all">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-lg text-green-400">Channel 1</h3>
+                    <span id="ch1Status" class="text-xs px-3 py-1 bg-gray-700 text-gray-400 rounded-full">IDLE</span>
+                </div>
+                <div class="gauge-container mb-2"><div class="gauge-bg"></div><div class="gauge-mask"></div><div id="ch1Needle" class="gauge-needle" style="transform: rotate(-90deg);"></div><div class="gauge-center"></div></div>
+                <div class="text-center mb-3"><div id="ch1Power" class="text-4xl font-bold text-green-400">0.0</div><div class="text-gray-500 text-sm">Watts (Peak)</div></div>
+                <div class="grid grid-cols-3 gap-2 text-sm">
+                    <div class="bg-gray-700/50 rounded-lg p-2 text-center"><div class="text-gray-400 text-xs">Average</div><div id="ch1Avg" class="font-bold text-blue-400 text-lg">0.0 W</div></div>
+                    <div class="bg-gray-700/50 rounded-lg p-2 text-center"><div class="text-gray-400 text-xs">Reflected</div><div id="ch1Rfld" class="font-bold text-yellow-400 text-lg">0.0 W</div></div>
+                    <div class="bg-gray-700/50 rounded-lg p-2 text-center"><div class="text-gray-400 text-xs">Accum. Wh</div><div id="ch1Wh" class="font-bold text-purple-400 text-lg">0.0</div></div>
+                </div>
+                <div class="mt-3 bg-gray-700/30 rounded-lg p-2"><div class="flex justify-between text-xs text-gray-400 mb-1"><span>SWR Estimate</span><span id="ch1SWR">1.0:1</span></div><div class="h-2 bg-gray-700 rounded-full overflow-hidden"><div id="ch1SWRBar" class="swr-bar h-full bg-green-500 rounded-full" style="width: 0%"></div></div></div>
+            </div>
+            <!-- Channel 2 -->
+            <div id="channel2Card" class="bg-gray-800 rounded-xl p-4 border-2 border-gray-700 transition-all">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-lg text-blue-400">Channel 2</h3>
+                    <span id="ch2Status" class="text-xs px-3 py-1 bg-gray-700 text-gray-400 rounded-full">IDLE</span>
+                </div>
+                <div class="gauge-container mb-2"><div class="gauge-bg"></div><div class="gauge-mask"></div><div id="ch2Needle" class="gauge-needle" style="transform: rotate(-90deg);"></div><div class="gauge-center"></div></div>
+                <div class="text-center mb-3"><div id="ch2Power" class="text-4xl font-bold text-blue-400">0.0</div><div class="text-gray-500 text-sm">Watts (Peak)</div></div>
+                <div class="grid grid-cols-3 gap-2 text-sm">
+                    <div class="bg-gray-700/50 rounded-lg p-2 text-center"><div class="text-gray-400 text-xs">Average</div><div id="ch2Avg" class="font-bold text-blue-400 text-lg">0.0 W</div></div>
+                    <div class="bg-gray-700/50 rounded-lg p-2 text-center"><div class="text-gray-400 text-xs">Reflected</div><div id="ch2Rfld" class="font-bold text-yellow-400 text-lg">0.0 W</div></div>
+                    <div class="bg-gray-700/50 rounded-lg p-2 text-center"><div class="text-gray-400 text-xs">Accum. Wh</div><div id="ch2Wh" class="font-bold text-purple-400 text-lg">0.0</div></div>
+                </div>
+                <div class="mt-3 bg-gray-700/30 rounded-lg p-2"><div class="flex justify-between text-xs text-gray-400 mb-1"><span>SWR Estimate</span><span id="ch2SWR">1.0:1</span></div><div class="h-2 bg-gray-700 rounded-full overflow-hidden"><div id="ch2SWRBar" class="swr-bar h-full bg-green-500 rounded-full" style="width: 0%"></div></div></div>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+            <div class="bg-gradient-to-br from-green-900/50 to-green-800/30 rounded-xl p-3 border border-green-700/50"><div class="text-green-400 text-xs font-semibold"><span class="range-label">1d</span> Peak</div><div id="totalPeak" class="text-xl font-bold text-white">0.0 W</div></div>
+            <div class="bg-gradient-to-br from-purple-900/50 to-purple-800/30 rounded-xl p-3 border border-purple-700/50"><div class="text-purple-400 text-xs font-semibold"><span class="range-label">1d</span> Total Wh</div><div id="totalWh" class="text-xl font-bold text-white">0.0</div></div>
+            <div class="bg-gradient-to-br from-orange-900/50 to-orange-800/30 rounded-xl p-3 border border-orange-700/50"><div class="text-orange-400 text-xs font-semibold">TX Events</div><div id="txCount" class="text-xl font-bold text-white">0</div></div>
+            <div class="bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 rounded-xl p-3 border border-cyan-700/50"><div class="text-cyan-400 text-xs font-semibold">Avg TX Power</div><div id="avgTxPower" class="text-xl font-bold text-white">0.0 W</div></div>
+            <div class="bg-gradient-to-br from-pink-900/50 to-pink-800/30 rounded-xl p-3 border border-pink-700/50"><div class="text-pink-400 text-xs font-semibold">Duty Cycle</div><div id="dutyCycle" class="text-xl font-bold text-white">0.0%</div></div>
+            <div class="bg-gradient-to-br from-indigo-900/50 to-indigo-800/30 rounded-xl p-3 border border-indigo-700/50"><div class="text-indigo-400 text-xs font-semibold">Files Loaded</div><div id="filesLoaded" class="text-xl font-bold text-white">0</div></div>
+        </div>
+
+        <!-- Tabbed Section -->
+        <div class="bg-gray-800 rounded-xl p-4 mb-6">
+            <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-700 pb-3">
+                <button onclick="showTab('power')" id="tabPower" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold tab-active">📊 Power History</button>
+                <button onclick="showTab('hourly')" id="tabHourly" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-700 hover:bg-gray-600">🕐 Hourly Stats</button>
+                <button onclick="showTab('heatmap')" id="tabHeatmap" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-700 hover:bg-gray-600">🔥 Activity Heatmap</button>
+                <button onclick="showTab('events')" id="tabEvents" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-700 hover:bg-gray-600">📡 TX Events</button>
+            </div>
+            <div id="panelPower" class="tab-panel">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-4">
+                        <select id="chartMetric" onchange="updateChart()" class="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"><option value="peak">Peak Power</option><option value="avg">Average Power</option><option value="rfld">Reflected Power</option></select>
+                        <select id="chartChannel" onchange="updateChart()" class="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">Both Channels</option><option value="1">Channel 1</option><option value="2">Channel 2</option></select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="setTimeRange(3600)" class="time-btn px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg">1h</button>
+                        <button onclick="setTimeRange(14400)" class="time-btn px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg">4h</button>
+                        <button onclick="setTimeRange(43200)" class="time-btn px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg">12h</button>
+                        <button onclick="setTimeRange(86400)" class="time-btn px-3 py-1 text-xs bg-blue-600 rounded-lg">24h</button>
+                        <button onclick="setTimeRange(0)" class="time-btn px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded-lg">All</button>
+                    </div>
+                </div>
+                <div class="h-72"><canvas id="powerChart"></canvas></div>
+            </div>
+            <div id="panelHourly" class="tab-panel hidden">
+                <div class="h-72"><canvas id="hourlyChart"></canvas></div>
+                <div class="mt-4 max-h-48 overflow-y-auto custom-scrollbar"><table class="w-full text-sm"><thead class="text-gray-400 text-xs sticky top-0 bg-gray-800"><tr><th class="text-left p-2">Hour</th><th class="text-right p-2">TX Events</th><th class="text-right p-2">Ch1 Peak</th><th class="text-right p-2">Ch2 Peak</th><th class="text-right p-2">Total Wh</th></tr></thead><tbody id="hourlyTableBody" class="text-gray-300"></tbody></table></div>
+            </div>
+            <div id="panelHeatmap" class="tab-panel hidden">
+                <div class="flex items-center gap-4 mb-4"><select id="heatmapMetric" onchange="renderHeatmap()" class="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"><option value="txCount">TX Events</option><option value="power">Peak Power</option><option value="wh">Watt-Hours</option></select><select id="heatmapChannel" onchange="renderHeatmap()" class="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">Both Channels</option><option value="1">Channel 1</option><option value="2">Channel 2</option></select></div>
+                <div class="overflow-x-auto custom-scrollbar"><div id="heatmapContainer" class="min-w-[600px]"><div class="text-gray-500 text-center py-8">Load data to see heatmap</div></div></div>
+                <div class="flex items-center justify-center gap-4 mt-4 text-xs text-gray-400"><span>Less</span><div class="flex gap-1"><div class="w-4 h-4 rounded bg-gray-700"></div><div class="w-4 h-4 rounded bg-green-900"></div><div class="w-4 h-4 rounded bg-green-700"></div><div class="w-4 h-4 rounded bg-yellow-600"></div><div class="w-4 h-4 rounded bg-orange-500"></div><div class="w-4 h-4 rounded bg-red-500"></div></div><span>More</span></div>
+            </div>
+            <div id="panelEvents" class="tab-panel hidden">
+                <div class="flex items-center justify-between mb-4"><span class="text-sm text-gray-400">TX threshold: <span id="txThreshold" class="text-white font-bold">5</span>W</span><input type="range" id="thresholdSlider" min="1" max="50" value="5" class="w-32" oninput="updateThreshold(this.value)"></div>
+                <div id="txEventsContainer" class="space-y-2 max-h-96 overflow-y-auto custom-scrollbar"><div class="text-gray-500 text-center py-8">No transmit events</div></div>
+            </div>
+        </div>
+
+        <!-- Playback -->
+        <div class="bg-gray-800 rounded-xl p-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <button id="playBtn" onclick="togglePlayback()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">▶️ Play</button>
+                    <button onclick="stepBack()" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">⏮️</button>
+                    <button onclick="stepForward()" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">⏭️</button>
+                    <select id="playbackSpeed" onchange="updatePlaybackSpeed()" class="bg-gray-700 rounded-lg px-3 py-2 text-sm"><option value="1">1x</option><option value="10" selected>10x</option><option value="50">50x</option><option value="100">100x</option><option value="500">500x</option></select>
+                </div>
+                <div class="flex items-center gap-2 text-sm"><span id="playbackDate" class="font-mono text-gray-500">--/--/----</span><span id="playbackTime" class="font-mono text-white text-lg">--:--:--</span><span id="playbackFreq" class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-500 ml-2"></span></div>
+            </div>
+            <div class="mt-4"><input type="range" id="playbackSlider" min="0" max="100" value="100" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" oninput="seekPlayback(this.value)"></div>
+        </div>
+    </div>
+
+    <script>
+        const LOG_PATH = './logs/', TX_THRESHOLD_DEFAULT = 5;
+        const CHANNEL_NAMES = { 1: 'Channel 1', 2: 'Channel 2' };
+        const CHANNEL_COLORS = { 1: { border: '#22c55e', bg: 'rgba(34,197,94,0.2)' }, 2: { border: '#3b82f6', bg: 'rgba(59,130,246,0.2)' } };
+        
+        const BAND_COLORS = { '160m': '#7c3aed', '80m': '#ef4444', '40m': '#f59e0b', '30m': '#10b981', '20m': '#3b82f6', '17m': '#8b5cf6', '15m': '#ec4899', '12m': '#14b8a6', '10m': '#f97316' };
+        
+        
+        // === STATE === (var for console access during debugging)
+        var allLogData = [];      // ALL loaded raw samples (up to 30 days)
+        var logData = [];          // Filtered to selected range
+        var playbackIndex = 0, isPlaying = false, playbackInterval = null, playbackSpeed = 10, timeRangeSeconds = 86400;
+        var powerChart = null, hourlyChart = null, txEvents = [], maxPower = 100, txThreshold = TX_THRESHOLD_DEFAULT, hourlyStats = {};
+        var channelStats = { 1: {}, 2: {} }, filesLoadedCount = 0;
+        var selectedDays = 1;      // Current range: 1, 7, or 30 days
+        var isLoading = false;     // Prevent double-loading
+        var dataSource = '';       // 'api' or 'legacy' — how data was loaded
+        
+        // Connection time windows from VARA/BBS logs for frequency correlation
+        // Each entry: { startTs, endTs, callsign, freqMHz, band }
+        var connectionWindows = [];
+
+        function calcSWR(fwd, rfl) {
+            if (fwd <= 0 || rfl < 0) return 1.0;
+            if (rfl >= fwd) return 10.0;
+            const gamma = Math.sqrt(rfl / fwd);
+            return Math.min((1 + gamma) / (1 - gamma), 10.0);
+        }
+
+        function parseDateTime(dateStr, timeStr) {
+            try {
+                const [mm, dd, yyyy] = dateStr.split('/').map(Number);
+                const [hh, mi, ss] = timeStr.split(':').map(Number);
+                return new Date(yyyy, mm - 1, dd, hh, mi, ss);
+            } catch (e) {
+                return new Date();
+            }
+        }
+
+        function initCharts() {
+            powerChart = new Chart(document.getElementById('powerChart').getContext('2d'), {
+                type: 'line', 
+                data: { labels: [], datasets: [
+                    { label: 'Channel 1', data: [], borderColor: CHANNEL_COLORS[1].border, backgroundColor: CHANNEL_COLORS[1].bg, fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2 },
+                    { label: 'Channel 2', data: [], borderColor: CHANNEL_COLORS[2].border, backgroundColor: CHANNEL_COLORS[2].bg, fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, interaction: { intersect: false, mode: 'index' },
+                    scales: { x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af', maxTicksLimit: 12 } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af' }, title: { display: true, text: 'Watts', color: '#9ca3af' } } },
+                    plugins: { legend: { labels: { color: '#9ca3af', usePointStyle: true } } } }
+            });
+            hourlyChart = new Chart(document.getElementById('hourlyChart').getContext('2d'), {
+                type: 'bar', 
+                data: { labels: [], datasets: [
+                    { label: 'Ch1 TX', data: [], backgroundColor: 'rgba(34,197,94,0.7)', yAxisID: 'y' },
+                    { label: 'Ch2 TX', data: [], backgroundColor: 'rgba(59,130,246,0.7)', yAxisID: 'y' },
+                    { label: 'Total Wh', data: [], backgroundColor: 'rgba(168,85,247,0.7)', yAxisID: 'y1' }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+                    scales: { x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af' } }, 
+                        y: { position: 'left', beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#22c55e' } }, 
+                        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: '#a855f7' } } },
+                    plugins: { legend: { labels: { color: '#9ca3af' } } } }
+            });
+        }
+
+        function parseCSV(text) {
+            const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].trim().split(',');
+                if (cols.length >= 10) {
+                    const entry = { 
+                        date: cols[0], 
+                        time: cols[1], 
+                        timestamp: parseDateTime(cols[0], cols[1]),
+                        ch1: { peak: parseFloat(cols[2]) || 0, rfld: parseFloat(cols[3]) || 0, avg: parseFloat(cols[4]) || 0 }, 
+                        ch2: { peak: parseFloat(cols[5]) || 0, rfld: parseFloat(cols[6]) || 0, avg: parseFloat(cols[7]) || 0 }, 
+                        wh1: parseFloat(cols[8]) || 0, 
+                        wh2: parseFloat(cols[9]) || 0 
+                    };
+                    data.push(entry);
+                }
+            }
+            return data;
+        }
+
+        // === FREQUENCY CORRELATION ===
+        // Load connection windows from server API (VARA + BBS logs parsed server-side)
+        async function loadConnectionData() {
+            connectionWindows = [];
+            try {
+                const r = await fetch(`api/data.php?source=connections&days=${Math.max(selectedDays, 7)}&t=${Date.now()}`);
+                if (!r.ok) {
+                    console.error('[RF-FREQ] connections endpoint returned', r.status);
+                    return;
+                }
+                const json = await r.json();
+                
+                if (json.connections && json.connections.length > 0) {
+                    connectionWindows = json.connections.map(c => ({
+                        startTs: c.startTs * 1000,
+                        endTs: c.endTs ? c.endTs * 1000 : null,
+                        callsign: c.callsign,
+                        freqMHz: c.freq || null,
+                        band: c.band || null,
+                        failed: !!c.failed
+                    }));
+                } else {
+                    console.warn('[RF-FREQ] No connections returned from API');
+                }
+            } catch(e) {
+                console.error('[RF-FREQ] Connection data load failed:', e.message);
+            }
+        }
+        
+        // Log diagnostic info after both datasets are loaded (called from processLoadedData)
+        function logCorrelationDiagnostics() {
+            if (connectionWindows.length === 0) {
+                console.warn('[RF-FREQ] No connection windows — frequency correlation disabled');
+                console.warn('[RF-FREQ] Check: api/data.php?source=connections&days=7&debug=1');
+                return;
+            }
+            if (logData.length === 0) return;
+            
+            const cFirst = connectionWindows[0], cLast = connectionWindows[connectionWindows.length - 1];
+            const dFirst = logData[0], dLast = logData[logData.length - 1];
+            
+            
+            // Check for overlap
+            const connStart = cFirst.startTs, connEnd = cLast.endTs || cLast.startTs;
+            const dataStart = dFirst.timestamp.getTime(), dataEnd = dLast.timestamp.getTime();
+            const hasOverlap = connStart <= dataEnd && connEnd >= dataStart;
+            
+            if (!hasOverlap) {
+                const gapMs = Math.min(Math.abs(connEnd - dataStart), Math.abs(dataEnd - connStart));
+                console.error(`[RF-FREQ] Gap between datasets: ${(gapMs / 3600000).toFixed(1)} hours — likely a timezone mismatch`);
+            }
+            
+            // Test correlation on last few TX events
+            const recentTx = txEvents.slice(0, 5);
+            for (const tx of recentTx) {
+                const txTs = logData[tx.startIndex].timestamp.getTime();
+                const conn = findConnectionAt(txTs);
+            }
+        }
+        
+        // === TIMESTAMP OFFSET AUTO-DETECTION ===
+        // DataLog CSVs may be in local time while connections (VARA/BBS) are UTC.
+        // If the server is UTC, mktime() misinterprets local timestamps.
+        // Detect and compensate automatically.
+        let connectionOffsetMs = 0;  // Added to DataLog timestamps to align with connection timestamps
+        
+        function detectTimestampOffset() {
+            connectionOffsetMs = 0;
+            if (connectionWindows.length === 0 || logData.length === 0) return;
+            
+            // Compare the time spans of both datasets
+            const cFirst = connectionWindows[0].startTs;
+            const cLast = connectionWindows[connectionWindows.length - 1].endTs || connectionWindows[connectionWindows.length - 1].startTs;
+            const dFirst = logData[0].timestamp.getTime();
+            const dLast = logData[logData.length - 1].timestamp.getTime();
+            
+            // Check if they already overlap — no offset needed
+            if (cFirst <= dLast && cLast >= dFirst) {
+                return;
+            }
+            
+            // They don't overlap. Estimate offset from midpoints.
+            const cMid = (cFirst + cLast) / 2;
+            const dMid = (dFirst + dLast) / 2;
+            const rawOffset = cMid - dMid;
+            
+            // Round to nearest whole hour (timezone offsets are always whole or half hours)
+            const offsetHours = Math.round(rawOffset / 3600000);
+            if (offsetHours === 0) {
+                console.warn('[RF-FREQ] Datasets don\'t overlap but offset is <30min — data may be from different time periods');
+                return;
+            }
+            
+            connectionOffsetMs = offsetHours * 3600000;
+            
+            // Verify the offset creates overlap
+            const adjDFirst = dFirst + connectionOffsetMs;
+            const adjDLast = dLast + connectionOffsetMs;
+            const nowOverlaps = cFirst <= adjDLast && cLast >= adjDFirst;
+        }
+        
+        // Find which connection (if any) overlaps a given DataLog timestamp (ms)
+        // Applies connectionOffsetMs to correct for timezone mismatch
+        function findConnectionAt(datalogTs) {
+            const ts = datalogTs + connectionOffsetMs;  // Adjust DataLog time to match connection time base
+            // Scan backwards (connections sorted ascending by startTs)
+            for (let i = connectionWindows.length - 1; i >= 0; i--) {
+                const w = connectionWindows[i];
+                const end = w.endTs || (w.startTs + 120000); // assume 2min if no end
+                // ±30s tolerance for clock drift between DataLog and VARA/BBS logs
+                if (ts >= w.startTs - 30000 && ts <= end + 30000) {
+                    return w;
+                }
+                // Stop searching once connections are more than 5 min before our target
+                if (w.startTs < ts - 300000) break;
+            }
+            return null;
+        }
+
+        // === DATA LOADING ===
+        // Uses server-side API (api/data.php) for parsing and caching.
+        // Full load: fetches all data for max range (31 days). Called once on startup.
+        // Refresh load: fetches last 2 days only. Called by auto-refresh timer.
+        async function loadAllData(refreshOnly) {
+            if (isLoading) return;
+            isLoading = true;
+            document.getElementById('statusText').textContent = refreshOnly ? 'Refreshing...' : 'Loading data...';
+            
+            const now = new Date();
+            const daysToFetch = refreshOnly ? 2 : 31;
+            
+            try {
+                const r = await fetch(`api/data.php?source=datalog&days=${daysToFetch}&t=${Date.now()}`);
+                if (!r.ok) {
+                    // Try to read the error body for diagnostics
+                    let errBody = '';
+                    try { errBody = await r.text(); } catch(e2) {}
+                    console.error('[RF-API] datalog endpoint error:', r.status, errBody);
+                    throw new Error('API returned ' + r.status + (errBody ? ': ' + errBody.substring(0, 200) : ''));
+                }
+                const json = await r.json();
+                
+                if (json.error) throw new Error(json.error);
+                if (!json.data || json.data.length === 0) {
+                    if (allLogData.length === 0) {
+                        document.getElementById('statusText').textContent = 'No data found';
+                        isLoading = false;
+                        return;
+                    }
+                    // Refresh found nothing new — keep existing data
+                    isLoading = false;
+                    filterByRange();
+                    return;
+                }
+                
+                // Convert compact arrays to objects: [ts, c1p, c1r, c1a, c2p, c2r, c2a, wh1, wh2]
+                const newData = json.data.map(s => {
+                    const d = new Date(s[0] * 1000);  // Unix seconds → JS Date
+                    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getUTCDate()).padStart(2, '0');
+                    const yyyy = d.getUTCFullYear();
+                    const hh = String(d.getUTCHours()).padStart(2, '0');
+                    const mi = String(d.getUTCMinutes()).padStart(2, '0');
+                    const ss = String(d.getUTCSeconds()).padStart(2, '0');
+                    return {
+                        date: `${mm}/${dd}/${yyyy}`,
+                        time: `${hh}:${mi}:${ss}`,
+                        timestamp: d,
+                        ch1: { peak: s[1], rfld: s[2], avg: s[3] },
+                        ch2: { peak: s[4], rfld: s[5], avg: s[6] },
+                        wh1: s[7], wh2: s[8]
+                    };
+                });
+                
+                if (refreshOnly && allLogData.length > 0) {
+                    // Merge: keep older data, replace last 2 days with fresh
+                    const twoDaysAgo = new Date(now.getTime() - 2 * 86400000);
+                    const olderData = allLogData.filter(d => d.timestamp < twoDaysAgo);
+                    const merged = olderData.concat(newData);
+                    merged.sort((a, b) => a.timestamp - b.timestamp);
+                    const seen = new Set();
+                    allLogData = merged.filter(d => { const k = d.timestamp.getTime(); if (seen.has(k)) return false; seen.add(k); return true; });
+                } else {
+                    allLogData = newData;
+                    filesLoadedCount = json.files || 0;
+                }
+            } catch(e) {
+                console.warn('API load failed, falling back to direct file loading:', e.message);
+                dataSource = 'legacy';
+                await loadAllDataLegacy(refreshOnly);
+                return;
+            }
+            
+            // Load connection data for frequency correlation
+            await loadConnectionData();
+            
+            dataSource = 'api';
+            isLoading = false;
+            filterByRange();
+        }
+        
+        // Legacy fallback: direct file loading (if api/data.php is not available)
+        async function loadAllDataLegacy(refreshOnly) {
+            const now = new Date();
+            const daysToLoad = refreshOnly ? 2 : 31;
+            let fileList = [];
+            
+            // Try PHP lister first
+            if (!refreshOnly) {
+                try {
+                    const r = await fetch(LOG_PATH + 'datalog-list.php?t=' + Date.now());
+                    if (r.ok) { const d = await r.json(); if (d.success && d.files) fileList = d.files.map(f => typeof f === 'string' ? f : f.name); }
+                } catch(e) {}
+            }
+            
+            // Generate filenames as fallback (try both tilde~ and underscore_ separators)
+            if (fileList.length === 0) {
+                for (let i = 0; i < daysToLoad; i++) {
+                    const d = new Date(now); d.setUTCDate(d.getUTCDate() - i);
+                    const mm = String(d.getUTCMonth()+1).padStart(2,'0'), dd = String(d.getUTCDate()).padStart(2,'0'), yyyy = d.getUTCFullYear();
+                    for (const t of ['000000','060000','080000','100000','120000','140000','160000','162457','180000','200000','220000']) {
+                        fileList.push(`DataLog~${mm}${dd}${yyyy}~${t}.txt`);
+                        fileList.push(`DataLog_${mm}${dd}${yyyy}_${t}.txt`);
+                    }
+                }
+            }
+            
+            let newData = [], loadedFiles = 0;
+            const BATCH = 8;
+            for (let i = 0; i < fileList.length; i += BATCH) {
+                const batch = fileList.slice(i, i + BATCH);
+                if (!refreshOnly) document.getElementById('statusText').textContent = `Loading files... ${Math.min(i+BATCH, fileList.length)}/${fileList.length}`;
+                const results = await Promise.all(batch.map(async fn => {
+                    try { const r = await fetch(LOG_PATH + fn + '?t=' + Date.now()); if (r.ok) { const t = await r.text(); if (t && !t.trim().startsWith('<') && t.includes('DATE,TIME')) return parseCSV(t); } } catch(e) {} return null;
+                }));
+                for (const data of results) { if (data && data.length > 0) { newData = newData.concat(data); loadedFiles++; } }
+            }
+            
+            if (newData.length === 0 && allLogData.length === 0) {
+                document.getElementById('statusText').textContent = 'No data found';
+                isLoading = false; return;
+            }
+            if (newData.length > 0) {
+                if (refreshOnly && allLogData.length > 0) {
+                    const twoDaysAgo = new Date(now.getTime() - 2*86400000);
+                    const merged = allLogData.filter(d => d.timestamp < twoDaysAgo).concat(newData);
+                    merged.sort((a,b) => a.timestamp - b.timestamp);
+                    const seen = new Set();
+                    allLogData = merged.filter(d => { const k = d.timestamp.getTime(); if (seen.has(k)) return false; seen.add(k); return true; });
+                } else {
+                    newData.sort((a,b) => a.timestamp - b.timestamp);
+                    const seen = new Set();
+                    allLogData = newData.filter(d => { const k = d.timestamp.getTime(); if (seen.has(k)) return false; seen.add(k); return true; });
+                }
+                filesLoadedCount = refreshOnly ? filesLoadedCount : loadedFiles;
+            }
+            await loadConnectionData();
+            isLoading = false;
+            filterByRange();
+        }
+
+        // === RANGE FILTERING & DOWNSAMPLING ===
+        function filterByRange() {
+            const now = new Date();
+            const cutoff = new Date(now.getTime() - selectedDays * 24 * 60 * 60 * 1000);
+            
+            // Filter to selected range
+            const filtered = allLogData.filter(d => d.timestamp >= cutoff);
+            
+            // Use filtered data if available, otherwise show whatever we have
+            const rangeData = filtered.length > 0 ? filtered : allLogData;
+            
+            // Downsample for longer ranges to keep UI responsive
+            // 1 day: use raw data (up to ~86400 samples)
+            // 7 days: average into ~30-sec buckets (keeps ~20k points)  
+            // 30 days: average into ~5-min buckets (keeps ~8600 points)
+            if (selectedDays <= 1) {
+                logData = rangeData;
+            } else if (selectedDays <= 7) {
+                logData = downsample(rangeData, 30);   // 30-second buckets
+            } else {
+                logData = downsample(rangeData, 300);  // 5-minute buckets
+            }
+            
+            // Update range label in summary cards
+            const label = selectedDays + 'd';
+            document.querySelectorAll('.range-label').forEach(el => el.textContent = label);
+            
+            processLoadedData();
+        }
+        
+        // Downsample data by averaging into time buckets of `bucketSecs` seconds
+        function downsample(data, bucketSecs) {
+            if (data.length === 0) return [];
+            const bucketMs = bucketSecs * 1000;
+            const result = [];
+            let bucketStart = data[0].timestamp.getTime();
+            let bucket = { ch1Peak: 0, ch1Rfld: 0, ch1Avg: 0, ch2Peak: 0, ch2Rfld: 0, ch2Avg: 0, wh1: 0, wh2: 0, count: 0, lastEntry: null };
+            
+            for (const d of data) {
+                const t = d.timestamp.getTime();
+                
+                if (t >= bucketStart + bucketMs && bucket.count > 0) {
+                    // Emit averaged bucket — use peak of peaks (not average of peaks) for power
+                    const e = bucket.lastEntry;
+                    result.push({
+                        date: e.date, time: e.time, timestamp: e.timestamp,
+                        ch1: { peak: bucket.ch1Peak, rfld: bucket.ch1Rfld / bucket.count, avg: bucket.ch1Avg / bucket.count },
+                        ch2: { peak: bucket.ch2Peak, rfld: bucket.ch2Rfld / bucket.count, avg: bucket.ch2Avg / bucket.count },
+                        wh1: bucket.wh1, wh2: bucket.wh2
+                    });
+                    // Reset bucket
+                    bucketStart = t;
+                    bucket = { ch1Peak: 0, ch1Rfld: 0, ch1Avg: 0, ch2Peak: 0, ch2Rfld: 0, ch2Avg: 0, wh1: 0, wh2: 0, count: 0, lastEntry: null };
+                }
+                
+                // Accumulate — track peak as max, others as running sum for averaging
+                if (d.ch1.peak > bucket.ch1Peak) bucket.ch1Peak = d.ch1.peak;
+                if (d.ch2.peak > bucket.ch2Peak) bucket.ch2Peak = d.ch2.peak;
+                bucket.ch1Rfld += d.ch1.rfld;
+                bucket.ch1Avg += d.ch1.avg;
+                bucket.ch2Rfld += d.ch2.rfld;
+                bucket.ch2Avg += d.ch2.avg;
+                bucket.wh1 = d.wh1;  // Wh is cumulative — use latest value
+                bucket.wh2 = d.wh2;
+                bucket.count++;
+                bucket.lastEntry = d;
+            }
+            
+            // Emit final bucket
+            if (bucket.count > 0) {
+                const e = bucket.lastEntry;
+                result.push({
+                    date: e.date, time: e.time, timestamp: e.timestamp,
+                    ch1: { peak: bucket.ch1Peak, rfld: bucket.ch1Rfld / bucket.count, avg: bucket.ch1Avg / bucket.count },
+                    ch2: { peak: bucket.ch2Peak, rfld: bucket.ch2Rfld / bucket.count, avg: bucket.ch2Avg / bucket.count },
+                    wh1: bucket.wh1, wh2: bucket.wh2
+                });
+            }
+            
+            return result;
+        }
+
+        // === RANGE SELECTOR ===
+        function setDataRange(days) {
+            selectedDays = days;
+            
+            // Update button styles
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('text-gray-400', 'hover:bg-gray-700');
+            });
+            const activeBtn = document.getElementById('range' + days + 'd');
+            activeBtn.classList.add('bg-blue-600', 'text-white');
+            activeBtn.classList.remove('text-gray-400', 'hover:bg-gray-700');
+            
+            if (allLogData.length > 0) {
+                filterByRange();
+            }
+        }
+
+        function updateDataSourceBadge() {
+            const badge = document.getElementById('dataSourceBadge');
+            if (dataSource === 'api') {
+                badge.textContent = 'API';
+                badge.style.background = '#065f46';
+                badge.style.color = '#6ee7b7';
+                badge.classList.remove('hidden');
+            } else if (dataSource === 'legacy') {
+                badge.textContent = 'Direct';
+                badge.style.background = '#713f12';
+                badge.style.color = '#fde68a';
+                badge.classList.remove('hidden');
+            }
+        }
+        
+        function processLoadedData() {
+            if (logData.length === 0) return;
+            
+            updateDataSourceBadge();
+            
+            maxPower = Math.max(100, ...logData.flatMap(d => [d.ch1.peak, d.ch2.peak]));
+            maxPower = Math.ceil(maxPower / 10) * 10;
+            detectTimestampOffset();  // Auto-detect and compensate timezone mismatch before correlation
+            calculateStats();
+            
+            const first = logData[0], last = logData[logData.length - 1];
+            const rangeLabel = selectedDays === 1 ? 'Last 24 hours' : `Last ${selectedDays} days`;
+            document.getElementById('dateRange').textContent = `${rangeLabel}: ${first.date} ${first.time} → ${last.date} ${last.time}`;
+            document.getElementById('statusText').textContent = `${logData.length.toLocaleString()} samples (${selectedDays}d)`;
+            document.getElementById('filesLoaded').textContent = filesLoadedCount;
+            
+            playbackIndex = logData.length - 1;
+            updateDisplay();
+            updateHourlyChart();
+            renderHeatmap();
+            renderTxEvents();
+            logCorrelationDiagnostics();
+        }
+
+        function calculateStats() {
+            hourlyStats = {}; 
+            txEvents = [];
+            channelStats = { 1: { txCount: 0, txTime: 0, peakPower: 0, powers: [] }, 2: { txCount: 0, txTime: 0, peakPower: 0, powers: [] } };
+            let currentTx = { 1: null, 2: null };
+            
+            for (let i = 0; i < logData.length; i++) {
+                const d = logData[i];
+                const hour = d.date + ' ' + d.time.substring(0, 2) + ':00';
+                
+                if (!hourlyStats[hour]) {
+                    hourlyStats[hour] = { txCount: 0, txTime: 0, peakPower: 0, totalPower: 0, samples: 0, wh: 0, 
+                        channels: { 1: { tx: 0, peak: 0, wh: 0 }, 2: { tx: 0, peak: 0, wh: 0 } } };
+                }
+                const hs = hourlyStats[hour];
+                
+                for (let ch = 1; ch <= 2; ch++) {
+                    const power = d[`ch${ch}`].peak;
+                    if (power > channelStats[ch].peakPower) channelStats[ch].peakPower = power;
+                    if (power > hs.channels[ch].peak) hs.channels[ch].peak = power;
+                    if (power > hs.peakPower) hs.peakPower = power;
+                    hs.channels[ch].wh = d[`wh${ch}`];
+                    
+                    if (power >= txThreshold) {
+                        channelStats[ch].powers.push(power);
+                        hs.totalPower += power;
+                        hs.samples++;
+                        
+                        if (!currentTx[ch]) { 
+                            currentTx[ch] = { channel: ch, startIndex: i, startTime: d.time, startDate: d.date, peakPower: power, peakReflected: d[`ch${ch}`].rfld, powers: [power] }; 
+                            channelStats[ch].txCount++;
+                            hs.txCount++;
+                            hs.channels[ch].tx++; 
+                        } else { 
+                            currentTx[ch].powers.push(power); 
+                            if (power > currentTx[ch].peakPower) {
+                                currentTx[ch].peakPower = power;
+                                currentTx[ch].peakReflected = d[`ch${ch}`].rfld;
+                            }
+                        }
+                        channelStats[ch].txTime++;
+                        hs.txTime++;
+                    } else if (currentTx[ch]) {
+                        currentTx[ch].endIndex = i - 1;
+                        currentTx[ch].endTime = logData[i - 1].time;
+                        currentTx[ch].duration = currentTx[ch].powers.length;
+                        currentTx[ch].avgPower = currentTx[ch].powers.reduce((a, b) => a + b, 0) / currentTx[ch].powers.length;
+                        currentTx[ch].swr = calcSWR(currentTx[ch].peakPower, currentTx[ch].peakReflected);
+                        // Correlate with VARA connection for frequency/band
+                        const txStartTs = logData[currentTx[ch].startIndex].timestamp.getTime();
+                        const conn = findConnectionAt(txStartTs);
+                        if (conn) { currentTx[ch].freqMHz = conn.freqMHz; currentTx[ch].band = conn.band; currentTx[ch].connCallsign = conn.callsign; currentTx[ch].connFailed = conn.failed; }
+                        txEvents.push(currentTx[ch]);
+                        currentTx[ch] = null;
+                    }
+                }
+            }
+            
+            // Close open TX events
+            for (let ch = 1; ch <= 2; ch++) {
+                if (currentTx[ch]) { 
+                    const last = logData[logData.length - 1];
+                    currentTx[ch].endIndex = logData.length - 1;
+                    currentTx[ch].endTime = last.time;
+                    currentTx[ch].duration = currentTx[ch].powers.length;
+                    currentTx[ch].avgPower = currentTx[ch].powers.reduce((a, b) => a + b, 0) / currentTx[ch].powers.length;
+                    currentTx[ch].swr = calcSWR(currentTx[ch].peakPower, currentTx[ch].peakReflected);
+                    const txStartTs = logData[currentTx[ch].startIndex].timestamp.getTime();
+                    const conn = findConnectionAt(txStartTs);
+                    if (conn) { currentTx[ch].freqMHz = conn.freqMHz; currentTx[ch].band = conn.band; currentTx[ch].connCallsign = conn.callsign; currentTx[ch].connFailed = conn.failed; }
+                    txEvents.push(currentTx[ch]); 
+                }
+            }
+            
+            Object.values(hourlyStats).forEach(hs => { 
+                if (hs.samples > 0) hs.avgPower = hs.totalPower / hs.samples;
+                hs.wh = hs.channels[1].wh + hs.channels[2].wh;
+            });
+            
+            txEvents.sort((a, b) => b.startIndex - a.startIndex);
+            if (txEvents.length > 0) {
+                const first = logData[txEvents[txEvents.length-1].startIndex];
+                const last = logData[txEvents[0].startIndex];
+            }
+            if (connectionWindows.length > 0) {
+                const cFirst = new Date(connectionWindows[0].startTs);
+                const cLast = new Date(connectionWindows[connectionWindows.length-1].startTs);
+            }
+        }
+
+        function updateChannel(ch, data) {
+            const chData = data[`ch${ch}`];
+            const power = chData.peak, avg = chData.avg, rfld = chData.rfld, wh = data[`wh${ch}`];
+            const swr = calcSWR(power, rfld);
+            
+            document.getElementById(`ch${ch}Needle`).style.transform = `rotate(${Math.min((power / maxPower) * 180 - 90, 90)}deg)`;
+            document.getElementById(`ch${ch}Power`).textContent = power.toFixed(1);
+            document.getElementById(`ch${ch}Avg`).textContent = avg.toFixed(1) + ' W';
+            document.getElementById(`ch${ch}Rfld`).textContent = rfld.toFixed(1) + ' W';
+            document.getElementById(`ch${ch}Wh`).textContent = wh.toFixed(1);
+            document.getElementById(`ch${ch}SWR`).textContent = swr.toFixed(1) + ':1';
+            
+            const swrPercent = Math.min((swr - 1) / 4 * 100, 100);
+            const swrBar = document.getElementById(`ch${ch}SWRBar`);
+            swrBar.style.width = swrPercent + '%';
+            swrBar.className = 'swr-bar h-full rounded-full ' + (swr < 1.5 ? 'bg-green-500' : swr < 2.0 ? 'bg-yellow-500' : swr < 3.0 ? 'bg-orange-500' : 'bg-red-500');
+            
+            const card = document.getElementById(`channel${ch}Card`);
+            const status = document.getElementById(`ch${ch}Status`);
+            if (power >= txThreshold) {
+                card.classList.add('transmitting');
+                status.textContent = 'TX';
+                status.className = 'text-xs px-3 py-1 bg-green-600 text-white rounded-full font-bold';
+            } else {
+                card.classList.remove('transmitting');
+                status.textContent = 'IDLE';
+                status.className = 'text-xs px-3 py-1 bg-gray-700 text-gray-400 rounded-full';
+            }
+        }
+
+        function updateSummary() {
+            const data = logData[playbackIndex];
+            document.getElementById('totalPeak').textContent = Math.max(channelStats[1].peakPower, channelStats[2].peakPower).toFixed(1) + ' W';
+            document.getElementById('totalWh').textContent = (data.wh1 + data.wh2).toFixed(1);
+            document.getElementById('txCount').textContent = txEvents.length;
+            
+            const allPowers = channelStats[1].powers.concat(channelStats[2].powers);
+            document.getElementById('avgTxPower').textContent = (allPowers.length > 0 ? allPowers.reduce((a, b) => a + b, 0) / allPowers.length : 0).toFixed(1) + ' W';
+            
+            const totalTxTime = channelStats[1].txTime + channelStats[2].txTime;
+            document.getElementById('dutyCycle').textContent = (logData.length > 0 ? (totalTxTime / logData.length) * 100 : 0).toFixed(1) + '%';
+        }
+
+        function updateDisplay() {
+            if (logData.length === 0) return;
+            const data = logData[playbackIndex];
+            updateChannel(1, data);
+            updateChannel(2, data);
+            updateSummary();
+            updateChart();
+            document.getElementById('playbackDate').textContent = data.date;
+            document.getElementById('playbackTime').textContent = data.time;
+            document.getElementById('playbackSlider').value = (playbackIndex / (logData.length - 1)) * 100;
+            
+            // Show frequency/band if a connection is active at this timestamp
+            const freqEl = document.getElementById('playbackFreq');
+            const isTx = data.ch1.peak >= txThreshold || data.ch2.peak >= txThreshold;
+            if (isTx) {
+                const conn = findConnectionAt(data.timestamp.getTime());
+                if (conn && conn.band) {
+                    const icon = conn.failed ? '✗ ' : '✓ ';
+                    freqEl.textContent = `${icon}${conn.callsign} • ${conn.band}${conn.freqMHz ? ' • ' + conn.freqMHz.toFixed(3) : ''}`;
+                    freqEl.style.background = conn.failed ? '#991b1b' : (BAND_COLORS[conn.band] || '#374151');
+                    freqEl.style.color = 'white';
+                } else if (conn) {
+                    const icon = conn.failed ? '✗ ' : '✓ ';
+                    freqEl.textContent = icon + conn.callsign;
+                    freqEl.style.background = conn.failed ? '#991b1b' : '#374151';
+                    freqEl.style.color = conn.failed ? '#fca5a5' : '#9ca3af';
+                } else {
+                    freqEl.textContent = '';
+                }
+            } else {
+                freqEl.textContent = '';
+            }
+        }
+
+        function updateChart() {
+            if (logData.length === 0 || !powerChart) return;
+            const metric = document.getElementById('chartMetric').value;
+            const sel = document.getElementById('chartChannel').value;
+            const startIdx = timeRangeSeconds > 0 ? Math.max(0, playbackIndex - timeRangeSeconds) : 0;
+            const chartData = logData.slice(startIdx, playbackIndex + 1);
+            // Dynamic step: keep chart under ~800 points for smooth rendering
+            const step = Math.max(1, Math.floor(chartData.length / 800));
+            
+            const labels = [], ds1 = [], ds2 = [];
+            for (let i = 0; i < chartData.length; i += step) { 
+                const d = chartData[i]; 
+                labels.push(d.date.substring(0,5) + ' ' + d.time.substring(0,5)); 
+                ds1.push(d.ch1[metric]);
+                ds2.push(d.ch2[metric]); 
+            }
+            
+            powerChart.data.labels = labels;
+            powerChart.data.datasets[0].data = (sel === 'all' || sel === '1') ? ds1 : [];
+            powerChart.data.datasets[1].data = (sel === 'all' || sel === '2') ? ds2 : [];
+            powerChart.data.datasets[0].hidden = (sel === '2');
+            powerChart.data.datasets[1].hidden = (sel === '1');
+            powerChart.update('none');
+        }
+
+        function updateHourlyChart() {
+            if (!hourlyChart || Object.keys(hourlyStats).length === 0) return;
+            const hours = Object.keys(hourlyStats).sort();
+            
+            // For 7d/30d, show date+hour labels; for 1d show just hours
+            const labelFormat = selectedDays <= 1 
+                ? h => (h.split(' ')[1] || h)
+                : h => { const parts = h.split(' '); return parts[0].substring(0,5) + ' ' + (parts[1] || ''); };
+            
+            hourlyChart.data.labels = hours.map(labelFormat);
+            hourlyChart.data.datasets[0].data = hours.map(h => hourlyStats[h].channels[1].tx);
+            hourlyChart.data.datasets[1].data = hours.map(h => hourlyStats[h].channels[2].tx);
+            hourlyChart.data.datasets[2].data = hours.map(h => hourlyStats[h].wh);
+            hourlyChart.update('none');
+            
+            // For 7d/30d, limit table to most recent 168 hours (7 days) to prevent massive DOM
+            const displayHours = hours.length > 200 ? hours.slice(-200) : hours;
+            document.getElementById('hourlyTableBody').innerHTML = displayHours.map(h => {
+                const hs = hourlyStats[h];
+                return `<tr class="border-t border-gray-700 hover:bg-gray-700/50"><td class="p-2 font-mono">${h}</td><td class="p-2 text-right">${hs.txCount}</td><td class="p-2 text-right text-green-400">${hs.channels[1].peak.toFixed(1)}</td><td class="p-2 text-right text-blue-400">${hs.channels[2].peak.toFixed(1)}</td><td class="p-2 text-right text-purple-400">${hs.wh.toFixed(1)}</td></tr>`;
+            }).join('');
+        }
+
+        function renderHeatmap() {
+            const container = document.getElementById('heatmapContainer');
+            const metric = document.getElementById('heatmapMetric').value;
+            const channel = document.getElementById('heatmapChannel').value;
+            
+            if (Object.keys(hourlyStats).length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-8">Load data</div>';
+                return;
+            }
+            
+            const dateHourData = {}, dates = new Set();
+            Object.entries(hourlyStats).forEach(([key, stats]) => {
+                const [date, time] = key.split(' ');
+                const hour = parseInt(time.split(':')[0]);
+                dates.add(date);
+                if (!dateHourData[date]) dateHourData[date] = {};
+                
+                let val = 0;
+                if (metric === 'txCount') val = channel === 'all' ? stats.txCount : stats.channels[channel]?.tx || 0;
+                else if (metric === 'power') val = channel === 'all' ? stats.peakPower : stats.channels[channel]?.peak || 0;
+                else val = channel === 'all' ? stats.wh : stats.channels[channel]?.wh || 0;
+                dateHourData[date][hour] = val;
+            });
+            
+            const sortedDates = Array.from(dates).sort();
+            let maxVal = 0;
+            sortedDates.forEach(date => { for (let h = 0; h < 24; h++) maxVal = Math.max(maxVal, dateHourData[date]?.[h] || 0); });
+            
+            let html = '<div class="flex flex-col gap-1"><div class="flex gap-1 ml-24">';
+            for (let h = 0; h < 24; h++) html += `<div class="w-6 text-center text-xs text-gray-500">${h}</div>`;
+            html += '</div>';
+            
+            sortedDates.forEach(date => {
+                html += `<div class="flex items-center gap-1"><div class="w-24 text-xs text-gray-400 text-right pr-2">${date}</div>`;
+                for (let h = 0; h < 24; h++) {
+                    const val = dateHourData[date]?.[h] || 0;
+                    const intensity = maxVal > 0 ? val / maxVal : 0;
+                    const color = intensity === 0 ? '#374151' : intensity < 0.2 ? '#14532d' : intensity < 0.4 ? '#15803d' : intensity < 0.6 ? '#ca8a04' : intensity < 0.8 ? '#ea580c' : '#dc2626';
+                    html += `<div class="heatmap-cell w-6 h-6 rounded cursor-pointer" style="background-color:${color}" title="${date} ${String(h).padStart(2,'0')}:00 - ${metric === 'txCount' ? val + ' events' : val.toFixed(1) + (metric === 'power' ? 'W' : ' Wh')}"></div>`;
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderTxEvents() {
+            const container = document.getElementById('txEventsContainer');
+            if (txEvents.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-8">No TX events</div>';
+                return;
+            }
+            
+            // Consolidate TX events into connection sessions
+            // Multiple TX bursts during one VARA connection → one session row
+            const sessions = [];
+            const unmatchedEvents = [];
+            const connSessionMap = new Map();  // key = connWindow index → session
+            
+            for (const ev of txEvents) {
+                if (!ev.connCallsign) {
+                    unmatchedEvents.push(ev);
+                    continue;
+                }
+                // Find which connection window this TX belongs to
+                const txTs = logData[ev.startIndex].timestamp.getTime();
+                let connIdx = -1;
+                for (let i = connectionWindows.length - 1; i >= 0; i--) {
+                    const w = connectionWindows[i];
+                    const end = w.endTs || (w.startTs + 120000);
+                    if (txTs >= w.startTs - 30000 && txTs <= end + 30000) {
+                        connIdx = i;
+                        break;
+                    }
+                    if (w.startTs < txTs - 300000) break;
+                }
+                
+                if (connIdx >= 0 && connSessionMap.has(connIdx)) {
+                    // Add to existing session
+                    const sess = connSessionMap.get(connIdx);
+                    sess.txBursts++;
+                    sess.totalDuration += ev.duration;
+                    if (ev.peakPower > sess.peakPower) {
+                        sess.peakPower = ev.peakPower;
+                        sess.peakReflected = ev.peakReflected;
+                    }
+                    sess.allPowers.push(...ev.powers);
+                    sess.allSWRs.push(ev.swr);
+                    // Extend time range
+                    if (ev.startIndex < sess.startIndex) {
+                        sess.startIndex = ev.startIndex;
+                        sess.startTime = ev.startTime;
+                        sess.startDate = ev.startDate;
+                    }
+                    if (ev.endIndex !== undefined && (!sess.endIndex || ev.endIndex > sess.endIndex)) {
+                        sess.endIndex = ev.endIndex;
+                        sess.endTime = ev.endTime;
+                    }
+                } else {
+                    // New session
+                    const sess = {
+                        connCallsign: ev.connCallsign,
+                        connFailed: ev.connFailed,
+                        band: ev.band,
+                        freqMHz: ev.freqMHz,
+                        channel: ev.channel,
+                        txBursts: 1,
+                        totalDuration: ev.duration,
+                        peakPower: ev.peakPower,
+                        peakReflected: ev.peakReflected,
+                        allPowers: [...ev.powers],
+                        allSWRs: [ev.swr],
+                        startIndex: ev.startIndex,
+                        startTime: ev.startTime,
+                        startDate: ev.startDate,
+                        endIndex: ev.endIndex,
+                        endTime: ev.endTime,
+                        swr: ev.swr
+                    };
+                    sessions.push(sess);
+                    if (connIdx >= 0) connSessionMap.set(connIdx, sess);
+                }
+            }
+            
+            // Finalize session stats
+            sessions.forEach(s => {
+                s.avgPower = s.allPowers.length > 0 ? s.allPowers.reduce((a, b) => a + b, 0) / s.allPowers.length : 0;
+                s.swr = s.allSWRs.length > 0 ? s.allSWRs.reduce((a, b) => a + b, 0) / s.allSWRs.length : 0;
+            });
+            
+            // Sort sessions newest first
+            sessions.sort((a, b) => b.startIndex - a.startIndex);
+            unmatchedEvents.sort((a, b) => b.startIndex - a.startIndex);
+            
+            // Show more events for longer ranges
+            const maxSessions = selectedDays <= 1 ? 100 : selectedDays <= 7 ? 250 : 500;
+            const colors = ['green', 'blue'];
+            const totalTxEvents = txEvents.length;
+            const matchedCount = txEvents.filter(t => t.freqMHz).length;
+            const failedSessions = sessions.filter(s => s.connFailed).length;
+            const successSessions = sessions.length - failedSessions;
+            
+            const summaryHtml = `<div class="text-xs text-gray-400 px-3 pb-2 border-b border-gray-700 mb-2">
+                ${sessions.length} connection sessions (${totalTxEvents} TX bursts) · 
+                <span class="text-green-400">✓${successSessions} connected</span> / <span class="text-red-400">✗${failedSessions} failed</span>
+                ${unmatchedEvents.length > 0 ? ` · ${unmatchedEvents.length} unmatched` : ''}
+                ${connectionWindows.length > 0 ? ` · ${connectionWindows.length} connections loaded` : ' · <span class="text-yellow-400">no connection data</span>'}
+                ${connectionOffsetMs !== 0 ? ` · <span class="text-yellow-300">TZ offset: ${connectionOffsetMs/3600000}h</span>` : ''}
+            </div>`;
+            
+            // Render sessions
+            let rowsHtml = sessions.slice(0, maxSessions).map(s => {
+                const swrColor = s.swr < 1.5 ? 'green' : s.swr < 2.0 ? 'yellow' : s.swr < 3.0 ? 'orange' : 'red';
+                const bandBadge = s.band ? `<span style="background:${BAND_COLORS[s.band] || '#6b7280'};color:white;padding:1px 6px;border-radius:4px;font-size:0.65rem;font-weight:bold;margin-left:4px;">${s.band}</span>` : '';
+                const freqStr = s.freqMHz ? ` • ${s.freqMHz.toFixed(3)} MHz` : '';
+                const statusIcon = s.connFailed ? '<span title="Failed connection" style="color:#f87171;margin-right:3px;">✗</span>' : '<span title="Successful connection" style="color:#4ade80;margin-right:3px;">✓</span>';
+                const callStr = `${statusIcon}<span class="${s.connFailed ? 'text-red-400' : 'text-cyan-400'}">${s.connCallsign}</span>`;
+                const burstsLabel = s.txBursts > 1 ? `${s.txBursts} bursts • ` : '';
+                return `<div class="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 cursor-pointer" onclick="seekToEvent(${s.startIndex})">
+                    <div class="flex items-center gap-3"><div class="w-2 h-10 rounded bg-${colors[s.channel - 1]}-500"></div>
+                    <div><div class="flex items-center">${callStr}${bandBadge}</div><div class="text-xs text-gray-400">${s.startDate} ${s.startTime} - ${s.endTime}${freqStr}</div></div></div>
+                    <div class="text-right"><div class="text-lg font-bold">${s.peakPower.toFixed(1)} W</div><div class="text-xs text-gray-400">${burstsLabel}${s.totalDuration}s • avg ${s.avgPower.toFixed(1)}W • <span class="text-${swrColor}-400">SWR ${s.swr.toFixed(1)}:1</span></div></div></div>`;
+            }).join('');
+            
+            // Show unmatched events (no connection) in a collapsed section
+            if (unmatchedEvents.length > 0) {
+                const maxUnmatched = 20;
+                rowsHtml += `<div class="mt-3 pt-2 border-t border-gray-600">
+                    <div class="text-xs text-gray-500 px-3 pb-2">${unmatchedEvents.length} unmatched TX event${unmatchedEvents.length > 1 ? 's' : ''} (no connection data)</div>`;
+                rowsHtml += unmatchedEvents.slice(0, maxUnmatched).map(ev => {
+                    const swrColor = ev.swr < 1.5 ? 'green' : ev.swr < 2.0 ? 'yellow' : ev.swr < 3.0 ? 'orange' : 'red';
+                    return `<div class="flex items-center justify-between p-2 bg-gray-800/50 rounded hover:bg-gray-700 cursor-pointer text-sm opacity-60" onclick="seekToEvent(${ev.startIndex})">
+                        <div class="flex items-center gap-3"><div class="w-1.5 h-8 rounded bg-${colors[ev.channel - 1]}-500"></div>
+                        <div><div class="text-gray-500">—</div><div class="text-xs text-gray-500">${ev.startDate} ${ev.startTime} - ${ev.endTime}</div></div></div>
+                        <div class="text-right"><div class="font-bold text-gray-400">${ev.peakPower.toFixed(1)} W</div><div class="text-xs text-gray-500">${ev.duration}s • <span class="text-${swrColor}-400">SWR ${ev.swr.toFixed(1)}:1</span></div></div></div>`;
+                }).join('');
+                if (unmatchedEvents.length > maxUnmatched) {
+                    rowsHtml += `<div class="text-center text-gray-600 py-1 text-xs">${unmatchedEvents.length - maxUnmatched} more unmatched not shown</div>`;
+                }
+                rowsHtml += '</div>';
+            }
+            
+            if (sessions.length > maxSessions) {
+                rowsHtml += `<div class="text-center text-gray-500 py-2 text-sm">${sessions.length - maxSessions} more sessions not shown</div>`;
+            }
+            
+            container.innerHTML = summaryHtml + rowsHtml;
+        }
+
+        function updateThreshold(val) {
+            txThreshold = parseInt(val);
+            document.getElementById('txThreshold').textContent = txThreshold;
+            if (logData.length > 0) { calculateStats(); renderTxEvents(); updateDisplay(); }
+        }
+        
+        function seekToEvent(index) { playbackIndex = index; updateDisplay(); }
+        
+        function showTab(tab) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('tab-active'); b.classList.add('bg-gray-700', 'hover:bg-gray-600'); });
+            document.getElementById(`panel${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            const btn = document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            btn.classList.add('tab-active');
+            btn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+            if (tab === 'hourly') updateHourlyChart();
+            if (tab === 'heatmap') renderHeatmap();
+            if (tab === 'events') renderTxEvents();
+        }
+        
+        function togglePlayback() {
+            isPlaying = !isPlaying;
+            document.getElementById('playBtn').textContent = isPlaying ? '⏸️ Pause' : '▶️ Play';
+            if (isPlaying) {
+                playbackInterval = setInterval(() => {
+                    playbackIndex = Math.min(playbackIndex + 1, logData.length - 1);
+                    updateDisplay();
+                    if (playbackIndex >= logData.length - 1) togglePlayback();
+                }, 1000 / playbackSpeed);
+            } else {
+                clearInterval(playbackInterval);
+            }
+        }
+        
+        function stepBack() { playbackIndex = Math.max(0, playbackIndex - 300); updateDisplay(); }
+        function stepForward() { playbackIndex = Math.min(logData.length - 1, playbackIndex + 300); updateDisplay(); }
+        function seekPlayback(percent) { playbackIndex = Math.floor((percent / 100) * (logData.length - 1)); updateDisplay(); }
+        function updatePlaybackSpeed() { playbackSpeed = parseInt(document.getElementById('playbackSpeed').value); if (isPlaying) { clearInterval(playbackInterval); togglePlayback(); togglePlayback(); } }
+        
+        function setTimeRange(seconds) {
+            timeRangeSeconds = seconds;
+            document.querySelectorAll('.time-btn').forEach(btn => { btn.classList.remove('bg-blue-600'); btn.classList.add('bg-gray-700', 'hover:bg-gray-600'); });
+            event.target.classList.add('bg-blue-600');
+            event.target.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+            updateChart();
+        }
+
+        // Manual file loading
+        document.getElementById('fileInput').addEventListener('change', async function(e) { 
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            
+            document.getElementById('statusText').textContent = `Loading ${files.length} file(s)...`;
+            let fileData = [];
+            
+            for (const file of files) {
+                const text = await file.text();
+                if (text.includes('DATE,TIME')) {
+                    const data = parseCSV(text);
+                    fileData = fileData.concat(data);
+                }
+            }
+            
+            if (fileData.length > 0) {
+                fileData.sort((a, b) => a.timestamp - b.timestamp);
+                allLogData = fileData;
+                logData = fileData;
+                filesLoadedCount = files.length;
+                processLoadedData();
+            }
+        });
+
+        // Initialize
+        initCharts();
+        loadAllData(false);
+        
+        // === AUTO-REFRESH: Reload 1-day data every 10 minutes ===
+        const AUTO_REFRESH_MS = 10 * 60 * 1000;  // 10 minutes
+        let autoRefreshTimer = null;
+        let countdownTimer = null;
+        let nextRefreshAt = 0;
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            if (selectedDays === 1) {
+                nextRefreshAt = Date.now() + AUTO_REFRESH_MS;
+                autoRefreshTimer = setInterval(() => {
+                    if (!isLoading && selectedDays === 1) {
+                        loadAllData(true);
+                        nextRefreshAt = Date.now() + AUTO_REFRESH_MS;
+                    }
+                }, AUTO_REFRESH_MS);
+                // Update countdown in status every 30 seconds
+                countdownTimer = setInterval(updateCountdown, 30000);
+                updateCountdown();
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+        }
+
+        function updateCountdown() {
+            if (selectedDays !== 1 || !nextRefreshAt) return;
+            const secsLeft = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+            const mins = Math.floor(secsLeft / 60);
+            const statusEl = document.getElementById('statusText');
+            // Only append countdown if not currently loading
+            if (!isLoading && logData.length > 0) {
+                statusEl.textContent = `${logData.length.toLocaleString()} samples (1d) • refresh ${mins}m`;
+            }
+        }
+
+        // Wire auto-refresh into setDataRange
+        const _baseSetDataRange = setDataRange;
+        setDataRange = function(days) {
+            _baseSetDataRange(days);
+            startAutoRefresh();
+        };
+
+        startAutoRefresh();
+        // Nav bar clock
+        (function updateNavClocks(){var n=new Date(),u=String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0'),l=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'),a=document.getElementById('navUtcClock'),b=document.getElementById('navLocalClock');if(a)a.textContent=u+' Z';if(b)b.textContent=l+' L';setTimeout(updateNavClocks,1000-n.getMilliseconds())})();
+    </script>
+<script src="shared/settings-modal.js"></script>
+</body>
+</html>

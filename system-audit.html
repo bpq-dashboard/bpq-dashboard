@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BPQ Dashboard — System Audit</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0d1117;--surface:#161b22;--border:#21262d;--border2:#30363d;
+    --text:#e6edf3;--muted:#7d8590;--green:#3fb950;--green-dim:#1a4428;
+    --amber:#d29922;--amber-dim:#3d2b05;--blue:#58a6ff;--blue-dim:#0d2340;
+    --red:#f85149;--red-dim:#3d0c0a;--purple:#bc8cff;--purple-dim:#1e1040;
+    --cyan:#39d0d8;--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;padding:32px 24px 64px;max-width:1000px;margin:0 auto;}
+  header{border-bottom:1px solid var(--border2);padding-bottom:20px;margin-bottom:32px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+  header h1{font-family:var(--mono);font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;}
+  header h1 span{color:var(--green);}
+  header .meta{font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-align:right;line-height:1.8;}
+  .nav-back{font-family:var(--mono);font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;opacity:0.8;transition:opacity 0.15s;}
+  .nav-back:hover{opacity:1;}
+
+  /* Auth */
+  .auth-gate{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:32px;max-width:400px;margin:80px auto;text-align:center;}
+  .auth-gate h2{font-family:var(--mono);font-size:1rem;margin-bottom:8px;color:var(--amber);}
+  .auth-gate p{color:var(--muted);font-size:0.85rem;margin-bottom:20px;}
+  .auth-input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px 14px;font-family:var(--mono);font-size:0.9rem;color:var(--text);margin-bottom:12px;outline:none;}
+  .auth-input:focus{border-color:var(--blue);}
+  .auth-btn{width:100%;background:var(--blue-dim);border:1px solid var(--blue);border-radius:6px;padding:10px;font-family:var(--mono);font-size:0.85rem;font-weight:600;color:var(--blue);cursor:pointer;transition:background 0.15s;}
+  .auth-btn:hover{background:rgba(88,166,255,0.15);}
+  .auth-error{color:var(--red);font-size:0.8rem;margin-top:8px;}
+
+  /* Score banner */
+  .score-banner{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px 28px;margin-bottom:28px;display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
+  .score-ring{width:80px;height:80px;flex-shrink:0;}
+  .score-ring svg{transform:rotate(-90deg);}
+  .score-ring circle{fill:none;stroke-width:6;}
+  .score-ring .track{stroke:var(--border2);}
+  .score-ring .fill{stroke-dasharray:220;stroke-dashoffset:220;transition:stroke-dashoffset 1s ease;stroke-linecap:round;}
+  .score-info h2{font-family:var(--mono);font-size:1.1rem;font-weight:700;margin-bottom:4px;}
+  .score-info p{color:var(--muted);font-size:0.82rem;}
+  .score-counts{display:flex;gap:20px;margin-left:auto;flex-wrap:wrap;}
+  .score-count{text-align:center;}
+  .score-count .n{font-family:var(--mono);font-size:1.6rem;font-weight:700;line-height:1;}
+  .score-count .l{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+  .score-count.ok .n{color:var(--green);}
+  .score-count.warn .n{color:var(--amber);}
+  .score-count.crit .n{color:var(--red);}
+  .sysinfo{font-family:var(--mono);font-size:0.72rem;color:var(--muted);margin-left:auto;text-align:right;line-height:1.9;}
+
+  /* Category tabs */
+  .cat-tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+  .cat-tab{font-family:var(--mono);font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:5px 14px;border-radius:4px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all 0.15s;position:relative;}
+  .cat-tab:hover{background:var(--surface);color:var(--text);}
+  .cat-tab.active{border-color:var(--blue);color:var(--blue);background:var(--blue-dim);}
+  .cat-tab .badge{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;font-size:0.6rem;display:flex;align-items:center;justify-content:center;font-weight:700;}
+  .cat-tab .badge.warn{background:var(--amber);color:#000;}
+  .cat-tab .badge.crit{background:var(--red);color:#fff;}
+
+  /* Finding cards */
+  .findings-list{display:flex;flex-direction:column;gap:8px;}
+  .finding{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .finding.ok   {border-left:3px solid var(--green);}
+  .finding.warn {border-left:3px solid var(--amber);}
+  .finding.crit {border-left:3px solid var(--red);}
+  .finding-header{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none;}
+  .finding-header:hover{background:rgba(255,255,255,0.02);}
+  .finding-icon{font-size:1rem;flex-shrink:0;width:20px;text-align:center;}
+  .finding-title{flex:1;font-weight:600;font-size:0.88rem;}
+  .finding-cat{font-family:var(--mono);font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;background:var(--border);padding:2px 7px;border-radius:3px;flex-shrink:0;}
+  .finding-chevron{color:var(--muted);font-size:0.7rem;transition:transform 0.2s;flex-shrink:0;}
+  .finding-body{display:none;padding:0 16px 14px 48px;border-top:1px solid var(--border);}
+  .finding-body.open{display:block;}
+  .finding-detail{color:var(--muted);font-size:0.82rem;margin-top:10px;white-space:pre-wrap;}
+  .finding-rec{background:var(--blue-dim);border:1px solid var(--blue);border-radius:6px;padding:10px 14px;margin-top:10px;font-family:var(--mono);font-size:0.78rem;color:var(--blue);}
+  .finding-rec::before{content:'💡 Recommended action: ';font-weight:700;display:block;margin-bottom:4px;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;}
+
+  /* Section title */
+  .section-title{font-family:var(--mono);font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .section-title::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+  .section-title.green{color:var(--green);}.section-title.amber{color:var(--amber);}.section-title.blue{color:var(--blue);}.section-title.red{color:var(--red);}.section-title.cyan{color:var(--cyan);}.section-title.purple{color:var(--purple);}
+
+  .ts{font-family:var(--mono);font-size:0.7rem;color:var(--muted);margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .refresh-btn{font-family:var(--mono);font-size:0.7rem;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted);padding:3px 10px;cursor:pointer;transition:all 0.15s;}
+  .refresh-btn:hover{border-color:var(--blue);color:var(--blue);}
+  .loading{text-align:center;padding:60px 20px;color:var(--muted);font-family:var(--mono);font-size:0.85rem;}
+  .error-msg{background:var(--red-dim);border:1px solid var(--red);border-radius:6px;padding:14px 18px;color:var(--red);font-family:var(--mono);font-size:0.82rem;}
+
+  .cat-colors{--security:var(--red);--resources:var(--amber);--nginx:var(--blue);--database:var(--purple);--logs:var(--cyan);--application:var(--green);}
+
+  @media(max-width:600px){.score-banner{flex-direction:column;align-items:flex-start;}.score-counts{margin-left:0;}.sysinfo{text-align:left;margin-left:0;}}
+</style>
+</head>
+<body>
+
+<a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
+
+<header>
+  <h1>🔍 BPQ Dashboard <span>//</span> System Audit</h1>
+  <div class="meta">K1AJD · ARSSYSTEM · Live health check<br>Security · Resources · Services · Database · Logs</div>
+</header>
+
+<div id="auth-gate" class="auth-gate" style="display:none;">
+  <h2>🔒 Authentication Required</h2>
+  <p>Enter your BBS password to run a system audit</p>
+  <input type="password" id="auth-input" class="auth-input" placeholder="BBS Password">
+  <button class="auth-btn" onclick="attemptAuth()">Run Audit</button>
+  <div id="auth-error" class="auth-error" style="display:none;"></div>
+</div>
+
+<div id="main-content" style="display:none;">
+  <div id="score-banner" class="score-banner"></div>
+
+  <div id="ts" class="ts"></div>
+
+  <div class="cat-tabs" id="cat-tabs"></div>
+
+  <div id="findings-container"></div>
+</div>
+
+<div id="loading" class="loading">Running system audit…</div>
+
+<script>
+const API = 'system-audit-api.php';
+let savedPw = sessionStorage.getItem('bbs_pw') || '';
+let auditData = null;
+let activeFilter = 'all';
+
+const CAT_META = {
+  security:    { label: 'Security',    icon: '🔒', color: '#f85149', sectionColor: 'red'    },
+  resources:   { label: 'Resources',   icon: '⚡', color: '#d29922', sectionColor: 'amber'  },
+  nginx:       { label: 'NGINX & PHP', icon: '🌐', color: '#58a6ff', sectionColor: 'blue'   },
+  database:    { label: 'Database',    icon: '🗄️', color: '#bc8cff', sectionColor: 'purple' },
+  logs:        { label: 'Logs',        icon: '📋', color: '#39d0d8', sectionColor: 'cyan'   },
+  application: { label: 'Application', icon: '📡', color: '#3fb950', sectionColor: 'green'  },
+};
+
+const STATUS_ICON = { ok: '✅', warn: '⚠️', crit: '🔴' };
+
+function init() {
+  if (savedPw) { loadData(savedPw); }
+  else {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('auth-gate').style.display = 'block';
+    document.getElementById('auth-input').addEventListener('keydown', e => { if(e.key==='Enter') attemptAuth(); });
+  }
+}
+
+function attemptAuth() {
+  const pw = document.getElementById('auth-input').value.trim();
+  if (!pw) return;
+  loadData(pw);
+}
+
+function loadData(pw) {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('loading').textContent = 'Running system audit…';
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('main-content').style.display = 'none';
+
+  fetch(API + '?password=' + encodeURIComponent(pw))
+    .then(r => { if(r.status===401) throw new Error('auth'); return r.json(); })
+    .then(data => {
+      if (data.error === 'Unauthorized') throw new Error('auth');
+      savedPw = pw;
+      sessionStorage.setItem('bbs_pw', pw);
+      auditData = data;
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+      render(data);
+    })
+    .catch(err => {
+      document.getElementById('loading').style.display = 'none';
+      if (err.message === 'auth') {
+        document.getElementById('auth-gate').style.display = 'block';
+        document.getElementById('auth-error').textContent = '✗ Invalid password';
+        document.getElementById('auth-error').style.display = 'block';
+        sessionStorage.removeItem('bbs_pw'); savedPw = '';
+      } else {
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('main-content').innerHTML =
+          '<div class="error-msg">⚠ Audit failed: ' + err.message +
+          '<br><small>Ensure system-audit-api.php is deployed to /var/www/tprfn/</small></div>';
+      }
+    });
+}
+
+function render(data) {
+  const f = data.findings;
+  const s = data.summary;
+  const total = f.length;
+  const score = total > 0 ? Math.round((s.ok / total) * 100) : 100;
+  const scoreColor = score >= 80 ? '#3fb950' : score >= 60 ? '#d29922' : '#f85149';
+
+  // Score banner
+  const circumference = 220;
+  const offset = circumference - (score / 100 * circumference);
+  document.getElementById('score-banner').innerHTML = `
+    <div class="score-ring">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle class="track" cx="40" cy="40" r="35"/>
+        <circle class="fill" id="score-arc" cx="40" cy="40" r="35" stroke="${scoreColor}"
+          style="stroke-dashoffset:${circumference}"/>
+      </svg>
+    </div>
+    <div class="score-info">
+      <h2 style="color:${scoreColor}">${score}% Healthy</h2>
+      <p>${s.ok} checks passed · ${s.warn||0} warnings · ${s.crit||0} critical</p>
+    </div>
+    <div class="score-counts">
+      <div class="score-count ok"><div class="n">${s.ok}</div><div class="l">OK</div></div>
+      <div class="score-count warn"><div class="n">${s.warn||0}</div><div class="l">Warn</div></div>
+      <div class="score-count crit"><div class="n">${s.crit||0}</div><div class="l">Critical</div></div>
+    </div>
+    <div class="sysinfo">
+      Host: ${data.hostname||'ARSSYSTEM'}<br>
+      Kernel: ${data.kernel||'—'}<br>
+      ${data.uptime||'—'}
+    </div>
+  `;
+
+  // Animate score ring
+  setTimeout(() => {
+    const arc = document.getElementById('score-arc');
+    if (arc) arc.style.strokeDashoffset = offset;
+  }, 100);
+
+  // Timestamp
+  document.getElementById('ts').innerHTML =
+    `<span>Generated: ${data.generated_at}</span>
+     <button class="refresh-btn" onclick="loadData(savedPw)">⟳ Re-run Audit</button>`;
+
+  // Category tabs — count warnings/crits per category
+  const catCounts = {};
+  f.forEach(finding => {
+    if (!catCounts[finding.category]) catCounts[finding.category] = {warn:0,crit:0};
+    if (finding.status==='warn') catCounts[finding.category].warn++;
+    if (finding.status==='crit') catCounts[finding.category].crit++;
+  });
+
+  const allWarn = f.filter(x=>x.status==='warn').length;
+  const allCrit = f.filter(x=>x.status==='crit').length;
+  let tabsHtml = `<button class="cat-tab active" onclick="setFilter('all',this)">All
+    ${allCrit>0?`<span class="badge crit">${allCrit}</span>`:''}
+    ${!allCrit&&allWarn>0?`<span class="badge warn">${allWarn}</span>`:''}
+  </button>`;
+
+  Object.keys(CAT_META).forEach(cat => {
+    const meta = CAT_META[cat];
+    const cc = catCounts[cat] || {warn:0,crit:0};
+    const badge = cc.crit>0 ? `<span class="badge crit">${cc.crit}</span>` :
+                  cc.warn>0 ? `<span class="badge warn">${cc.warn}</span>` : '';
+    tabsHtml += `<button class="cat-tab" onclick="setFilter('${cat}',this)">${meta.icon} ${meta.label}${badge}</button>`;
+  });
+
+  // Issues only tab
+  const issueCount = (s.warn||0)+(s.crit||0);
+  if (issueCount > 0) {
+    tabsHtml += `<button class="cat-tab" onclick="setFilter('issues',this)">⚠ Issues Only
+      <span class="badge ${s.crit>0?'crit':'warn'}">${issueCount}</span>
+    </button>`;
+  }
+
+  document.getElementById('cat-tabs').innerHTML = tabsHtml;
+
+  renderFindings(f, 'all');
+}
+
+function setFilter(filter, btn) {
+  document.querySelectorAll('.cat-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  activeFilter = filter;
+  renderFindings(auditData.findings, filter);
+}
+
+function renderFindings(findings, filter) {
+  let filtered = findings;
+  if (filter === 'issues') filtered = findings.filter(f=>f.status!=='ok');
+  else if (filter !== 'all') filtered = findings.filter(f=>f.category===filter);
+
+  // Group by category
+  const groups = {};
+  filtered.forEach(f => {
+    if (!groups[f.category]) groups[f.category] = [];
+    groups[f.category].push(f);
+  });
+
+  let html = '';
+
+  // Sort categories: crit first, then warn, then ok
+  const sortedCats = Object.keys(groups).sort((a,b) => {
+    const score = cat => {
+      const items = groups[cat];
+      if (items.some(i=>i.status==='crit')) return 0;
+      if (items.some(i=>i.status==='warn')) return 1;
+      return 2;
+    };
+    return score(a) - score(b);
+  });
+
+  if (sortedCats.length === 0) {
+    html = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);">No findings match this filter</div>';
+  }
+
+  sortedCats.forEach(cat => {
+    const meta = CAT_META[cat] || { label: cat, icon: '•', sectionColor: 'blue' };
+    const items = groups[cat];
+    // Sort: crit → warn → ok
+    items.sort((a,b) => {
+      const o = {crit:0,warn:1,ok:2};
+      return (o[a.status]||3) - (o[b.status]||3);
+    });
+
+    html += `<div style="margin-bottom:24px;">
+      <div class="section-title ${meta.sectionColor}">${meta.icon} ${meta.label}</div>
+      <div class="findings-list">
+        ${items.map((f,i) => renderFinding(f, cat+i)).join('')}
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('findings-container').innerHTML = html;
+}
+
+function renderFinding(f, id) {
+  const icon = STATUS_ICON[f.status] || '•';
+  const hasBody = f.detail || f.recommendation;
+  const recHtml = f.recommendation
+    ? `<div class="finding-rec">${escHtml(f.recommendation)}</div>` : '';
+
+  return `<div class="finding ${f.status}">
+    <div class="finding-header" onclick="${hasBody?`toggleFinding('${id}')`:''}">
+      <span class="finding-icon">${icon}</span>
+      <span class="finding-title">${escHtml(f.title)}</span>
+      <span class="finding-cat">${f.category}</span>
+      ${hasBody?`<span class="finding-chevron" id="chev-${id}">▼</span>`:''}
+    </div>
+    ${hasBody?`<div class="finding-body" id="body-${id}">
+      <div class="finding-detail">${escHtml(f.detail)}</div>
+      ${recHtml}
+    </div>`:''}
+  </div>`;
+}
+
+function toggleFinding(id) {
+  const body = document.getElementById('body-'+id);
+  const chev = document.getElementById('chev-'+id);
+  if (!body) return;
+  const open = body.classList.toggle('open');
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>

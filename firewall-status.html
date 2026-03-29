@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BPQ Dashboard — Firewall Status</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0d1117;--surface:#161b22;--border:#21262d;--border2:#30363d;
+    --text:#e6edf3;--muted:#7d8590;--green:#3fb950;--green-dim:#1a4428;
+    --amber:#d29922;--amber-dim:#3d2b05;--blue:#58a6ff;--blue-dim:#0d2340;
+    --red:#f85149;--red-dim:#3d0c0a;--purple:#bc8cff;--purple-dim:#1e1040;
+    --cyan:#39d0d8;--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;padding:32px 24px 64px;max-width:1100px;margin:0 auto;}
+  header{border-bottom:1px solid var(--border2);padding-bottom:20px;margin-bottom:32px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+  header h1{font-family:var(--mono);font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;}
+  header h1 span{color:var(--green);}
+  header .meta{font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-align:right;line-height:1.8;}
+  .nav-back{font-family:var(--mono);font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;opacity:0.8;transition:opacity 0.15s;}
+  .nav-back:hover{opacity:1;}
+  .auth-gate{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:32px;max-width:400px;margin:80px auto;text-align:center;}
+  .auth-gate h2{font-family:var(--mono);font-size:1rem;margin-bottom:8px;color:var(--amber);}
+  .auth-gate p{color:var(--muted);font-size:0.85rem;margin-bottom:20px;}
+  .auth-input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px 14px;font-family:var(--mono);font-size:0.9rem;color:var(--text);margin-bottom:12px;outline:none;}
+  .auth-input:focus{border-color:var(--blue);}
+  .auth-btn{width:100%;background:var(--blue-dim);border:1px solid var(--blue);border-radius:6px;padding:10px;font-family:var(--mono);font-size:0.85rem;font-weight:600;color:var(--blue);cursor:pointer;transition:background 0.15s;}
+  .auth-btn:hover{background:rgba(88,166,255,0.15);}
+  .auth-error{color:var(--red);font-size:0.8rem;margin-top:8px;}
+  .summary-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px;}
+  .summary-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;}
+  .summary-card .val{font-family:var(--mono);font-size:1.8rem;font-weight:700;line-height:1;margin-bottom:4px;}
+  .summary-card .lbl{font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;}
+  .summary-card.green .val{color:var(--green);}
+  .summary-card.amber .val{color:var(--amber);}
+  .summary-card.red   .val{color:var(--red);}
+  .summary-card.blue  .val{color:var(--blue);}
+  .section{margin-bottom:28px;}
+  .section-title{font-family:var(--mono);font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .section-title::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+  .section-title.green{color:var(--green);}.section-title.amber{color:var(--amber);}.section-title.blue{color:var(--blue);}.section-title.red{color:var(--red);}.section-title.cyan{color:var(--cyan);}
+  .policy-banner{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:14px 18px;margin-bottom:20px;}
+  .policy-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .policy-dot.green{background:var(--green);box-shadow:0 0 8px var(--green);}
+  .policy-dot.red{background:var(--red);box-shadow:0 0 8px var(--red);}
+  .policy-text{font-family:var(--mono);font-size:0.85rem;}
+  .policy-text strong{color:var(--green);}
+  .policy-meta{margin-left:auto;font-family:var(--mono);font-size:0.7rem;color:var(--muted);}
+  .filter-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .filter-tab{font-family:var(--mono);font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:4px 12px;border-radius:4px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all 0.15s;}
+  .filter-tab:hover,.filter-tab.active{background:var(--surface);color:var(--text);}
+  .filter-tab.active{border-color:var(--blue);color:var(--blue);}
+  .port-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;}
+  .port-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;}
+  .port-card.pub{border-left:3px solid var(--green);}
+  .port-card.lan{border-left:3px solid var(--blue);}
+  .port-card.blk{border-left:3px solid var(--red);}
+  .port-card.ipr{border-left:3px solid var(--amber);}
+  .port-card.loc{border-left:3px solid var(--muted);}
+  .port-header{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .port-num{font-family:var(--mono);font-size:1rem;font-weight:700;}
+  .port-badge{font-family:var(--mono);font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;border-radius:4px;}
+  .port-badge.pub{background:var(--green-dim);color:var(--green);}
+  .port-badge.lan{background:var(--blue-dim);color:var(--blue);}
+  .port-badge.blk{background:var(--red-dim);color:var(--red);}
+  .port-badge.ipr{background:var(--amber-dim);color:var(--amber);}
+  .port-badge.loc{background:var(--border);color:var(--muted);}
+  .port-label{font-size:0.8rem;color:var(--muted);}
+  .port-allowed{font-family:var(--mono);font-size:0.75rem;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}
+  .port-allowed span{background:var(--border);padding:1px 6px;border-radius:3px;font-size:0.7rem;}
+  .rules-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.78rem;}
+  .rules-table th{text-align:left;padding:8px 12px;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);border-bottom:1px solid var(--border);background:var(--surface);}
+  .rules-table td{padding:7px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  .rules-table tr:last-child td{border-bottom:none;}
+  .rules-table tr:hover td{background:rgba(255,255,255,0.02);}
+  .t-accept{color:var(--green);font-weight:600;}.t-drop{color:var(--red);font-weight:600;}.t-reject{color:var(--red);font-weight:600;}.t-f2b{color:var(--amber);font-weight:600;}
+  .pill{display:inline-block;padding:1px 7px;border-radius:10px;font-size:0.68rem;font-weight:600;text-transform:uppercase;}
+  .pill.green{background:var(--green-dim);color:var(--green);}.pill.red{background:var(--red-dim);color:var(--red);}.pill.blue{background:var(--blue-dim);color:var(--blue);}.pill.amber{background:var(--amber-dim);color:var(--amber);}
+  .f2b-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .f2b-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;}
+  .f2b-card h3{font-family:var(--mono);font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+  .f2b-num{font-family:var(--mono);font-size:2rem;font-weight:700;color:var(--red);line-height:1;}
+  .f2b-ips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+  .f2b-ip{font-family:var(--mono);font-size:0.68rem;background:var(--red-dim);color:var(--red);padding:2px 6px;border-radius:3px;}
+  .ts{font-family:var(--mono);font-size:0.7rem;color:var(--muted);margin-bottom:24px;}
+  .loading{text-align:center;padding:60px 20px;color:var(--muted);font-family:var(--mono);font-size:0.85rem;}
+  .error-msg{background:var(--red-dim);border:1px solid var(--red);border-radius:6px;padding:14px 18px;color:var(--red);font-family:var(--mono);font-size:0.82rem;}
+  @media(max-width:640px){.port-grid,.f2b-grid{grid-template-columns:1fr;}.summary-bar{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
+
+<header>
+  <h1>🛡️ BPQ Dashboard <span>//</span> Firewall Status</h1>
+  <div class="meta">K1AJD · ARSSYSTEM · iptables / fail2ban<br>Live data · Refreshes on load</div>
+</header>
+
+<div id="auth-gate" class="auth-gate" style="display:none;">
+  <h2>🔒 Authentication Required</h2>
+  <p>Enter your BBS password to view firewall status</p>
+  <input type="password" id="auth-input" class="auth-input" placeholder="BBS Password">
+  <button class="auth-btn" onclick="attemptAuth()">Unlock</button>
+  <div id="auth-error" class="auth-error" style="display:none;"></div>
+</div>
+
+<div id="main-content" style="display:none;">
+  <div id="ts" class="ts"></div>
+  <div id="policy-banner" class="policy-banner">
+    <div class="policy-dot" id="policy-dot"></div>
+    <div class="policy-text" id="policy-text"></div>
+    <div class="policy-meta" id="policy-meta"></div>
+  </div>
+  <div class="summary-bar" id="summary-bar"></div>
+
+  <div class="section">
+    <div class="section-title blue">Port Access Summary</div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="filterPorts('all',this)">All</button>
+      <button class="filter-tab" onclick="filterPorts('pub',this)">Public</button>
+      <button class="filter-tab" onclick="filterPorts('lan',this)">LAN Only</button>
+      <button class="filter-tab" onclick="filterPorts('blk',this)">Blocked</button>
+      <button class="filter-tab" onclick="filterPorts('loc',this)">Localhost</button>
+    </div>
+    <div class="port-grid" id="port-grid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title red">Fail2ban</div>
+    <div class="f2b-grid" id="f2b-grid"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title amber">INPUT Chain Rules</div>
+    <div style="overflow-x:auto;">
+      <table class="rules-table">
+        <thead><tr><th>#</th><th>Action</th><th>Proto</th><th>Source</th><th>Port</th><th>Service</th><th>Pkts</th></tr></thead>
+        <tbody id="rules-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="loading" class="loading">Loading firewall data…</div>
+
+<script>
+const API = 'firewall-api.php';
+let allPorts = [];
+let savedPw = sessionStorage.getItem('bbs_pw') || '';
+
+function init() {
+  if (savedPw) { loadData(savedPw); }
+  else {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('auth-gate').style.display = 'block';
+    document.getElementById('auth-input').addEventListener('keydown', e => { if(e.key==='Enter') attemptAuth(); });
+  }
+}
+
+function attemptAuth() {
+  const pw = document.getElementById('auth-input').value.trim();
+  if (!pw) return;
+  loadData(pw);
+}
+
+function loadData(pw) {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('auth-gate').style.display = 'none';
+  fetch(API + '?password=' + encodeURIComponent(pw))
+    .then(r => { if(r.status===401) throw new Error('auth'); return r.json(); })
+    .then(data => {
+      if (data.error === 'Unauthorized') throw new Error('auth');
+      savedPw = pw;
+      sessionStorage.setItem('bbs_pw', pw);
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+      render(data);
+    })
+    .catch(err => {
+      document.getElementById('loading').style.display = 'none';
+      if (err.message === 'auth') {
+        document.getElementById('auth-gate').style.display = 'block';
+        document.getElementById('auth-error').textContent = '✗ Invalid password';
+        document.getElementById('auth-error').style.display = 'block';
+        sessionStorage.removeItem('bbs_pw'); savedPw = '';
+      } else {
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('main-content').innerHTML =
+          '<div class="error-msg">⚠ Could not load firewall data: ' + err.message +
+          '<br><small>Ensure firewall-api.php is deployed and www-data has sudo iptables access.</small></div>';
+      }
+    });
+}
+
+function statusClass(s) {
+  if (s==='public') return 'pub';
+  if (s==='lan-only') return 'lan';
+  if (s==='blocked') return 'blk';
+  if (s==='ip-restricted') return 'ipr';
+  return 'loc';
+}
+function statusBadge(s) {
+  const map = {public:'PUBLIC','lan-only':'LAN ONLY',blocked:'BLOCKED','ip-restricted':'IP RESTRICT'};
+  return map[s] || 'LOCALHOST';
+}
+
+function renderPortGrid(ports) {
+  document.getElementById('port-grid').innerHTML = ports.map(p => {
+    const sc = statusClass(p.status);
+    const allowed = (p.allowed||[]).map(a=>`<span>${a}</span>`).join('');
+    return `<div class="port-card ${sc}">
+      <div class="port-header">
+        <span class="port-num">:${p.port}</span>
+        <span class="port-badge ${sc}">${statusBadge(p.status)}</span>
+      </div>
+      <div class="port-label">${p.label}</div>
+      ${allowed?`<div class="port-allowed">${allowed}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function filterPorts(f, btn) {
+  document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  const map = {pub:'public',lan:'lan-only',blk:'blocked',loc:['localhost','unknown','ip-restricted']};
+  const filtered = f==='all' ? allPorts : allPorts.filter(p => {
+    const target = map[f];
+    return Array.isArray(target) ? target.includes(p.status) : p.status===target;
+  });
+  renderPortGrid(filtered);
+}
+
+function render(data) {
+  document.getElementById('ts').textContent = 'Generated: ' + data.generated_at;
+
+  const isDrop = data.policy === 'DROP';
+  document.getElementById('policy-dot').className = 'policy-dot ' + (isDrop?'green':'red');
+  document.getElementById('policy-text').innerHTML =
+    'INPUT chain policy: <strong>' + data.policy + '</strong>' +
+    (isDrop?' — all unmatched traffic is dropped ✓':' — WARNING: unmatched traffic ACCEPTED');
+  document.getElementById('policy-meta').textContent = data.rules.length + ' rules loaded';
+
+  const ports = data.port_summary;
+  allPorts = ports;
+  const pub = ports.filter(p=>p.status==='public').length;
+  const lan = ports.filter(p=>p.status==='lan-only').length;
+  const blk = ports.filter(p=>p.status==='blocked').length;
+  const f2bN = data.fail2ban.sshd_banned || 0;
+
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="summary-card green"><div class="val">${pub}</div><div class="lbl">Public Ports</div></div>
+    <div class="summary-card blue"><div class="val">${lan}</div><div class="lbl">LAN-Only Ports</div></div>
+    <div class="summary-card red"><div class="val">${blk}</div><div class="lbl">Blocked Ports</div></div>
+    <div class="summary-card amber"><div class="val">${data.rules.length}</div><div class="lbl">Total Rules</div></div>
+    <div class="summary-card red"><div class="val">${f2bN}</div><div class="lbl">Fail2ban Banned</div></div>
+  `;
+
+  renderPortGrid(ports);
+
+  const f2b = data.fail2ban;
+  const ips = (f2b.recent_banned||[]).map(ip=>`<span class="f2b-ip">${ip}</span>`).join('');
+  document.getElementById('f2b-grid').innerHTML = `
+    <div class="f2b-card">
+      <h3>Currently Banned (SSH)</h3>
+      <div class="f2b-num">${f2b.sshd_banned||0}</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Total ever banned: ${f2b.banned_count||0}</div>
+    </div>
+    <div class="f2b-card">
+      <h3>Recently Banned IPs (last 10)</h3>
+      <div class="f2b-ips">${ips||'<span style="color:var(--muted);font-size:0.8rem;">None recorded</span>'}</div>
+    </div>
+  `;
+
+  document.getElementById('rules-tbody').innerHTML = data.rules.map(r => {
+    let tc = r.target.startsWith('f2b-') ? 't-f2b' : 't-'+r.target.toLowerCase();
+    const portBadge = r.port
+      ? `<span class="pill ${r.category==='block'?'red':r.category==='lan-allow'?'blue':'green'}">${r.port}</span>`
+      : '<span style="color:var(--muted)">—</span>';
+    return `<tr>
+      <td style="color:var(--muted)">${r.num}</td>
+      <td class="${tc}">${r.target}</td>
+      <td style="color:var(--muted)">${r.prot}</td>
+      <td style="font-family:var(--mono);font-size:0.75rem">${r.source}</td>
+      <td>${portBadge}</td>
+      <td style="color:var(--muted);font-size:0.75rem">${r.label||(r.extra?r.extra.substring(0,40):'—')}</td>
+      <td style="color:var(--muted)">${r.pkts}</td>
+    </tr>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>

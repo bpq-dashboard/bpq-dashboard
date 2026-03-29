@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BPQ Dashboard — Maintenance Reference</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --border:   #21262d;
+    --border2:  #30363d;
+    --text:     #e6edf3;
+    --muted:    #7d8590;
+    --green:    #3fb950;
+    --green-dim:#1a4428;
+    --amber:    #d29922;
+    --amber-dim:#3d2b05;
+    --blue:     #58a6ff;
+    --blue-dim: #0d2340;
+    --red:      #f85149;
+    --red-dim:  #3d0c0a;
+    --purple:   #bc8cff;
+    --purple-dim:#1e1040;
+    --cyan:     #39d0d8;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 32px 24px 64px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border2);
+    padding-bottom: 20px;
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  header h1 span { color: var(--green); }
+  header .meta {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* ── SECTION ── */
+  .section {
+    margin-bottom: 28px;
+  }
+  .section-title {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .section-title.green  { color: var(--green);  }
+  .section-title.amber  { color: var(--amber);  }
+  .section-title.blue   { color: var(--blue);   }
+  .section-title.red    { color: var(--red);    }
+  .section-title.purple { color: var(--purple); }
+  .section-title.cyan   { color: var(--cyan);   }
+
+  /* ── CMD BLOCK ── */
+  .cmd-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .cmd {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: stretch;
+  }
+  .cmd-inner {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .cmd code {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--green);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+  }
+  .cmd code .dim   { color: var(--muted); font-weight: 400; }
+  .cmd code .kw    { color: var(--blue); }
+  .cmd code .path  { color: var(--amber); }
+  .cmd code .flag  { color: var(--purple); }
+  .cmd code .sudo  { color: var(--red); }
+  .cmd-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .cmd-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .cmd-tag.green  { color: var(--green);  background: var(--green-dim); }
+  .cmd-tag.amber  { color: var(--amber);  background: var(--amber-dim); }
+  .cmd-tag.blue   { color: var(--blue);   background: var(--blue-dim);  }
+  .cmd-tag.red    { color: var(--red);    background: var(--red-dim);   }
+  .cmd-tag.purple { color: var(--purple); background: var(--purple-dim);}
+
+  /* ── GRID ── */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* ── PATHS TABLE ── */
+  .paths {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .paths-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .paths-row:last-child { border-bottom: none; }
+  .paths-key {
+    padding: 8px 14px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 600;
+    border-right: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .paths-val {
+    padding: 8px 14px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--amber);
+    word-break: break-all;
+  }
+
+
+  /* ── COPY BUTTON ── */
+  .cmd { position: relative; }
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--border2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    cursor: pointer;
+    opacity: 1;
+    transition: background 0.15s, color 0.15s;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    z-index: 2;
+  }
+
+  .copy-btn:hover { background: var(--border); color: var(--text); }
+  .copy-btn.copied {
+    opacity: 1;
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  /* shift cmd-tag down on hover to avoid overlap */
+  .cmd-inner { padding-right: 70px; }
+
+  /* ── PARTNERS EDITOR ── */
+  .partners-editor {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 8px;
+  }
+  .partner-card {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .partner-card.inactive { opacity: 0.5; }
+  .partner-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .partner-callsign {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .partner-field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .partner-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .partner-field label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .partner-field input[type="text"],
+  .partner-field input[type="number"],
+  .partner-field select {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+  }
+  .partner-field input:focus,
+  .partner-field select:focus { border-color: var(--blue); }
+  .band-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+  }
+  .band-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 36px;
+  }
+  .band-row input {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 4px 7px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text);
+    outline: none;
+    width: 110px;
+  }
+  .band-row input:focus { border-color: var(--blue); }
+  .partner-delete-btn {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: none;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    font-family: var(--mono);
+    color: var(--red);
+    cursor: pointer;
+  }
+  .partner-delete-btn:hover { background: rgba(248,81,73,0.1); }
+  .editor-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .editor-btn {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.15s;
+  }
+  .editor-btn.save   { background: var(--green-dim);  color: var(--green);  border-color: var(--green); }
+  .editor-btn.add    { background: var(--blue-dim);   color: var(--blue);   border-color: var(--blue); }
+  .editor-btn.reload { background: var(--surface);    color: var(--muted);  border-color: var(--border2); }
+  .editor-btn:hover  { filter: brightness(1.15); }
+  .editor-status {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+  .editor-status.ok   { color: var(--green); background: var(--green-dim); }
+  .editor-status.err  { color: var(--red);   background: rgba(248,81,73,0.1); }
+  .editor-status.info { color: var(--muted); }
+  .auth-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .auth-row input {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--text);
+    outline: none;
+    width: 200px;
+  }
+  .auth-row input:focus { border-color: var(--blue); }
+  .toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    user-select: none;
+  }
+  .toggle-switch input { display: none; }
+  .toggle-track {
+    width: 32px; height: 16px;
+    background: var(--border2);
+    border-radius: 8px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: transform 0.2s;
+  }
+  .toggle-switch input:checked + .toggle-track { background: var(--green); }
+  .toggle-switch input:checked + .toggle-track::after { transform: translateX(16px); }
+
+  /* ── PRINT ── */
+  @media print {
+    body { background: #fff; color: #000; padding: 16px; }
+    .cmd { border: 1px solid #ccc; background: #f6f8fa; }
+    .cmd code { color: #1a7f37; }
+    .cmd-tag.green { background: #dafbe1; color: #1a7f37; }
+    .cmd-tag.amber { background: #fff8c5; color: #9a6700; }
+    .cmd-tag.blue  { background: #ddf4ff; color: #0550ae; }
+    .cmd-tag.red   { background: #ffebe9; color: #cf222e; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📡 BPQ Dashboard <span>//</span> Maintenance Reference</h1>
+  <div class="meta">
+    K1AJD · ARSSYSTEM · Ubuntu / nginx 1.28 / PHP 8.3<br>
+    Web root: /var/www/tprfn · v1.5.2 · March 2026
+  </div>
+</header>
+
+<!-- ── Tool Links ── -->
+<div style="display:flex;gap:10px;margin-bottom:28px;flex-wrap:wrap;">
+  <a href="firewall-status.html" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:10px 18px;text-decoration:none;color:var(--text);font-family:var(--mono);font-size:0.8rem;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border2)'">
+    <span style="font-size:1.1rem;">🛡️</span>
+    <span><strong style="color:var(--green)">Firewall Status</strong><br><span style="color:var(--muted);font-size:0.7rem;">iptables rules · port access · fail2ban</span></span>
+  </a>
+  <a href="system-audit.html" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:10px 18px;text-decoration:none;color:var(--text);font-family:var(--mono);font-size:0.8rem;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)'">
+    <span style="font-size:1.1rem;">🔍</span>
+    <span><strong style="color:var(--blue)">System Audit</strong><br><span style="color:var(--muted);font-size:0.7rem;">security · resources · services · database · logs</span></span>
+  </a>
+  <a href="log-viewer.html" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:10px 18px;text-decoration:none;color:var(--text);font-family:var(--mono);font-size:0.8rem;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--border2)'">
+    <span style="font-size:1.1rem;">📋</span>
+    <span><strong style="color:var(--cyan)">Log Viewer</strong><br><span style="color:var(--muted);font-size:0.7rem;">prop-scheduler · watchdog · VARA · BBS · system</span></span>
+  </a>
+  <a href="#partners-editor" onclick="document.getElementById('partners-editor').scrollIntoView({behavior:'smooth'});return false;" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:10px 18px;text-decoration:none;color:var(--text);font-family:var(--mono);font-size:0.8rem;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--purple)'" onmouseout="this.style.borderColor='var(--border2)'">
+    <span style="font-size:1.1rem;">📡</span>
+    <span><strong style="color:var(--purple)">Partners Editor</strong><br><span style="color:var(--muted);font-size:0.7rem;">forwarding partners · bands · storm thresholds</span></span>
+  </a>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title green">Propagation Scheduler</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span></code>
+        <div class="cmd-label">Dry run — show what would change without touching linmail.cfg</div>
+      </div>
+      <div class="cmd-tag blue">dry run</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span> <span class="flag">--apply</span></code>
+        <div class="cmd-label">Apply new schedules if propagation model detects meaningful change</div>
+      </div>
+      <div class="cmd-tag green">apply</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span> <span class="flag">--apply --force</span></code>
+        <div class="cmd-label">Force apply even if no change is detected — use after manual edits or to reset</div>
+      </div>
+      <div class="cmd-tag amber">force</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span> <span class="flag">--apply --partner</span> <span class="kw">N4VAD</span></code>
+        <div class="cmd-label">Apply to a single partner only — replace N4VAD with any partner callsign</div>
+      </div>
+      <div class="cmd-tag blue">single</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>tail -50 <span class="path">/var/www/tprfn/logs/prop-scheduler.log</span></code>
+        <div class="cmd-label">View last 50 lines of prop scheduler log</div>
+      </div>
+      <div class="cmd-tag blue">log</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title red">Storm Monitor</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">/var/www/tprfn/scripts/storm-monitor.py</span> <span class="flag">--status</span></code>
+        <div class="cmd-label">Show current Kp, storm state, and saved ConnectScripts</div>
+      </div>
+      <div class="cmd-tag blue">status</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/storm-monitor.py</span> <span class="flag">--restore</span></code>
+        <div class="cmd-label">Force restore optimized schedules — use if storm cleared but auto-restore didn't fire</div>
+      </div>
+      <div class="cmd-tag amber">restore</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>tail -50 <span class="path">/var/www/tprfn/logs/storm-monitor.log</span></code>
+        <div class="cmd-label">View last 50 lines of storm monitor log</div>
+      </div>
+      <div class="cmd-tag blue">log</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title amber">BPQ / linmail.cfg</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl stop bpq <span class="dim">&amp;&amp;</span> sleep 2 <span class="dim">&amp;&amp;</span> <span class="sudo">sudo</span> systemctl start bpq</code>
+        <div class="cmd-label">Safe BPQ restart — stop first so BPQ writes its config, then start fresh</div>
+      </div>
+      <div class="cmd-tag amber">restart</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl status bpq</code>
+        <div class="cmd-label">Check BPQ service status</div>
+      </div>
+      <div class="cmd-tag blue">status</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>ls -lt <span class="path">/var/www/tprfn/scripts/prop-backups/</span> <span class="dim">| head -10</span></code>
+        <div class="cmd-label">List most recent linmail.cfg backups (newest first)</div>
+      </div>
+      <div class="cmd-tag blue">backups</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl stop bpq <span class="dim">&amp;&amp;</span> \
+  cp <span class="path">/var/www/tprfn/scripts/prop-backups/</span><span class="kw">linmail_YYYYMMDD_HHMMSS.cfg.bak</span> \
+     <span class="path">/home/tony/linbpq/linmail.cfg</span> <span class="dim">&amp;&amp;</span> \
+  <span class="sudo">sudo</span> systemctl start bpq</code>
+        <div class="cmd-label">Restore a specific backup — replace filename with actual backup name from listing above</div>
+      </div>
+      <div class="cmd-tag red">restore</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title blue">Cache &amp; Dashboard Data</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>rm -f <span class="path">/var/www/tprfn/cache/prop-state.json</span></code>
+        <div class="cmd-label">Clear prop scheduler state — forces full recalculation on next run</div>
+      </div>
+      <div class="cmd-tag amber">cache</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>rm -f <span class="path">/var/www/tprfn/cache/storm-state.json</span></code>
+        <div class="cmd-label">Clear storm monitor state — resets calm counter and saved ConnectScripts</div>
+      </div>
+      <div class="cmd-tag amber">cache</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>rm -f <span class="path">/var/www/tprfn/cache/*.json</span></code>
+        <div class="cmd-label">Clear all dashboard cache files — dashboard rebuilds on next page load</div>
+      </div>
+      <div class="cmd-tag red">flush all</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>ls -lh <span class="path">/var/www/tprfn/cache/</span></code>
+        <div class="cmd-label">List cache files and sizes</div>
+      </div>
+      <div class="cmd-tag blue">inspect</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title purple">Nginx &amp; PHP</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> nginx <span class="flag">-t</span></code>
+        <div class="cmd-label">Test nginx config for syntax errors before reloading</div>
+      </div>
+      <div class="cmd-tag blue">test</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl reload nginx</code>
+        <div class="cmd-label">Reload nginx config without dropping connections</div>
+      </div>
+      <div class="cmd-tag green">reload</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>tail -30 <span class="path">/var/log/nginx/error.log</span></code>
+        <div class="cmd-label">View recent nginx errors — check here if pages return 500 or blank</div>
+      </div>
+      <div class="cmd-tag blue">log</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>tail -30 <span class="path">/var/log/php8.3-fpm.log</span></code>
+        <div class="cmd-label">View PHP-FPM errors — check here for PHP fatal errors or permission issues</div>
+      </div>
+      <div class="cmd-tag blue">log</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl restart php8.3-fpm</code>
+        <div class="cmd-label">Restart PHP-FPM — use if PHP pages hang or return 502 Bad Gateway</div>
+      </div>
+      <div class="cmd-tag amber">restart</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> nginx <span class="flag">-T</span> 2>/dev/null | grep <span class="flag">-A 8</span> <span class="kw">"ALLOW: logs"</span></code>
+        <div class="cmd-label">Verify the /logs/ nginx location blocks — confirm the ~* regex block appears before the plain /logs/ catch-all</div>
+      </div>
+      <div class="cmd-tag blue">inspect</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> grep <span class="flag">limiting requests</span> <span class="path">/var/log/nginx/error.log</span> | tail -10</code>
+        <div class="cmd-label">Check for rate limit errors — if dashboard log cards show 503, the tprfn_logs zone (100r/s) may need increasing</div>
+      </div>
+      <div class="cmd-tag amber">rate limit</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> chown www-data:www-data <span class="path">/var/www/tprfn/logs/CMSAccess_*.log</span></code>
+        <div class="cmd-label">Fix CMSAccess log ownership — run if RMS Services card shows zero. LinBPQ writes these as root; nginx needs www-data ownership to serve them.</div>
+      </div>
+      <div class="cmd-tag red">fix perms</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title cyan">Logs &amp; Disk</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>du -sh <span class="path">/var/www/tprfn/logs/</span>*</code>
+        <div class="cmd-label">Check size of all log files — VARA logs can grow large</div>
+      </div>
+      <div class="cmd-tag blue">disk</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>df -h <span class="path">/var/www/tprfn</span></code>
+        <div class="cmd-label">Check disk space on the web partition</div>
+      </div>
+      <div class="cmd-tag blue">disk</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>ls -lh <span class="path">/var/www/tprfn/logs/</span></code>
+        <div class="cmd-label">List all log files with sizes and dates</div>
+      </div>
+      <div class="cmd-tag blue">inspect</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>ls -lh <span class="path">/var/www/tprfn/data/stations/</span></code>
+        <div class="cmd-label">Check saved station locations and forwarding partner files</div>
+      </div>
+      <div class="cmd-tag blue">inspect</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title green">Permissions (after file uploads)</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> bash <span class="path">/var/www/tprfn/set-permissions.sh</span></code>
+        <div class="cmd-label">Run the included permissions script — use after uploading new files</div>
+      </div>
+      <div class="cmd-tag green">fix perms</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> chown -R www-data:www-data <span class="path">/var/www/tprfn/data/</span>
+<span class="sudo">sudo</span> chmod -R 750 <span class="path">/var/www/tprfn/data/</span></code>
+        <div class="cmd-label">Fix permissions on data/ directory — run if settings or station storage fails to write</div>
+      </div>
+      <div class="cmd-tag amber">fix perms</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title amber">Key Paths</div>
+  <div class="paths">
+    <div class="paths-row"><div class="paths-key">Web root</div><div class="paths-val">/var/www/tprfn/</div></div>
+    <div class="paths-row"><div class="paths-key">BPQ config</div><div class="paths-val">/home/tony/linbpq/linmail.cfg</div></div>
+    <div class="paths-row"><div class="paths-key">Log directory</div><div class="paths-val">/var/www/tprfn/logs/</div></div>
+    <div class="paths-row"><div class="paths-key">Cache directory</div><div class="paths-val">/var/www/tprfn/cache/</div></div>
+    <div class="paths-row"><div class="paths-key">linmail.cfg backups</div><div class="paths-val">/var/www/tprfn/scripts/prop-backups/</div></div>
+    <div class="paths-row"><div class="paths-key">Settings JSON</div><div class="paths-val">/var/www/tprfn/data/settings.json</div></div>
+    <div class="paths-row"><div class="paths-key">Station storage</div><div class="paths-val">/var/www/tprfn/data/stations/</div></div>
+    <div class="paths-row"><div class="paths-key">Prop scheduler log</div><div class="paths-val">/var/www/tprfn/logs/prop-scheduler.log</div></div>
+    <div class="paths-row"><div class="paths-key">Storm monitor log</div><div class="paths-val">/var/www/tprfn/logs/storm-monitor.log</div></div>
+    <div class="paths-row"><div class="paths-key">Prop state</div><div class="paths-val">/var/www/tprfn/cache/prop-state.json</div></div>
+    <div class="paths-row"><div class="paths-key">Storm state</div><div class="paths-val">/var/www/tprfn/cache/storm-state.json</div></div>
+    <div class="paths-row"><div class="paths-key">Nginx config (live)</div><div class="paths-val">/etc/nginx/sites-enabled/tprfn.conf  (edit this — not sites-available)</div></div>
+    <div class="paths-row"><div class="paths-key">Prop scheduler</div><div class="paths-val">/var/www/tprfn/scripts/prop-scheduler.py</div></div>
+    <div class="paths-row"><div class="paths-key">Storm monitor</div><div class="paths-val">/var/www/tprfn/scripts/storm-monitor.py</div></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title cyan">WP Manager — Winlink White Pages Cleaner</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">scripts/wp_manager.py</span> --scan</code>
+        <div class="cmd-label">Scan WP.cfg and write wp_review.txt — flags invalid callsigns, BBS names, stale entries (&gt;730 days), ghost records, and hierarchy anomalies. AUTO-REMOVE entries pre-filled; others marked ? for review.</div>
+      </div>
+      <div class="cmd-tag blue">scan</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>nano wp_review.txt</code>
+        <div class="cmd-label">Edit review file — change ? to REMOVE or KEEP for each flagged entry. AUTO entries are pre-filled REMOVE; leave or override as needed.</div>
+      </div>
+      <div class="cmd-tag amber">edit</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">scripts/wp_manager.py</span> --apply</code>
+        <div class="cmd-label">Apply decisions from wp_review.txt — surgically removes REMOVE entries (no renumbering), creates timestamped backup of WP.cfg, then automatically restarts BPQ via <span class="kw">systemctl restart bpq</span>. KEEP decisions added to whitelist.</div>
+      </div>
+      <div class="cmd-tag red">apply + restart</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">scripts/wp_manager.py</span> --diff</code>
+        <div class="cmd-label">Compare current WP.cfg against saved baseline — detects entries re-injected by Winlink CMS on the last sync. Run after each Winlink session to check for re-injection of previously removed callsigns.</div>
+      </div>
+      <div class="cmd-tag purple">diff</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">scripts/wp_manager.py</span> --blacklist-add <span class="kw">CALLSIGN1 CALLSIGN2</span></code>
+        <div class="cmd-label">Add persistent offenders to blacklist — always flagged on future scans even if CMS repopulates. Use for entries that keep re-appearing after removal.</div>
+      </div>
+      <div class="cmd-tag red">blacklist</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">scripts/wp_manager.py</span> <span class="flag">--auto-clean --dry-run</span></code>
+        <div class="cmd-label">Preview automated clean — shows what would be removed (invalid callsigns, BBS names, blacklisted) without making any changes. Run this before scheduling as a cron job.</div>
+      </div>
+      <div class="cmd-tag blue">preview</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">scripts/wp_manager.py</span> <span class="flag">--auto-clean</span></code>
+        <div class="cmd-label">Automated clean — removes AUTO-flagged (invalid format, BBS names, empty) and BLACKLISTED entries immediately. STALE and REVIEW entries are never touched automatically. Creates backup, restarts BPQ, updates baseline.</div>
+      </div>
+      <div class="cmd-tag red">auto remove</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>python3 <span class="path">scripts/wp_scanner.py</span></code>
+        <div class="cmd-label">Read-only batch scanner — produces wp_scan_report.txt summary. Safe to run at any time, makes no changes to WP.cfg. Use for audit reporting or a quick look before committing to a full manage cycle.</div>
+      </div>
+      <div class="cmd-tag green">read-only</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>tail -40 wp_manager.log</code>
+        <div class="cmd-label">View recent WP manager activity — shows REMOVE actions, BPQ restart result, diff results, and blacklist changes with timestamps.</div>
+      </div>
+      <div class="cmd-tag blue">log</div>
+    </div>
+
+  </div>
+
+  <div class="paths" style="margin-top:12px;">
+    <div class="paths-row"><div class="paths-key">WP.cfg</div><div class="paths-val">/home/tony/linbpq/WP.cfg</div></div>
+    <div class="paths-row"><div class="paths-key">Review file</div><div class="paths-val">wp_review.txt (same dir as script)</div></div>
+    <div class="paths-row"><div class="paths-key">Whitelist</div><div class="paths-val">wp_whitelist.txt</div></div>
+    <div class="paths-row"><div class="paths-key">Blacklist</div><div class="paths-val">wp_blacklist.txt</div></div>
+    <div class="paths-row"><div class="paths-key">Baseline snapshot</div><div class="paths-val">wp_baseline.json</div></div>
+    <div class="paths-row"><div class="paths-key">Audit log</div><div class="paths-val">wp_manager.log</div></div>
+    <div class="paths-row"><div class="paths-key">WP.cfg backups</div><div class="paths-val">WP_backup_YYYYMMDD_HHMMSS.cfg (same dir as WP.cfg)</div></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-title cyan">VARA Callsign Validator</div>
+  <div class="cmd-group">
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl status vara-validator</code>
+        <div class="cmd-label">Check validator proxy status — should show <span class="kw">active (running)</span>. Must be running before BPQ connects to VARA.</div>
+      </div>
+      <div class="cmd-tag blue">status</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl start vara-validator</code>
+        <div class="cmd-label">Start the validator — do this before starting BPQ if it was stopped</div>
+      </div>
+      <div class="cmd-tag green">start</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> systemctl restart vara-validator</code>
+        <div class="cmd-label">Restart after editing the script (e.g. changing VARA_HOST, ALLOWLIST, or DENYLIST)</div>
+      </div>
+      <div class="cmd-tag amber">restart</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>tail -f <span class="path">/var/log/vara-validator.log</span></code>
+        <div class="cmd-label">Watch live — shows ACCEPTED / REJECTED for every incoming VARA connection with callsign and reason</div>
+      </div>
+      <div class="cmd-tag blue">log</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>grep <span class="flag">REJECTED</span> <span class="path">/var/log/vara-validator.log</span></code>
+        <div class="cmd-label">List all rejected callsigns — shows raw callsign and ITU validation failure reason</div>
+      </div>
+      <div class="cmd-tag red">rejected</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>grep <span class="flag">REJECTED</span> <span class="path">/var/log/vara-validator.log</span> | grep <span class="kw">$(date +%Y-%m-%d)</span></code>
+        <div class="cmd-label">Rejected callsigns today only</div>
+      </div>
+      <div class="cmd-tag red">today</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>ss -tlnp | grep <span class="kw">902</span></code>
+        <div class="cmd-label">Confirm proxy is listening on ports 9025 and 9026 — both must appear before BPQ starts</div>
+      </div>
+      <div class="cmd-tag blue">ports</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>echo <span class="kw">HELLO</span> | nc -w 2 <span class="path">127.0.0.1</span> <span class="kw">9025</span></code>
+        <div class="cmd-label">Test proxy accepts local connections — should connect and drop cleanly. If it times out, the iptables loopback rule is missing (see below).</div>
+      </div>
+      <div class="cmd-tag blue">test local</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code>nc -zv <span class="path">10.0.0.213</span> <span class="kw">9025</span></code>
+        <div class="cmd-label">Test connectivity to VARA HF on Windows — must return <span class="kw">open</span>. Fails if VARA HF is not running or Windows Firewall is blocking.</div>
+      </div>
+      <div class="cmd-tag blue">test vara</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> iptables -L INPUT -n <span class="dim">| head -5</span></code>
+        <div class="cmd-label">Check firewall — rule 1 must be <span class="kw">ACCEPT all -- lo</span>. If INPUT policy is DROP and no loopback rule exists, BPQ32 cannot reach the proxy.</div>
+      </div>
+      <div class="cmd-tag blue">firewall</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> iptables -I INPUT 1 -i lo -j ACCEPT
+<span class="sudo">sudo</span> netfilter-persistent save</code>
+        <div class="cmd-label">Add loopback accept rule and make it permanent — required if INPUT chain policy is DROP. Without this rule BPQ32 connections to 127.0.0.1 are silently dropped.</div>
+      </div>
+      <div class="cmd-tag red">fix firewall</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> nano <span class="path">/usr/local/bin/vara-callsign-validator.py</span></code>
+        <div class="cmd-label">Edit config — update <span class="kw">VARA_HOST</span> if Windows IP changes, or edit <span class="kw">ALLOWLIST</span> / <span class="kw">DENYLIST</span> sets near the top of the file. Restart service after any change.</div>
+      </div>
+      <div class="cmd-tag amber">edit</div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-inner">
+        <code><span class="sudo">sudo</span> journalctl -u vara-validator <span class="flag">-n 50</span></code>
+        <div class="cmd-label">View last 50 journal entries — use if the service fails to start</div>
+      </div>
+      <div class="cmd-tag blue">journal</div>
+    </div>
+
+  </div>
+
+  <div class="paths" style="margin-top:12px;">
+    <div class="paths-row"><div class="paths-key">Script</div><div class="paths-val">/usr/local/bin/vara-callsign-validator.py</div></div>
+    <div class="paths-row"><div class="paths-key">Service file</div><div class="paths-val">/etc/systemd/system/vara-validator.service</div></div>
+    <div class="paths-row"><div class="paths-key">Log file</div><div class="paths-val">/var/log/vara-validator.log</div></div>
+    <div class="paths-row"><div class="paths-key">VARA HF host</div><div class="paths-val">10.0.0.213  (cmd: 9025 · data: 9026)</div></div>
+    <div class="paths-row"><div class="paths-key">Proxy listens on</div><div class="paths-val">127.0.0.1:9025 / 127.0.0.1:9026</div></div>
+    <div class="paths-row"><div class="paths-key">BPQ32 VARAHOST</div><div class="paths-val">127.0.0.1  (changed from 10.0.0.213)</div></div>
+    <div class="paths-row"><div class="paths-key">User manual</div><div class="paths-val">vara-validator-user-guide.docx</div></div>
+  </div>
+</div>
+
+
+<!-- ═══ PARTNERS EDITOR ═══════════════════════════════════════════ -->
+<div class="section" id="partners-editor">
+  <div class="section-title purple">Forwarding Partners Editor</div>
+  <p style="font-size:0.8rem;color:var(--muted);margin-bottom:14px;font-family:var(--mono);">
+    Edits <span style="color:var(--cyan)">/var/www/tprfn/data/partners.json</span> — read by both
+    <strong>prop-scheduler.py</strong> and <strong>storm-monitor.py</strong> at startup.
+    A timestamped backup is created automatically on every save.
+  </p>
+
+  <!-- Auth -->
+  <div class="auth-row">
+    <input type="password" id="pePassword" placeholder="BBS password" autocomplete="current-password">
+    <button class="editor-btn reload" onclick="peLoad()">⟳ Load Partners</button>
+    <span class="editor-status info" id="peStatus">Enter password and click Load</span>
+  </div>
+
+  <!-- Editor area (hidden until loaded) -->
+  <div id="peEditor" style="display:none;">
+    <div class="editor-toolbar">
+      <button class="editor-btn save"   onclick="peSave()">💾 Save to Server</button>
+      <button class="editor-btn add"    onclick="peAddPartner()">＋ Add Partner</button>
+      <button class="editor-btn reload" onclick="peLoad()">⟳ Reload</button>
+    </div>
+    <div id="peCards"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  PARTNERS EDITOR
+// ════════════════════════════════════════════════════════════
+const PE_API = './partners-api.php';
+
+let peData = null;  // Full parsed partners.json object
+
+function peStatus(msg, cls='info') {
+  const el = document.getElementById('peStatus');
+  el.textContent = msg;
+  el.className = 'editor-status ' + cls;
+}
+
+async function peLoad() {
+  const pw = document.getElementById('pePassword').value.trim();
+  if (!pw) { peStatus('Enter your BBS password first', 'err'); return; }
+  peStatus('Loading…', 'info');
+  try {
+    const r = await fetch(PE_API + '?action=load&password=' + encodeURIComponent(pw));
+    const d = await r.json();
+    if (!d.ok) { peStatus('✗ ' + d.error, 'err'); return; }
+    peData = d.data;
+    peStatus('✓ Loaded ' + peData.partners.length + ' partners · last modified ' + d.modified, 'ok');
+    document.getElementById('peEditor').style.display = 'block';
+    peRenderAll();
+  } catch(e) {
+    peStatus('✗ ' + e.message, 'err');
+  }
+}
+
+function peRenderAll() {
+  const container = document.getElementById('peCards');
+  container.innerHTML = '';
+  (peData.partners || []).forEach((p, i) => container.appendChild(peBuildCard(p, i)));
+}
+
+function peBuildCard(p, idx) {
+  const div = document.createElement('div');
+  div.className = 'partner-card' + (p.active === false ? ' inactive' : '');
+  div.dataset.idx = idx;
+
+  const bands = p.bands || {};
+  const bandRows = Object.entries(bands).map(([band, bd]) => `
+    <div class="band-row">
+      <span class="band-label" style="color:${bandColor(band)}">${band}</span>
+      <input type="text" placeholder="freq MHz" value="${bd.freq||''}"
+        onchange="peUpdateBand(${idx},'${band}','freq',this.value)"
+        title="Frequency MHz e.g. 3.596000" style="width:100px;">
+      <input type="text" placeholder="mode" value="${bd.mode||''}"
+        onchange="peUpdateBand(${idx},'${band}','mode',this.value)"
+        title="Mode e.g. PKT-U" style="width:70px;">
+      <button onclick="peRemoveBand(${idx},'${band}')" title="Remove band"
+        style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.8rem;">✕</button>
+    </div>`).join('');
+
+  const suspendKp = p.storm?.suspend_kp ?? '';
+
+  div.innerHTML = `
+    <button class="partner-delete-btn" onclick="peRemovePartner(${idx})">✕ Remove</button>
+    <div class="partner-card-header">
+      <span class="partner-callsign">${p.call||'NEW'}</span>
+      <span style="font-size:0.75rem;color:var(--muted);font-family:var(--mono);">${p.location||''}</span>
+      <label class="toggle-switch" title="Active — if off, both scripts skip this partner">
+        <input type="checkbox" ${p.active!==false?'checked':''} onchange="peUpdate(${idx},'active',this.checked)">
+        <span class="toggle-track"></span>
+        Active
+      </label>
+    </div>
+
+    <div class="partner-field-grid">
+      <div class="partner-field">
+        <label>Callsign</label>
+        <input type="text" value="${p.call||''}" onchange="peUpdate(${idx},'call',this.value.toUpperCase())">
+      </div>
+      <div class="partner-field">
+        <label>Connect Call (with SSID)</label>
+        <input type="text" value="${p.connect_call||''}" onchange="peUpdate(${idx},'connect_call',this.value.toUpperCase())">
+      </div>
+      <div class="partner-field">
+        <label>Name</label>
+        <input type="text" value="${p.name||''}" onchange="peUpdate(${idx},'name',this.value)">
+      </div>
+      <div class="partner-field">
+        <label>Location</label>
+        <input type="text" value="${p.location||''}" onchange="peUpdate(${idx},'location',this.value)">
+      </div>
+      <div class="partner-field">
+        <label>Latitude</label>
+        <input type="number" step="0.001" value="${p.lat||''}" onchange="peUpdate(${idx},'lat',parseFloat(this.value))">
+      </div>
+      <div class="partner-field">
+        <label>Longitude</label>
+        <input type="number" step="0.001" value="${p.lon||''}" onchange="peUpdate(${idx},'lon',parseFloat(this.value))">
+      </div>
+      <div class="partner-field">
+        <label>Distance (mi)</label>
+        <input type="number" value="${p.distance_mi||0}" onchange="peUpdate(${idx},'distance_mi',parseInt(this.value))">
+      </div>
+      <div class="partner-field">
+        <label>Attach Port</label>
+        <input type="number" value="${p.attach_port||3}" onchange="peUpdate(${idx},'attach_port',parseInt(this.value))">
+      </div>
+      <div class="partner-field">
+        <label>Storm Suspend Kp (blank=never)</label>
+        <input type="number" step="0.5" min="1" max="9" placeholder="e.g. 6.0"
+          value="${suspendKp}" onchange="peUpdateStorm(${idx},'suspend_kp',this.value)">
+      </div>
+      <div class="partner-field">
+        <label>Fixed Schedule</label>
+        <select onchange="peUpdate(${idx},'fixed_schedule',this.value==='true')">
+          <option value="false" ${!p.fixed_schedule?'selected':''}>No (prop-scheduler optimises)</option>
+          <option value="true"  ${p.fixed_schedule?'selected':''}>Yes (use fallback script only)</option>
+        </select>
+      </div>
+      <div class="partner-field">
+        <label>Last Resort (packet fallback)</label>
+        <input type="text" value="${p.last_resort_else||''}" placeholder="e.g. C 2 LHBBS"
+          onchange="peUpdate(${idx},'last_resort_else',this.value)">
+      </div>
+    </div>
+
+    <div style="margin-bottom:6px;">
+      <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-family:var(--mono);margin-bottom:6px;">Bands</div>
+      <div id="pe-bands-${idx}">${bandRows}</div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+        ${['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m'].map(b =>
+          `<button onclick="peAddBand(${idx},'${b}')" title="Add ${b}"
+            style="background:none;border:1px solid var(--border2);border-radius:3px;padding:2px 7px;font-family:var(--mono);font-size:0.65rem;color:${bandColor(b)};cursor:pointer;">+${b}</button>`
+        ).join('')}
+      </div>
+    </div>
+
+    <div class="partner-field" style="margin-top:8px;">
+      <label>Fallback Script (used during storms / fixed schedule)</label>
+      <input type="text" value="${(p.fallback_script||'').replace(/"/g,'&quot;')}"
+        onchange="peUpdate(${idx},'fallback_script',this.value)"
+        style="width:100%;font-size:0.7rem;">
+    </div>`;
+  return div;
+}
+
+function bandColor(b) {
+  const m = {'160m':'#7c3aed','80m':'#ef4444','40m':'#f59e0b','30m':'#10b981',
+             '20m':'#3b82f6','17m':'#8b5cf6','15m':'#ec4899','12m':'#14b8a6',
+             '10m':'#f97316','6m':'#06b6d4','2m':'#10b981'};
+  return m[b] || '#6b7280';
+}
+
+function peUpdate(idx, field, value) {
+  if (!peData) return;
+  peData.partners[idx][field] = value;
+  // Refresh card header to show updated callsign/location
+  if (field === 'call' || field === 'location' || field === 'active') peRenderAll();
+}
+
+function peUpdateStorm(idx, field, value) {
+  if (!peData) return;
+  if (!peData.partners[idx].storm) peData.partners[idx].storm = {};
+  peData.partners[idx].storm[field] = value === '' ? null : parseFloat(value);
+}
+
+function peUpdateBand(idx, band, subfield, value) {
+  if (!peData) return;
+  if (!peData.partners[idx].bands) peData.partners[idx].bands = {};
+  if (!peData.partners[idx].bands[band]) peData.partners[idx].bands[band] = {};
+  peData.partners[idx].bands[band][subfield] = value;
+}
+
+function peAddBand(idx, band) {
+  if (!peData) return;
+  if (!peData.partners[idx].bands) peData.partners[idx].bands = {};
+  if (!peData.partners[idx].bands[band]) {
+    peData.partners[idx].bands[band] = {freq: '', mode: 'PKT-U'};
+    // Re-render just this card
+    const cards = document.getElementById('peCards');
+    const oldCard = cards.querySelector('[data-idx="'+idx+'"]');
+    const newCard = peBuildCard(peData.partners[idx], idx);
+    cards.replaceChild(newCard, oldCard);
+  }
+}
+
+function peRemoveBand(idx, band) {
+  if (!peData) return;
+  if (confirm('Remove ' + band + ' from ' + peData.partners[idx].call + '?')) {
+    delete peData.partners[idx].bands[band];
+    const cards = document.getElementById('peCards');
+    const oldCard = cards.querySelector('[data-idx="'+idx+'"]');
+    cards.replaceChild(peBuildCard(peData.partners[idx], idx), oldCard);
+  }
+}
+
+function peRemovePartner(idx) {
+  if (!peData) return;
+  const call = peData.partners[idx].call || 'this partner';
+  if (confirm('Remove ' + call + ' from partners.json?\nA backup will be created on save.')) {
+    peData.partners.splice(idx, 1);
+    peRenderAll();
+    peStatus('Removed ' + call + ' — click Save to write to server', 'info');
+  }
+}
+
+function peAddPartner() {
+  if (!peData) return;
+  peData.partners.push({
+    call: 'NEW',
+    name: '',
+    location: '',
+    lat: 0,
+    lon: 0,
+    distance_mi: 0,
+    connect_call: 'NEW',
+    attach_port: 3,
+    active: true,
+    bands: { '40m': {freq: '', mode: 'PKT-U'} },
+    fixed_schedule: false,
+    last_resort_else: '',
+    fallback_script: '',
+    storm: { suspend_kp: null }
+  });
+  peRenderAll();
+  // Scroll to new card
+  const cards = document.getElementById('peCards');
+  cards.lastElementChild?.scrollIntoView({behavior:'smooth'});
+}
+
+async function peSave() {
+  if (!peData) { peStatus('Nothing loaded yet', 'err'); return; }
+  const pw = document.getElementById('pePassword').value.trim();
+  if (!pw) { peStatus('Password required', 'err'); return; }
+  peStatus('Saving…', 'info');
+  try {
+    const r = await fetch(PE_API + '?action=save&password=' + encodeURIComponent(pw), {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(peData, null, 2)
+    });
+    const d = await r.json();
+    if (!d.ok) { peStatus('✗ ' + d.error, 'err'); return; }
+    peStatus('✓ ' + d.message + (d.backup ? ' · backup: ' + d.backup.split('/').pop() : ''), 'ok');
+  } catch(e) {
+    peStatus('✗ ' + e.message, 'err');
+  }
+}
+// ════════════════════════════════════════════════════════════
+//  END PARTNERS EDITOR
+// ════════════════════════════════════════════════════════════
+</script>
+
+<script>
+document.querySelectorAll('.cmd').forEach(function(cmd) {
+  var codeEl = cmd.querySelector('code');
+  if (!codeEl) return;
+
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'Copy';
+  cmd.appendChild(btn);
+
+  btn.addEventListener('click', function() {
+    var raw = codeEl.innerText.trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(raw).then(function() {
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(function() {
+          btn.textContent = 'Copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    } else {
+      // Fallback for older browsers — select from a temp element
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = raw;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, 99999);
+        document.body.removeChild(ta);
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+      } catch(ignored) {
+        btn.textContent = '(copy manually)';
+      }
+      setTimeout(function() {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    }
+  });
+});
+</script>
+
+</body>
+</html>

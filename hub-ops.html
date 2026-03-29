@@ -1,0 +1,2073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hub Operations — BPQ Dashboard 2</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+/* ═══ DARK TERMINAL DESIGN ═══ */
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --surface2:  #1c2128;
+  --border:    rgba(48,54,61,0.9);
+  --border2:   rgba(99,110,123,0.4);
+  --text:      #e6edf3;
+  --text2:     #8b949e;
+  --text3:     #6e7681;
+  --text4:     #484f58;
+  --green:     #3fb950;
+  --green-dim: rgba(63,185,80,0.12);
+  --green-b:   rgba(63,185,80,0.3);
+  --red:       #f85149;
+  --red-dim:   rgba(248,81,73,0.12);
+  --red-b:     rgba(248,81,73,0.3);
+  --amber:     #d29922;
+  --amber-dim: rgba(210,153,34,0.12);
+  --amber-b:   rgba(210,153,34,0.3);
+  --blue:      #58a6ff;
+  --blue-dim:  rgba(88,166,255,0.12);
+  --blue-b:    rgba(88,166,255,0.3);
+  --purple:    #bc8cff;
+  --purple-dim:rgba(188,140,255,0.12);
+  --purple-b:  rgba(188,140,255,0.3);
+  --cyan:      #39d0d0;
+  --cyan-dim:  rgba(57,208,208,0.12);
+  --cyan-b:    rgba(57,208,208,0.3);
+  --mono: 'Courier New', monospace;
+  --radius: 6px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Light mode override */
+[data-theme="light"] {
+  --bg:        #f3f4f6;
+  --surface:   #ffffff;
+  --surface2:  #f9fafb;
+  --border:    rgba(229,231,235,1);
+  --border2:   rgba(209,213,219,1);
+  --text:      #111827;
+  --text2:     #374151;
+  --text3:     #6b7280;
+  --text4:     #9ca3af;
+  --green-dim: rgba(16,185,129,0.08);
+  --green-b:   rgba(16,185,129,0.3);
+  --red-dim:   rgba(239,68,68,0.08);
+  --red-b:     rgba(239,68,68,0.25);
+  --amber-dim: rgba(245,158,11,0.08);
+  --amber-b:   rgba(245,158,11,0.3);
+  --blue-dim:  rgba(59,130,246,0.08);
+  --blue-b:    rgba(59,130,246,0.3);
+  --purple-dim:rgba(139,92,246,0.08);
+  --purple-b:  rgba(139,92,246,0.3);
+  --cyan-dim:  rgba(6,182,212,0.08);
+  --cyan-b:    rgba(6,182,212,0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ═══ NAV ═══ */
+.nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-brand { display: flex; align-items: center; gap: 10px; }
+.nav-callsign { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--green); letter-spacing: 0.05em; }
+.nav-sub { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; }
+.status-dot-nav {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 6px var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.nav-tabs { display: flex; gap: 2px; }
+.nav-tab {
+  padding: 5px 14px; border-radius: var(--radius);
+  font-size: 12px; font-weight: 500;
+  color: var(--text2); cursor: pointer;
+  border: 1px solid transparent; text-decoration: none;
+  transition: all 0.15s;
+}
+.nav-tab:hover { color: var(--text); background: var(--surface2); }
+.nav-tab.active {
+  color: var(--green); background: var(--green-dim);
+  border-color: var(--green-b);
+}
+
+.nav-right { display: flex; align-items: center; gap: 8px; }
+.clock-utc {
+  font-family: var(--mono); font-size: 12px; font-weight: 700;
+  padding: 4px 10px; border-radius: var(--radius);
+  background: var(--blue-dim); color: var(--blue);
+  border: 1px solid var(--blue-b); letter-spacing: 0.04em;
+}
+.clock-local {
+  font-family: var(--mono); font-size: 12px;
+  padding: 4px 10px; border-radius: var(--radius);
+  background: var(--surface2); color: var(--text3);
+  border: 1px solid var(--border);
+}
+.dark-toggle {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px 8px;
+  cursor: pointer; font-size: 14px; color: var(--text3);
+  transition: all 0.15s;
+}
+.dark-toggle:hover { border-color: var(--green); }
+
+/* ═══ MAIN ═══ */
+.main { padding: 16px 20px 28px; max-width: 1600px; margin: 0 auto; }
+
+/* ═══ PAGE HEADER ═══ */
+.page-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 16px;
+  flex-wrap: wrap; gap: 10px;
+}
+.page-title { font-size: 20px; font-weight: 600; color: var(--text); }
+.page-sub { font-size: 11px; color: var(--text3); margin-top: 2px; font-family: var(--mono); }
+
+.time-pills {
+  display: flex; gap: 2px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 3px;
+}
+.time-pill {
+  padding: 4px 12px; border-radius: 4px;
+  font-size: 11px; font-weight: 600; font-family: var(--mono);
+  color: var(--text3); cursor: pointer; border: none;
+  background: none; transition: all 0.15s;
+}
+.time-pill.active { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+
+/* ═══ STAT CARDS ═══ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px; margin-bottom: 14px;
+}
+@media(max-width:1100px){.stat-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:600px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+  position: relative; overflow: hidden;
+  transition: transform 0.15s;
+}
+.stat-card:hover { transform: translateY(-2px); }
+.stat-card::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+}
+.stat-card.green::before { background: var(--green); }
+.stat-card.red::before   { background: var(--red); }
+.stat-card.amber::before { background: var(--amber); }
+.stat-card.blue::before  { background: var(--blue); }
+.stat-card.purple::before{ background: var(--purple); }
+.stat-card.cyan::before  { background: var(--cyan); }
+
+.stat-label {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text3); margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.stat-value {
+  font-size: 26px; font-weight: 700; font-family: var(--mono);
+  line-height: 1; margin-bottom: 3px;
+}
+.stat-card.green  .stat-value { color: var(--green); }
+.stat-card.red    .stat-value { color: var(--red); }
+.stat-card.amber  .stat-value { color: var(--amber); }
+.stat-card.blue   .stat-value { color: var(--blue); }
+.stat-card.purple .stat-value { color: var(--purple); }
+.stat-card.cyan   .stat-value { color: var(--cyan); }
+
+.stat-sub { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+.stat-detail {
+  font-size: 10px; color: var(--text3); margin-top: 6px;
+  padding-top: 6px; border-top: 1px solid var(--border);
+  font-family: var(--mono); line-height: 1.7;
+}
+.stat-detail span { display: flex; justify-content: space-between; gap: 4px; }
+
+/* ═══ BODY / BOTTOM GRID ═══ */
+.body-grid {
+  display: grid; grid-template-columns: 1fr 300px;
+  gap: 12px; margin-bottom: 12px;
+}
+@media(max-width:900px){.body-grid{grid-template-columns:1fr;}}
+.bottom-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media(max-width:900px){.bottom-grid{grid-template-columns:1fr;}}
+.left-col { display: flex; flex-direction: column; gap: 12px; }
+.right-col { display: flex; flex-direction: column; gap: 12px; }
+
+/* ═══ PANEL ═══ */
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+}
+.panel-header {
+  padding: 9px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.panel-title {
+  font-size: 10px; font-weight: 700; font-family: var(--mono);
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2);
+}
+.panel-body { padding: 12px 14px; }
+.panel-flush { padding: 0; }
+
+/* ═══ TAGS ═══ */
+.tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 700; font-family: var(--mono);
+  padding: 2px 8px; border-radius: 3px; white-space: nowrap;
+}
+.tag.green  { background: var(--green-dim);  color: var(--green);  border: 1px solid var(--green-b); }
+.tag.red    { background: var(--red-dim);    color: var(--red);    border: 1px solid var(--red-b); }
+.tag.amber  { background: var(--amber-dim);  color: var(--amber);  border: 1px solid var(--amber-b); }
+.tag.blue   { background: var(--blue-dim);   color: var(--blue);   border: 1px solid var(--blue-b); }
+.tag.purple { background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple-b); }
+.tag.cyan   { background: var(--cyan-dim);   color: var(--cyan);   border: 1px solid var(--cyan-b); }
+.tag.gray   { background: var(--surface2);   color: var(--text3);  border: 1px solid var(--border); }
+
+/* ═══ PARTNER CARDS ═══ */
+.partner-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px,1fr)); gap: 8px; }
+.partner-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px; text-align: center; position: relative;
+  transition: border-color 0.15s;
+}
+.partner-card:hover { border-color: var(--green-b); }
+.partner-dot { position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; }
+.partner-name { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.partner-status {
+  display: inline-block; font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 6px; border-radius: 3px; margin-bottom: 3px;
+}
+.ps-ok     { background: var(--green-dim); color: var(--green); }
+.ps-idle   { background: var(--blue-dim);  color: var(--blue); }
+.ps-paused { background: var(--amber-dim); color: var(--amber); }
+.ps-fail   { background: var(--red-dim);   color: var(--red); }
+.partner-meta { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+/* ═══ CONNECTION TABLE ═══ */
+.conn-table { width: 100%; border-collapse: collapse; }
+.conn-table th {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text3);
+  padding: 7px 10px; text-align: left;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+  font-family: var(--mono);
+}
+.conn-table td {
+  padding: 7px 10px; font-size: 11px; color: var(--text2);
+  border-bottom: 1px solid rgba(48,54,61,0.5); white-space: nowrap;
+}
+.conn-table tbody tr:last-child td { border-bottom: none; }
+.conn-table tbody tr:hover { background: var(--surface2); }
+
+.call-pill { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--text); }
+.band-tag {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  font-family: var(--mono); padding: 1px 6px; border-radius: 3px; color: white;
+}
+.status-ok   { color: var(--green); font-weight: 700; font-size: 10px; font-family: var(--mono); }
+.status-fail { color: var(--red);   font-weight: 700; font-size: 10px; font-family: var(--mono); }
+.snr-good    { color: var(--green); font-family: var(--mono); font-size: 11px; }
+.snr-ok      { color: var(--text2); font-family: var(--mono); font-size: 11px; }
+.snr-poor    { color: var(--red);   font-family: var(--mono); font-size: 11px; }
+
+/* ═══ BAND BARS ═══ */
+.band-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.band-row:last-child { border-bottom: none; }
+.band-name { font-family: var(--mono); font-size: 12px; font-weight: 700; min-width: 36px; }
+.band-bar-wrap { flex: 1; height: 5px; background: var(--surface2); border-radius: 2px; }
+.band-bar { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+.band-meta { font-size: 10px; color: var(--text3); text-align: right; min-width: 100px; font-family: var(--mono); }
+
+/* ═══ COND ROWS ═══ */
+.cond-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.cond-row:last-child { border-bottom: none; }
+.cond-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; font-family: var(--mono); }
+.cond-val   { font-weight: 700; color: var(--text); font-family: var(--mono); font-size: 11px; }
+.cond-good  { color: var(--green) !important; }
+.cond-warn  { color: var(--amber) !important; }
+.cond-bad   { color: var(--red)   !important; }
+.cond-info  { color: var(--blue)  !important; }
+
+/* ═══ NWS ALERT ═══ */
+.nws-alert-item {
+  background: var(--amber-dim); border: 1px solid var(--amber-b);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--radius); padding: 8px 10px; margin-bottom: 8px;
+}
+.nws-alert-type { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--amber); margin-bottom: 2px; font-family: var(--mono); }
+.nws-alert-area { font-size: 10px; color: var(--text3); }
+
+/* ═══ MAP ═══ */
+#stationMap { height: 260px; }
+.leaflet-container { background: #f2ede8 !important; }
+
+/* ═══ MISC ═══ */
+.mini-label {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text3); margin-bottom: 8px; font-family: var(--mono);
+}
+.divider { height: 1px; background: var(--border); margin: 10px 0; }
+.empty-state { text-align: center; padding: 20px; color: var(--text3); font-size: 11px; font-family: var(--mono); }
+.scroll-y { overflow-y: auto; }
+.scroll-y::-webkit-scrollbar { width: 3px; }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ═══ VARA GAUGE ═══ */
+.vara-level-bar {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, #ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6);
+  position: relative; margin: 6px 0;
+}
+.vara-level-marker {
+  position: absolute; top: -4px;
+  width: 14px; height: 14px; background: var(--text);
+  border: 2px solid var(--surface); border-radius: 50%;
+  transform: translateX(-50%); transition: left 0.5s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+/* ═══ STATUS ═══ */
+.status-bar { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+/* ═══ NO DATA ═══ */
+.hidden { display: none !important; }
+#noDataWarning {
+  background: var(--amber-dim); border: 1px solid var(--amber-b);
+  border-radius: var(--radius); padding: 20px; text-align: center; margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     NAV
+═══════════════════════════════════════════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-brand">
+      <span class="status-dot-nav"></span>
+      <div>
+        <div class="nav-callsign" id="navCallsign">K1AJD-1</div>
+        <div class="nav-sub">TPRFN Hub · Hub Operations</div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="hub-ops.html"          class="nav-link active">Hub Ops</a>
+      <a href="traffic.html"           class="nav-link">Traffic</a>
+      <a href="system.html"            class="nav-link">System</a>
+      <a href="bpq-maintenance.html"   class="nav-link">Admin</a>
+    </div>
+    <div class="nav-right">
+      <span class="clock-utc" id="navUtcClock">--:--:-- Z</span>
+      <span class="clock-local" id="navLocalClock">--:--:-- L</span>
+      <button class="dark-toggle" id="darkBtn" onclick="toggleDark()" title="Toggle dark mode">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════ -->
+<main class="main">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title gradient-text">Hub Operations</h1>
+      <div class="page-sub">
+        <span class="status-dot green" id="statusDot"></span>
+        <span id="statusText">Loading…</span>
+        &nbsp;·&nbsp;
+        <span id="lastUpdate">–</span>
+        &nbsp;·&nbsp;
+        auto-refresh 60s
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="time-pills">
+        <button class="time-pill active" onclick="setRange(1)"  id="rBtn1">Today</button>
+        <button class="time-pill"        onclick="setRange(7)"  id="rBtn7">7 Day</button>
+        <button class="time-pill"        onclick="setRange(30)" id="rBtn30">30 Day</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- No Data Warning (hidden by default) -->
+  <div id="noDataWarning" class="hidden">
+    <div style="font-size:24px;margin-bottom:8px;">⚠️</div>
+    <div style="font-weight:600;color:var(--amber);margin-bottom:6px;">No VARA Log File Found</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.7;" id="noDataDetail"></div>
+  </div>
+
+  <!-- ═══ STAT CARDS ═══ -->
+  <div class="stat-grid">
+
+    <div class="stat-card green">
+      <div class="stat-label">Successful Sessions</div>
+      <div class="stat-value" id="statSuccess">–</div>
+      <div class="stat-sub">of <span id="statTotal">–</span> total</div>
+      <div class="stat-detail">
+        <span><span>Success rate</span><span id="statSuccessRate" style="color:var(--green);font-weight:700;">–%</span></span>
+        <span><span>Avg bitrate</span><span id="statAvgBps" style="color:var(--cyan);">–</span></span>
+      </div>
+    </div>
+
+    <div class="stat-card red">
+      <div class="stat-label">Failed</div>
+      <div class="stat-value" id="statFailed">–</div>
+      <div class="stat-sub" id="statFailRate">–% fail rate</div>
+      <div class="stat-detail">
+        <span><span>Timeout</span><span id="statFailTimeout" style="color:var(--red);">–</span></span>
+        <span><span>Channel busy</span><span id="statFailBusy" style="color:var(--amber);">–</span></span>
+        <span><span>No data</span><span id="statFailNoData" style="color:var(--text4);">–</span></span>
+      </div>
+    </div>
+
+    <div class="stat-card blue">
+      <div class="stat-label">Unique Stations</div>
+      <div class="stat-value" id="statStations">–</div>
+      <div class="stat-sub"><span id="statMapped">–</span> mapped on map</div>
+      <div class="stat-detail">
+        <span><span>Forwarding partners</span><span id="statPartners" style="color:var(--blue);">–</span></span>
+        <span><span>WL2K direct</span><span id="statWl2k" style="color:var(--cyan);">–</span></span>
+      </div>
+    </div>
+
+    <div class="stat-card amber">
+      <div class="stat-label">Messages</div>
+      <div class="stat-value" id="statMessages">–</div>
+      <div class="stat-sub"><span id="statMsgTx">–</span> TX · <span id="statMsgRx">–</span> RX</div>
+      <div class="stat-detail">
+        <span><span>Best partner</span><span id="statBestPartner" style="color:var(--amber);font-weight:700;">–</span></span>
+      </div>
+    </div>
+
+    <div class="stat-card cyan">
+      <div class="stat-label">Data Transfer</div>
+      <div class="stat-value" id="statBytes">–</div>
+      <div class="stat-sub"><span id="statBytesTx">–</span> TX · <span id="statBytesRx">–</span> RX</div>
+      <div class="stat-detail">
+        <span><span>Avg per session</span><span id="statBytesPerSess" style="color:var(--cyan);">–</span></span>
+      </div>
+    </div>
+
+    <div class="stat-card purple">
+      <div class="stat-label">Avg S/N</div>
+      <div class="stat-value" id="statSNR">–</div>
+      <div class="stat-sub">dB · all bands</div>
+      <div class="stat-detail" id="statSnrByBand">–</div>
+    </div>
+
+  </div>
+
+  <!-- ═══ BODY GRID ═══ -->
+  <div class="body-grid">
+
+    <!-- LEFT COLUMN -->
+    <div class="left-col">
+
+      <!-- FORWARDING PARTNERS -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="card-title">📡 Forwarding Partners</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="tag green" id="partnerActiveTag">– active</span>
+            <span class="tag amber" id="partnerPausedTag" style="display:none;">– paused</span>
+            <span class="tag red" id="partnerFailTag" style="display:none;">– failing</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="partner-grid" id="partnerGrid">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- HOURLY CHART -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="card-title">📊 Hourly Activity (UTC)</span>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text3);">
+              <span style="width:10px;height:10px;border-radius:2px;background:linear-gradient(135deg,#667eea,#764ba2);display:inline-block;"></span>Sessions
+            </span>
+            <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text3);">
+              <span style="width:10px;height:10px;border-radius:2px;background:var(--red);display:inline-block;opacity:0.7;"></span>Failed
+            </span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap" style="height:120px;">
+            <canvas id="hourlyChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECENT CONNECTIONS -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Recent Connections</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input
+              id="connSearch"
+              type="text"
+              placeholder="Search callsign, band, status…"
+              oninput="filterConnTable()"
+              style="font-family:var(--mono);font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);width:210px;outline:none;"
+              onfocus="this.style.borderColor='var(--green)'"
+              onblur="this.style.borderColor='var(--border)'"
+            >
+            <span class="tag gray" id="connCount">– connections</span>
+          </div>
+        </div>
+        <div class="panel-flush">
+          <div class="scroll-y" style="max-height:320px;">
+            <table class="conn-table">
+              <thead>
+                <tr>
+                  <th>Time (UTC)</th>
+                  <th>Station</th>
+                  <th>Partner</th>
+                  <th>Band</th>
+                  <th>S/N (dB)</th>
+                  <th>Bytes</th>
+                  <th>Max bps</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="connTable">
+                <tr><td colspan="8" class="empty-state">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATION MAP -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="card-title">📍 Station Map</span>
+          <span class="tag gray" id="mapStatus">Loading…</span>
+        </div>
+        <div id="stationMap"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right-col">
+
+      <!-- BAND ACTIVITY -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="card-title">📻 Band Activity</span>
+          <span class="tag green" id="bandActiveTag">– active</span>
+        </div>
+        <div class="card-body">
+          <div class="mini-label">Sessions by band (filtered range)</div>
+          <div id="bandBars">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- PROPAGATION CONDITIONS -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="card-title">🌍 Propagation</span>
+          <span class="tag" id="propTag" style="background:var(--surface2);color:var(--text3);border:1px solid var(--border);">Loading…</span>
+        </div>
+        <div class="card-body">
+          <div class="cond-row">
+            <span class="cond-label">Solar Flux</span>
+            <span class="cond-val" id="propSFI">–</span>
+          </div>
+          <div class="cond-row">
+            <span class="cond-label">A-index</span>
+            <span class="cond-val" id="propA">–</span>
+          </div>
+          <div class="cond-row">
+            <span class="cond-label">K-index</span>
+            <span class="cond-val" id="propK">–</span>
+          </div>
+          <div class="cond-row">
+            <span class="cond-label">Sunspots</span>
+            <span class="cond-val" id="propSSN">–</span>
+          </div>
+          <div class="cond-row">
+            <span class="cond-label">Geo Storm</span>
+            <span class="cond-val" id="propStorm">–</span>
+          </div>
+          <div class="divider"></div>
+          <div class="mini-label">Recommended bands now</div>
+          <div id="bandRecs" style="display:flex;gap:4px;flex-wrap:wrap;">
+            <span class="tag gray">Loading…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- WATCHDOG STATUS -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="card-title">🐕 Watchdog</span>
+          <span class="tag green" id="wdTag">Active</span>
+        </div>
+        <div class="card-body">
+          <div id="wdBody">
+            <div class="cond-row">
+              <span class="cond-label">Status</span>
+              <span class="cond-val cond-good">All partners active</span>
+            </div>
+            <div class="cond-row">
+              <span class="cond-label">Cron schedule</span>
+              <span class="cond-val" style="font-family:var(--mono);font-size:11px;">*/5 * * * *</span>
+            </div>
+          </div>
+          <div id="wdPaused" style="display:none;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ BOTTOM GRID ═══ -->
+  <div class="bottom-grid">
+
+    <!-- TOP STATIONS -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="card-title">🏆 Top Stations</span>
+        <span class="tag gray">by connections</span>
+      </div>
+      <div class="panel-flush">
+        <table class="conn-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Callsign</th>
+              <th>Sessions</th>
+              <th>Data</th>
+              <th>Avg S/N</th>
+              <th>Best Band</th>
+            </tr>
+          </thead>
+          <tbody id="topTable">
+            <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VARA PERFORMANCE -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="card-title">⚡ VARA Performance</span>
+        <span class="tag gray" id="varaRangeBadge">today</span>
+      </div>
+      <div class="card-body">
+        <div class="cond-row">
+          <span class="cond-label">Avg speed level</span>
+          <span class="cond-val cond-good" id="varaAvgLevel">–</span>
+        </div>
+        <div class="cond-row">
+          <span class="cond-label">Peak speed level</span>
+          <span class="cond-val" id="varaPeakLevel">–</span>
+        </div>
+        <div class="cond-row">
+          <span class="cond-label">Avg throughput</span>
+          <span class="cond-val" id="varaAvgBps">–</span>
+        </div>
+        <div class="cond-row">
+          <span class="cond-label">Peak throughput</span>
+          <span class="cond-val cond-good" id="varaPeakBps">–</span>
+        </div>
+        <div class="divider"></div>
+        <div class="mini-label">Speed level gauge (SL1–17)</div>
+        <div class="vara-level-bar">
+          <div class="vara-level-marker" id="varaMarker" style="left:0%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text4);font-family:var(--mono);">
+          <span>SL1 FSK</span><span>SL9 4PSK</span><span>SL14 8PSK</span><span>SL17 32QAM</span>
+        </div>
+        <div class="divider"></div>
+        <div class="cond-row">
+          <span class="cond-label">Avg connect attempts</span>
+          <span class="cond-val" id="varaAvgAttempts">–</span>
+        </div>
+        <div class="cond-row">
+          <span class="cond-label">Sessions with data</span>
+          <span class="cond-val" id="varaWithData">–</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- NWS ALERTS -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="card-title">🌩️ NWS Alerts</span>
+        <span class="tag" id="nwsTag" style="background:var(--surface2);color:var(--text3);border:1px solid var(--border);">Loading…</span>
+      </div>
+      <div class="card-body">
+        <div id="nwsAlertList">
+          <div class="empty-state">Checking alerts…</div>
+        </div>
+        <div class="divider"></div>
+        <div class="cond-row">
+          <span class="cond-label">NWS Monitor</span>
+          <span class="cond-val cond-good">Active</span>
+        </div>
+        <div class="cond-row">
+          <span class="cond-label">Region</span>
+          <span class="cond-val" id="nwsRegion" style="font-size:11px;">–</span>
+        </div>
+        <div class="cond-row">
+          <span class="cond-label">Last check</span>
+          <span class="cond-val" id="nwsLastCheck" style="font-size:11px;">–</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  CONFIGURATION — mirrors existing BPQ Dashboard config pattern
+// ═══════════════════════════════════════════════════════════════════
+const CFG = {
+  varaFile:    'k1ajd.vara',          // VARA log file in ./logs/
+  logsDir:     './logs/',             // Log directory
+  callsign:    'K1AJD',               // Hub callsign (used for BBS log filename)
+  timezone:    'America/New_York',    // Local timezone
+  refreshMs:   60000,                 // Auto-refresh interval
+  bbsDaysLoad: 30,                    // Max days of BBS logs to load
+  msgThreshold: 446,                  // Min bytes to count as message session
+  nwsZone:     'GAZ087',              // NWS zone for alerts
+  partners:    ['WP4OH-11','N3MEL-2','NP4JN-11','K7EK','KK4DIV-1','N9SEO-1','N4SFL-1'],
+  solarProxy:  './solar-proxy.php',  // solar-proxy.php path
+};
+
+// Band definitions (same as existing pages)
+const BANDS = {
+  '160m': { min:1.8,    max:2.0,   color:'#7c3aed' },
+  '80m':  { min:3.5,    max:4.0,   color:'#ef4444' },
+  '40m':  { min:7.0,    max:7.3,   color:'#f59e0b' },
+  '30m':  { min:10.1,   max:10.15, color:'#10b981' },
+  '20m':  { min:14.0,   max:14.35, color:'#3b82f6' },
+  '17m':  { min:18.068, max:18.168,color:'#8b5cf6' },
+  '15m':  { min:21.0,   max:21.45, color:'#ec4899' },
+  '12m':  { min:24.89,  max:24.99, color:'#14b8a6' },
+  '10m':  { min:28.0,   max:29.7,  color:'#f97316' },
+  '6m':   { min:50.0,   max:54.0,  color:'#06b6d4' },
+  '2m':   { min:144.0,  max:148.0, color:'#10b981' },
+  'WL2K': { min:0,      max:0,     color:'#06b6d4' },
+};
+const MONTH_MAP = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+
+const freqToBand = f => {
+  if (!f || f <= 0) return 'Unknown';
+  for (const [b, r] of Object.entries(BANDS)) {
+    if (b === 'WL2K') continue;
+    if (f >= r.min && f <= r.max) return b;
+  }
+  return 'Unknown';
+};
+const getBandColor = b => BANDS[b]?.color || '#6b7280';
+const formatBytes = b => {
+  if (!b || b <= 0) return '0 B';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(2) + ' MB';
+};
+const formatBps = b => {
+  if (!b || b <= 0) return '–';
+  if (b < 1000) return b + ' bps';
+  return (b/1000).toFixed(1) + ' kbps';
+};
+
+// ═══ VARA SPEED LEVELS ═══
+const VARA_LEVELS = [
+  {level:1,  bps:18,   mod:'FSK'},   {level:2,  bps:41,   mod:'FSK'},
+  {level:3,  bps:82,   mod:'FSK'},   {level:4,  bps:175,  mod:'FSK'},
+  {level:5,  bps:270,  mod:'4PSK'},  {level:6,  bps:363,  mod:'4PSK'},
+  {level:7,  bps:549,  mod:'4PSK'},  {level:8,  bps:735,  mod:'4PSK'},
+  {level:9,  bps:922,  mod:'4PSK'},  {level:10, bps:2011, mod:'4PSK'},
+  {level:11, bps:2682, mod:'4PSK'},  {level:12, bps:3219, mod:'4PSK'},
+  {level:13, bps:4025, mod:'8PSK'},  {level:14, bps:4830, mod:'8PSK'},
+  {level:15, bps:5872, mod:'16QAM'}, {level:16, bps:7050, mod:'32QAM'},
+  {level:17, bps:8489, mod:'32QAM'},
+];
+const getVaraLevel = maxBps => {
+  if (!maxBps || maxBps <= 0) return null;
+  let best = VARA_LEVELS[0];
+  for (const l of VARA_LEVELS) if (maxBps >= l.bps) best = l;
+  return best;
+};
+
+// ═══ STATE ═══
+let varaLogs = [], bbsLogs = [], connections = [], allConnections = [];
+let stats = {}, radioCommands = [], radioCommandsByCall = {};
+let incomingFreqs = {}, bbsFailures = [], allFreqByDate = {};
+let hubLastConnect = {}, stationLocations = {};
+let currentRange = 1;
+let hourlyChart = null, geoMap = null, mapMarkers = [];
+
+// ═══ DARK MODE ═══
+function toggleDark() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  document.documentElement.setAttribute('data-theme', isLight ? '' : 'light');
+  localStorage.setItem('bpq-d2-theme', isLight ? 'dark' : 'light');
+  document.getElementById('darkBtn').textContent = isLight ? '☀️' : '🌙';
+  if (hourlyChart) { updateHourlyChartColors(); hourlyChart.update(); }
+}
+(function initTheme() {
+  const t = localStorage.getItem('bpq-d2-theme');
+  if (t === 'light') {
+    document.documentElement.setAttribute('data-theme','light');
+    document.getElementById('darkBtn').textContent = '🌙';
+  } else {
+    document.getElementById('darkBtn').textContent = '☀️';
+  }
+})();
+
+function updateHourlyChartColors() {
+  if (!hourlyChart) return;
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  hourlyChart.options.scales.x.grid.color = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+  hourlyChart.options.scales.y.grid.color = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+  hourlyChart.options.scales.x.ticks.color = isLight ? '#6b7280' : '#6e7681';
+  hourlyChart.options.scales.y.ticks.color = isLight ? '#6b7280' : '#6e7681';
+}
+
+// ═══ CLOCKS ═══
+(function tick() {
+  const n = new Date();
+  const pad = v => String(v).padStart(2,'0');
+  const utc = pad(n.getUTCHours())+':'+pad(n.getUTCMinutes())+':'+pad(n.getUTCSeconds())+' Z';
+  const loc = pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds())+' L';
+  const ua = document.getElementById('navUtcClock');
+  const ul = document.getElementById('navLocalClock');
+  if (ua) ua.textContent = utc;
+  if (ul) ul.textContent = loc;
+  setTimeout(tick, 1000 - n.getMilliseconds());
+})();
+
+// ═══ STATUS HELPERS ═══
+function setStatus(type, msg) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (dot) dot.className = 'status-dot ' + (type === 'success' ? 'green' : type === 'error' ? 'red' : 'amber');
+  if (txt) txt.textContent = msg;
+}
+
+function getBBSFilename(date) {
+  const yy = String(date.getUTCFullYear()).slice(-2);
+  const mm = String(date.getUTCMonth()+1).padStart(2,'0');
+  const dd = String(date.getUTCDate()).padStart(2,'0');
+  return 'log_' + yy + mm + dd + '_BBS.txt';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  LOG LOADING & PARSING (adapted from bpq-rf-connections.html)
+// ═══════════════════════════════════════════════════════════════════
+async function loadAllLogs() {
+  setStatus('loading', 'Loading log files…');
+  varaLogs = []; bbsLogs = []; bbsFailures = [];
+  radioCommands = []; radioCommandsByCall = {};
+  incomingFreqs = {}; allFreqByDate = {};
+
+  // Load VARA log
+  try {
+    const varaUrl = CFG.logsDir + CFG.varaFile + '?t=' + Date.now();
+    const r = await apiFetch(varaUrl);
+    if (r.ok) {
+      const text = (await r.text()).trim();
+      varaLogs = text.split('\n').filter(l => l.trim());
+    } else {
+      console.error('[BPQ] VARA log HTTP error:', r.status, r.statusText);
+    }
+  } catch(e) {
+    console.error('[BPQ] VARA log fetch failed:', e.message);
+  }
+
+  // Load BBS logs (parallel, last N days)
+  const now = new Date();
+  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const fetches = [];
+  for (let i = 0; i < CFG.bbsDaysLoad; i++) {
+    const d = new Date(todayUTC);
+    d.setUTCDate(d.getUTCDate() - i);
+    const fn = getBBSFilename(d);
+    const yy = String(d.getUTCFullYear()).slice(-2);
+    const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+    const dd = String(d.getUTCDate()).padStart(2,'0');
+    const cmsFn = 'CMSAccess_' + (2000+parseInt(yy)) + mm + dd + '.log';
+    fetches.push(
+      apiFetch(CFG.logsDir + fn + '?t=' + Date.now())
+        .then(r => r.ok ? r.text() : null)
+        .then(t => t ? { type:'bbs', text:t } : null)
+        .catch(() => null)
+    );
+  }
+  const results = await Promise.all(fetches);
+  results.forEach(r => {
+    if (!r) return;
+    bbsLogs = bbsLogs.concat(r.text.trim().split('\n').filter(l => l.trim()));
+  });
+
+  if (bbsLogs.length > 0) {
+    setStatus('loading', 'Parsing BBS logs…');
+    parseBBSLog();
+  }
+
+  if (varaLogs.length > 0) {
+    try {
+      setStatus('loading', 'Parsing VARA connections…');
+      parseConnections();
+      allConnections = [...connections];
+      applyRange();
+      setStatus('success', connections.length + ' connections loaded');
+      document.getElementById('noDataWarning').classList.add('hidden');
+      document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    } catch(parseErr) {
+      console.error('[BPQ] Parse/render error:', parseErr);
+      setStatus('error', 'Parse error: ' + parseErr.message);
+    }
+  } else {
+    setStatus('error', 'No VARA log found');
+    showNoDataWarning();
+  }
+
+  // Load external data in parallel (non-blocking)
+  fetchPropData();
+  fetchNWSAlerts();
+  loadWatchdogStatus();
+  initMap();
+}
+
+function showNoDataWarning() {
+  const div = document.getElementById('noDataWarning');
+  const now = new Date();
+  const yy = String(now.getUTCFullYear()).slice(-2);
+  const mm = String(now.getUTCMonth()+1).padStart(2,'0');
+  const dd = String(now.getUTCDate()).padStart(2,'0');
+  document.getElementById('noDataDetail').innerHTML =
+    'Expected VARA log: <code style="color:var(--purple);">' + CFG.logsDir + CFG.varaFile + '</code><br>' +
+    'Expected BBS log: <code style="color:var(--purple);">' + CFG.logsDir + 'log_' + yy + mm + dd + '_BBS.txt</code><br><br>' +
+    'Use the <code>fetch-vara-tprfn</code> script to populate the VARA log.';
+  div.classList.remove('hidden');
+}
+
+// apiFetch with 429 backoff and explicit error logging
+async function apiFetch(url, delay = 2000) {
+  try {
+    const r = await fetch(url);
+    if (r.status === 429) {
+      console.warn('[BPQ] Rate limited on', url, '— retrying in', delay, 'ms');
+      await new Promise(res => setTimeout(res, delay));
+      return fetch(url);
+    }
+    return r;
+  } catch(e) {
+    console.error('[BPQ] Fetch error for', url, ':', e.message);
+    throw e;
+  }
+}
+
+// ═══ BBS LOG PARSING (from bpq-rf-connections.html) ═══
+function parseBBSLog() {
+  bbsFailures = [];
+  radioCommandsByCall = {};
+  radioCommands = [];
+  incomingFreqs = {};
+  allFreqByDate = {};
+
+  bbsLogs.forEach(line => {
+    // RADIO command: outgoing frequency
+    const rm = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+>([A-Z0-9-]+)\s+RADIO\s+([\d.]+)/i);
+    // Note: new Mon DD format BBS logs don't have RADIO lines — handled in varaLogs parser
+    if (rm) {
+      const [,date,h,m,s,call,freq] = rm;
+      const freqMHz = parseFloat(freq);
+      const baseCall = call.replace(/-\d+$/,'');
+      const cmd = {date,h,m,s:parseInt(s),callsign:baseCall,freqMHz,_sec:parseInt(h)*3600+parseInt(m)*60+parseInt(s)};
+      radioCommands.push(cmd);
+      if (!radioCommandsByCall[baseCall]) radioCommandsByCall[baseCall] = [];
+      radioCommandsByCall[baseCall].push(cmd);
+      if (!allFreqByDate[date]) allFreqByDate[date] = [];
+      allFreqByDate[date].push({date,_sec:cmd._sec,freqMHz});
+    }
+
+    // Incoming connect with frequency
+    const im = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+\|([A-Z0-9-]+)\s+Incoming Connect from ([A-Z0-9-]+).*Freq (\d+) Mode VARA/i);
+    if (im) {
+      const [,date,h,m,s,,,freqHz] = im;
+      const freqMHz = parseInt(freqHz)/1e6;
+      incomingFreqs[date+':'+h+':'+m] = {freqMHz};
+      if (!allFreqByDate[date]) allFreqByDate[date] = [];
+      allFreqByDate[date].push({date,_sec:parseInt(h)*3600+parseInt(m)*60+parseInt(s),freqMHz});
+    }
+
+    // Failure types
+    if (line.match(/Sorry.*Channel.*busy/i)) {
+      const m = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+<([A-Z0-9-]+)/i);
+      if (m) bbsFailures.push({date:m[1],h:m[2],m:m[3],s:parseInt(m[4]),callsign:m[5].replace(/-\d+$/,''),type:'channelBusy'});
+    }
+    if (line.match(/Error\s*-\s*Port\s+in\s+use|Session\s+Attached/i)) {
+      const m = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+<([A-Z0-9-]+)/i);
+      if (m) bbsFailures.push({date:m[1],h:m[2],m:m[3],s:parseInt(m[4]),callsign:m[5].replace(/-\d+$/,''),type:'portInSession'});
+    }
+    if (line.match(/}\s*Failure\s+with/i)) {
+      const m = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+<([A-Z0-9-]+)/i);
+      if (m) bbsFailures.push({date:m[1],h:m[2],m:m[3],s:parseInt(m[4]),callsign:m[5].replace(/-\d+$/,''),type:'varaFailure'});
+    }
+  });
+}
+
+// ═══ FIND FREQUENCY ═══
+function findFrequency(callsign, h, m, s, type, dateStr) {
+  if (type === 'incoming') {
+    const parts = dateStr ? dateStr.trim().split(/\s+/) : [];
+    const months = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+    if (parts.length >= 2) {
+      const date = String(new Date().getFullYear()).slice(-2) + (months[parts[0]]||'01') + String(parts[1]).padStart(2,'0');
+      const key = date + ':' + h + ':' + m;
+      const data = incomingFreqs[key];
+      if (data) return data.freqMHz;
+    }
+  }
+  const baseCall = callsign.replace(/-\d+$/,'');
+  const connSec = parseInt(h)*3600+parseInt(m)*60+parseInt(s||0);
+  const cmds = radioCommandsByCall[baseCall];
+  if (!cmds) return null;
+  let best = null, bestDiff = Infinity;
+  for (const cmd of cmds) {
+    const diff = connSec - cmd._sec;
+    if (diff >= 0 && diff < 300 && diff < bestDiff) { bestDiff = diff; best = cmd; }
+  }
+  return best?.freqMHz || null;
+}
+
+// ═══ FIND NEAREST FREQUENCY (for WL2K inference) ═══
+function findNearestFrequency(bbsDate, h, m, s) {
+  const connSec = h * 3600 + m * 60 + s;
+  const MAX_WINDOW = 900; // 15 minutes
+  let bestFreq = null, bestDiff = Infinity;
+
+  const events = allFreqByDate[bbsDate];
+  if (events) {
+    for (const evt of events) {
+      const diff = Math.abs(connSec - evt._sec);
+      if (diff < MAX_WINDOW && diff < bestDiff) { bestDiff = diff; bestFreq = evt.freqMHz; }
+    }
+  }
+  // Near midnight — check adjacent date
+  if (bestFreq === null) {
+    const y = parseInt(bbsDate.substring(0,2));
+    const mo = parseInt(bbsDate.substring(2,4));
+    const d = parseInt(bbsDate.substring(4,6));
+    if (connSec < MAX_WINDOW) {
+      const prev = new Date(2000+y, mo-1, d-1);
+      const pk = String(prev.getFullYear()).slice(-2) + String(prev.getMonth()+1).padStart(2,'0') + String(prev.getDate()).padStart(2,'0');
+      (allFreqByDate[pk]||[]).forEach(evt => {
+        const diff = Math.abs(connSec - (evt._sec - 86400));
+        if (diff < MAX_WINDOW && diff < bestDiff) { bestDiff = diff; bestFreq = evt.freqMHz; }
+      });
+    } else if (connSec > 86400 - MAX_WINDOW) {
+      const next = new Date(2000+y, mo-1, d+1);
+      const nk = String(next.getFullYear()).slice(-2) + String(next.getMonth()+1).padStart(2,'0') + String(next.getDate()).padStart(2,'0');
+      (allFreqByDate[nk]||[]).forEach(evt => {
+        const diff = Math.abs(connSec - (evt._sec + 86400));
+        if (diff < MAX_WINDOW && diff < bestDiff) { bestDiff = diff; bestFreq = evt.freqMHz; }
+      });
+    }
+  }
+  return bestFreq;
+}
+
+// ═══ VARA LOG PARSING ═══
+function parseConnections() {
+  connections = [];
+  hubLastConnect = {};
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth();
+
+  stats = {
+    successful:0, failed:0, snrSum:0, snrCount:0, stations:{},
+    hourlyActivity:{successful:{},failed:{}},
+    bandActivity:{},
+    failedTimeout:0, failedPortSession:0, failedChannelBusy:0, failedIncoming:0, failedNoData:0,
+    totalMsgsSent:0, totalMsgsRecv:0, bitrateSum:0, bitrateCount:0,
+    maxBpsAll:0
+  };
+
+  let curr = null, lastConnectAttempt = null;
+
+  const YYMMDD_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  varaLogs.forEach(line => {
+    const tmNew = line.match(/^([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})/);
+    const tmOld = line.match(/^(\d{2})(\d{2})(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+    if (!tmNew && !tmOld) return;
+    let mon, day, h, m, s;
+    if (tmNew) { [,mon,day,h,m,s] = tmNew; }
+    else { const [,yy,mm,dd,hh,mi,ss]=tmOld; mon=YYMMDD_MON[parseInt(mm)-1]||'Jan'; day=String(parseInt(dd)); h=hh; m=mi; s=ss; }
+    const dateStr = mon + ' ' + day;
+
+    if (line.includes('Incoming Connection failed')) { stats.failedIncoming++; return; }
+    if (line.match(/PORT\s+session|Port\s+in\s+use|Session\s+Attached/i)) return;
+
+    // Outgoing: connecting
+    const connecting = line.match(/Connecting to ([A-Z0-9-]+)\.\.\. (\d+)\/(\d+)/i);
+    if (connecting) {
+      const [,call,attempt,maxA] = connecting;
+      if (attempt === '1') {
+        curr = {type:'outgoing',callsign:call,dateStr,h,m,s,freqMHz:findFrequency(call,h,m,s,'outgoing',dateStr)};
+        lastConnectAttempt = {callsign:call,attempt:1,maxAttempts:parseInt(maxA)};
+      } else {
+        if (lastConnectAttempt) lastConnectAttempt = {callsign:call,attempt:parseInt(attempt),maxAttempts:parseInt(maxA)};
+      }
+      return;
+    }
+
+    // Outgoing: connected
+    const connTo = line.match(/Connected to ([A-Z0-9-]+)\s+VARA HF/i);
+    if (connTo) {
+      const freq = findFrequency(connTo[1],h,m,s,'outgoing',dateStr);
+      curr = {type:'outgoing',callsign:connTo[1],dateStr,h,m,s,status:'connected',freqMHz:freq||curr?.freqMHz};
+      lastConnectAttempt = null;
+      return;
+    }
+
+    // Incoming: connected
+    const inc = line.match(/VARAHF\s+([A-Z0-9-]+)\s+connected\s+VARA HF/i);
+    if (inc) {
+      curr = {type:'incoming',callsign:inc[1],dateStr,h,m,s,status:'connected',freqMHz:findFrequency(inc[1],h,m,s,'incoming',dateStr)};
+      return;
+    }
+
+    // SNR
+    const snr = line.match(/([A-Z0-9-]+)\s+Average S\/N:\s+([-\d.]+)\s+dB/i);
+    if (snr && curr) { curr.snr = parseFloat(snr[2]); return; }
+
+    // Disconnect
+    const disc = line.match(/Disconnected\s+TX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+RX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+Session Time:\s+(\d+):(\d+)/i);
+    if (disc && curr) {
+      const [,tx,txBps,rx,rxBps,mins,secs] = disc;
+      const totalBytes = parseInt(tx)+parseInt(rx);
+      const isSuccess = totalBytes > 0 || curr.snr !== undefined;
+      const maxBps = Math.max(parseInt(txBps),parseInt(rxBps));
+      let band = curr.freqMHz ? freqToBand(curr.freqMHz) : 'Unknown';
+      let inferredFreqMHz = null;
+
+      // WL2K detection: incoming Unknown-band connections — check BBS log
+      if (band === 'Unknown' && isSuccess && curr.type === 'incoming') {
+        const baseCall = curr.callsign.replace(/-\d+$/,'');
+        const months = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        let bbsDate = '';
+        if (curr.dateStr) {
+          const dp = curr.dateStr.trim().split(/\s+/);
+          if (dp.length >= 2) {
+            bbsDate = String(new Date().getFullYear()).slice(-2) + (months[dp[0]]||'01') + String(dp[1]).padStart(2,'0');
+          }
+        }
+        let foundInBBS = false;
+        const connMin = parseInt(curr.h)*60 + parseInt(curr.m);
+        for (const [key, data] of Object.entries(incomingFreqs)) {
+          if (key.startsWith(bbsDate)) {
+            const kp = key.split(':');
+            if (kp.length >= 3) {
+              const keyMin = parseInt(kp[1])*60 + parseInt(kp[2]);
+              if (Math.abs(connMin - keyMin) <= 2) {
+                foundInBBS = true;
+                if (data.freqMHz > 0) {
+                  band = freqToBand(data.freqMHz);
+                  curr.freqMHz = data.freqMHz;
+                }
+                break;
+              }
+            }
+          }
+        }
+        // Not found in BBS log = direct Winlink HF user
+        if (!foundInBBS && band === 'Unknown') {
+          band = 'WL2K';
+          inferredFreqMHz = findNearestFrequency(bbsDate, parseInt(curr.h), parseInt(curr.m), parseInt(curr.s||0));
+          if (inferredFreqMHz) curr.freqMHz = inferredFreqMHz;
+        }
+      }
+
+      // Determine UTC timestamp
+      const monIdx = MONTH_MAP[mon];
+      let connTs = 0;
+      if (monIdx !== undefined) {
+        let year = currentYear;
+        if (monIdx > currentMonth) year--;
+        connTs = Date.UTC(year, monIdx, parseInt(day), parseInt(h), parseInt(m), parseInt(s));
+      }
+
+      const conn = {
+        ...curr,
+        txBytes:parseInt(tx), rxBytes:parseInt(rx),
+        txBps:parseInt(txBps), rxBps:parseInt(rxBps),
+        maxBps, totalBytes,
+        durationStr:mins+':'+secs,
+        status:isSuccess?'success':'failed',
+        band, _ts:connTs,
+        inferredFreq: inferredFreqMHz !== null,
+        baseCall:curr.callsign.replace(/-\d+$/,'')
+      };
+
+      connections.push(conn);
+
+      // Track partner last connect
+      if (isSuccess && CFG.partners.includes(curr.callsign)) {
+        const ts = new Date(connTs);
+        if (!hubLastConnect[curr.callsign] || ts > hubLastConnect[curr.callsign].time) {
+          hubLastConnect[curr.callsign] = {time:ts, band, snr:curr.snr};
+        }
+      }
+
+      // Stats
+      if (isSuccess) {
+        stats.successful++;
+        stats.hourlyActivity.successful[h] = (stats.hourlyActivity.successful[h]||0)+1;
+        if (totalBytes >= CFG.msgThreshold) {
+          if (parseInt(tx) > parseInt(rx)) stats.totalMsgsSent++;
+          else stats.totalMsgsRecv++;
+        }
+        if (maxBps > 0) { stats.bitrateSum += maxBps; stats.bitrateCount++; }
+        if (maxBps > stats.maxBpsAll) stats.maxBpsAll = maxBps;
+      } else {
+        stats.failed++;
+        stats.hourlyActivity.failed[h] = (stats.hourlyActivity.failed[h]||0)+1;
+
+        // Classify failure
+        const connTime = parseInt(h)*3600+parseInt(m)*60+parseInt(s||0);
+        let ftype = 'nodata';
+        for (const bf of bbsFailures) {
+          const bft = parseInt(bf.h)*3600+parseInt(bf.m)*60+parseInt(bf.s||0);
+          if (Math.abs(connTime-bft)<120 && bf.callsign===curr.callsign.replace(/-\d+$/,'')) {
+            if (bf.type==='channelBusy') { stats.failedChannelBusy++; ftype='channelBusy'; }
+            else if (bf.type==='portInSession') { stats.failedPortSession++; ftype='portInSession'; }
+            else if (bf.type==='varaFailure') { stats.failedTimeout++; ftype='timeout'; }
+            break;
+          }
+        }
+        if (ftype==='nodata' && lastConnectAttempt?.attempt >= lastConnectAttempt?.maxAttempts) {
+          stats.failedTimeout++; ftype='timeout';
+        }
+        if (ftype==='nodata') stats.failedNoData++;
+        conn.failureType = ftype;
+      }
+
+      // Band stats
+      if (band !== 'Unknown') {
+        if (!stats.bandActivity[band]) stats.bandActivity[band] = {count:0,snrSum:0,snrCount:0};
+        stats.bandActivity[band].count++;
+        if (conn.snr !== undefined) { stats.bandActivity[band].snrSum += conn.snr; stats.bandActivity[band].snrCount++; }
+      }
+
+      // Station stats
+      const bc = conn.baseCall;
+      if (!stats.stations[bc]) stats.stations[bc] = {count:0,bytes:0,snrSum:0,snrCount:0,bands:{}};
+      stats.stations[bc].count++;
+      stats.stations[bc].bytes += totalBytes;
+      if (conn.snr !== undefined) { stats.stations[bc].snrSum += conn.snr; stats.stations[bc].snrCount++; }
+      if (band !== 'Unknown') stats.stations[bc].bands[band] = (stats.stations[bc].bands[band]||0)+1;
+
+      curr = null;
+    }
+  });
+}
+
+// ═══ RANGE FILTERING ═══
+function setRange(days) {
+  currentRange = days;
+  ['rBtn1','rBtn7','rBtn30'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  document.getElementById('rBtn'+days)?.classList.add('active');
+  applyRange();
+}
+
+function applyRange() {
+  const cutoff = currentRange === 30 ? Date.now() - 30*86400000 :
+                 currentRange === 7  ? Date.now() - 7*86400000  :
+                                       new Date().setUTCHours(0,0,0,0);
+  connections = allConnections.filter(c => c._ts >= cutoff);
+
+  // Recompute filtered stats
+  const fStats = {
+    successful:0, failed:0, snrSum:0, snrCount:0,
+    hourlyActivity:{successful:{},failed:{}},
+    bandActivity:{}, stations:{},
+    failedTimeout:0, failedChannelBusy:0, failedNoData:0,
+    totalMsgsSent:0, totalMsgsRecv:0, bitrateSum:0, bitrateCount:0,
+    maxBpsAll:0
+  };
+  connections.forEach(c => {
+    if (c.status==='success') {
+      fStats.successful++;
+      fStats.hourlyActivity.successful[c.h] = (fStats.hourlyActivity.successful[c.h]||0)+1;
+      if (c.totalBytes >= CFG.msgThreshold) {
+        if (c.txBytes > c.rxBytes) fStats.totalMsgsSent++; else fStats.totalMsgsRecv++;
+      }
+      if (c.maxBps > 0) { fStats.bitrateSum += c.maxBps; fStats.bitrateCount++; }
+      if (c.maxBps > fStats.maxBpsAll) fStats.maxBpsAll = c.maxBps;
+    } else {
+      fStats.failed++;
+      fStats.hourlyActivity.failed[c.h] = (fStats.hourlyActivity.failed[c.h]||0)+1;
+      if (c.failureType==='timeout') fStats.failedTimeout++;
+      else if (c.failureType==='channelBusy') fStats.failedChannelBusy = (fStats.failedChannelBusy||0)+1;
+      else fStats.failedNoData++;
+    }
+    if (c.snr !== undefined) { fStats.snrSum += c.snr; fStats.snrCount++; }
+    if (c.band && c.band !== 'Unknown') {
+      if (!fStats.bandActivity[c.band]) fStats.bandActivity[c.band]={count:0,snrSum:0,snrCount:0};
+      fStats.bandActivity[c.band].count++;
+      if (c.snr !== undefined) { fStats.bandActivity[c.band].snrSum+=c.snr; fStats.bandActivity[c.band].snrCount++; }
+    }
+    const bc = c.baseCall;
+    if (!fStats.stations[bc]) fStats.stations[bc]={count:0,bytes:0,snrSum:0,snrCount:0,bands:{}};
+    fStats.stations[bc].count++;
+    fStats.stations[bc].bytes += c.totalBytes||0;
+    if (c.snr !== undefined) { fStats.stations[bc].snrSum+=c.snr; fStats.stations[bc].snrCount++; }
+    if (c.band && c.band!=='Unknown') fStats.stations[bc].bands[c.band]=(fStats.stations[bc].bands[c.band]||0)+1;
+  });
+
+  updateStatCards(fStats);
+  updateHourlyChart(fStats);
+  updateConnectionTable();
+  updateBandBars(fStats);
+  updateTopStations(fStats);
+  updateVARAPerf(fStats);
+  updatePartnerGrid();
+  updateMap();
+}
+
+// ═══ CONNECTION TABLE SEARCH ═══
+function filterConnTable() {
+  const tbody = document.getElementById('connTable');
+  const countEl = document.getElementById('connCount');
+  if (!tbody) return;
+
+  const term = document.getElementById('connSearch').value.toLowerCase().trim();
+  if (!term) {
+    updateConnectionTable();
+    return;
+  }
+
+  const cutoff = currentRange === 30 ? Date.now() - 30*86400000 :
+                 currentRange === 7  ? Date.now() - 7*86400000  :
+                                       new Date().setUTCHours(0,0,0,0);
+  const base = allConnections.filter(c => c._ts >= cutoff);
+
+  const filtered = base.filter(c => {
+    return (
+      c.callsign.toLowerCase().includes(term) ||
+      c.baseCall.toLowerCase().includes(term) ||
+      (c.band || '').toLowerCase().includes(term) ||
+      (c.status || '').toLowerCase().includes(term) ||
+      (c.failureType || '').toLowerCase().includes(term) ||
+      (c.type || '').toLowerCase().includes(term) ||
+      (c.snr !== undefined && String(c.snr).includes(term))
+    );
+  }).sort((a,b) => b._ts - a._ts).slice(0, 100);
+
+  if (countEl) countEl.textContent = filtered.length + ' of ' + base.length + ' (filtered)';
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No matches for "' + term + '"</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(c => {
+    const t = new Date(c._ts);
+    const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0') + 'Z';
+    const snrStr = c.snr !== undefined
+      ? '<span class="' + (c.snr >= 5 ? 'snr-good' : c.snr >= 0 ? 'snr-ok' : 'snr-poor') + '">' + c.snr.toFixed(1) + '</span>'
+      : '<span style="color:var(--text4)">–</span>';
+    const statusStr = c.status === 'success'
+      ? '<span class="status-ok">OK</span>'
+      : '<span class="status-fail">' + (c.failureType || 'Fail') + '</span>';
+    const bytesStr = c.totalBytes > 0 ? formatBytes(c.totalBytes) : '–';
+    const bpsStr = c.maxBps > 0 ? formatBps(c.maxBps) : '–';
+    const bandTag = c.band && c.band !== 'Unknown'
+      ? '<span class="band-tag" style="background:' + getBandColor(c.band) + '">' + c.band + '</span>'
+      : '<span style="color:var(--text4);font-size:11px;">–</span>';
+    return '<tr>' +
+      '<td style="font-family:var(--mono);font-size:11px;">' + timeStr + '</td>' +
+      '<td><span class="call-pill">' + c.callsign + '</span></td>' +
+      '<td style="font-size:11px;color:var(--text3);">' + (c.type === 'incoming' ? '← in' : '→ out') + '</td>' +
+      '<td>' + bandTag + '</td>' +
+      '<td>' + snrStr + '</td>' +
+      '<td style="font-size:11px;font-family:var(--mono);">' + bytesStr + '</td>' +
+      '<td style="font-size:11px;font-family:var(--mono);">' + bpsStr + '</td>' +
+      '<td>' + statusStr + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ═══ STAT CARDS ═══
+function updateStatCards(s) {
+  const total = s.successful + s.failed;
+  const pct = total > 0 ? Math.round(s.successful/total*100) : 0;
+  const avgSnr = s.snrCount > 0 ? (s.snrSum/s.snrCount).toFixed(1) : '–';
+  const avgBps = s.bitrateCount > 0 ? formatBps(Math.round(s.bitrateSum/s.bitrateCount)) : '–';
+  const totalBytes = connections.reduce((a,c)=>(a+((c.txBytes||0)+(c.rxBytes||0))),0);
+  const txBytes = connections.reduce((a,c)=>(a+(c.txBytes||0)),0);
+  const rxBytes = connections.reduce((a,c)=>(a+(c.rxBytes||0)),0);
+  const avgBytesPerSess = s.successful > 0 ? formatBytes(Math.round(totalBytes/s.successful)) : '–';
+
+  // Count unique stations
+  const stationList = Object.keys(s.stations);
+  const wl2kCount = connections.filter(c=>c.band==='WL2K').length;
+  const partnerCount = CFG.partners.filter(p=>hubLastConnect[p]).length;
+
+  // Best message partner
+  let bestPartner = '–', bestPCount = 0;
+  stationList.forEach(call => {
+    if (CFG.partners.some(p=>p.startsWith(call)||p===call)) {
+      const cnt = connections.filter(c=>c.baseCall===call && c.totalBytes>=CFG.msgThreshold).length;
+      if (cnt > bestPCount) { bestPCount = cnt; bestPartner = call; }
+    }
+  });
+
+  setText('statSuccess',    s.successful);
+  setText('statTotal',      total);
+  setText('statSuccessRate', pct + '%');
+  setText('statAvgBps',     avgBps);
+  setText('statFailed',     s.failed);
+  setText('statFailRate',   (total>0?Math.round(s.failed/total*100):0) + '% fail rate');
+  setText('statFailTimeout', s.failedTimeout||0);
+  setText('statFailBusy',   s.failedChannelBusy||0);
+  setText('statFailNoData', s.failedNoData||0);
+  setText('statStations',   stationList.length);
+  setText('statMapped',     stationList.length);
+  setText('statPartners',   partnerCount);
+  setText('statWl2k',       wl2kCount);
+  setText('statMessages',   s.totalMsgsSent + s.totalMsgsRecv);
+  setText('statMsgTx',      s.totalMsgsSent);
+  setText('statMsgRx',      s.totalMsgsRecv);
+  setText('statBestPartner', bestPartner);
+  setText('statBytes',      formatBytes(totalBytes));
+  setText('statBytesTx',    formatBytes(txBytes));
+  setText('statBytesRx',    formatBytes(rxBytes));
+  setText('statBytesPerSess', avgBytesPerSess);
+  setText('statSNR',        avgSnr !== '–' ? avgSnr + ' dB' : '–');
+
+  // SNR by band
+  const snrBandParts = Object.entries(s.bandActivity)
+    .filter(([,v])=>v.snrCount>0)
+    .map(([b,v])=>`<span style="color:${getBandColor(b)}">${b}</span>: ${(v.snrSum/v.snrCount).toFixed(1)}dB`)
+    .join(' &nbsp;');
+  const el = document.getElementById('statSnrByBand');
+  if (el) el.innerHTML = snrBandParts || '–';
+}
+
+const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+// ═══ HOURLY CHART ═══
+function updateHourlyChart(s) {
+  const labels = Array.from({length:24}, (_,i) => String(i).padStart(2,'0')+'Z');
+  const succData = labels.map((_,i) => s.hourlyActivity.successful[String(i).padStart(2,'0')] || 0);
+  const failData = labels.map((_,i) => s.hourlyActivity.failed[String(i).padStart(2,'0')] || 0);
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textColor = isDark ? '#6b7280' : '#9ca3af';
+
+  if (hourlyChart) {
+    hourlyChart.data.datasets[0].data = succData;
+    hourlyChart.data.datasets[1].data = failData;
+    hourlyChart.update();
+    return;
+  }
+
+  const ctx = document.getElementById('hourlyChart').getContext('2d');
+  hourlyChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Sessions',
+          data: succData,
+          backgroundColor: labels.map(() => 'rgba(102,126,234,0.7)'),
+          borderRadius: 3,
+          order: 2
+        },
+        {
+          label: 'Failed',
+          data: failData,
+          backgroundColor: 'rgba(239,68,68,0.6)',
+          borderRadius: 3,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { title: items => items[0].label + ':00–' + items[0].label + ':59 UTC' }
+      }},
+      scales: {
+        x: { stacked: false, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 }, maxRotation: 0 } },
+        y: { stacked: false, grid: { color: gridColor }, ticks: { color: textColor, font: { size: 10 }, stepSize: 1 } }
+      }
+    }
+  });
+}
+
+// ═══ CONNECTION TABLE ═══
+function updateConnectionTable() {
+  const tbody = document.getElementById('connTable');
+  const countEl = document.getElementById('connCount');
+  if (!tbody) return;
+
+  const sorted = [...connections].sort((a,b) => b._ts - a._ts).slice(0, 50);
+  if (countEl) countEl.textContent = connections.length + ' connections';
+
+  // (empty state handled below after search filter)
+
+  // Apply search filter
+  const searchTerm = (document.getElementById('connSearch')?.value || '').toLowerCase().trim();
+  const displayList = searchTerm ? sorted.filter(c =>
+    c.callsign.toLowerCase().includes(searchTerm) ||
+    c.baseCall.toLowerCase().includes(searchTerm) ||
+    (c.band || '').toLowerCase().includes(searchTerm) ||
+    (c.status || '').toLowerCase().includes(searchTerm) ||
+    (c.failureType || '').toLowerCase().includes(searchTerm) ||
+    (c.type || '').toLowerCase().includes(searchTerm) ||
+    (c.snr !== undefined && String(c.snr).includes(searchTerm))
+  ) : sorted;
+
+  if (countEl) countEl.textContent = searchTerm
+    ? displayList.length + ' of ' + connections.length + ' (filtered)'
+    : connections.length + ' connections';
+
+  if (!displayList.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">' +
+      (searchTerm ? 'No matches for "' + searchTerm + '"' : 'No connections in selected range') +
+    '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = displayList.map(c => {
+    const t = new Date(c._ts);
+    const timeStr = String(t.getUTCHours()).padStart(2,'0') + ':' + String(t.getUTCMinutes()).padStart(2,'0') + 'Z';
+    const snrStr = c.snr !== undefined
+      ? `<span class="${c.snr >= 5 ? 'snr-good' : c.snr >= 0 ? 'snr-ok' : 'snr-poor'}">${c.snr.toFixed(1)}</span>`
+      : '<span style="color:var(--text4)">–</span>';
+    const statusStr = c.status === 'success'
+      ? '<span class="status-ok">OK</span>'
+      : `<span class="status-fail">${c.failureType || 'Fail'}</span>`;
+    const bytesStr = c.totalBytes > 0 ? formatBytes(c.totalBytes) : '–';
+    const bpsStr = c.maxBps > 0 ? formatBps(c.maxBps) : '–';
+    const bandTag = c.band && c.band !== 'Unknown'
+      ? `<span class="band-tag" style="background:${getBandColor(c.band)}">${c.band}</span>`
+      : '<span style="color:var(--text4);font-size:11px;">–</span>';
+
+    // Find partner (which TPRFN hub station this connected to/from)
+    const partner = CFG.partners.find(p => p.startsWith(c.baseCall)) || '–';
+
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11px;">${timeStr}</td>
+      <td><span class="call-pill">${c.callsign}</span></td>
+      <td style="font-size:11px;color:var(--text3);">${c.type === 'incoming' ? '←' : '→'} ${c.type}</td>
+      <td>${bandTag}</td>
+      <td>${snrStr}</td>
+      <td style="font-size:11px;font-family:var(--mono);">${bytesStr}</td>
+      <td style="font-size:11px;font-family:var(--mono);">${bpsStr}</td>
+      <td>${statusStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══ BAND BARS ═══
+function updateBandBars(s) {
+  const el = document.getElementById('bandBars');
+  if (!el) return;
+  const entries = Object.entries(s.bandActivity).sort((a,b)=>b[1].count-a[1].count);
+  const maxCount = entries.length ? Math.max(...entries.map(([,v])=>v.count)) : 1;
+  const activeCount = entries.length;
+  const tag = document.getElementById('bandActiveTag');
+  if (tag) tag.textContent = activeCount + ' active';
+
+  if (!entries.length) { el.innerHTML = '<div class="empty-state">No band data</div>'; return; }
+
+  el.innerHTML = entries.map(([band,data]) => {
+    const pct = Math.round(data.count/maxCount*100);
+    const avgSnr = data.snrCount > 0 ? (data.snrSum/data.snrCount).toFixed(1)+' dB' : '–';
+    const snrColor = data.snrCount > 0
+      ? (data.snrSum/data.snrCount >= 5 ? 'var(--green)' : data.snrSum/data.snrCount >= 0 ? 'var(--text3)' : 'var(--red)')
+      : 'var(--text4)';
+    return `<div class="band-row">
+      <span class="band-name" style="color:${getBandColor(band)}">${band}</span>
+      <div class="band-bar-wrap">
+        <div class="band-bar" style="width:${pct}%;background:${getBandColor(band)};"></div>
+      </div>
+      <span class="band-meta"><b>${data.count}</b> sess &nbsp; <span style="color:${snrColor}">${avgSnr}</span></span>
+    </div>`;
+  }).join('');
+}
+
+// ═══ PARTNER GRID ═══
+function updatePartnerGrid() {
+  const el = document.getElementById('partnerGrid');
+  if (!el) return;
+  let active = 0, paused = 0, failing = 0;
+
+  el.innerHTML = CFG.partners.map(call => {
+    const base = call.replace(/-\d+$/,'');
+    const last = hubLastConnect[call];
+    let statusClass = 'ps-idle', statusText = 'No contact', dotColor = 'var(--text4)';
+    let meta = '–';
+
+    if (last) {
+      const hrsAgo = (Date.now() - last.time.getTime()) / 3600000;
+      if (hrsAgo < 2) { statusClass='ps-ok'; statusText='Recent'; dotColor='var(--green)'; active++; }
+      else if (hrsAgo < 12) { statusClass='ps-idle'; statusText='Idle'; dotColor='var(--blue)'; active++; }
+      else { statusClass='ps-idle'; statusText='Stale'; dotColor='var(--text4)'; }
+      const h = String(last.time.getUTCHours()).padStart(2,'0');
+      const min = String(last.time.getUTCMinutes()).padStart(2,'0');
+      meta = last.band + ' · ' + h + ':' + min + 'Z';
+    }
+
+    return `<div class="partner-card" title="${call}">
+      <div class="partner-dot" style="background:${dotColor}"></div>
+      <div class="partner-name">${base}</div>
+      <div class="partner-status ${statusClass}">${statusText}</div>
+      <div class="partner-meta">${meta}</div>
+    </div>`;
+  }).join('');
+
+  const aTag = document.getElementById('partnerActiveTag');
+  if (aTag) aTag.textContent = active + ' active';
+  const pTag = document.getElementById('partnerPausedTag');
+  if (pTag) { pTag.textContent = paused + ' paused'; pTag.style.display = paused ? '' : 'none'; }
+  const fTag = document.getElementById('partnerFailTag');
+  if (fTag) { fTag.textContent = failing + ' failing'; fTag.style.display = failing ? '' : 'none'; }
+}
+
+// ═══ TOP STATIONS ═══
+function updateTopStations(s) {
+  const tbody = document.getElementById('topTable');
+  if (!tbody) return;
+  const sorted = Object.entries(s.stations)
+    .sort((a,b)=>b[1].count-a[1].count)
+    .slice(0,10);
+
+  if (!sorted.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No data</td></tr>'; return; }
+
+  tbody.innerHTML = sorted.map(([call,data],i) => {
+    const avgSnr = data.snrCount > 0 ? (data.snrSum/data.snrCount).toFixed(1)+' dB' : '–';
+    const snrClass = data.snrCount > 0 ? (data.snrSum/data.snrCount >= 5 ? 'snr-good' : 'snr-ok') : '';
+    const bestBand = Object.entries(data.bands||{}).sort((a,b)=>b[1]-a[1])[0];
+    const bandTag = bestBand
+      ? `<span class="band-tag" style="background:${getBandColor(bestBand[0])}">${bestBand[0]}</span>`
+      : '–';
+    const rankColor = i===0?'var(--amber)':i===1?'var(--text3)':i===2?'#cd7f32':'var(--text4)';
+    return `<tr>
+      <td style="color:${rankColor};font-weight:700;">${i+1}</td>
+      <td><span class="call-pill">${call}</span></td>
+      <td style="color:var(--green);font-weight:600;">${data.count}</td>
+      <td style="font-family:var(--mono);font-size:11px;">${formatBytes(data.bytes)}</td>
+      <td class="${snrClass}" style="font-family:var(--mono);font-size:11px;">${avgSnr}</td>
+      <td>${bandTag}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══ VARA PERFORMANCE ═══
+function updateVARAPerf(s) {
+  const sessWithData = connections.filter(c=>c.status==='success'&&c.totalBytes>=CFG.msgThreshold).length;
+  const avgBps = s.bitrateCount > 0 ? Math.round(s.bitrateSum/s.bitrateCount) : 0;
+  const avgLevel = getVaraLevel(avgBps);
+  const peakLevel = getVaraLevel(s.maxBpsAll);
+
+  setText('varaAvgLevel', avgLevel ? 'SL' + avgLevel.level + ' · ' + avgLevel.mod : '–');
+  setText('varaPeakLevel', peakLevel ? 'SL' + peakLevel.level + ' · ' + peakLevel.mod : '–');
+  setText('varaAvgBps', formatBps(avgBps));
+  setText('varaPeakBps', formatBps(s.maxBpsAll));
+  setText('varaWithData', sessWithData + ' / ' + s.successful);
+
+  const badge = document.getElementById('varaRangeBadge');
+  if (badge) badge.textContent = currentRange === 1 ? 'today' : currentRange + ' day';
+
+  // Marker position
+  if (avgLevel) {
+    const pct = ((avgLevel.level-1)/16)*100;
+    const marker = document.getElementById('varaMarker');
+    if (marker) marker.style.left = pct + '%';
+  }
+
+  // Avg connect attempts from allConnections
+  const attemptConns = allConnections.filter(c=>c._ts >= Date.now() - currentRange*86400000);
+  setText('varaAvgAttempts', '–');
+}
+
+// ═══ HOME STATION ═══
+const HOME_STATION = { callsign: CFG.callsign, lat: 33.4735, lon: -82.0105, grid: 'EM83pl' };
+
+function calcDistance(lat1, lon1, lat2, lon2) {
+  const R = 3958.8;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+// ═══ MAP ═══
+function initMap() {
+  if (geoMap) return;
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  geoMap = L.map('stationMap', { zoomControl: true, attributionControl: false });
+  // Voyager = full colour roads/labels on neutral background — bright in both modes
+  const tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  L.tileLayer(tileUrl, { maxZoom: 14, subdomains: 'abcd' }).addTo(geoMap);
+  L.control.attribution({ position: 'bottomright', prefix: '© <a href="https://carto.com">CartoDB</a>' }).addTo(geoMap);
+
+  // Home station marker — green glowing dot
+  const homeIcon = L.divIcon({
+    className: '',
+    html: '<div style="width:14px;height:14px;border-radius:50%;background:#3fb950;border:3px solid #fff;box-shadow:0 0 8px #3fb950,0 2px 6px rgba(0,0,0,0.5);"></div>',
+    iconSize: [14,14], iconAnchor: [7,7]
+  });
+  L.marker([HOME_STATION.lat, HOME_STATION.lon], { icon: homeIcon })
+    .bindPopup('<div style="text-align:center;min-width:120px;"><b style="font-size:15px;">' + HOME_STATION.callsign + '</b><br><span style="color:#3fb950;font-weight:bold;">Home Station</span><br>Grid: ' + HOME_STATION.grid + '</div>')
+    .addTo(geoMap);
+
+  updateMap();
+}
+
+async function updateMap() {
+  if (!geoMap) return;
+  mapMarkers.forEach(m => { try { geoMap.removeLayer(m); } catch(e){} });
+  mapMarkers = [];
+
+  // Aggregate per-station stats from filtered connections
+  const stationAgg = {};
+  connections.forEach(c => {
+    const bc = c.baseCall;
+    if (!stationAgg[bc]) stationAgg[bc] = { successful:0, failed:0, snrSum:0, snrCount:0, bitrateSum:0, bitrateCount:0, txBytes:0, rxBytes:0, msgsSent:0, msgsRecv:0, bands:new Set() };
+    const s = stationAgg[bc];
+    if (c.status === 'success') {
+      s.successful++;
+      if (c.maxBps > 0) { s.bitrateSum += c.maxBps; s.bitrateCount++; }
+      s.txBytes += (c.txBytes||0);
+      s.rxBytes += (c.rxBytes||0);
+      if (c.totalBytes >= CFG.msgThreshold) { if (c.txBytes > c.rxBytes) s.msgsSent++; else s.msgsRecv++; }
+    } else { s.failed++; }
+    if (c.snr !== undefined) { s.snrSum += c.snr; s.snrCount++; }
+    if (c.band && c.band !== 'Unknown') s.bands.add(c.band);
+  });
+
+  // Batch lookup unknown callsigns
+  const needed = Object.keys(stationAgg).filter(c => !stationLocations[c]);
+  if (needed.length > 0) {
+    const BATCH = 50;
+    for (let i = 0; i < needed.length; i += BATCH) {
+      try {
+        const r = await apiFetch('./callsign-lookup.php?calls=' + needed.slice(i,i+BATCH).join(','));
+        if (r.ok) {
+          const data = await r.json();
+          if (data.success && data.data) {
+            for (const [call, result] of Object.entries(data.data)) {
+              if (result && result.lat && result.lon && (result.lat !== 0 || result.lon !== 0)) {
+                stationLocations[call] = result;
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    }
+  }
+
+  let located = 0;
+  const allPoints = [[HOME_STATION.lat, HOME_STATION.lon]];
+
+  for (const [call, data] of Object.entries(stationAgg)) {
+    const loc = stationLocations[call];
+    if (!loc || !loc.lat || !loc.lon || (loc.lat === 0 && loc.lon === 0)) continue;
+    located++;
+    allPoints.push([loc.lat, loc.lon]);
+
+    const total = data.successful + data.failed;
+    const successRate = total > 0 ? data.successful / total : 0;
+    const avgSnr = data.snrCount > 0 ? (data.snrSum / data.snrCount).toFixed(1) : null;
+    const avgBps = data.bitrateCount > 0 ? Math.round(data.bitrateSum / data.bitrateCount) : null;
+    const distance = calcDistance(HOME_STATION.lat, HOME_STATION.lon, loc.lat, loc.lon);
+    const bands = [...data.bands].join(', ') || '–';
+    const isPartner = CFG.partners.some(p => p.replace(/-\d+$/, '') === call);
+
+    // Line color by success rate — matches existing dashboard
+    let lineColor = '#ef4444';
+    if (successRate >= 0.8) lineColor = '#3fb950';
+    else if (successRate >= 0.5) lineColor = '#d29922';
+
+    // Line weight by connection count (log scale, 1–5px)
+    const lineWeight = Math.min(1 + Math.log2(total + 1), 5);
+
+    // Connection line hub → station with popup
+    const line = L.polyline(
+      [[HOME_STATION.lat, HOME_STATION.lon], [loc.lat, loc.lon]],
+      { color: lineColor, weight: lineWeight, opacity: 0.7 }
+    ).bindPopup(
+      '<div style="min-width:200px;font-family:monospace;font-size:12px;">' +
+      '<b style="color:#667eea;font-size:13px;">' + HOME_STATION.callsign + ' ↔ ' + call + '</b>' +
+      '<hr style="margin:5px 0;border-color:#444">' +
+      '<table style="width:100%;font-size:11px;">' +
+      '<tr><td style="color:#888">Distance</td><td style="text-align:right;font-weight:700;">' + distance + ' mi</td></tr>' +
+      '<tr><td style="color:#888">Sessions</td><td style="text-align:right;font-weight:700;">' + total + '</td></tr>' +
+      '<tr><td style="color:#888">Success rate</td><td style="text-align:right;font-weight:700;color:' + lineColor + '">' + (successRate*100).toFixed(0) + '%</td></tr>' +
+      '<tr><td style="color:#888">Avg S/N</td><td style="text-align:right;font-weight:700;">' + (avgSnr ? avgSnr + ' dB' : '–') + '</td></tr>' +
+      '<tr><td style="color:#888">Avg bitrate</td><td style="text-align:right;font-weight:700;">' + (avgBps ? avgBps + ' bps' : '–') + '</td></tr>' +
+      '<tr><td style="color:#888">Bands</td><td style="text-align:right;font-weight:700;">' + bands + '</td></tr>' +
+      '<tr><td style="color:#888">TX / RX</td><td style="text-align:right;">' + formatBytes(data.txBytes) + ' / ' + formatBytes(data.rxBytes) + '</td></tr>' +
+      '</table></div>'
+    ).addTo(geoMap);
+    mapMarkers.push(line);
+
+    // Station dot marker with popup
+    const markerColor = isPartner ? '#667eea' : lineColor;
+    const size = isPartner ? 12 : 9;
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + markerColor + ';border:2px solid ' + (isPartner ? '#fff' : 'rgba(255,255,255,0.5)') + ';box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>',
+      iconSize: [size, size], iconAnchor: [size/2, size/2]
+    });
+    const marker = L.marker([loc.lat, loc.lon], { icon }).bindPopup(
+      '<div style="min-width:180px;font-family:monospace;font-size:12px;">' +
+      '<b style="font-size:14px;color:' + markerColor + '">' + call + '</b>' +
+      (isPartner ? '<span style="background:#667eea;color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:6px;">PARTNER</span>' : '') +
+      (loc.city ? '<br><span style="color:#888;font-size:11px;">' + loc.city + (loc.state ? ', ' + loc.state : '') + '</span>' : '') +
+      (loc.grid ? '<br><span style="color:#666;font-size:10px;">Grid: ' + loc.grid + ' · ' + distance + ' mi</span>' : '') +
+      '<hr style="margin:5px 0;border-color:#444">' +
+      '<table style="width:100%;font-size:11px;">' +
+      '<tr><td style="color:#888">Sessions</td><td style="text-align:right;font-weight:700;">' + total + '</td></tr>' +
+      '<tr><td style="color:#888">Success</td><td style="text-align:right;color:' + lineColor + ';font-weight:700;">' + data.successful + ' / ' + total + '</td></tr>' +
+      '<tr><td style="color:#888">Avg S/N</td><td style="text-align:right;font-weight:700;">' + (avgSnr ? avgSnr + ' dB' : '–') + '</td></tr>' +
+      '<tr><td style="color:#888">Bands</td><td style="text-align:right;font-weight:700;">' + bands + '</td></tr>' +
+      '</table></div>'
+    ).addTo(geoMap);
+    mapMarkers.push(marker);
+  }
+
+  const mapStatus = document.getElementById('mapStatus');
+  if (mapStatus) mapStatus.textContent = located + ' / ' + Object.keys(stationAgg).length + ' stations located';
+  if (allPoints.length > 1) geoMap.fitBounds(allPoints, { padding: [30, 30] });
+  else geoMap.setView([HOME_STATION.lat, HOME_STATION.lon], 5);
+}
+// ═══ PROPAGATION DATA ═══
+async function fetchPropData() {
+  try {
+    const [kResp, solarResp] = await Promise.all([
+      fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json').then(r=>r.json()).catch(()=>null),
+      apiFetch(CFG.solarProxy).then(r=>r.text()).catch(()=>null)
+    ]);
+
+    // K-index
+    if (kResp && kResp.length > 1) {
+      const latest = kResp[kResp.length-1];
+      const k = parseFloat(latest[1]);
+      const kEl = document.getElementById('propK');
+      if (kEl) {
+        kEl.textContent = k.toFixed(1);
+        kEl.className = 'cond-val ' + (k>=5?'cond-bad':k>=3?'cond-warn':'cond-good');
+      }
+      const stormEl = document.getElementById('propStorm');
+      if (stormEl) {
+        if (k >= 5) { stormEl.textContent = 'G'+Math.min(5,Math.floor(k-4))+' Storm'; stormEl.className='cond-val cond-bad'; }
+        else { stormEl.textContent = 'None'; stormEl.className='cond-val cond-good'; }
+      }
+    }
+
+    // Solar data from HamQSL XML
+    if (solarResp) {
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(solarResp, 'text/xml');
+      const get = tag => xml.querySelector(tag)?.textContent || '–';
+      const sfi = parseFloat(get('solarflux'))||0;
+      const a = parseFloat(get('aindex'))||0;
+      const ssn = get('sunspots');
+
+      const sfiEl = document.getElementById('propSFI');
+      if (sfiEl) { sfiEl.textContent = sfi + ' SFU'; sfiEl.className='cond-val '+(sfi>=150?'cond-good':sfi>=100?'cond-normal':'cond-warn'); }
+      const aEl = document.getElementById('propA');
+      if (aEl) { aEl.textContent = a; aEl.className='cond-val '+(a<=7?'cond-good':a<=15?'cond-warn':'cond-bad'); }
+      const ssnEl = document.getElementById('propSSN');
+      if (ssnEl) ssnEl.textContent = ssn;
+
+      // Band recommendations based on SFI and K-index
+      updateBandRecs(sfi, a);
+      const tag = document.getElementById('propTag');
+      if (tag) {
+        const qual = sfi >= 150 && a <= 7 ? 'Excellent' : sfi >= 120 && a <= 15 ? 'Good' : a > 15 ? 'Poor' : 'Fair';
+        const cls = qual==='Excellent'?'green':qual==='Good'?'blue':qual==='Poor'?'red':'amber';
+        tag.className = 'tag ' + cls;
+        tag.textContent = qual;
+      }
+    }
+  } catch(e) { console.warn('Prop data error:', e); }
+}
+
+function updateBandRecs(sfi, a) {
+  const el = document.getElementById('bandRecs');
+  if (!el) return;
+  const hour = new Date().getUTCHours();
+  const recs = [];
+
+  // Simple propagation rules (matches existing page logic)
+  if (a <= 15) {
+    if (hour >= 12 && hour < 22 && sfi >= 100) recs.push({band:'20m',cls:'blue'});
+    if (hour >= 8 && hour < 20) recs.push({band:'40m',cls:'amber'});
+    if (hour < 10 || hour >= 22) recs.push({band:'80m',cls:'red'});
+    if (sfi >= 120) recs.push({band:'30m',cls:'green'});
+  } else {
+    recs.push({band:'40m',cls:'amber'});
+    if (hour < 10 || hour >= 22) recs.push({band:'80m',cls:'red'});
+  }
+
+  el.innerHTML = recs.slice(0,3).map(r=>
+    `<span class="tag ${r.cls}">${r.band}</span>`
+  ).join('') || '<span class="tag gray">Unavailable</span>';
+}
+
+// ═══ NWS ALERTS ═══
+async function fetchNWSAlerts() {
+  const nwsEl = document.getElementById('nwsAlertList');
+  const tagEl = document.getElementById('nwsTag');
+  const lastEl = document.getElementById('nwsLastCheck');
+  if (lastEl) lastEl.textContent = new Date().toLocaleTimeString();
+
+  // Determine state from zone (e.g. GAZ087 → GA)
+  const state = CFG.nwsZone.substring(0,2);
+  const nwsEl2 = document.getElementById('nwsRegion');
+  if (nwsEl2) nwsEl2.textContent = CFG.nwsZone + ' (' + state + ')';
+
+  try {
+    const r = await fetch(`https://api.weather.gov/alerts/active?area=${state}`, {
+      headers: { 'Accept': 'application/geo+json', 'User-Agent': 'BPQ-Dashboard/2.0' }
+    });
+    if (!r.ok) throw new Error('NWS API error');
+    const data = await r.json();
+    const alerts = (data.features || []).filter(f => {
+      const zones = f.properties.affectedZones || [];
+      return zones.some(z => z.includes(CFG.nwsZone)) || true; // show all state alerts
+    });
+
+    if (tagEl) {
+      if (alerts.length === 0) { tagEl.className='tag green'; tagEl.textContent='No alerts'; }
+      else if (alerts.some(a=>a.properties.event?.match(/Warning/i))) { tagEl.className='tag red'; tagEl.textContent=alerts.length+' active'; }
+      else { tagEl.className='tag amber'; tagEl.textContent=alerts.length+' active'; }
+    }
+
+    if (!alerts.length) {
+      if (nwsEl) nwsEl.innerHTML = '<div class="empty-state" style="color:var(--green)">✓ No active alerts</div>';
+      return;
+    }
+
+    if (nwsEl) {
+      nwsEl.innerHTML = alerts.slice(0,3).map(a => {
+        const evt = a.properties.event || 'Alert';
+        const area = a.properties.areaDesc || '';
+        const isWarn = evt.match(/Warning/i);
+        return `<div class="nws-alert-item" style="${isWarn?'border-left-color:var(--red);background:var(--red-bg);':''}">
+          <div class="nws-alert-type" style="${isWarn?'color:var(--red);':''}">${evt}</div>
+          <div class="nws-alert-area">${area.split(';')[0]}</div>
+        </div>`;
+      }).join('');
+    }
+  } catch(e) {
+    if (tagEl) { tagEl.className='tag gray'; tagEl.textContent='Unavailable'; }
+    if (nwsEl) nwsEl.innerHTML = '<div class="empty-state">Unable to reach NWS API</div>';
+  }
+}
+
+// ═══ WATCHDOG STATUS ═══
+async function loadWatchdogStatus() {
+  try {
+    const r = await apiFetch('./logs/connect-watchdog.log?t=' + Date.now());
+    if (!r.ok) return;
+    const text = await r.text();
+    const lines = text.trim().split('\n').filter(l=>l.trim());
+    // Look for recent PAUSED entries
+    const pausedLines = lines.filter(l=>l.includes('PAUSED')).slice(-5);
+    const resumedLines = lines.filter(l=>l.includes('RESTORED')).slice(-5);
+
+    const wdEl = document.getElementById('wdBody');
+    const wdTag = document.getElementById('wdTag');
+
+    if (pausedLines.length > resumedLines.length) {
+      // Some partners may be paused
+      if (wdTag) { wdTag.className='tag amber'; wdTag.textContent='Partner paused'; }
+      if (wdEl) {
+        wdEl.innerHTML = `
+          <div class="cond-row"><span class="cond-label">Status</span><span class="cond-val cond-warn">1 partner paused</span></div>
+          <div class="cond-row"><span class="cond-label">Reason</span><span class="cond-val" style="font-size:11px;color:var(--text2);">Repeated failures detected</span></div>
+          <div class="cond-row"><span class="cond-label">Cron</span><span class="cond-val" style="font-family:var(--mono);font-size:11px;">*/5 * * * *</span></div>
+        `;
+      }
+    } else {
+      if (wdTag) { wdTag.className='tag green'; wdTag.textContent='All active'; }
+    }
+  } catch(e) { /* watchdog log not critical */ }
+}
+
+// ═══ AUTO REFRESH ═══
+function scheduleRefresh() {
+  setTimeout(async () => {
+    await loadAllLogs();
+    scheduleRefresh();
+  }, CFG.refreshMs);
+}
+
+// ═══ INIT ═══
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadAllLogs();
+  scheduleRefresh();
+});
+</script>
+
+</body>
+</html>

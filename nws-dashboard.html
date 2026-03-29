@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPQ NWS Weather Alerts v1.5.0</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #f3f4f6; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+        .glass-container { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 10px; }
+        
+        /* Alert severity colors */
+        .alert-tornado { border-left: 4px solid #dc2626; background: linear-gradient(90deg, rgba(220,38,38,0.1), transparent); }
+        .alert-severe { border-left: 4px solid #ea580c; background: linear-gradient(90deg, rgba(234,88,12,0.1), transparent); }
+        .alert-flood { border-left: 4px solid #0891b2; background: linear-gradient(90deg, rgba(8,145,178,0.1), transparent); }
+        .alert-hurricane { border-left: 4px solid #7c3aed; background: linear-gradient(90deg, rgba(124,58,237,0.1), transparent); }
+        .alert-winter { border-left: 4px solid #0ea5e9; background: linear-gradient(90deg, rgba(14,165,233,0.1), transparent); }
+        .alert-other { border-left: 4px solid #6b7280; background: linear-gradient(90deg, rgba(107,114,128,0.1), transparent); }
+        
+        .alert-item { transition: all 0.2s ease; cursor: pointer; }
+        .alert-item:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .alert-item.selected { box-shadow: 0 0 0 2px #667eea, 0 4px 12px rgba(102,126,234,0.3); }
+        
+        .badge { padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .badge-tornado { background: #fef2f2; color: #dc2626; }
+        .badge-severe { background: #fff7ed; color: #ea580c; }
+        .badge-flood { background: #ecfeff; color: #0891b2; }
+        .badge-hurricane { background: #f5f3ff; color: #7c3aed; }
+        .badge-winter { background: #f0f9ff; color: #0ea5e9; }
+        .badge-other { background: #f3f4f6; color: #6b7280; }
+        
+        .region-btn { transition: all 0.2s ease; border: 1px solid #e5e7eb; }
+        .region-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-color: transparent; box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        .region-btn:not(.active):hover { background: #f3f4f6; }
+        
+        .type-toggle { transition: all 0.2s ease; }
+        .type-toggle.active { border-color: #667eea; background: rgba(102,126,234,0.1); }
+        .type-toggle:not(.active) { opacity: 0.5; }
+        
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; transition: all 0.2s; }
+        .btn-primary:hover { box-shadow: 0 4px 15px rgba(102,126,234,0.4); transform: translateY(-1px); }
+        .btn-secondary { background: white; border: 2px solid #e5e7eb; color: #374151; transition: all 0.2s; }
+        .btn-secondary:hover { border-color: #667eea; background: #f5f3ff; }
+        
+        .log-entry { font-family: ui-monospace, monospace; font-size: 0.75rem; padding: 0.25rem 0; border-bottom: 1px solid #f3f4f6; }
+        .log-success { color: #059669; }
+        .log-error { color: #dc2626; }
+        .log-warning { color: #d97706; }
+        .log-info { color: #6b7280; }
+        
+        .bbs-preview { font-family: ui-monospace, monospace; font-size: 0.75rem; background: #1e293b; color: #e2e8f0; border-radius: 8px; padding: 1rem; white-space: pre-wrap; line-height: 1.4; }
+        
+        .toast-container { position: fixed; top: 80px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+        .toast { background: white; border-radius: 8px; padding: 12px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px; animation: slideIn 0.3s ease; }
+        .toast.success { border-left: 4px solid #059669; }
+        .toast.error { border-left: 4px solid #dc2626; }
+        .toast.warning { border-left: 4px solid #d97706; }
+        .toast.info { border-left: 4px solid #667eea; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        /* Mobile: Alerts first */
+        @media (max-width: 1024px) {
+            .main-grid { display: flex !important; flex-direction: column; }
+            .main-content { order: 1; }
+            .sidebar { order: 2; }
+        }
+    </style>
+    <style id="bpq-dark-mode">
+    /* Dark Mode — auto-detects OS preference, manual toggle in nav */
+    [data-theme="dark"] { background: #111827 !important; color-scheme: dark; }
+    [data-theme="dark"] body { background: #111827 !important; color: #e5e7eb !important; }
+    [data-theme="dark"] .glass-container { background: rgba(31,41,55,0.95) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; border: 1px solid rgba(75,85,99,0.4); }
+    /* Backgrounds */
+    [data-theme="dark"] [class~="bg-white"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-50"] { background-color: #1a2332 !important; }
+    [data-theme="dark"] [class~="bg-gray-100"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-200"] { background-color: #374151 !important; }
+    [data-theme="dark"] [class~="bg-gray-300"] { background-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="bg-green-50"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-green-100"] { background-color: #065f46 !important; }
+    [data-theme="dark"] [class~="bg-blue-50"] { background-color: #1e3a5f !important; }
+    [data-theme="dark"] [class~="bg-blue-100"] { background-color: #1e40af !important; }
+    [data-theme="dark"] [class~="bg-purple-50"] { background-color: #2e1065 !important; }
+    [data-theme="dark"] [class~="bg-purple-100"] { background-color: #3b0764 !important; }
+    [data-theme="dark"] [class~="bg-red-50"] { background-color: #450a0a !important; }
+    [data-theme="dark"] [class~="bg-red-100"] { background-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="bg-amber-50"] { background-color: #451a03 !important; }
+    [data-theme="dark"] [class~="bg-amber-100"] { background-color: #78350f !important; }
+    [data-theme="dark"] [class~="bg-orange-50"] { background-color: #431407 !important; }
+    [data-theme="dark"] [class~="bg-orange-100"] { background-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="bg-emerald-50"] { background-color: #022c22 !important; }
+    [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
+    [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
+    [data-theme="dark"] [class~="bg-sky-200"] { background-color: #0369a1 !important; }
+    [data-theme="dark"] [class~="bg-cyan-50"] { background-color: #083344 !important; }
+    /* Stat card gradients */
+    [data-theme="dark"] [class*="from-green-50"] { background-image: linear-gradient(to bottom right, #064e3b, #065f46) !important; }
+    [data-theme="dark"] [class*="from-blue-50"] { background-image: linear-gradient(to bottom right, #1e3a5f, #1e40af) !important; }
+    [data-theme="dark"] [class*="from-purple-50"] { background-image: linear-gradient(to bottom right, #2e1065, #4c1d95) !important; }
+    [data-theme="dark"] [class*="from-red-50"] { background-image: linear-gradient(to bottom right, #450a0a, #7f1d1d) !important; }
+    [data-theme="dark"] [class*="from-orange-50"] { background-image: linear-gradient(to bottom right, #431407, #7c2d12) !important; }
+    [data-theme="dark"] [class*="from-amber-50"] { background-image: linear-gradient(to bottom right, #451a03, #78350f) !important; }
+    [data-theme="dark"] [class*="from-emerald-50"] { background-image: linear-gradient(to bottom right, #022c22, #064e3b) !important; }
+    [data-theme="dark"] [class*="from-sky-50"] { background-image: linear-gradient(to bottom right, #0c4a6e, #075985) !important; }
+    [data-theme="dark"] [class*="from-cyan-50"] { background-image: linear-gradient(to bottom right, #083344, #155e75) !important; }
+    /* Text colors */
+    [data-theme="dark"] [class~="text-gray-900"] { color: #f3f4f6 !important; }
+    [data-theme="dark"] [class~="text-gray-800"] { color: #e5e7eb !important; }
+    [data-theme="dark"] [class~="text-gray-700"] { color: #d1d5db !important; }
+    [data-theme="dark"] [class~="text-gray-600"] { color: #9ca3af !important; }
+    [data-theme="dark"] [class~="text-gray-500"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-gray-400"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-green-600"] { color: #34d399 !important; }
+    [data-theme="dark"] [class~="text-green-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-green-800"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-blue-600"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-700"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-800"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-purple-600"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-700"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-800"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-red-600"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-700"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-800"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-orange-600"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-orange-700"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-amber-600"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-amber-700"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-yellow-600"] { color: #fde047 !important; }
+    [data-theme="dark"] [class~="text-sky-700"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-sky-800"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-emerald-600"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-emerald-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-cyan-600"] { color: #67e8f9 !important; }
+    /* Borders */
+    [data-theme="dark"] [class~="border-gray-200"] { border-color: #374151 !important; }
+    [data-theme="dark"] [class~="border-gray-300"] { border-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="border-green-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-blue-200"] { border-color: #1e40af !important; }
+    [data-theme="dark"] [class~="border-purple-100"] { border-color: #4c1d95 !important; }
+    [data-theme="dark"] [class~="border-purple-200"] { border-color: #5b21b6 !important; }
+    [data-theme="dark"] [class~="border-red-200"] { border-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="border-amber-200"] { border-color: #78350f !important; }
+    [data-theme="dark"] [class~="border-orange-200"] { border-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="border-emerald-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-sky-200"] { border-color: #0369a1 !important; }
+    /* Forms */
+    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] input::placeholder { color: #6b7280 !important; }
+    /* Tables */
+    [data-theme="dark"] thead { background-color: #1f2937 !important; }
+    [data-theme="dark"] th { color: #d1d5db !important; }
+    [data-theme="dark"] tr:hover { background-color: rgba(55,65,81,0.5) !important; }
+    /* Log viewer */
+    [data-theme="dark"] .log-entry { color: #d1d5db; }
+    [data-theme="dark"] .log-connect { color: #6ee7b7 !important; }
+    [data-theme="dark"] .log-disconnect { color: #fca5a5 !important; }
+    [data-theme="dark"] .log-message { color: #93c5fd !important; }
+    [data-theme="dark"] .log-error { color: #f87171 !important; }
+    /* Nav */
+    [data-theme="dark"] #navLocalClock { background-color: #374151 !important; color: #d1d5db !important; }
+    [data-theme="dark"] .gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #93c5fd 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+    /* Buttons */
+    [data-theme="dark"] .modern-button { background: linear-gradient(135deg, #7c3aed, #2563eb) !important; }
+    /* Leaflet */
+    [data-theme="dark"] .leaflet-control-zoom a { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] .leaflet-popup-content-wrapper, [data-theme="dark"] .leaflet-popup-tip { background-color: #1f2937 !important; color: #e5e7eb !important; }
+    /* Scrollbar */
+    [data-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+    [data-theme="dark"] ::-webkit-scrollbar-track { background: #1f2937; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    /* Toggle */
+    .dark-mode-toggle { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.5rem; border: none; background: transparent; font-size: 1.1rem; line-height: 1; transition: transform 0.3s ease; }
+    .dark-mode-toggle:hover { transform: scale(1.2); }
+    /* Skeleton */
+    [data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%) !important; background-size: 200% 100%; }
+    /* Modals */
+    [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="glass-container mx-4 mt-4 mb-6">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <h2 class="text-xl font-bold gradient-text">📡 BPQ Dashboard</h2>
+                <div class="flex items-center gap-2 font-mono text-sm">
+                    <span class="px-3 py-1.5 rounded bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold" id="navUtcClock">--:--:-- Z</span>
+                    <span class="px-3 py-1.5 rounded bg-gray-100 text-gray-600 font-semibold" id="navLocalClock">--:--:-- L</span>
+                    <button id="darkModeToggle" class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
+                </div>
+                <div class="flex gap-2 flex-wrap justify-center">
+                    <a href="bpq-rf-connections.html" class="px-4 py-2 rounded-lg text-gray-600 hover:text-purple-600 hover:bg-purple-50 font-medium text-sm transition-colors">RF</a>
+                    <a href="bpq-traffic.html" class="px-4 py-2 rounded-lg text-gray-600 hover:text-purple-600 hover:bg-purple-50 font-medium text-sm transition-colors">Traffic</a>
+                    <a href="bpq-system-logs.html" class="px-4 py-2 rounded-lg text-gray-600 hover:text-purple-600 hover:bg-purple-50 font-medium text-sm transition-colors">System</a>
+                    <a href="bpq-connect-log.html" class="px-4 py-2 rounded-lg text-gray-600 hover:text-purple-600 hover:bg-purple-50 font-medium text-sm transition-colors">Connects</a>
+                <a href="bpq-email-monitor.html" class="px-4 py-2 rounded-lg text-gray-600 hover:text-purple-600 hover:bg-purple-50 font-medium text-sm transition-colors">Messages</a>
+                    <a href="bbs-messages.html" class="px-4 py-2 rounded-lg text-gray-600 hover:text-purple-600 hover:bg-purple-50 font-medium text-sm transition-colors">BBS</a>
+                    <a href="nws-dashboard.html" class="px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium text-sm">Weather</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="px-4 pb-8">
+        <div class="max-w-7xl mx-auto">
+            <!-- Header Card -->
+            <div class="glass-container p-6 mb-6">
+                <div class="flex flex-col lg:flex-row justify-between items-center gap-4">
+                    <div class="text-center lg:text-left">
+                        <div class="flex items-center justify-center lg:justify-start gap-3 mb-2">
+                            <span class="text-4xl">🌪️</span>
+                            <h1 class="text-3xl font-bold gradient-text">NWS Weather Alerts</h1>
+                            <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.0</span>
+                        </div>
+                        <p class="text-gray-500">Real-time severe weather alerts • National Weather Service → BPQ BBS Gateway</p>
+                    </div>
+                    <div class="flex flex-wrap justify-center gap-2">
+                        <button id="fetchBtn" class="btn-primary font-semibold px-5 py-2 rounded-lg text-sm flex items-center gap-2">
+                            ⟳ Fetch Alerts
+                        </button>
+                        <button id="postAllBtn" class="btn-secondary font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                            📡 Post All to BBS
+                        </button>
+                        <button id="exportBtn" class="btn-secondary font-semibold px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                            💾 Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="stat-card glass-container p-4 rounded-xl border-l-4 border-purple-500">
+                    <div class="text-purple-600 text-xs font-bold uppercase mb-1">Active Alerts</div>
+                    <div id="activeAlerts" class="text-3xl font-bold text-gray-900">--</div>
+                </div>
+                <div class="stat-card glass-container p-4 rounded-xl border-l-4 border-red-500">
+                    <div class="text-red-600 text-xs font-bold uppercase mb-1">Warnings</div>
+                    <div id="warningCount" class="text-3xl font-bold text-gray-900">--</div>
+                </div>
+                <div class="stat-card glass-container p-4 rounded-xl border-l-4 border-amber-500">
+                    <div class="text-amber-600 text-xs font-bold uppercase mb-1">Watches</div>
+                    <div id="watchCount" class="text-3xl font-bold text-gray-900">--</div>
+                </div>
+                <div class="stat-card glass-container p-4 rounded-xl border-l-4 border-green-500">
+                    <div class="text-green-600 text-xs font-bold uppercase mb-1">Posted to BBS</div>
+                    <div id="postedCount" class="text-3xl font-bold text-gray-900">0</div>
+                </div>
+            </div>
+
+            <!-- Main Grid -->
+            <div class="main-grid grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Sidebar -->
+                <aside class="sidebar space-y-4">
+                    <!-- Configuration -->
+                    <div class="glass-container p-4 rounded-xl">
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">⚙️ Configuration</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-500 uppercase">Your Callsign</label>
+                                <input type="text" id="callsign" value="K1AJD" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:border-transparent font-mono">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-500 uppercase">BBS Destination</label>
+                                <input type="text" id="destination" value="WX@ALLUS" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:border-transparent font-mono">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-500 uppercase">Auto-Refresh</label>
+                                <select id="refreshInterval" class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white">
+                                    <option value="30000">30 seconds (active weather)</option>
+                                    <option value="60000" selected>1 minute (default)</option>
+                                    <option value="300000">5 minutes (monitoring)</option>
+                                    <option value="900000">15 minutes (background)</option>
+                                    <option value="0">Off (manual only)</option>
+                                </select>
+                                <p class="text-xs text-gray-400 mt-1">Use faster refresh during severe weather events</p>
+                            </div>
+                            <div id="refreshStatus" class="text-xs text-gray-500 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                <span>Auto-refresh: <span id="nextRefresh">60s</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Region Selector -->
+                    <div class="glass-container p-4 rounded-xl">
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">🗺️ NWS Regions</h3>
+                        <div class="grid grid-cols-4 gap-2" id="regionButtons">
+                            <button class="region-btn active px-2 py-2 rounded-lg text-xs font-semibold" data-region="ALL">ALL</button>
+                            <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="SR">SR</button>
+                            <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="CR">CR</button>
+                            <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="ER">ER</button>
+                            <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="WR">WR</button>
+                            <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="AR">AK</button>
+                            <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="PR">PAC</button>
+                        </div>
+                    </div>
+
+                    <!-- Alert Types -->
+                    <div class="glass-container p-4 rounded-xl">
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">⚡ Alert Types</h3>
+                        <div class="space-y-2" id="alertTypeToggles">
+                            <label class="type-toggle active flex items-center gap-3 p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="checkbox" data-type="tornado" checked class="hidden">
+                                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                                <span class="text-sm font-medium text-gray-700">Tornado</span>
+                            </label>
+                            <label class="type-toggle active flex items-center gap-3 p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="checkbox" data-type="severe" checked class="hidden">
+                                <span class="w-3 h-3 rounded-full bg-orange-500"></span>
+                                <span class="text-sm font-medium text-gray-700">Severe Thunderstorm</span>
+                            </label>
+                            <label class="type-toggle flex items-center gap-3 p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="checkbox" data-type="flood" class="hidden">
+                                <span class="w-3 h-3 rounded-full bg-cyan-500"></span>
+                                <span class="text-sm font-medium text-gray-700">Flood</span>
+                            </label>
+                            <label class="type-toggle flex items-center gap-3 p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="checkbox" data-type="hurricane" class="hidden">
+                                <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+                                <span class="text-sm font-medium text-gray-700">Hurricane/Tropical</span>
+                            </label>
+                            <label class="type-toggle active flex items-center gap-3 p-2 rounded-lg border border-gray-200 cursor-pointer">
+                                <input type="checkbox" data-type="winter" checked class="hidden">
+                                <span class="w-3 h-3 rounded-full bg-sky-500"></span>
+                                <span class="text-sm font-medium text-gray-700">Winter Storm</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Activity Log -->
+                    <div class="glass-container p-4 rounded-xl">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-bold text-gray-800 flex items-center gap-2">📋 Activity Log</h3>
+                            <button id="clearLogBtn" class="text-xs text-gray-400 hover:text-purple-600">Clear</button>
+                        </div>
+                        <div id="statusLog" class="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
+                            <div class="log-entry log-info">Dashboard ready. Select regions and click Fetch Alerts.</div>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Main Content -->
+                <main class="main-content lg:col-span-3 space-y-6">
+                    <!-- Alerts List -->
+                    <div class="glass-container p-6 rounded-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-gray-800 text-lg flex items-center gap-2">🚨 Active Alerts</h3>
+                            <span id="alertsCount" class="text-sm text-gray-500 font-medium">0 alerts</span>
+                        </div>
+                        <div id="alertsList" class="space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
+                            <div class="text-center py-12 text-gray-400">
+                                <div class="text-5xl mb-3">🌤️</div>
+                                <h4 class="font-semibold text-gray-500 text-lg">No Alerts Loaded</h4>
+                                <p class="text-sm mt-1">Click "Fetch Alerts" to load weather alerts from NWS</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alert Detail -->
+                    <div id="alertDetail" class="glass-container p-6 rounded-xl hidden">
+                        <div class="mb-4">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span id="detailBadge" class="badge badge-tornado">TORNADO WARNING</span>
+                            </div>
+                            <h2 id="detailTitle" class="text-xl font-bold text-gray-900 mb-4">Alert headline will appear here</h2>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    <div class="text-xs text-gray-500 uppercase font-medium">Issued By</div>
+                                    <div id="detailSender" class="font-semibold text-gray-800 mt-1">NWS</div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    <div class="text-xs text-gray-500 uppercase font-medium">Expires</div>
+                                    <div id="detailExpires" class="font-semibold text-gray-800 mt-1">--</div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    <div class="text-xs text-gray-500 uppercase font-medium">Severity</div>
+                                    <div id="detailSeverity" class="font-semibold text-gray-800 mt-1">--</div>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-3">
+                                    <div class="text-xs text-gray-500 uppercase font-medium">Urgency</div>
+                                    <div id="detailUrgency" class="font-semibold text-gray-800 mt-1">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2 flex items-center gap-2">📍 Affected Areas</h4>
+                                <div id="detailAreas" class="text-sm text-gray-600 bg-gray-50 rounded-lg p-3"></div>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2 flex items-center gap-2">📝 Description</h4>
+                                <p id="detailDescription" class="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap"></p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2 flex items-center gap-2">🛡️ Protective Actions</h4>
+                                <p id="detailInstructions" class="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 whitespace-pre-wrap"></p>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-700 mb-2 flex items-center gap-2">📻 BBS Message Preview</h4>
+                                <div id="bbsPreview" class="bbs-preview"></div>
+                            </div>
+                            <div class="flex gap-3 pt-2">
+                                <button id="postSelectedBtn" class="btn-primary flex-1 font-semibold px-4 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
+                                    📡 Post to BBS
+                                </button>
+                                <button id="copyMessageBtn" class="btn-secondary flex-1 font-semibold px-4 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2">
+                                    📋 Copy Message
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-container p-6 rounded-2xl max-w-sm w-full">
+            <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">🔐 Authentication Required</h3>
+            <p class="text-sm text-gray-600 mb-4">Enter password to post all alerts to BBS</p>
+            <input type="password" id="postAllPassword" placeholder="Enter password" 
+                   class="w-full px-4 py-2 border border-gray-200 rounded-lg mb-2 focus:ring-2 focus:ring-purple-400 focus:outline-none" 
+                   onkeyup="if(event.key === 'Enter') confirmPostAll()">
+            <div id="passwordError" class="text-red-500 text-sm mb-3 hidden">Incorrect password</div>
+            <div class="flex gap-3">
+                <button onclick="closePasswordModal()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors">Cancel</button>
+                <button onclick="confirmPostAll()" class="flex-1 px-4 py-2 btn-primary rounded-lg font-semibold">Confirm</button>
+            </div>
+            <div class="mt-4 text-center">
+                <a href="#" onclick="resetPostAllPassword(); return false;" class="text-xs text-gray-400 hover:text-purple-600">Reset password</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // BPQ NWS Weather Alert Dashboard
+        // ============================================================
+        
+        // State
+        let alerts = [];
+        let selectedAlert = null;
+        let selectedRegions = ['ALL'];
+        let selectedTypes = ['tornado', 'severe', 'winter'];
+        let postedAlerts = new Set();
+        let autoRefreshInterval = null;
+        let lastFetchTime = null;
+        
+        // Configuration
+        const CONFIG = {
+            alertsJsonUrl: './wx/nws-alerts.json',
+            autoRefreshMs: 60000,
+            useLocalJson: false,
+            bbsPostUrl: './nws-bbs-post.php',
+            bbsPostEnabled: true,
+            bbsDestination: 'WX@ALLUS'
+        };
+        
+        // Event type mapping
+        const EVENT_TYPES = {
+            tornado: ['Tornado Warning', 'Tornado Watch'],
+            severe: ['Severe Thunderstorm Warning', 'Severe Thunderstorm Watch'],
+            flood: ['Flash Flood Warning', 'Flash Flood Watch', 'Flood Warning', 'Flood Watch'],
+            hurricane: ['Hurricane Warning', 'Hurricane Watch', 'Tropical Storm Warning', 'Tropical Storm Watch'],
+            winter: ['Winter Storm Warning', 'Winter Storm Watch', 'Winter Weather Advisory', 'Blizzard Warning', 'Ice Storm Warning', 'Freeze Warning', 'Wind Chill Warning', 'Wind Chill Advisory']
+        };
+        
+        const REGION_STATES = {
+            SR: ['AL', 'AR', 'FL', 'GA', 'LA', 'MS', 'NM', 'NC', 'OK', 'SC', 'TN', 'TX', 'VA', 'PR', 'VI'],
+            CR: ['CO', 'IL', 'IN', 'IA', 'KS', 'KY', 'MI', 'MN', 'MO', 'NE', 'ND', 'OH', 'SD', 'WI', 'WY'],
+            ER: ['CT', 'DE', 'ME', 'MD', 'MA', 'NH', 'NJ', 'NY', 'PA', 'RI', 'VT', 'WV', 'DC'],
+            WR: ['AZ', 'CA', 'ID', 'MT', 'NV', 'OR', 'UT', 'WA'],
+            AR: ['AK'],
+            PR: ['HI', 'GU', 'AS', 'MP', 'PW', 'FM', 'MH']
+        };
+        
+        function getAlertStates(alert) {
+            const props = alert.properties;
+            const states = new Set();
+            if (props.geocode && props.geocode.UGC) {
+                props.geocode.UGC.forEach(ugc => {
+                    const stateCode = ugc.substring(0, 2);
+                    if (stateCode && stateCode.length === 2) states.add(stateCode);
+                });
+            }
+            if (states.size === 0 && props.areaDesc) {
+                const allStates = Object.values(REGION_STATES).flat();
+                const matches = props.areaDesc.match(/\b([A-Z]{2})\b/g);
+                if (matches) matches.forEach(code => { if (allStates.includes(code)) states.add(code); });
+            }
+            return Array.from(states);
+        }
+        
+        function alertMatchesRegions(alert) {
+            if (selectedRegions.includes('ALL')) return true;
+            const alertStates = getAlertStates(alert);
+            if (alertStates.length === 0) return true;
+            for (const region of selectedRegions) {
+                const regionStates = REGION_STATES[region] || [];
+                for (const state of alertStates) {
+                    if (regionStates.includes(state)) return true;
+                }
+            }
+            return false;
+        }
+        
+        function getAlertType(eventName) {
+            for (const [type, events] of Object.entries(EVENT_TYPES)) {
+                if (events.some(e => eventName && eventName.includes(e.split(' ')[0]))) return type;
+            }
+            return 'other';
+        }
+        
+        function alertMatchesTypes(alert) {
+            const eventName = alert.properties.event || '';
+            const type = getAlertType(eventName);
+            return selectedTypes.includes(type) || type === 'other';
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initRegionButtons();
+            initAlertTypeToggles();
+            initActionButtons();
+            initAutoRefresh();
+            loadSettings();
+            
+            if (CONFIG.useLocalJson) {
+                loadFromLocalJson().then(success => {
+                    if (!success) log('Local JSON not available. Click Fetch Alerts.', 'info');
+                });
+            }
+        });
+        
+        function initRegionButtons() {
+            document.querySelectorAll('.region-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const region = btn.dataset.region;
+                    if (region === 'ALL') {
+                        selectedRegions = ['ALL'];
+                        document.querySelectorAll('.region-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    } else {
+                        document.querySelector('.region-btn[data-region="ALL"]').classList.remove('active');
+                        selectedRegions = selectedRegions.filter(r => r !== 'ALL');
+                        btn.classList.toggle('active');
+                        if (btn.classList.contains('active')) {
+                            if (!selectedRegions.includes(region)) selectedRegions.push(region);
+                        } else {
+                            selectedRegions = selectedRegions.filter(r => r !== region);
+                        }
+                        if (selectedRegions.length === 0) {
+                            selectedRegions = ['ALL'];
+                            document.querySelector('.region-btn[data-region="ALL"]').classList.add('active');
+                        }
+                    }
+                    renderAlerts();
+                });
+            });
+        }
+        
+        function initAlertTypeToggles() {
+            document.querySelectorAll('.type-toggle').forEach(toggle => {
+                toggle.addEventListener('click', () => {
+                    const checkbox = toggle.querySelector('input');
+                    checkbox.checked = !checkbox.checked;
+                    toggle.classList.toggle('active', checkbox.checked);
+                    const type = checkbox.dataset.type;
+                    if (checkbox.checked) {
+                        if (!selectedTypes.includes(type)) selectedTypes.push(type);
+                    } else {
+                        selectedTypes = selectedTypes.filter(t => t !== type);
+                    }
+                    renderAlerts();
+                });
+            });
+        }
+        
+        function initActionButtons() {
+            document.getElementById('fetchBtn').addEventListener('click', fetchAlerts);
+            document.getElementById('postAllBtn').addEventListener('click', showPasswordModal);
+            document.getElementById('exportBtn').addEventListener('click', exportMessages);
+            document.getElementById('clearLogBtn').addEventListener('click', () => {
+                document.getElementById('statusLog').innerHTML = '';
+                log('Log cleared', 'info');
+            });
+            document.getElementById('postSelectedBtn').addEventListener('click', postSelectedAlert);
+            document.getElementById('copyMessageBtn').addEventListener('click', copySelectedMessage);
+        }
+        
+        let refreshCountdown = 0;
+        let countdownTimer = null;
+        
+        function initAutoRefresh() {
+            const select = document.getElementById('refreshInterval');
+            const savedInterval = localStorage.getItem('nws_refresh_interval');
+            
+            if (savedInterval) {
+                select.value = savedInterval;
+                CONFIG.autoRefreshMs = parseInt(savedInterval);
+            }
+            
+            select.addEventListener('change', e => {
+                const newInterval = parseInt(e.target.value);
+                CONFIG.autoRefreshMs = newInterval;
+                localStorage.setItem('nws_refresh_interval', e.target.value);
+                
+                // Clear existing interval and start new one
+                if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+                if (countdownTimer) clearInterval(countdownTimer);
+                
+                if (newInterval > 0) {
+                    startAutoRefresh(newInterval);
+                    log(`Auto-refresh set to ${formatInterval(newInterval)}`, 'info');
+                } else {
+                    updateRefreshStatus(0);
+                    log('Auto-refresh disabled', 'info');
+                }
+            });
+            
+            // Start initial auto-refresh
+            if (CONFIG.autoRefreshMs > 0) {
+                startAutoRefresh(CONFIG.autoRefreshMs);
+            } else {
+                updateRefreshStatus(0);
+            }
+        }
+        
+        function startAutoRefresh(intervalMs) {
+            refreshCountdown = intervalMs / 1000;
+            updateRefreshStatus(refreshCountdown);
+            
+            // Countdown timer (updates every second)
+            countdownTimer = setInterval(() => {
+                refreshCountdown--;
+                if (refreshCountdown <= 0) {
+                    refreshCountdown = intervalMs / 1000;
+                }
+                updateRefreshStatus(refreshCountdown);
+            }, 1000);
+            
+            // Actual refresh timer
+            autoRefreshInterval = setInterval(() => {
+                if (alerts.length > 0) {
+                    fetchAlerts();
+                    refreshCountdown = intervalMs / 1000;
+                }
+            }, intervalMs);
+        }
+        
+        function updateRefreshStatus(seconds) {
+            const statusEl = document.getElementById('refreshStatus');
+            const nextEl = document.getElementById('nextRefresh');
+            
+            if (seconds <= 0 || CONFIG.autoRefreshMs === 0) {
+                statusEl.innerHTML = '<span class="w-2 h-2 rounded-full bg-gray-400"></span><span>Auto-refresh: Off</span>';
+            } else {
+                const indicator = seconds <= 5 ? 'bg-yellow-500' : 'bg-green-500';
+                const timeStr = seconds >= 60 ? `${Math.floor(seconds/60)}m ${seconds%60}s` : `${seconds}s`;
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full ${indicator} animate-pulse"></span><span>Next refresh: ${timeStr}</span>`;
+            }
+        }
+        
+        function formatInterval(ms) {
+            if (ms === 0) return 'Off';
+            if (ms < 60000) return `${ms/1000} seconds`;
+            return `${ms/60000} minute${ms > 60000 ? 's' : ''}`;
+        }
+        
+        function loadSettings() {
+            const savedCallsign = localStorage.getItem('nws_callsign');
+            const savedDest = localStorage.getItem('nws_destination');
+            if (savedCallsign) document.getElementById('callsign').value = savedCallsign;
+            if (savedDest) document.getElementById('destination').value = savedDest;
+            
+            document.getElementById('callsign').addEventListener('change', e => {
+                localStorage.setItem('nws_callsign', e.target.value);
+            });
+            document.getElementById('destination').addEventListener('change', e => {
+                localStorage.setItem('nws_destination', e.target.value);
+            });
+        }
+        
+        async function fetchAlerts() {
+            log('Fetching alerts from NWS API...', 'info');
+            const btn = document.getElementById('fetchBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="animate-spin">⟳</span> Loading...';
+            
+            try {
+                const response = await fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert', {
+                    headers: { 'Accept': 'application/geo+json', 'User-Agent': 'BPQ-Dashboard/1.4.2' }
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                
+                const data = await response.json();
+                alerts = data.features || [];
+                lastFetchTime = new Date();
+                
+                log(`Loaded ${alerts.length} alerts from NWS API`, 'success');
+                renderAlerts();
+                updateStats();
+                showToast(`Loaded ${alerts.length} alerts`, 'success');
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                showToast('Failed to fetch alerts', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '⟳ Fetch Alerts';
+            }
+        }
+        
+        async function loadFromLocalJson() {
+            try {
+                const response = await fetch(CONFIG.alertsJsonUrl + '?t=' + Date.now());
+                if (!response.ok) return false;
+                const data = await response.json();
+                alerts = data.features || [];
+                lastFetchTime = new Date();
+                log(`Loaded ${alerts.length} alerts from local cache`, 'success');
+                renderAlerts();
+                updateStats();
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        function renderAlerts() {
+            const list = document.getElementById('alertsList');
+            const filtered = alerts.filter(a => alertMatchesTypes(a) && alertMatchesRegions(a));
+            
+            document.getElementById('alertsCount').textContent = `${filtered.length} alerts`;
+            
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-12 text-gray-400">
+                        <div class="text-5xl mb-3">🌤️</div>
+                        <h4 class="font-semibold text-gray-500 text-lg">${alerts.length > 0 ? 'No Matching Alerts' : 'No Alerts Loaded'}</h4>
+                        <p class="text-sm mt-1">${alerts.length > 0 ? 'Try adjusting your region or type filters' : 'Click "Fetch Alerts" to load weather alerts'}</p>
+                    </div>`;
+                return;
+            }
+            
+            // Sort by severity
+            const severityOrder = { Extreme: 0, Severe: 1, Moderate: 2, Minor: 3, Unknown: 4 };
+            filtered.sort((a, b) => (severityOrder[a.properties.severity] || 4) - (severityOrder[b.properties.severity] || 4));
+            
+            list.innerHTML = filtered.map((alert, idx) => {
+                const props = alert.properties;
+                const type = getAlertType(props.event || '');
+                const areas = truncateText(props.areaDesc, 80);
+                const isSelected = selectedAlert && selectedAlert.id === alert.id;
+                const time = formatTime(props.effective);
+                
+                return `
+                    <div class="alert-item alert-${type} ${isSelected ? 'selected' : ''} p-3 rounded-lg" data-index="${idx}">
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <span class="badge badge-${type}">${props.event || 'Alert'}</span>
+                            <span class="text-xs text-gray-400">${time}</span>
+                        </div>
+                        <div class="text-sm font-semibold text-gray-800 mb-1 line-clamp-2">${props.headline || props.event}</div>
+                        <div class="text-xs text-gray-500 truncate">📍 ${areas}</div>
+                    </div>`;
+            }).join('');
+            
+            // Add click handlers
+            document.querySelectorAll('.alert-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const idx = parseInt(item.dataset.index);
+                    selectAlert(idx);
+                });
+            });
+        }
+        
+        function selectAlert(idx) {
+            const filtered = alerts.filter(a => alertMatchesTypes(a) && alertMatchesRegions(a));
+            const severityOrder = { Extreme: 0, Severe: 1, Moderate: 2, Minor: 3, Unknown: 4 };
+            filtered.sort((a, b) => (severityOrder[a.properties.severity] || 4) - (severityOrder[b.properties.severity] || 4));
+            
+            selectedAlert = filtered[idx];
+            if (!selectedAlert) return;
+            
+            const props = selectedAlert.properties;
+            const type = getAlertType(props.event || '');
+            
+            // Update selection highlight
+            document.querySelectorAll('.alert-item').forEach((item, i) => {
+                item.classList.toggle('selected', i === idx);
+            });
+            
+            // Update detail view
+            document.getElementById('detailBadge').className = `badge badge-${type}`;
+            document.getElementById('detailBadge').textContent = props.event || 'ALERT';
+            document.getElementById('detailTitle').textContent = props.headline || props.event;
+            document.getElementById('detailSender').textContent = props.senderName || 'NWS';
+            document.getElementById('detailExpires').textContent = formatDateTime(props.expires);
+            document.getElementById('detailSeverity').textContent = props.severity || '--';
+            document.getElementById('detailUrgency').textContent = props.urgency || '--';
+            document.getElementById('detailAreas').textContent = props.areaDesc || 'Not specified';
+            document.getElementById('detailDescription').textContent = props.description || 'No description available';
+            document.getElementById('detailInstructions').textContent = props.instruction || 'Follow local emergency guidance';
+            document.getElementById('bbsPreview').textContent = generateBBSMessage(selectedAlert);
+            
+            document.getElementById('alertDetail').classList.remove('hidden');
+        }
+        
+        function updateStats() {
+            let warnings = 0, watches = 0;
+            alerts.forEach(alert => {
+                const event = alert.properties.event || '';
+                if (event.includes('Warning')) warnings++;
+                else if (event.includes('Watch')) watches++;
+            });
+            
+            document.getElementById('activeAlerts').textContent = alerts.length;
+            document.getElementById('warningCount').textContent = warnings;
+            document.getElementById('watchCount').textContent = watches;
+        }
+        
+        function generateBBSMessage(alert) {
+            const props = alert.properties;
+            const callsign = document.getElementById('callsign').value || 'K1AJD';
+            
+            const lines = [
+                `NWS ${props.event || 'WEATHER ALERT'}`,
+                `FROM: ${callsign}`,
+                `TIME: ${formatDateTime(props.effective)}`,
+                `EXPIRES: ${formatDateTime(props.expires)}`,
+                '',
+                props.headline || '',
+                '',
+                'AREAS: ' + (props.areaDesc || 'Not specified'),
+                '',
+                props.description || '',
+                '',
+                'INSTRUCTIONS:',
+                props.instruction || 'Follow local emergency guidance',
+                '',
+                `73 de ${callsign}`
+            ];
+            return lines.join('\n');
+        }
+        
+        async function postSelectedAlert() {
+            if (!selectedAlert) {
+                showToast('No alert selected', 'warning');
+                return;
+            }
+            
+            const message = generateBBSMessage(selectedAlert);
+            const dest = document.getElementById('destination').value || 'WX@ALLUS';
+            
+            try {
+                const response = await fetch(CONFIG.bbsPostUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ destination: dest, message: message, alertId: selectedAlert.id })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    log(`Posted alert to ${dest}`, 'success');
+                    showToast('Alert posted to BBS', 'success');
+                    postedAlerts.add(selectedAlert.id);
+                    updatePostedCount();
+                } else {
+                    throw new Error(result.error || 'Post failed');
+                }
+            } catch (e) {
+                log(`Post failed: ${e.message}`, 'error');
+                showToast('Failed to post: ' + e.message, 'error');
+            }
+        }
+        
+        function copySelectedMessage() {
+            if (!selectedAlert) {
+                showToast('No alert selected', 'warning');
+                return;
+            }
+            const message = generateBBSMessage(selectedAlert);
+            navigator.clipboard.writeText(message).then(() => {
+                showToast('Message copied to clipboard', 'success');
+                log('Message copied to clipboard', 'success');
+            }).catch(() => {
+                showToast('Copy failed', 'error');
+            });
+        }
+        
+        function exportMessages() {
+            const filtered = alerts.filter(a => alertMatchesTypes(a) && alertMatchesRegions(a));
+            if (filtered.length === 0) {
+                showToast('No alerts to export', 'warning');
+                return;
+            }
+            
+            const messages = filtered.map(a => generateBBSMessage(a)).join('\n\n' + '='.repeat(60) + '\n\n');
+            const blob = new Blob([messages], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nws-alerts-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            log(`Exported ${filtered.length} alerts`, 'success');
+            showToast(`Exported ${filtered.length} alerts`, 'success');
+        }
+        
+        function showPasswordModal() {
+            const savedHash = localStorage.getItem('nws_postall_hash');
+            if (!savedHash) {
+                const pwd = prompt('Set a password for "Post All" (first time setup):');
+                if (pwd) {
+                    localStorage.setItem('nws_postall_hash', btoa(pwd));
+                    showToast('Password set. Click Post All again.', 'info');
+                }
+                return;
+            }
+            document.getElementById('passwordModal').classList.remove('hidden');
+            document.getElementById('postAllPassword').value = '';
+            document.getElementById('passwordError').classList.add('hidden');
+            document.getElementById('postAllPassword').focus();
+        }
+        
+        function closePasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+        }
+        
+        async function confirmPostAll() {
+            const pwd = document.getElementById('postAllPassword').value;
+            const savedHash = localStorage.getItem('nws_postall_hash');
+            
+            if (btoa(pwd) !== savedHash) {
+                document.getElementById('passwordError').classList.remove('hidden');
+                return;
+            }
+            
+            closePasswordModal();
+            
+            const filtered = alerts.filter(a => alertMatchesTypes(a) && alertMatchesRegions(a));
+            if (filtered.length === 0) {
+                showToast('No alerts to post', 'warning');
+                return;
+            }
+            
+            log(`Posting ${filtered.length} alerts to BBS...`, 'info');
+            let success = 0, failed = 0;
+            
+            for (const alert of filtered) {
+                if (postedAlerts.has(alert.id)) continue;
+                try {
+                    const message = generateBBSMessage(alert);
+                    const dest = document.getElementById('destination').value || 'WX@ALLUS';
+                    const response = await fetch(CONFIG.bbsPostUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ destination: dest, message: message, alertId: alert.id })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        success++;
+                        postedAlerts.add(alert.id);
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+            
+            updatePostedCount();
+            log(`Posted ${success} alerts (${failed} failed)`, success > 0 ? 'success' : 'error');
+            showToast(`Posted ${success} alerts`, success > 0 ? 'success' : 'error');
+        }
+        
+        function resetPostAllPassword() {
+            if (confirm('Reset the Post All password?')) {
+                localStorage.removeItem('nws_postall_hash');
+                closePasswordModal();
+                showToast('Password reset. Set new password on next Post All.', 'info');
+            }
+        }
+        
+        function updatePostedCount() {
+            document.getElementById('postedCount').textContent = postedAlerts.size;
+        }
+        
+        function log(message, type = 'info') {
+            const container = document.getElementById('statusLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            entry.innerHTML = `<span class="text-gray-400">${time}</span> ${message}`;
+            container.insertBefore(entry, container.firstChild);
+            if (container.children.length > 50) container.removeChild(container.lastChild);
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icons = { success: '✓', error: '✗', warning: '⚠', info: 'ℹ' };
+            toast.innerHTML = `<span class="text-lg">${icons[type] || 'ℹ'}</span><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+        
+        function truncateText(text, maxLen) {
+            if (!text) return 'Unknown';
+            if (text.length <= maxLen) return text;
+            return text.substring(0, maxLen) + '...';
+        }
+        
+        function formatTime(isoString) {
+            if (!isoString) return '--';
+            try {
+                return new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return isoString;
+            }
+        }
+        
+        function formatDateTime(isoString) {
+            if (!isoString) return '--';
+            try {
+                return new Date(isoString).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
+                });
+            } catch (e) {
+                return isoString;
+            }
+        }
+        
+        // Nav bar clocks
+        (function updateNavClocks() {
+            const now = new Date();
+            const utc = String(now.getUTCHours()).padStart(2, '0') + ':' + 
+                        String(now.getUTCMinutes()).padStart(2, '0') + ':' + 
+                        String(now.getUTCSeconds()).padStart(2, '0');
+            const local = String(now.getHours()).padStart(2, '0') + ':' + 
+                          String(now.getMinutes()).padStart(2, '0') + ':' + 
+                          String(now.getSeconds()).padStart(2, '0');
+            
+            const utcEl = document.getElementById('navUtcClock');
+            const localEl = document.getElementById('navLocalClock');
+            if (utcEl) utcEl.textContent = utc + ' Z';
+            if (localEl) localEl.textContent = local + ' L';
+            
+            setTimeout(updateNavClocks, 1000 - now.getMilliseconds());
+        })();
+    </script>
+    <script>
+    (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
+    </script>
+<script src="shared/settings-modal.js"></script>
+</body>
+</html>

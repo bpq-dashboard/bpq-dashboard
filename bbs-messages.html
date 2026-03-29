@@ -1,0 +1,2174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPQ BBS — K1AJD</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ── Reset & base ───────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --tb-bg:         #1c1c1e;
+            --tb-sidebar:    #242426;
+            --tb-toolbar:    #2a2a2d;
+            --tb-border:     #3a3a3e;
+            --tb-list-bg:    #1e1e20;
+            --tb-list-hover: #2c2c2f;
+            --tb-list-sel:   #0a4a8c;
+            --tb-preview:    #1a1a1c;
+            --tb-text:       #e8e8ea;
+            --tb-muted:      #8e8e93;
+            --tb-accent:     #4a9eff;
+            --tb-green:      #30d158;
+            --tb-red:        #ff453a;
+            --tb-orange:     #ff9f0a;
+            --tb-unread-dot: #4a9eff;
+            --tb-folder-sel: #0a4a8c22;
+            --font-ui:       'IBM Plex Sans', system-ui, sans-serif;
+            --font-mono:     'IBM Plex Mono', monospace;
+            --radius:        6px;
+        }
+
+        /* ── Light (day) theme ──────────────────────────────────── */
+        [data-theme="light"] {
+            --tb-bg:         #f0f0f5;
+            --tb-sidebar:    #e4e4ea;
+            --tb-toolbar:    #dcdce4;
+            --tb-border:     #c4c4cc;
+            --tb-list-bg:    #f6f6fb;
+            --tb-list-hover: #eaeaf2;
+            --tb-list-sel:   #0a6edb;
+            --tb-preview:    #ffffff;
+            --tb-text:       #1c1c1e;
+            --tb-muted:      #6e6e77;
+            --tb-accent:     #0a6edb;
+            --tb-green:      #1a8f3c;
+            --tb-red:        #d92b2b;
+            --tb-orange:     #b86800;
+            --tb-unread-dot: #0a6edb;
+            --tb-folder-sel: #0a6edb18;
+        }
+        [data-theme="light"] .type-P { background: rgba(10,110,219,.12); color: #0a6edb; }
+        [data-theme="light"] .type-B { background: rgba(184,104,0,.12);  color: #b86800; }
+        [data-theme="light"] .type-T { background: rgba(26,143,60,.12);   color: #1a8f3c; }
+        [data-theme="light"] .tag-chip { background: rgba(10,110,219,.1); color: #0a6edb; border-color: rgba(10,110,219,.25); }
+        [data-theme="light"] .tag-chip:hover { background: rgba(10,110,219,.2); }
+        [data-theme="light"] .spinner { border-color: #c4c4cc; border-top-color: #0a6edb; }
+        [data-theme="light"] .act-btn { background: #fff; }
+        [data-theme="light"] .auth-box { box-shadow: 0 8px 32px rgba(0,0,0,.12); }
+
+        html, body { height: 100%; overflow: hidden; background: var(--tb-bg); color: var(--tb-text); font-family: var(--font-ui); font-size: 13px; }
+
+        /* ── Auth screen ────────────────────────────────────────── */
+        #authScreen {
+            position: fixed; inset: 0; background: var(--tb-bg);
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .auth-box {
+            background: var(--tb-sidebar); border: 1px solid var(--tb-border);
+            border-radius: 12px; padding: 40px; width: 340px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+        }
+        .auth-box h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+        .auth-box p  { color: var(--tb-muted); font-size: 12px; margin-bottom: 24px; }
+        .auth-input {
+            width: 100%; background: var(--tb-bg); border: 1px solid var(--tb-border);
+            border-radius: var(--radius); color: var(--tb-text); padding: 10px 12px;
+            font-size: 13px; outline: none; margin-bottom: 12px; font-family: var(--font-ui);
+            transition: border-color .15s;
+        }
+        .auth-input:focus { border-color: var(--tb-accent); }
+        .auth-btn {
+            width: 100%; background: var(--tb-accent); color: #fff; border: none;
+            border-radius: var(--radius); padding: 10px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: opacity .15s;
+        }
+        .auth-btn:hover { opacity: .85; }
+        .auth-error { color: var(--tb-red); font-size: 12px; margin-top: 10px; text-align: center; }
+        #authScreen.hidden { display: none; }
+
+        /* ── App shell ──────────────────────────────────────────── */
+        #app { display: none; height: 100%; flex-direction: column; }
+        #app.visible { display: flex; }
+
+        /* ── Top nav bar ────────────────────────────────────────── */
+        #topbar {
+            height: 42px; background: var(--tb-toolbar); border-bottom: 1px solid var(--tb-border);
+            display: flex; align-items: center; padding: 0 12px; gap: 4px; flex-shrink: 0;
+            user-select: none;
+        }
+        .nav-title { font-weight: 700; font-size: 14px; margin-right: 8px; color: var(--tb-accent); letter-spacing: -.3px; }
+        .nav-sep { width: 1px; height: 20px; background: var(--tb-border); margin: 0 4px; }
+        .nav-link {
+            color: var(--tb-muted); text-decoration: none; padding: 4px 9px;
+            border-radius: var(--radius); font-size: 12px; font-weight: 500; transition: all .12s;
+        }
+        .nav-link:hover { color: var(--tb-text); background: var(--tb-border); }
+        .nav-link.active { color: var(--tb-text); background: var(--tb-list-sel); }
+        .nav-spacer { flex: 1; }
+        .nav-clock { font-family: var(--font-mono); font-size: 11px; color: var(--tb-muted); }
+        .nav-utc { color: var(--tb-accent); margin-right: 8px; }
+
+        /* ── Toolbar ────────────────────────────────────────────── */
+        #toolbar {
+            height: 46px; background: var(--tb-toolbar); border-bottom: 1px solid var(--tb-border);
+            display: flex; align-items: center; padding: 0 8px; gap: 2px; flex-shrink: 0;
+        }
+        .tb-btn {
+            display: flex; align-items: center; gap: 5px; padding: 5px 10px;
+            background: transparent; border: none; color: var(--tb-text); border-radius: var(--radius);
+            cursor: pointer; font-size: 12px; font-weight: 500; font-family: var(--font-ui);
+            transition: background .12s; white-space: nowrap;
+        }
+        .tb-btn:hover { background: var(--tb-border); }
+        .tb-btn:active { background: var(--tb-list-sel); }
+        .tb-btn .icon { font-size: 15px; }
+        .tb-btn.accent { color: var(--tb-accent); }
+        .tb-btn.danger { color: var(--tb-red); }
+        .tb-btn.success { color: var(--tb-green); }
+        .tb-btn:disabled { opacity: .4; cursor: not-allowed; }
+        .tb-sep { width: 1px; height: 24px; background: var(--tb-border); margin: 0 4px; }
+        .tb-count-select {
+            background: var(--tb-bg); border: 1px solid var(--tb-border); color: var(--tb-text);
+            border-radius: var(--radius); padding: 4px 8px; font-size: 12px; outline: none;
+            font-family: var(--font-ui); cursor: pointer;
+        }
+        .tb-count-select:focus { border-color: var(--tb-accent); }
+        #statusChip {
+            margin-left: auto; padding: 3px 10px; border-radius: 20px; font-size: 11px;
+            font-weight: 600; background: var(--tb-bg); border: 1px solid var(--tb-border);
+            color: var(--tb-muted);
+        }
+        #statusChip.loading { border-color: var(--tb-orange); color: var(--tb-orange); }
+        #statusChip.ready   { border-color: var(--tb-green);  color: var(--tb-green); }
+        #statusChip.error   { border-color: var(--tb-red);    color: var(--tb-red); }
+
+        /* ── Three-pane layout ──────────────────────────────────── */
+        #panes { display: flex; flex: 1; overflow: hidden; }
+
+        /* Sidebar */
+        #sidebar {
+            width: 180px; flex-shrink: 0; background: var(--tb-sidebar);
+            border-right: 1px solid var(--tb-border); display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .sidebar-section { padding: 8px 0; }
+        .sidebar-heading {
+            font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
+            color: var(--tb-muted); padding: 6px 12px 4px;
+        }
+        .folder-item {
+            display: flex; align-items: center; gap: 7px; padding: 6px 12px;
+            cursor: pointer; border-radius: 0; transition: background .1s;
+            color: var(--tb-text); font-size: 12.5px; border-left: 3px solid transparent;
+        }
+        .folder-item:hover { background: var(--tb-list-hover); }
+        .folder-item.active {
+            background: var(--tb-folder-sel); border-left-color: var(--tb-accent);
+            color: var(--tb-accent); font-weight: 600;
+        }
+        .folder-icon { font-size: 13px; width: 16px; text-align: center; flex-shrink: 0; }
+        .folder-count {
+            margin-left: auto; font-size: 10px; background: var(--tb-accent);
+            color: #fff; border-radius: 10px; padding: 1px 6px; font-weight: 700;
+        }
+        .folder-count.zero { background: transparent; color: var(--tb-muted); }
+        .folder-count.unread {
+            background: var(--tb-accent); color: #fff;
+            animation: pulse-badge .3s ease;
+        }
+        .folder-item.has-unread { font-weight: 700; }
+        @keyframes pulse-badge {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.25); }
+            100% { transform: scale(1); }
+        }
+        .sidebar-footer { margin-top: auto; padding: 8px 12px; border-top: 1px solid var(--tb-border); }
+        #storageChip {
+            font-size: 10px; color: var(--tb-muted); cursor: pointer;
+            padding: 3px 0; display: block;
+        }
+        #storageChip:hover { color: var(--tb-text); }
+
+        /* Right side — list + preview stacked */
+        #right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Message list */
+        #listPane {
+            height: 45%; flex-shrink: 0; border-bottom: 1px solid var(--tb-border);
+            display: flex; flex-direction: column; overflow: hidden; background: var(--tb-list-bg);
+        }
+        #listHeader {
+            display: grid; grid-template-columns: 28px 52px 58px 90px 90px 1fr 54px;
+            gap: 0; padding: 0 4px; height: 26px; align-items: center;
+            background: var(--tb-toolbar); border-bottom: 1px solid var(--tb-border);
+            user-select: none; flex-shrink: 0;
+        }
+        .list-hdr {
+            font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+            color: var(--tb-muted); padding: 0 6px; overflow: hidden; white-space: nowrap;
+        }
+        #listBody { flex: 1; overflow-y: auto; }
+        .msg-row {
+            display: grid; grid-template-columns: 28px 52px 58px 90px 90px 1fr 54px;
+            gap: 0; padding: 0 4px; height: 30px; align-items: center; cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,.03); transition: background .08s;
+            position: relative;
+        }
+        .msg-row:hover { background: var(--tb-list-hover); }
+        .msg-row.selected { background: var(--tb-list-sel) !important; }
+        .msg-row.unread .msg-subject { font-weight: 700; color: var(--tb-text); }
+        .msg-row.saved-msg .msg-from { color: var(--tb-green); }
+        .msg-cell { padding: 0 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--tb-muted); }
+        .msg-cell.msg-num  { font-family: var(--font-mono); font-size: 10px; }
+        .msg-cell.msg-date { font-family: var(--font-mono); font-size: 10px; color: var(--tb-muted); }
+        .msg-cell.msg-type { font-size: 10px; }
+        .msg-cell.msg-from { color: var(--tb-text); font-weight: 500; }
+        .msg-cell.msg-to   { color: var(--tb-accent); }
+        .msg-cell.msg-subject { color: var(--tb-text); }
+        .msg-cell.msg-size { font-family: var(--font-mono); font-size: 10px; text-align: right; }
+        .unread-dot {
+            position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+            width: 7px; height: 7px; border-radius: 50%; background: var(--tb-unread-dot); flex-shrink: 0;
+        }
+        .type-badge {
+            display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 5px;
+            border-radius: 3px; letter-spacing: .3px;
+        }
+        .type-P { background: rgba(74,158,255,.18); color: var(--tb-accent); }
+        .type-B { background: rgba(255,159,10,.18); color: var(--tb-orange); }
+        .type-T { background: rgba(48,209,88,.18); color: var(--tb-green); }
+        #listEmpty {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: var(--tb-muted); gap: 8px;
+        }
+        #listEmpty .big { font-size: 36px; }
+        #listEmpty p { font-size: 12px; }
+
+        /* Preview pane */
+        #previewPane {
+            flex: 1; background: var(--tb-preview); display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        #previewHeader {
+            padding: 12px 16px; border-bottom: 1px solid var(--tb-border);
+            background: var(--tb-sidebar); flex-shrink: 0;
+        }
+        #previewSubject { font-size: 15px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+        #previewMeta { display: flex; flex-wrap: wrap; gap: 16px; }
+        .meta-item { display: flex; flex-direction: column; gap: 1px; }
+        .meta-label { font-size: 9px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--tb-muted); }
+        .meta-value { font-size: 12px; font-family: var(--font-mono); color: var(--tb-text); }
+        #previewActions {
+            padding: 6px 10px; border-bottom: 1px solid var(--tb-border);
+            background: var(--tb-toolbar); display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap;
+        }
+        .act-btn {
+            display: flex; align-items: center; gap: 4px; padding: 4px 10px;
+            background: var(--tb-bg); border: 1px solid var(--tb-border);
+            border-radius: var(--radius); color: var(--tb-text); cursor: pointer;
+            font-size: 11px; font-weight: 500; font-family: var(--font-ui);
+            transition: all .12s; white-space: nowrap;
+        }
+        .act-btn:hover { background: var(--tb-border); border-color: var(--tb-muted); }
+        .act-btn.primary { background: var(--tb-accent); border-color: var(--tb-accent); color: #fff; }
+        .act-btn.primary:hover { opacity: .85; }
+        .act-btn.danger { border-color: var(--tb-red); color: var(--tb-red); }
+        .act-btn.danger:hover { background: rgba(255,69,58,.15); }
+        .act-btn.saved-state { border-color: var(--tb-green); color: var(--tb-green); cursor: default; }
+        #previewBody { flex: 1; overflow-y: auto; padding: 16px; }
+        #previewBodyText {
+            font-family: var(--font-mono); font-size: 12px; line-height: 1.7;
+            white-space: pre-wrap; word-break: break-word; color: var(--tb-text);
+        }
+        #previewEmpty {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: var(--tb-muted); gap: 8px;
+        }
+        #previewEmpty .big { font-size: 48px; }
+
+        /* Resizer */
+        #resizer {
+            height: 4px; background: var(--tb-border); cursor: ns-resize; flex-shrink: 0;
+            transition: background .15s;
+        }
+        #resizer:hover { background: var(--tb-accent); }
+
+        /* ── Compose modal ──────────────────────────────────────── */
+        .modal-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,.6);
+            display: flex; align-items: center; justify-content: center; z-index: 500;
+            backdrop-filter: blur(3px);
+        }
+        .modal-backdrop.hidden { display: none; }
+        .modal-box {
+            background: var(--tb-sidebar); border: 1px solid var(--tb-border);
+            border-radius: 10px; width: 640px; max-width: 95vw; max-height: 90vh;
+            display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.7);
+        }
+        .modal-header {
+            padding: 14px 16px; border-bottom: 1px solid var(--tb-border);
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .modal-title { font-size: 14px; font-weight: 700; }
+        .modal-close { background: none; border: none; color: var(--tb-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 0 4px; }
+        .modal-close:hover { color: var(--tb-text); }
+        .modal-body { padding: 16px; flex: 1; overflow-y: auto; }
+        .modal-footer { padding: 12px 16px; border-top: 1px solid var(--tb-border); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
+        .form-row { display: flex; align-items: center; border-bottom: 1px solid var(--tb-border); padding: 6px 0; }
+        .form-label { width: 64px; font-size: 11px; font-weight: 600; color: var(--tb-muted); flex-shrink: 0; }
+        .form-input {
+            flex: 1; background: transparent; border: none; color: var(--tb-text);
+            font-size: 13px; outline: none; font-family: var(--font-ui); padding: 2px 4px;
+        }
+        .form-input::placeholder { color: var(--tb-muted); }
+        .form-select {
+            background: var(--tb-bg); border: 1px solid var(--tb-border); color: var(--tb-text);
+            border-radius: var(--radius); padding: 3px 8px; font-size: 12px; outline: none;
+            font-family: var(--font-ui);
+        }
+        #composeBody {
+            width: 100%; min-height: 200px; background: var(--tb-bg); border: 1px solid var(--tb-border);
+            border-radius: var(--radius); color: var(--tb-text); padding: 10px 12px;
+            font-family: var(--font-mono); font-size: 12px; outline: none; resize: vertical;
+            margin-top: 10px; line-height: 1.6;
+        }
+        .modal-btn {
+            padding: 7px 18px; border-radius: var(--radius); font-size: 12px;
+            font-weight: 600; cursor: pointer; border: none; font-family: var(--font-ui);
+            transition: opacity .12s;
+        }
+        .modal-btn.primary { background: var(--tb-accent); color: #fff; }
+        .modal-btn.secondary { background: var(--tb-border); color: var(--tb-text); }
+        .modal-btn:hover { opacity: .85; }
+        .modal-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        /* ── Folder picker modal ────────────────────────────────── */
+        .folder-pick-item {
+            display: flex; align-items: center; gap: 8px; padding: 9px 12px;
+            cursor: pointer; border-radius: var(--radius); transition: background .1s;
+            color: var(--tb-text); font-size: 13px;
+        }
+        .folder-pick-item:hover { background: var(--tb-list-hover); }
+
+        /* ── Bulletin modal ─────────────────────────────────────── */
+        .tag-chip {
+            display: inline-block; padding: 3px 10px; background: rgba(74,158,255,.15);
+            color: var(--tb-accent); border-radius: 12px; font-size: 11px; cursor: pointer;
+            border: 1px solid rgba(74,158,255,.3); transition: all .1s; font-family: var(--font-mono);
+        }
+        .tag-chip:hover { background: rgba(74,158,255,.3); }
+        .saved-addr-chip {
+            display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+            background: var(--tb-bg); border: 1px solid var(--tb-border); border-radius: 12px;
+            font-size: 11px; font-family: var(--font-mono); color: var(--tb-text);
+        }
+        .saved-addr-chip button { background: none; border: none; color: var(--tb-muted); cursor: pointer; font-size: 13px; line-height: 1; }
+        .saved-addr-chip button:hover { color: var(--tb-red); }
+
+        /* ── Confirm modal ──────────────────────────────────────── */
+        .confirm-box {
+            background: var(--tb-sidebar); border: 1px solid var(--tb-border);
+            border-radius: 10px; width: 360px; padding: 24px;
+            box-shadow: 0 24px 64px rgba(0,0,0,.7);
+        }
+        .confirm-box h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+        .confirm-box p { color: var(--tb-muted); font-size: 12px; margin-bottom: 20px; line-height: 1.5; }
+
+        /* ── Toast ──────────────────────────────────────────────── */
+        #toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 999; transition: opacity .3s;
+        }
+        #toast.hidden { opacity: 0; pointer-events: none; }
+        .toast-inner {
+            display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+            background: var(--tb-sidebar); border: 1px solid var(--tb-border);
+            border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+            font-size: 13px; white-space: nowrap;
+        }
+        .toast-inner.ok  { border-color: var(--tb-green); }
+        .toast-inner.err { border-color: var(--tb-red); }
+
+        /* ── Loading overlay ────────────────────────────────────── */
+        #loadingOverlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 800;
+            display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px;
+            backdrop-filter: blur(2px);
+        }
+        #loadingOverlay.hidden { display: none; }
+        .spinner {
+            width: 28px; height: 28px; border: 3px solid var(--tb-border);
+            border-top-color: var(--tb-accent); border-radius: 50%; animation: spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loadingText { color: var(--tb-text); font-size: 13px; }
+
+        /* ── Multi-select ──────────────────────────────────────── */
+        .msg-row .row-cb { display: none; width: 15px; height: 15px; cursor: pointer; accent-color: var(--tb-accent); flex-shrink: 0; }
+        .multi-mode .msg-row .row-cb { display: block; }
+        .multi-mode .msg-row { padding-left: 2px; }
+        .msg-row.ms-checked { background: rgba(74,158,255,.12) !important; }
+        [data-theme="light"] .msg-row.ms-checked { background: rgba(10,110,219,.08) !important; }
+
+        #bulkBar {
+            display: none; align-items: center; gap: 8px; padding: 6px 10px;
+            background: var(--tb-toolbar); border-bottom: 1px solid var(--tb-border);
+            flex-shrink: 0;
+        }
+        #bulkBar.visible { display: flex; }
+        #bulkBarCount { font-size: 12px; font-weight: 600; color: var(--tb-accent); min-width: 80px; }
+        .cb-all { width: 14px; height: 14px; cursor: pointer; accent-color: var(--tb-accent); }
+
+        /* ── Scrollbars ─────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--tb-border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--tb-muted); }
+
+        /* ── Address book ───────────────────────────────────────── */
+        .contact-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; border-bottom: 1px solid var(--tb-border);
+            transition: background .1s;
+        }
+        .contact-row:hover { background: var(--tb-list-hover); }
+        .contact-call { font-family: var(--font-mono); font-weight: 600; color: var(--tb-accent); }
+        .contact-name { font-size: 11px; color: var(--tb-muted); }
+        .contact-actions { display: flex; gap: 4px; }
+        .icon-btn { background: none; border: none; cursor: pointer; padding: 3px 6px; border-radius: var(--radius); color: var(--tb-muted); font-size: 12px; transition: all .1s; }
+        .icon-btn:hover { background: var(--tb-border); color: var(--tb-text); }
+        .icon-btn.danger:hover { color: var(--tb-red); }
+
+        /* ── Folder mgmt ─────────────────────────────────────────── */
+        .folder-mgmt-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; border-bottom: 1px solid var(--tb-border);
+        }
+        .folder-mgmt-item:hover { background: var(--tb-list-hover); cursor: pointer; }
+
+        /* new folder input */
+        .inline-input {
+            background: var(--tb-bg); border: 1px solid var(--tb-border); color: var(--tb-text);
+            border-radius: var(--radius); padding: 6px 10px; font-size: 12px; outline: none;
+            font-family: var(--font-ui); flex: 1;
+        }
+        .inline-input:focus { border-color: var(--tb-accent); }
+    </style>
+</head>
+<body>
+
+<!-- ═══ AUTH SCREEN ══════════════════════════════════════════════ -->
+<div id="authScreen">
+    <div class="auth-box">
+        <h1>📡 BPQ BBS</h1>
+        <p id="authSubtitle">Enter your password to access messages</p>
+        <div id="setupMode" class="hidden">
+            <input type="password" id="newPassword"     class="auth-input" placeholder="Create password" autocomplete="new-password">
+            <input type="password" id="confirmPassword" class="auth-input" placeholder="Confirm password" autocomplete="new-password">
+            <button class="auth-btn" onclick="setupPassword()">🔒 Set Password</button>
+        </div>
+        <div id="loginMode" class="hidden">
+            <input type="password" id="loginPassword" class="auth-input" placeholder="Password"
+                   autocomplete="current-password" onkeypress="if(event.key==='Enter')verifyPassword()">
+            <button class="auth-btn" onclick="verifyPassword()">🔓 Sign In</button>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:10px;justify-content:center">
+                <input type="checkbox" id="rememberSession" style="width:14px;height:14px">
+                <label for="rememberSession" style="font-size:11px;color:var(--tb-muted)">Remember this session</label>
+            </div>
+        </div>
+        <div id="authError" class="auth-error hidden"></div>
+    </div>
+</div>
+
+<!-- ═══ LOADING OVERLAY ══════════════════════════════════════════ -->
+<div id="loadingOverlay" class="hidden">
+    <div class="spinner"></div>
+    <div id="loadingText">Loading…</div>
+</div>
+
+<!-- ═══ TOAST ═══════════════════════════════════════════════════ -->
+<div id="toast" class="hidden">
+    <div id="toastInner" class="toast-inner ok">
+        <span id="toastIcon">✓</span>
+        <span id="toastMsg"></span>
+    </div>
+</div>
+
+<!-- ═══ APP ══════════════════════════════════════════════════════ -->
+<div id="app">
+
+    <!-- Top nav -->
+    <div id="topbar">
+        <span class="nav-title">📡 BPQ Dashboard</span>
+        <div class="nav-sep"></div>
+        <a href="bpq-rf-connections.html"  class="nav-link">RF</a>
+        <a href="bpq-traffic.html"         class="nav-link">Traffic</a>
+        <a href="bpq-system-logs.html"     class="nav-link">System</a>
+        <a href="bpq-connect-log.html"     class="nav-link">Connects</a>
+        <a href="bpq-email-monitor.html"   class="nav-link">Messages</a>
+        <a href="bbs-messages.html"        class="nav-link active">BBS</a>
+        <a href="nws-dashboard.html"       class="nav-link">Weather</a>
+        <div class="nav-spacer"></div>
+        <button id="themeToggle" onclick="toggleTheme()" title="Toggle day/night" style="background:none;border:none;cursor:pointer;font-size:16px;padding:4px 8px;border-radius:var(--radius);transition:background .12s;color:var(--tb-muted)" onmouseover="this.style.background='var(--tb-border)'" onmouseout="this.style.background='none'">🌙</button>
+        <span class="nav-clock nav-utc" id="navUtcClock">--:--:-- Z</span>
+        <span class="nav-clock" id="navLocalClock" style="color:var(--tb-muted)">--:--:-- L</span>
+    </div>
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+        <button class="tb-btn accent" onclick="fetchMessages()"><span class="icon">⟳</span> Get Mail</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="openComposeModal()"><span class="icon">✎</span> Write</button>
+        <button class="tb-btn" id="replyBtn" onclick="replyToSelected()" disabled><span class="icon">↩</span> Reply</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" id="saveBtn"   onclick="saveSelected()"   disabled><span class="icon">⬇</span> Save</button>
+        <button class="tb-btn danger" id="deleteBtn" onclick="deleteSelected()" disabled><span class="icon">🗑</span> Delete</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="openBulletinModal()"><span class="icon">📢</span> Bulletins</button>
+        <button class="tb-btn" onclick="openAddressBook()"><span class="icon">👤</span> Contacts</button>
+        <div class="tb-sep"></div>
+        <label style="font-size:11px;color:var(--tb-muted);margin-right:4px">Show:</label>
+        <select class="tb-count-select" id="messageCount">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" id="multiSelectBtn" onclick="toggleMultiSelect()"><span class="icon">☑</span> Select</button>
+        <button class="tb-btn" onclick="openRulesModal()"><span class="icon">⚙</span> Rules</button>
+        <div id="statusChip">Ready</div>
+    </div>
+
+    <!-- Three-pane -->
+    <div id="panes">
+
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-heading">K1AJD BBS</div>
+                <div class="folder-item active" id="folderBBS"   onclick="switchFolder('bbs')">
+                    <span class="folder-icon">📥</span> Inbox
+                    <span class="folder-count zero" id="cntBBS">0</span>
+                </div>
+                <div class="folder-item" id="folderSaved" onclick="switchFolder('saved')">
+                    <span class="folder-icon">💾</span> Saved
+                    <span class="folder-count zero" id="cntSaved">0</span>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-heading">Folders</div>
+                <div id="folderList"></div>
+                <div style="padding:6px 12px">
+                    <div style="display:flex;gap:4px">
+                        <input class="inline-input" id="newFolderInput" placeholder="New folder…" onkeypress="if(event.key==='Enter')createFolder()">
+                        <button class="icon-btn" onclick="createFolder()" title="Create">＋</button>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <span id="storageChip" onclick="toggleStorageMode()">💻 Browser storage</span>
+                <div id="lastUpdate" style="font-size:10px;color:var(--tb-muted);margin-top:3px"></div>
+            </div>
+        </div>
+
+        <!-- Right -->
+        <div id="right">
+            <!-- Message list -->
+            <div id="listPane">
+                <!-- Bulk action bar — shown in multi-select mode -->
+                <div id="bulkBar">
+                    <input type="checkbox" class="cb-all" id="cbAll" onclick="toggleSelectAll()" title="Select all">
+                    <span id="bulkBarCount">0 selected</span>
+                    <button class="tb-btn success" onclick="bulkSaveSelected()"><span class="icon">⬇</span> Save Selected</button>
+                    <button class="tb-btn danger"  onclick="bulkDeleteSelected()"><span class="icon">🗑</span> Delete Selected</button>
+                    <button class="tb-btn" style="margin-left:auto" onclick="exitMultiSelect()">✕ Cancel</button>
+                </div>
+                <div id="listHeader">
+                    <div class="list-hdr" id="hdrCb"></div>
+                    <div class="list-hdr">#</div>
+                    <div class="list-hdr">Date</div>
+                    <div class="list-hdr">From</div>
+                    <div class="list-hdr">To</div>
+                    <div class="list-hdr">Subject</div>
+                    <div class="list-hdr" style="text-align:right">Size</div>
+                </div>
+                <div id="listBody">
+                    <div id="listEmpty">
+                        <div class="big">📭</div>
+                        <p>Click <strong>Get Mail</strong> to load messages</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resize handle -->
+            <div id="resizer"></div>
+
+            <!-- Preview pane -->
+            <div id="previewPane">
+                <div id="previewEmpty">
+                    <div class="big">✉️</div>
+                    <p style="font-size:12px;color:var(--tb-muted)">Select a message to read it</p>
+                </div>
+                <div id="previewContent" class="hidden" style="display:contents">
+                    <div id="previewHeader">
+                        <div id="previewSubject">—</div>
+                        <div id="previewMeta"></div>
+                    </div>
+                    <div id="previewActions"></div>
+                    <div id="previewBody">
+                        <pre id="previewBodyText"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ COMPOSE MODAL ═══════════════════════════════════════════ -->
+<div id="composeModal" class="modal-backdrop hidden">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title" id="composeTitle">✎ Write Message</span>
+            <button class="modal-close" onclick="closeComposeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-row">
+                <span class="form-label">To:</span>
+                <input class="form-input" id="composeTo" placeholder="Callsign or address" autocomplete="off">
+                <button class="icon-btn" onclick="openAddressBook()" title="Contacts">👤</button>
+            </div>
+            <div class="form-row">
+                <span class="form-label">Subject:</span>
+                <input class="form-input" id="composeSubject" placeholder="Subject">
+            </div>
+            <div class="form-row">
+                <span class="form-label">Type:</span>
+                <select class="form-select" id="composeType">
+                    <option value="P">Personal (P)</option>
+                    <option value="B">Bulletin (B)</option>
+                    <option value="T">Traffic (T)</option>
+                </select>
+            </div>
+            <textarea class="form-input" id="composeBody" placeholder="Message body…" style="margin-top:10px;min-height:200px;background:var(--tb-bg);border:1px solid var(--tb-border);border-radius:var(--radius);padding:10px;font-family:var(--font-mono);font-size:12px;resize:vertical;width:100%;outline:none;color:var(--tb-text);line-height:1.6"></textarea>
+            <!-- Signature strip -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:6px 8px;background:var(--tb-bg);border:1px solid var(--tb-border);border-radius:var(--radius)">
+                <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--tb-muted);cursor:pointer">
+                    <input type="checkbox" id="useSig" style="width:13px;height:13px;accent-color:var(--tb-accent)"
+                           onchange="toggleSigPreview()">
+                    Append signature
+                </label>
+                <button class="icon-btn" onclick="openSigEditor()" title="Edit signature" style="font-size:11px;padding:2px 8px">
+                    ✎ Edit Sig
+                </button>
+            </div>
+            <!-- Signature preview (shown when checked) -->
+            <div id="sigPreview" style="display:none;margin-top:4px;padding:8px 10px;background:var(--tb-bg);border:1px solid var(--tb-border);border-radius:var(--radius);border-left:3px solid var(--tb-accent)">
+                <div style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--tb-muted);margin-bottom:4px">Signature preview</div>
+                <pre id="sigPreviewText" style="font-family:var(--font-mono);font-size:11px;color:var(--tb-muted);white-space:pre-wrap;margin:0"></pre>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn secondary" onclick="closeComposeModal()">Cancel</button>
+            <button class="modal-btn primary" id="sendBtn" onclick="sendMessage()">📤 Send</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ FOLDER PICKER ════════════════════════════════════════════ -->
+<div id="saveModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="width:320px">
+        <div class="modal-header">
+            <span class="modal-title">📁 Save to Folder</span>
+            <button class="modal-close" onclick="closeSaveModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div id="saveFolderList"></div>
+            <div style="margin-top:8px;display:flex;gap:4px;align-items:center;border-top:1px solid var(--tb-border);padding-top:10px">
+                <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tb-muted);cursor:pointer">
+                    <input type="checkbox" id="deleteAfterSave" style="width:13px;height:13px">
+                    Delete from BBS after saving
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ BULLETIN MODAL ══════════════════════════════════════════ -->
+<div id="bulletinModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="width:480px">
+        <div class="modal-header">
+            <span class="modal-title">📢 Download Bulletins</span>
+            <button class="modal-close" onclick="closeBulletinModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-row" style="margin-bottom:10px">
+                <span class="form-label">Address:</span>
+                <input class="form-input" id="bulletinAddress" placeholder="e.g. WX@GA or SITREP@USA" style="font-family:var(--font-mono)">
+            </div>
+            <div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px">
+                <span class="tag-chip" onclick="addBulletinTag('WX')">WX</span>
+                <span class="tag-chip" onclick="addBulletinTag('SITREP')">SITREP</span>
+                <span class="tag-chip" onclick="addBulletinTag('NTS')">NTS</span>
+                <span class="tag-chip" onclick="addBulletinTag('ARES')">ARES</span>
+                <span class="tag-chip" onclick="addBulletinTag('TPRFN')">TPRFN</span>
+                <span class="tag-chip" onclick="addBulletinTag('NEWS')">NEWS</span>
+            </div>
+            <div class="form-row" style="margin-bottom:10px">
+                <span class="form-label">Count:</span>
+                <select class="form-select" id="bulletinCount">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+            <div id="savedBulletins" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn secondary" onclick="closeBulletinModal()">Cancel</button>
+            <button class="modal-btn primary" onclick="fetchBulletins()">📥 Download</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ CONFIRM DELETE ══════════════════════════════════════════ -->
+<div id="confirmModal" class="modal-backdrop hidden">
+    <div class="confirm-box">
+        <h3>⚠️ Confirm Delete</h3>
+        <p id="confirmText">Delete this message?</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="modal-btn secondary" onclick="cancelDelete()">Cancel</button>
+            <button class="modal-btn" style="background:var(--tb-red);color:#fff" onclick="executeDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ ADDRESS BOOK ════════════════════════════════════════════ -->
+<div id="addressBookModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="width:560px">
+        <div class="modal-header">
+            <span class="modal-title">👤 Contacts (<span id="contactCount">0</span>)</span>
+            <button class="modal-close" onclick="closeAddressBook()">×</button>
+        </div>
+        <div class="modal-body" style="padding:0">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--tb-border);display:flex;gap:8px">
+                <input class="inline-input" id="addressBookSearch" placeholder="Search…" oninput="filterAddressBook()">
+            </div>
+            <div id="addressBookList" style="max-height:280px;overflow-y:auto"></div>
+            <div id="addressBookEmpty" class="hidden" style="text-align:center;padding:24px;color:var(--tb-muted);font-size:12px">No contacts yet</div>
+            <div style="padding:12px 16px;border-top:1px solid var(--tb-border)">
+                <div style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--tb-muted);margin-bottom:8px">Add Contact</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                    <input class="inline-input" id="newContactCall"  placeholder="Callsign *">
+                    <input class="inline-input" id="newContactName"  placeholder="Name">
+                    <input class="inline-input" id="newContactEmail" placeholder="Email (optional)">
+                    <input class="inline-input" id="newContactPmail" placeholder="P-mail (optional)">
+                </div>
+                <button class="modal-btn primary" style="margin-top:8px" onclick="addContact()">Add Contact</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- edit contact -->
+<div id="editContactModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="width:380px">
+        <div class="modal-header">
+            <span class="modal-title">Edit Contact</span>
+            <button class="modal-close" onclick="closeEditContact()">×</button>
+        </div>
+        <div class="modal-body">
+            <input class="inline-input" id="editContactCall"  style="margin-bottom:6px;width:100%;background:var(--tb-border)" disabled>
+            <input class="inline-input" id="editContactName"  placeholder="Name"  style="margin-bottom:6px;width:100%">
+            <input class="inline-input" id="editContactEmail" placeholder="Email" style="margin-bottom:6px;width:100%">
+            <input class="inline-input" id="editContactPmail" placeholder="P-mail" style="width:100%">
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn secondary" onclick="closeEditContact()">Cancel</button>
+            <button class="modal-btn primary" onclick="saveEditContact()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════════════
+const CONFIG = {
+    apiUrl:     'bbs-messages.php',
+    storageUrl: './message-storage.php',
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let messages      = [];
+let savedMessages = [];
+let folders       = ['Saved'];
+let addressBook   = [];
+let savedBulletins= [];
+let currentFolder  = 'bbs';   // 'bbs' | 'saved' | folder name
+let multiSelectMode = false;
+let selectedMsgs    = new Set(); // set of message numbers
+let rules           = [];        // message filing rules
+let signature       = { text: '', enabled: false }; // user signature
+let unreadFolders   = {};        // folderName → unread count
+let selectedMsg   = null;    // the selected message object
+let deleteTarget  = null;
+let storageMode   = 'browser';
+let serverStorageAvailable = false;
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTH  (identical logic to original — server hash verify)
+// ═══════════════════════════════════════════════════════════════
+async function hashPassword(pw) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw + 'bpq_bbs_server_salt_2025_k1ajd'));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function checkServerAuth() {
+    try {
+        const r = await fetch(CONFIG.apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ authAction:'checkAuth' }) });
+        return await r.json();
+    } catch { return { configured: false }; }
+}
+async function setupPasswordOnServer(hash) {
+    try {
+        const r = await fetch(CONFIG.apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ authAction:'setup', hash }) });
+        return await r.json();
+    } catch { return { success: false }; }
+}
+async function verifyPasswordOnServer(hash) {
+    try {
+        const r = await fetch(CONFIG.apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ authAction:'verify', hash }) });
+        return await r.json();
+    } catch { return { success: false, verified: false }; }
+}
+function isSessionValid() {
+    const d = sessionStorage.getItem('bbs_auth_expiry');
+    return d && Date.now() < parseInt(d);
+}
+function setSessionAuth(hash) {
+    sessionStorage.setItem('bbs_auth_hash', hash);
+    sessionStorage.setItem('bbs_auth_expiry', Date.now() + 4*3600*1000);
+}
+function showAuthError(msg) {
+    const el = document.getElementById('authError');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+}
+async function setupPassword() {
+    const pw  = document.getElementById('newPassword').value;
+    const pw2 = document.getElementById('confirmPassword').value;
+    if (pw.length < 6) { showAuthError('Password must be at least 6 characters'); return; }
+    if (pw !== pw2)    { showAuthError('Passwords do not match'); return; }
+    const hash = await hashPassword(pw);
+    const r = await setupPasswordOnServer(hash);
+    if (r.success) { setSessionAuth(hash); unlockInterface(); }
+    else showAuthError(r.error || 'Setup failed');
+}
+async function verifyPassword() {
+    const pw = document.getElementById('loginPassword').value;
+    if (!pw) { showAuthError('Please enter your password'); return; }
+    try {
+        const hash = await hashPassword(pw);
+        const r = await verifyPasswordOnServer(hash);
+        if (r && r.verified) {
+            setSessionAuth(hash);
+            if (document.getElementById('rememberSession').checked) {
+                localStorage.setItem('bbs_remembered_hash', hash);
+            }
+            unlockInterface();
+        } else {
+            showAuthError('Incorrect password');
+        }
+    } catch(e) {
+        showAuthError('Connection error — check that bbs-messages.php is accessible');
+    }
+}
+function unlockInterface() {
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('app').classList.add('visible');
+    loadData();
+}
+async function initAuth() {
+    try {
+        // Auto-login if session still valid — skip auth screen entirely
+        if (isSessionValid()) {
+            const hash = sessionStorage.getItem('bbs_auth_hash');
+            if (hash) {
+                const r = await verifyPasswordOnServer(hash);
+                if (r && r.verified) { unlockInterface(); return; }
+            }
+        }
+        // Check localStorage for remembered hash from previous session
+        const rememberedHash = localStorage.getItem('bbs_remembered_hash');
+        if (rememberedHash) {
+            const r = await verifyPasswordOnServer(rememberedHash);
+            if (r && r.verified) { setSessionAuth(rememberedHash); unlockInterface(); return; }
+            else { localStorage.removeItem('bbs_remembered_hash'); }
+        }
+        // Check if password is configured on server
+        const auth = await checkServerAuth();
+        if (!auth || !auth.configured) {
+            document.getElementById('authSubtitle').textContent = 'Create a password to secure BBS access';
+            document.getElementById('setupMode').classList.remove('hidden');
+            return;
+        }
+        document.getElementById('loginMode').classList.remove('hidden');
+    } catch(e) {
+        // Network or parse error — always show login screen as fallback
+        console.error('Auth init error:', e);
+        document.getElementById('loginMode').classList.remove('hidden');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PERSISTENCE
+// ═══════════════════════════════════════════════════════════════
+function loadData() {
+    try { savedMessages  = JSON.parse(localStorage.getItem('bbs_saved_messages') || '[]'); } catch { savedMessages = []; }
+    try { folders        = JSON.parse(localStorage.getItem('bbs_folders') || '["Saved"]'); } catch { folders = ['Saved']; }
+    try { addressBook    = JSON.parse(localStorage.getItem('bbs_contacts') || '[]'); } catch { addressBook = []; }
+    try { savedBulletins = JSON.parse(localStorage.getItem('bbs_bulletins') || '[]'); } catch { savedBulletins = []; }
+    loadRules();
+    loadSignature();
+    updateSidebarFolders();
+    updateCounts();
+    checkServerStorage();
+}
+function persist(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function updateCounts() {
+    const bCnt  = document.getElementById('cntBBS');
+    const sCnt  = document.getElementById('cntSaved');
+    bCnt.textContent  = messages.length;
+    bCnt.className    = 'folder-count' + (messages.length ? '' : ' zero');
+    sCnt.textContent  = savedMessages.length;
+    sCnt.className    = 'folder-count' + (savedMessages.length ? '' : ' zero');
+}
+async function checkServerStorage() {
+    try {
+        const r = await fetch(CONFIG.storageUrl + '?action=stats', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const d = await r.json();
+        serverStorageAvailable = d.success !== false;
+        // Check if user had server mode enabled
+        const savedMode = localStorage.getItem('bbs_storage_mode');
+        if (savedMode) storageMode = savedMode;
+        if (storageMode === 'server' && serverStorageAvailable) {
+            await loadSavedFromServer();
+        }
+    } catch { serverStorageAvailable = false; }
+    updateStorageChip();
+}
+function updateStorageChip() {
+    document.getElementById('storageChip').textContent =
+        storageMode === 'server' ? '☁️ Server storage' : '💻 Browser storage';
+}
+async function toggleStorageMode() {
+    if (!serverStorageAvailable && storageMode !== 'server') {
+        showToast('Server storage not available', true);
+        return;
+    }
+    storageMode = storageMode === 'server' ? 'browser' : 'server';
+    localStorage.setItem('bbs_storage_mode', storageMode);
+    updateStorageChip();
+    if (storageMode === 'server') await loadSavedFromServer();
+}
+async function loadSavedFromServer() {
+    try {
+        // Load messages from server
+        const rm = await fetch(CONFIG.storageUrl + '?action=messages');
+        const dm = await rm.json();
+        if (dm.success) {
+            savedMessages = dm.messages || [];
+            persist('bbs_saved_messages', savedMessages);
+        }
+        // Load folders from server
+        const rf = await fetch(CONFIG.storageUrl + '?action=folders');
+        const df = await rf.json();
+        if (df.success) {
+            folders = df.folders || ['Saved'];
+            persist('bbs_folders', folders);
+        }
+        updateSidebarFolders();
+        updateCounts();
+        if (currentFolder !== 'bbs') renderList();
+    } catch(e) { console.warn('Server storage load failed:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SIDEBAR FOLDERS
+// ═══════════════════════════════════════════════════════════════
+function updateSidebarFolders() {
+    const counts = {};
+    savedMessages.forEach(m => {
+        const f = m.folder || 'Saved';
+        counts[f] = (counts[f]||0) + 1;
+    });
+    const container = document.getElementById('folderList');
+    const sorted = [...folders].sort((a,b) => a.localeCompare(b,undefined,{sensitivity:'base'}));
+    container.innerHTML = sorted.map(f => {
+        const hasUnread = unreadFolders[f] > 0;
+        const unreadCnt = unreadFolders[f] || 0;
+        const totalCnt  = counts[f] || 0;
+        return `
+        <div class="folder-item ${currentFolder===f?'active':''} ${hasUnread?'has-unread':''}"
+             onclick="switchFolder('${escapeHtml(f)}')">
+            <span class="folder-icon">📁</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f)}</span>
+            ${hasUnread
+                ? `<span class="folder-count unread" title="${unreadCnt} unread">${unreadCnt}</span>`
+                : `<span class="folder-count ${totalCnt?'':'zero'}">${totalCnt||0}</span>`}
+            ${f!=='Saved'?`<button class="icon-btn danger" style="padding:0 4px;margin-left:2px" onclick="event.stopPropagation();deleteFolder('${escapeHtml(f)}')" title="Delete">×</button>`:''}
+        </div>`;
+    }).join('');
+}
+function switchFolder(name) {
+    if (multiSelectMode) exitMultiSelect();
+    currentFolder = name;
+    selectedMsg   = null;
+    clearPreview();
+    setActionBtns(false);
+    // Mark folder as read when opened
+    markFolderRead(name);
+    // Update sidebar active state
+    document.getElementById('folderBBS').classList.toggle('active',   name==='bbs');
+    document.getElementById('folderSaved').classList.toggle('active', name==='saved');
+    updateSidebarFolders();
+    renderList();
+}
+async function createFolder() {
+    const input = document.getElementById('newFolderInput');
+    const name  = input.value.trim();
+    if (!name) return;
+    if (folders.includes(name)) { showToast('Folder already exists', true); return; }
+    folders.push(name);
+    persist('bbs_folders', folders);
+    input.value = '';
+    updateSidebarFolders();
+    // Keep rules folder dropdown in sync
+    const ruleFolderSel = document.getElementById('ruleFolder');
+    if (ruleFolderSel) {
+        const sorted = [...folders].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+        ruleFolderSel.innerHTML = sorted.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+    }
+    showToast(`Folder "${name}" created`);
+}
+async function deleteFolder(name) {
+    if (name === 'Saved') return;
+    if (!confirm(`Delete folder "${name}"? Messages will move to Saved.`)) return;
+    folders = folders.filter(f => f!==name);
+    savedMessages.forEach(m => { if (m.folder===name) m.folder='Saved'; });
+    persist('bbs_folders', folders);
+    persist('bbs_saved', savedMessages);
+    if (currentFolder === name) switchFolder('saved');
+    updateSidebarFolders();
+    updateCounts();
+    showToast(`Folder "${name}" deleted`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FETCH MESSAGES
+// ═══════════════════════════════════════════════════════════════
+async function fetchMessages() {
+    const count = document.getElementById('messageCount').value;
+    showLoading('Connecting to BBS…');
+    setStatus('loading', 'Fetching…');
+    try {
+        const r = await fetch(`${CONFIG.apiUrl}?action=list&count=${count}`);
+        const d = await r.json();
+        hideLoading();
+        if (d.success) {
+            messages = (d.messages || []).sort((a,b) => b.number - a.number);
+            setStatus('ready', `${messages.length} msgs`);
+            document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+            updateCounts();
+            if (currentFolder === 'bbs') { selectedMsg = null; clearPreview(); setActionBtns(false); renderList(); }
+            // Auto-apply rules after loading messages
+            applyRules(true);
+        } else {
+            setStatus('error', 'Error');
+            showToast(d.error || 'Failed to fetch', true);
+        }
+    } catch(e) {
+        hideLoading();
+        setStatus('error', 'Error');
+        showToast(e.message, true);
+    }
+}
+async function fetchMessageBody(num) {
+    showLoading(`Reading message #${num}…`);
+    try {
+        const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${num}`);
+        const d = await r.json();
+        hideLoading();
+        if (d.success) {
+            document.getElementById('previewBodyText').textContent = d.body || '(Empty message)';
+            if (selectedMsg) selectedMsg._body = d.body || '';
+        } else {
+            document.getElementById('previewBodyText').textContent = 'Error: ' + (d.error||'Failed');
+        }
+    } catch(e) {
+        hideLoading();
+        document.getElementById('previewBodyText').textContent = 'Error: ' + e.message;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER LIST
+// ═══════════════════════════════════════════════════════════════
+function renderList() {
+    const body  = document.getElementById('listBody');
+    const empty = document.getElementById('listEmpty');
+
+    let list = [];
+    if (currentFolder === 'bbs') {
+        list = messages;
+    } else if (currentFolder === 'saved') {
+        list = savedMessages;
+    } else {
+        list = savedMessages.filter(m => (m.folder||'Saved') === currentFolder);
+    }
+
+    if (list.length === 0) {
+        body.innerHTML = '';
+        body.appendChild(makeEmptyState(currentFolder));
+        return;
+    }
+
+    body.innerHTML = list.map((msg, i) => {
+        const isSaved   = currentFolder === 'bbs' && savedMessages.some(s => s.number === msg.number);
+        const isSelected= selectedMsg && selectedMsg.number === msg.number && selectedMsg._src === (currentFolder==='bbs'?'bbs':'saved');
+        const isChecked = selectedMsgs.has(msg.number);
+        const typeClass = `type-${(msg.type||msg.status||'B').charAt(0).toUpperCase()}`;
+        const typeLbl   = (msg.type||msg.status||'B').charAt(0).toUpperCase();
+        const savedIcon = isSaved ? '<span style="color:var(--tb-green);font-size:9px;margin-left:3px" title="Saved">●</span>' : '';
+        return `<div class="msg-row ${isSelected?'selected':''} ${isSaved?'saved-msg':''} ${isChecked?'ms-checked':''}"
+                     onclick="multiSelectMode ? toggleRowCheck(${msg.number}, event) : selectMsg(${i})"
+                     data-index="${i}" data-num="${msg.number}">
+            <div class="msg-cell" style="display:flex;align-items:center;justify-content:center">
+                <input type="checkbox" class="row-cb" ${isChecked?'checked':''} onclick="event.stopPropagation();toggleRowCheck(${msg.number},event)" data-num="${msg.number}">
+            </div>
+            <div class="msg-cell msg-num">#${msg.number}${savedIcon}</div>
+            <div class="msg-cell msg-date">${escapeHtml(msg.date||'--')}</div>
+            <div class="msg-cell msg-from">${escapeHtml(msg.from||'--')}</div>
+            <div class="msg-cell msg-to">${escapeHtml(msg.to||'--')}</div>
+            <div class="msg-cell msg-subject">${escapeHtml(msg.subject||'(No Subject)')}</div>
+            <div class="msg-cell msg-size">${fmtSize(msg.size)}</div>
+        </div>`;
+    }).join('');
+}
+function makeEmptyState(folder) {
+    const div = document.createElement('div');
+    div.id = 'listEmpty';
+    div.innerHTML = `<div class="big">${folder==='bbs'?'📭':'📁'}</div>
+        <p>${folder==='bbs'?'Click <strong>Get Mail</strong> to load messages':'No messages in this folder'}</p>`;
+    return div;
+}
+function fmtSize(n) {
+    if (!n) return '—';
+    if (n >= 1024) return (n/1024).toFixed(1)+'K';
+    return n+'B';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SELECT MESSAGE
+// ═══════════════════════════════════════════════════════════════
+function selectMsg(index) {
+    let list;
+    let src;
+    if (currentFolder === 'bbs')   { list = messages; src = 'bbs'; }
+    else if (currentFolder==='saved') { list = savedMessages; src = 'saved'; }
+    else { list = savedMessages.filter(m=>(m.folder||'Saved')===currentFolder); src = 'saved'; }
+
+    const msg = list[index];
+    if (!msg) return;
+
+    selectedMsg = { ...msg, _src: src, _index: index };
+
+    // Highlight row
+    document.querySelectorAll('.msg-row').forEach(r => r.classList.remove('selected'));
+    const rows = document.querySelectorAll('.msg-row');
+    if (rows[index]) rows[index].classList.add('selected');
+
+    // Show preview header
+    showPreviewHeader(msg, src);
+    setActionBtns(true, src, msg);
+
+    // Load body
+    if (src === 'bbs') {
+        document.getElementById('previewBodyText').textContent = 'Loading…';
+        fetchMessageBody(msg.number);
+    } else {
+        document.getElementById('previewBodyText').textContent = msg.body || '(No content stored)';
+        selectedMsg._body = msg.body || '';
+    }
+}
+function showPreviewHeader(msg, src) {
+    document.getElementById('previewEmpty').style.display   = 'none';
+    document.getElementById('previewHeader').style.display  = '';
+    document.getElementById('previewActions').style.display = '';
+    document.getElementById('previewBody').style.display    = '';
+
+    document.getElementById('previewSubject').textContent = msg.subject || '(No Subject)';
+    document.getElementById('previewMeta').innerHTML = `
+        <div class="meta-item"><div class="meta-label">From</div><div class="meta-value">${escapeHtml(msg.from||'—')}</div></div>
+        <div class="meta-item"><div class="meta-label">To</div><div class="meta-value">${escapeHtml(msg.to||'—')}</div></div>
+        <div class="meta-item"><div class="meta-label">Date</div><div class="meta-value">${escapeHtml(msg.date||'—')}</div></div>
+        <div class="meta-item"><div class="meta-label">Msg#</div><div class="meta-value">${msg.number}</div></div>
+        <div class="meta-item"><div class="meta-label">Size</div><div class="meta-value">${fmtSize(msg.size)}</div></div>
+    `;
+
+    const isSaved  = src==='bbs' && savedMessages.some(s=>s.number===msg.number);
+    const savedFldr= isSaved ? savedMessages.find(s=>s.number===msg.number)?.folder : null;
+    const actions  = document.getElementById('previewActions');
+
+    actions.innerHTML = `
+        <button class="act-btn primary" onclick="replyToSelected()">↩ Reply</button>
+        ${src==='bbs' ? (isSaved
+            ? `<button class="act-btn saved-state" disabled>✓ Saved to ${escapeHtml(savedFldr||'Saved')}</button>`
+            : `<button class="act-btn" onclick="saveSelected()">⬇ Save to Folder</button>`)
+            : ''}
+        <button class="act-btn danger" onclick="deleteSelected()">${src==='bbs'?'🗑 Delete from BBS':'🗑 Remove'}</button>
+    `;
+}
+function clearPreview() {
+    document.getElementById('previewEmpty').style.display   = '';
+    document.getElementById('previewHeader').style.display  = 'none';
+    document.getElementById('previewActions').style.display = 'none';
+    document.getElementById('previewBody').style.display    = 'none';
+    document.getElementById('previewBodyText').textContent  = '';
+    document.getElementById('previewSubject').textContent   = '—';
+    document.getElementById('previewMeta').innerHTML        = '';
+    document.getElementById('previewActions').innerHTML     = '';
+}
+function setActionBtns(enabled, src, msg) {
+    const replyBtn  = document.getElementById('replyBtn');
+    const saveBtn   = document.getElementById('saveBtn');
+    const deleteBtn = document.getElementById('deleteBtn');
+    replyBtn.disabled  = !enabled;
+    deleteBtn.disabled = !enabled;
+    if (enabled && src==='bbs') {
+        const isSaved = savedMessages.some(s=>s.number===msg.number);
+        saveBtn.disabled = isSaved;
+    } else {
+        saveBtn.disabled = true;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SAVE
+// ═══════════════════════════════════════════════════════════════
+function saveSelected() {
+    if (!selectedMsg || selectedMsg._src!=='bbs') return;
+    if (savedMessages.some(s=>s.number===selectedMsg.number)) {
+        showToast('Already saved', true); return;
+    }
+    renderSaveFolderList();
+    document.getElementById('saveModal').classList.remove('hidden');
+}
+function renderSaveFolderList() {
+    const sorted = [...folders].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+    document.getElementById('saveFolderList').innerHTML = sorted.map(f=>`
+        <div class="folder-pick-item" onclick="executeSave('${escapeHtml(f)}')">
+            <span>📁</span> ${escapeHtml(f)}
+        </div>`).join('');
+}
+function closeSaveModal() { document.getElementById('saveModal').classList.add('hidden'); }
+async function executeSave(folder) {
+    // Bulk save mode
+    if (window._bulkSaveMode) {
+        window._bulkSaveMode = false;
+        document.getElementById('deleteAfterSave').parentElement.style.display = '';
+        closeSaveModal();
+        const nums = [...selectedMsgs];
+        showLoading(`Saving ${nums.length} messages…`);
+        for (const num of nums) {
+            const msg = messages.find(m => m.number === num);
+            if (!msg) continue;
+            if (savedMessages.some(s => s.number === num)) continue;
+            try {
+                const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${num}`);
+                const d = await r.json();
+                const msgToSave = { ...msg, body: d.success?(d.body||''):'', folder, savedAt: new Date().toISOString() };
+                savedMessages.unshift(msgToSave);
+            } catch {}
+        }
+        persist('bbs_saved_messages', savedMessages);
+        hideLoading();
+        showToast(`${nums.length} messages saved to "${folder}"`);
+        exitMultiSelect();
+        updateSidebarFolders(); updateCounts(); renderList();
+        return;
+    }
+    if (!selectedMsg) return;
+    const msgToSave = { ...selectedMsg, body: selectedMsg._body||'', folder, savedAt: new Date().toISOString() };
+    delete msgToSave._src; delete msgToSave._index; delete msgToSave._body;
+
+    if (storageMode==='server' && serverStorageAvailable) {
+        try {
+            const r = await fetch(CONFIG.storageUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'saveMessage', message: msgToSave, folder }) });
+            const d = await r.json();
+            if (!d.success) { showToast('Server save failed: '+(d.error||''), true); return; }
+            await loadSavedFromServer();
+        } catch(e) { showToast('Server error: '+e.message, true); return; }
+    } else {
+        savedMessages.unshift(msgToSave);
+        persist('bbs_saved', savedMessages);
+    }
+
+    closeSaveModal();
+    updateSidebarFolders();
+    updateCounts();
+    renderList();
+    showPreviewHeader(selectedMsg, 'bbs');
+    setActionBtns(true, 'bbs', selectedMsg);
+
+    if (document.getElementById('deleteAfterSave').checked) {
+        deleteTarget = { ...selectedMsg };
+        await executeDeleteFromBBS();
+    } else {
+        showToast(`Saved to "${folder}"`);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DELETE
+// ═══════════════════════════════════════════════════════════════
+function deleteSelected() {
+    if (!selectedMsg) return;
+    deleteTarget = { ...selectedMsg };
+    document.getElementById('confirmText').textContent = selectedMsg._src==='bbs'
+        ? `Delete message #${selectedMsg.number} from the BBS? This cannot be undone.`
+        : `Remove this saved message from local storage?`;
+    document.getElementById('confirmModal').classList.remove('hidden');
+}
+function cancelDelete() {
+    document.getElementById('confirmModal').classList.add('hidden');
+    deleteTarget = null;
+}
+async function executeDelete() {
+    document.getElementById('confirmModal').classList.add('hidden');
+    if (!deleteTarget) return;
+    // Bulk delete
+    if (deleteTarget._bulk) {
+        const nums = deleteTarget.nums;
+        deleteTarget = null;
+        showLoading(`Deleting ${nums.length} messages…`);
+        let ok = 0, fail = 0;
+        for (const num of nums) {
+            try {
+                const r = await fetch(CONFIG.apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'delete', msgNum: num }) });
+                const d = await r.json();
+                if (d.success) ok++; else fail++;
+            } catch { fail++; }
+        }
+        hideLoading();
+        showToast(fail ? `Deleted ${ok}, failed ${fail}` : `${ok} messages deleted`, fail > 0);
+        exitMultiSelect();
+        fetchMessages();
+        return;
+    }
+    if (deleteTarget._src === 'saved') {
+        savedMessages = savedMessages.filter(m => !(m.number===deleteTarget.number && m.savedAt===deleteTarget.savedAt));
+        persist('bbs_saved', savedMessages);
+        showToast('Message removed from saved');
+        selectedMsg = null; clearPreview(); setActionBtns(false);
+        updateSidebarFolders(); updateCounts(); renderList();
+    } else {
+        await executeDeleteFromBBS();
+    }
+    deleteTarget = null;
+}
+async function executeDeleteFromBBS() {
+    const target = deleteTarget || selectedMsg;
+    if (!target) return;
+    showLoading('Deleting…');
+    try {
+        const r = await fetch(CONFIG.apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'delete', msgNum: target.number }) });
+        const d = await r.json();
+        hideLoading();
+        if (d.success) {
+            showToast('Deleted from BBS');
+            selectedMsg = null; clearPreview(); setActionBtns(false);
+            fetchMessages();
+        } else {
+            showToast(d.error||'Failed to delete', true);
+        }
+    } catch(e) { hideLoading(); showToast(e.message, true); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COMPOSE / REPLY
+// ═══════════════════════════════════════════════════════════════
+function openComposeModal(replyTo='', replySubj='') {
+    document.getElementById('composeTitle').textContent = replyTo ? '↩ Reply' : '✎ Write Message';
+    document.getElementById('composeTo').value      = replyTo;
+    document.getElementById('composeSubject').value = replySubj;
+    document.getElementById('composeBody').value    = '';
+    document.getElementById('composeType').value    = 'P';
+    // Restore signature checkbox to user's global preference
+    const useSigCb = document.getElementById('useSig');
+    if (useSigCb) useSigCb.checked = signature.enabled;
+    updateSigPreview();
+    document.getElementById('composeModal').classList.remove('hidden');
+    document.getElementById(replyTo ? 'composeBody' : 'composeTo').focus();
+}
+function closeComposeModal() { document.getElementById('composeModal').classList.add('hidden'); }
+function replyToSelected() {
+    if (!selectedMsg) return;
+    const subj = selectedMsg.subject || '';
+    openComposeModal(selectedMsg.from||'', subj.toLowerCase().startsWith('re:') ? subj : 'Re: '+subj);
+}
+async function sendMessage() {
+    const to   = document.getElementById('composeTo').value.trim().toUpperCase();
+    const type = document.getElementById('composeType').value;
+    const subj = document.getElementById('composeSubject').value.trim();
+    const body = buildBody();
+    if (!to||!subj||!body) { showToast('Fill in all fields', true); return; }
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    showLoading('Sending…');
+    try {
+        const r = await fetch(CONFIG.apiUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'send', to, type, subject:subj, body }) });
+        const d = await r.json();
+        hideLoading(); btn.disabled = false;
+        if (d.success) {
+            if (type==='P') autoAddContact(to);
+            showToast('Message sent!');
+            closeComposeModal();
+            fetchMessages();
+        } else {
+            showToast(d.error||'Send failed', true);
+        }
+    } catch(e) { hideLoading(); btn.disabled=false; showToast(e.message, true); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BULLETINS
+// ═══════════════════════════════════════════════════════════════
+function openBulletinModal() {
+    document.getElementById('bulletinAddress').value = '';
+    renderSavedBulletins();
+    document.getElementById('bulletinModal').classList.remove('hidden');
+}
+function closeBulletinModal() { document.getElementById('bulletinModal').classList.add('hidden'); }
+function addBulletinTag(tag) {
+    const inp = document.getElementById('bulletinAddress');
+    const cur = inp.value.trim();
+    inp.value = cur.includes('@') ? tag+'@'+cur.split('@')[1] : cur ? tag+'@'+cur : tag+'@';
+    inp.focus();
+}
+function renderSavedBulletins() {
+    document.getElementById('savedBulletins').innerHTML = savedBulletins.map(a=>`
+        <div class="saved-addr-chip">
+            <span onclick="document.getElementById('bulletinAddress').value='${escapeHtml(a)}'" style="cursor:pointer">${escapeHtml(a)}</span>
+            <button onclick="removeSavedBulletin('${escapeHtml(a)}')" title="Remove">×</button>
+        </div>`).join('');
+}
+function removeSavedBulletin(a) {
+    savedBulletins = savedBulletins.filter(x=>x!==a);
+    persist('bbs_bulletins', savedBulletins);
+    renderSavedBulletins();
+}
+async function fetchBulletins() {
+    const addr  = document.getElementById('bulletinAddress').value.trim().toUpperCase();
+    const count = document.getElementById('bulletinCount').value;
+    if (!addr||!addr.includes('@')) { showToast('Enter a valid address e.g. WX@GA', true); return; }
+    if (!savedBulletins.includes(addr)) { savedBulletins.push(addr); persist('bbs_bulletins', savedBulletins); }
+    closeBulletinModal();
+    showLoading(`Fetching ${addr}…`);
+    setStatus('loading', 'Fetching bulletins…');
+    try {
+        const r = await fetch(`${CONFIG.apiUrl}?action=bulletins&address=${encodeURIComponent(addr)}&count=${count}`);
+        const d = await r.json();
+        hideLoading();
+        if (d.success) {
+            const bulletins = (d.messages||[]).map(b=>({...b, _bulletin: addr}));
+            messages = [...bulletins, ...messages.filter(m=>m._bulletin!==addr)].sort((a,b)=>b.number-a.number);
+            updateCounts();
+            if (currentFolder==='bbs') renderList();
+            setStatus('ready', `${messages.length} msgs`);
+            showToast(`Loaded ${bulletins.length} ${addr} bulletins`);
+        } else {
+            setStatus('error','Error');
+            showToast(d.error||'Failed', true);
+        }
+    } catch(e) { hideLoading(); setStatus('error','Error'); showToast(e.message, true); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ADDRESS BOOK
+// ═══════════════════════════════════════════════════════════════
+function openAddressBook() {
+    renderAddressBook();
+    document.getElementById('addressBookModal').classList.remove('hidden');
+    document.getElementById('addressBookSearch').value = '';
+    ['newContactCall','newContactName','newContactEmail','newContactPmail'].forEach(id => document.getElementById(id).value='');
+    setTimeout(()=>document.getElementById('addressBookSearch').focus(), 80);
+}
+function closeAddressBook() { document.getElementById('addressBookModal').classList.add('hidden'); }
+function filterAddressBook() { renderAddressBook(document.getElementById('addressBookSearch').value); }
+function renderAddressBook(filter='') {
+    const lc = filter.toLowerCase();
+    const filtered = addressBook
+        .filter(c => c.callsign.toLowerCase().includes(lc) || (c.name||'').toLowerCase().includes(lc))
+        .sort((a,b)=>a.callsign.localeCompare(b.callsign));
+    document.getElementById('contactCount').textContent = addressBook.length;
+    const empty = document.getElementById('addressBookEmpty');
+    const list  = document.getElementById('addressBookList');
+    if (!addressBook.length) { empty.classList.remove('hidden'); list.innerHTML=''; return; }
+    empty.classList.add('hidden');
+    list.innerHTML = filtered.map(c => {
+        const addrs = [`<button class="tag-chip" onclick="selectContact('${escapeHtml(c.callsign)}','callsign')" style="font-size:10px;padding:2px 8px">${escapeHtml(c.callsign)}</button>`];
+        if (c.email) addrs.push(`<button class="tag-chip" onclick="selectContact('${escapeHtml(c.callsign)}','email')" style="font-size:10px;padding:2px 8px">${escapeHtml(c.email)}</button>`);
+        if (c.pmail) addrs.push(`<button class="tag-chip" onclick="selectContact('${escapeHtml(c.callsign)}','pmail')" style="font-size:10px;padding:2px 8px">${escapeHtml(c.pmail)}</button>`);
+        return `<div class="contact-row">
+            <div>
+                <div class="contact-call">${escapeHtml(c.callsign)}</div>
+                ${c.name?`<div class="contact-name">${escapeHtml(c.name)}</div>`:''}
+                <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${addrs.join('')}</div>
+            </div>
+            <div class="contact-actions">
+                <button class="icon-btn" onclick="editContact('${escapeHtml(c.callsign)}')" title="Edit">✎</button>
+                <button class="icon-btn danger" onclick="deleteContact('${escapeHtml(c.callsign)}')" title="Remove">×</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+function selectContact(call, type) {
+    const c = addressBook.find(x=>x.callsign===call);
+    if (!c) return;
+    let addr = call;
+    if (type==='email'&&c.email) addr=c.email;
+    if (type==='pmail'&&c.pmail) addr=c.pmail;
+    document.getElementById('composeTo').value = addr;
+    closeAddressBook();
+    const subj = document.getElementById('composeSubject');
+    (subj.value ? document.getElementById('composeBody') : subj).focus();
+}
+function addContact() {
+    const call = document.getElementById('newContactCall').value.trim().toUpperCase();
+    if (!call) { showToast('Callsign required', true); return; }
+    if (!/^[A-Z0-9]{3,10}(-[0-9]{1,2})?$/i.test(call)) { showToast('Invalid callsign', true); return; }
+    if (addressBook.some(c=>c.callsign===call)) { showToast('Already exists', true); return; }
+    addressBook.push({ callsign:call, name:document.getElementById('newContactName').value.trim()||null,
+        email:document.getElementById('newContactEmail').value.trim()||null,
+        pmail:document.getElementById('newContactPmail').value.trim().toUpperCase()||null,
+        addedAt: new Date().toISOString() });
+    persist('bbs_contacts', addressBook);
+    renderAddressBook();
+    ['newContactCall','newContactName','newContactEmail','newContactPmail'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('newContactCall').focus();
+    showToast(`${call} added`);
+}
+let editingContact = null;
+function editContact(call) {
+    const c = addressBook.find(x=>x.callsign===call);
+    if (!c) return;
+    editingContact = call;
+    document.getElementById('editContactCall').value  = c.callsign;
+    document.getElementById('editContactName').value  = c.name||'';
+    document.getElementById('editContactEmail').value = c.email||'';
+    document.getElementById('editContactPmail').value = c.pmail||'';
+    document.getElementById('editContactModal').classList.remove('hidden');
+}
+function closeEditContact() { document.getElementById('editContactModal').classList.add('hidden'); editingContact=null; }
+function saveEditContact() {
+    if (!editingContact) return;
+    const c = addressBook.find(x=>x.callsign===editingContact);
+    if (!c) return;
+    c.name  = document.getElementById('editContactName').value.trim()||null;
+    c.email = document.getElementById('editContactEmail').value.trim()||null;
+    c.pmail = document.getElementById('editContactPmail').value.trim().toUpperCase()||null;
+    persist('bbs_contacts', addressBook);
+    renderAddressBook(document.getElementById('addressBookSearch').value);
+    closeEditContact();
+    showToast(`${editingContact} updated`);
+}
+function deleteContact(call) {
+    addressBook = addressBook.filter(c=>c.callsign!==call);
+    persist('bbs_contacts', addressBook);
+    renderAddressBook(document.getElementById('addressBookSearch').value);
+    showToast(`${call} removed`);
+}
+function autoAddContact(call) {
+    if (!call||call.includes('@')) return;
+    const u = call.toUpperCase();
+    if (!addressBook.some(c=>c.callsign===u)) {
+        addressBook.push({ callsign:u, name:null, addedAt:new Date().toISOString() });
+        persist('bbs_contacts', addressBook);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RESIZE PANE
+// ═══════════════════════════════════════════════════════════════
+(function() {
+    const resizer  = document.getElementById('resizer');
+    const listPane = document.getElementById('listPane');
+    let dragging = false, startY = 0, startH = 0;
+    resizer.addEventListener('mousedown', e => {
+        dragging = true; startY = e.clientY; startH = listPane.offsetHeight;
+        document.body.style.cursor = 'ns-resize'; document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        const delta = e.clientY - startY;
+        const newH  = Math.max(120, Math.min(startH + delta, window.innerHeight - 200));
+        listPane.style.height = newH + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+        dragging = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════════════
+function setStatus(type, text) {
+    const chip = document.getElementById('statusChip');
+    chip.textContent = text;
+    chip.className   = type;
+}
+function showLoading(text='Loading…') {
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+}
+function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+function showToast(msg, isErr=false) {
+    const t  = document.getElementById('toast');
+    const ti = document.getElementById('toastInner');
+    document.getElementById('toastIcon').textContent = isErr ? '⚠' : '✓';
+    document.getElementById('toastMsg').textContent  = msg;
+    ti.className = 'toast-inner ' + (isErr ? 'err' : 'ok');
+    t.classList.remove('hidden');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.add('hidden'), 4000);
+}
+function escapeHtml(t) {
+    if (!t && t!==0) return '';
+    const d = document.createElement('div');
+    d.textContent = String(t);
+    return d.innerHTML;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MULTI-SELECT
+// ═══════════════════════════════════════════════════════════════
+function toggleMultiSelect() {
+    if (multiSelectMode) { exitMultiSelect(); return; }
+    // Only available in BBS inbox or saved/folder views
+    multiSelectMode = true;
+    selectedMsgs.clear();
+    document.getElementById('listBody').classList.add('multi-mode');
+    document.getElementById('bulkBar').classList.add('visible');
+    document.getElementById('multiSelectBtn').style.color = 'var(--tb-accent)';
+    document.getElementById('multiSelectBtn').style.background = 'var(--tb-folder-sel)';
+    updateBulkBar();
+    renderList();
+}
+function exitMultiSelect() {
+    multiSelectMode = false;
+    selectedMsgs.clear();
+    document.getElementById('listBody').classList.remove('multi-mode');
+    document.getElementById('bulkBar').classList.remove('visible');
+    document.getElementById('multiSelectBtn').style.color = '';
+    document.getElementById('multiSelectBtn').style.background = '';
+    document.getElementById('cbAll').checked = false;
+    renderList();
+}
+function toggleRowCheck(num, e) {
+    if (e) e.stopPropagation();
+    if (selectedMsgs.has(num)) selectedMsgs.delete(num);
+    else selectedMsgs.add(num);
+    updateBulkBar();
+    // Update just this row's appearance without full re-render
+    document.querySelectorAll(`[data-num="${num}"]`).forEach(el => {
+        if (el.classList.contains('msg-row')) {
+            el.classList.toggle('ms-checked', selectedMsgs.has(num));
+        }
+        if (el.type === 'checkbox') el.checked = selectedMsgs.has(num);
+    });
+}
+function toggleSelectAll() {
+    const list = getCurrentList();
+    const allChecked = list.every(m => selectedMsgs.has(m.number));
+    if (allChecked) { list.forEach(m => selectedMsgs.delete(m.number)); }
+    else            { list.forEach(m => selectedMsgs.add(m.number)); }
+    updateBulkBar();
+    renderList();
+}
+function updateBulkBar() {
+    const n = selectedMsgs.size;
+    document.getElementById('bulkBarCount').textContent = n === 1 ? '1 selected' : `${n} selected`;
+    const list = getCurrentList();
+    document.getElementById('cbAll').checked = list.length > 0 && list.every(m => selectedMsgs.has(m.number));
+    document.getElementById('cbAll').indeterminate = n > 0 && !document.getElementById('cbAll').checked;
+}
+function getCurrentList() {
+    if (currentFolder === 'bbs')   return messages;
+    if (currentFolder === 'saved') return savedMessages;
+    return savedMessages.filter(m => (m.folder||'Saved') === currentFolder);
+}
+async function bulkSaveSelected() {
+    if (selectedMsgs.size === 0) { showToast('No messages selected', true); return; }
+    if (currentFolder !== 'bbs') { showToast('Can only save from BBS inbox', true); return; }
+    // Show folder picker — reuse single save modal
+    renderSaveFolderList();
+    document.getElementById('deleteAfterSave').parentElement.style.display = 'none'; // hide single-msg option
+    document.getElementById('saveModal').classList.remove('hidden');
+    // Override executeSave to handle bulk
+    window._bulkSaveMode = true;
+}
+async function bulkDeleteSelected() {
+    if (selectedMsgs.size === 0) { showToast('No messages selected', true); return; }
+    deleteTarget = { _bulk: true, nums: [...selectedMsgs] };
+    document.getElementById('confirmText').textContent =
+        `Delete ${selectedMsgs.size} message${selectedMsgs.size>1?'s':''} from the BBS? This cannot be undone.`;
+    document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+    if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.add('hidden'));
+        document.getElementById('editContactModal').classList.add('hidden');
+        cancelDelete();
+        closeRulesModal();
+        closeSigEditor();
+    }
+    if (e.key === 'r' && !e.ctrlKey && !e.metaKey) fetchMessages();
+    if (e.key === 'n' && !e.ctrlKey && !e.metaKey) openComposeModal();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  CLOCKS
+// ═══════════════════════════════════════════════════════════════
+(function tick() {
+    const n = new Date();
+    const pad = x => String(x).padStart(2,'0');
+    const utc = `${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())}:${pad(n.getUTCSeconds())}`;
+    const loc = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+    const uel = document.getElementById('navUtcClock');
+    const lel = document.getElementById('navLocalClock');
+    if (uel) uel.textContent = utc + ' Z';
+    if (lel) lel.textContent = loc + ' L';
+    setTimeout(tick, 1000 - n.getMilliseconds());
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  SIGNATURE
+// ═══════════════════════════════════════════════════════════════
+
+function loadSignature() {
+    try {
+        const s = JSON.parse(localStorage.getItem('bbs_signature') || '{}');
+        signature.text    = s.text    || '';
+        signature.enabled = s.enabled || false;
+    } catch { signature = { text: '', enabled: false }; }
+}
+
+function saveSignature() {
+    localStorage.setItem('bbs_signature', JSON.stringify(signature));
+}
+
+function openSigEditor() {
+    document.getElementById('sigText').value          = signature.text;
+    document.getElementById('sigEnabledGlobal').checked = signature.enabled;
+    document.getElementById('sigModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('sigText').focus(), 80);
+}
+
+function closeSigEditor() {
+    document.getElementById('sigModal').classList.add('hidden');
+}
+
+function saveSig() {
+    const text = document.getElementById('sigText').value.trim();
+    if (!text && document.getElementById('sigEnabledGlobal').checked) {
+        showToast('Signature text is empty — enter your signature first', true);
+        return;
+    }
+    signature.text    = text;
+    signature.enabled = document.getElementById('sigEnabledGlobal').checked;
+    saveSignature();
+    // Refresh preview in compose if open
+    updateSigPreview();
+    closeSigEditor();
+    showToast('Signature saved');
+}
+
+function updateSigPreview() {
+    const cb      = document.getElementById('useSig');
+    const preview = document.getElementById('sigPreview');
+    const preText = document.getElementById('sigPreviewText');
+    if (!cb) return;
+    if (cb.checked && signature.text) {
+        preview.style.display = '';
+        preText.textContent   = '--\n' + signature.text;
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+function toggleSigPreview() {
+    updateSigPreview();
+}
+
+// Returns the full body string with signature appended if enabled
+function buildBody() {
+    const raw = document.getElementById('composeBody').value.trim();
+    const cb  = document.getElementById('useSig');
+    if (cb && cb.checked) {
+        // Use in-memory signature (loaded from localStorage at startup or updated by saveSig)
+        // If somehow empty, re-read from localStorage directly as fallback
+        let sigText = signature.text;
+        if (!sigText) {
+            try {
+                const s = JSON.parse(localStorage.getItem('bbs_signature') || '{}');
+                sigText = s.text || '';
+            } catch {}
+        }
+        if (sigText) {
+            return raw + '\n\n--\n' + sigText;
+        }
+    }
+    return raw;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MESSAGE RULES ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+function loadRules() {
+    try { rules = JSON.parse(localStorage.getItem('bbs_rules') || '[]'); } catch { rules = []; }
+    try { unreadFolders = JSON.parse(localStorage.getItem('bbs_unread') || '{}'); } catch { unreadFolders = {}; }
+}
+
+function saveRules() {
+    localStorage.setItem('bbs_rules', JSON.stringify(rules));
+}
+
+function saveUnread() {
+    localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
+}
+
+function matchesRule(msg, rule) {
+    const val    = (msg[rule.field] || '').toUpperCase();
+    const target = (rule.value || '').toUpperCase();
+    if (!target) return false;
+    switch (rule.op) {
+        case 'contains': return val.includes(target);
+        case 'starts':   return val.startsWith(target);
+        case 'equals':   return val === target;
+        default:         return val.includes(target);
+    }
+}
+
+// Run all enabled rules against the current inbox messages.
+// Matched messages are auto-saved to the target folder and removed from inbox.
+async function applyRules(silent = false) {
+    const enabled = rules.filter(r => r.enabled);
+    if (enabled.length === 0) return 0;
+
+    let matched = 0;
+    const toRemove = new Set();
+
+    for (const msg of messages) {
+        // Skip already-saved messages
+        if (savedMessages.some(s => s.number === msg.number)) continue;
+
+        for (const rule of enabled) {
+            if (!matchesRule(msg, rule)) continue;
+
+            // Fetch body if not cached
+            let body = '';
+            try {
+                const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${msg.number}`);
+                const d = await r.json();
+                body = d.success ? (d.body || '') : '';
+            } catch {}
+
+            // Ensure target folder exists
+            if (!folders.includes(rule.folder)) {
+                folders.push(rule.folder);
+                persist('bbs_folders', folders);
+            }
+
+            const msgToSave = {
+                ...msg, body, folder: rule.folder,
+                savedAt: new Date().toISOString(),
+                _ruleMatched: rule.name
+            };
+            savedMessages.unshift(msgToSave);
+            toRemove.add(msg.number);
+
+            // Mark folder as having unread
+            unreadFolders[rule.folder] = (unreadFolders[rule.folder] || 0) + 1;
+
+            matched++;
+            break; // First matching rule wins — don't double-file
+        }
+    }
+
+    if (matched > 0) {
+        // Remove matched messages from inbox
+        messages = messages.filter(m => !toRemove.has(m.number));
+        persist('bbs_saved_messages', savedMessages);
+        saveUnread();
+        updateSidebarFolders();
+        updateCounts();
+        if (currentFolder === 'bbs') renderList();
+        if (!silent) showToast(`Rules applied — ${matched} message${matched>1?'s':''} filed`);
+    }
+
+    return matched;
+}
+
+async function applyRulesNow() {
+    if (messages.length === 0) {
+        showToast('Get Mail first to load messages', true);
+        return;
+    }
+    showLoading('Applying rules…');
+    const n = await applyRules(false);
+    hideLoading();
+    document.getElementById('rulesAppliedMsg').textContent =
+        n > 0 ? `✓ Filed ${n} message${n>1?'s':''}` : 'No messages matched';
+    setTimeout(() => { document.getElementById('rulesAppliedMsg').textContent = ''; }, 4000);
+}
+
+// ── Rules UI ─────────────────────────────────────────────────────────────────
+
+function openRulesModal() {
+    // Populate folder dropdown
+    const sel = document.getElementById('ruleFolder');
+    const sorted = [...folders].sort((a,b) => a.localeCompare(b, undefined, {sensitivity:'base'}));
+    sel.innerHTML = sorted.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+    // Default to first non-Saved folder or Saved
+    sel.value = sorted.find(f => f !== 'Saved') || 'Saved';
+    renderRulesList();
+    document.getElementById('rulesModal').classList.remove('hidden');
+}
+
+function closeRulesModal() {
+    document.getElementById('rulesModal').classList.add('hidden');
+}
+
+function renderRulesList() {
+    const container = document.getElementById('rulesList');
+    const empty     = document.getElementById('rulesEmpty');
+    if (rules.length === 0) {
+        empty.style.display = '';
+        container.innerHTML = '';
+        container.appendChild(empty);
+        return;
+    }
+    empty.style.display = 'none';
+
+    const fieldLabels = { from:'From', to:'To', subject:'Subject' };
+    const opLabels    = { contains:'contains', starts:'starts with', equals:'equals' };
+
+    container.innerHTML = rules.map((rule, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;
+             border-bottom:1px solid var(--tb-border);
+             ${rule.enabled ? '' : 'opacity:.45'}">
+            <input type="checkbox" ${rule.enabled?'checked':''} style="width:14px;height:14px;accent-color:var(--tb-accent);cursor:pointer;flex-shrink:0"
+                   onchange="toggleRule(${i})" title="${rule.enabled?'Disable':'Enable'} rule">
+            <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:600;color:var(--tb-text);margin-bottom:2px">
+                    ${escapeHtml(rule.name||'Unnamed rule')}
+                </div>
+                <div style="font-size:11px;color:var(--tb-muted)">
+                    <span style="color:var(--tb-accent)">${fieldLabels[rule.field]||rule.field}</span>
+                    ${opLabels[rule.op]||rule.op}
+                    <span style="font-family:var(--font-mono);color:var(--tb-text)">"${escapeHtml(rule.value)}"</span>
+                    → 📁 <span style="color:var(--tb-green)">${escapeHtml(rule.folder)}</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0">
+                <button class="icon-btn" onclick="moveRule(${i},-1)" title="Move up"   ${i===0?'disabled':''}>↑</button>
+                <button class="icon-btn" onclick="moveRule(${i},1)"  title="Move down" ${i===rules.length-1?'disabled':''}>↓</button>
+                <button class="icon-btn danger" onclick="deleteRule(${i})" title="Delete rule">×</button>
+            </div>
+        </div>`).join('');
+}
+
+function addRule() {
+    const field  = document.getElementById('ruleField').value;
+    const op     = document.getElementById('ruleOp').value;
+    const value  = document.getElementById('ruleValue').value.trim();
+    const folder = document.getElementById('ruleFolder').value;
+    const enabled= document.getElementById('ruleEnabled').checked;
+
+    if (!value) { showToast('Enter a match value', true); return; }
+    if (!folder) { showToast('Select a destination folder', true); return; }
+
+    const fieldLabels = { from:'From', to:'To', subject:'Subject' };
+    const opLabels    = { contains:'contains', starts:'starts with', equals:'equals' };
+    const name = `${fieldLabels[field]} ${opLabels[op]} "${value}" → ${folder}`;
+
+    rules.push({ name, field, op, value, folder, enabled });
+    saveRules();
+    document.getElementById('ruleValue').value = '';
+    renderRulesList();
+    showToast('Rule added');
+}
+
+function toggleRule(i) {
+    rules[i].enabled = !rules[i].enabled;
+    saveRules();
+    renderRulesList();
+}
+
+function deleteRule(i) {
+    rules.splice(i, 1);
+    saveRules();
+    renderRulesList();
+    showToast('Rule deleted');
+}
+
+function moveRule(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= rules.length) return;
+    [rules[i], rules[j]] = [rules[j], rules[i]];
+    saveRules();
+    renderRulesList();
+}
+
+// ── Folder unread tracking ────────────────────────────────────────────────────
+
+function markFolderRead(folderName) {
+    if (unreadFolders[folderName]) {
+        delete unreadFolders[folderName];
+        saveUnread();
+        updateSidebarFolders();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HIDE PREVIEW SECTIONS INITIALLY
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('previewHeader').style.display  = 'none';
+document.getElementById('previewActions').style.display = 'none';
+document.getElementById('previewBody').style.display    = 'none';
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  THEME
+// ═══════════════════════════════════════════════════════════════
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = theme === 'light' ? '🌑' : '🌙';
+}
+function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+    const nxt = cur === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('bbs_theme', nxt);
+    applyTheme(nxt);
+}
+// Apply saved or system theme immediately
+(function() {
+    const saved = localStorage.getItem('bbs_theme');
+    if (saved) { applyTheme(saved); return; }
+    applyTheme(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+})();
+
+initAuth();
+</script>
+<!-- ═══ RULES MODAL ════════════════════════════════════════════ -->
+<div id="rulesModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="width:620px;max-height:85vh">
+        <div class="modal-header">
+            <span class="modal-title">⚙ Message Rules</span>
+            <button class="modal-close" onclick="closeRulesModal()">×</button>
+        </div>
+        <div class="modal-body" style="padding:0">
+            <!-- Add rule form -->
+            <div style="padding:14px 16px;border-bottom:1px solid var(--tb-border);background:var(--tb-bg)">
+                <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--tb-muted);margin-bottom:10px">New Rule</div>
+                <div style="display:grid;grid-template-columns:110px 1fr 1fr 1fr auto;gap:8px;align-items:center">
+                    <select class="form-select" id="ruleField" style="width:100%">
+                        <option value="from">From</option>
+                        <option value="to">To</option>
+                        <option value="subject">Subject</option>
+                    </select>
+                    <select class="form-select" id="ruleOp" style="width:100%">
+                        <option value="contains">contains</option>
+                        <option value="starts">starts with</option>
+                        <option value="equals">equals</option>
+                    </select>
+                    <input class="inline-input" id="ruleValue" placeholder="Match text…" style="width:100%">
+                    <select class="form-select" id="ruleFolder" style="width:100%">
+                    </select>
+                    <button class="modal-btn primary" onclick="addRule()" style="white-space:nowrap;padding:7px 14px">＋ Add</button>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tb-muted);cursor:pointer">
+                        <input type="checkbox" id="ruleEnabled" checked style="width:13px;height:13px;accent-color:var(--tb-accent)">
+                        Enable rule immediately
+                    </label>
+                    <button class="modal-btn secondary" onclick="applyRulesNow()" style="margin-left:auto">▶ Apply Rules Now</button>
+                </div>
+            </div>
+            <!-- Rules list -->
+            <div id="rulesList" style="max-height:340px;overflow-y:auto">
+                <div id="rulesEmpty" style="text-align:center;padding:28px;color:var(--tb-muted);font-size:12px">
+                    No rules yet — add one above
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <span style="font-size:11px;color:var(--tb-muted)" id="rulesAppliedMsg"></span>
+            <button class="modal-btn secondary" onclick="closeRulesModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ SIGNATURE EDITOR ═══════════════════════════════════════ -->
+<div id="sigModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="width:500px">
+        <div class="modal-header">
+            <span class="modal-title">✎ Edit Signature</span>
+            <button class="modal-close" onclick="closeSigEditor()">×</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size:11px;color:var(--tb-muted);margin-bottom:10px;line-height:1.6">
+                Your signature is appended to outgoing messages when enabled.<br>
+                A separator line <code style="font-family:var(--font-mono);color:var(--tb-accent)">--</code> is added automatically above it.
+            </div>
+            <textarea id="sigText"
+                style="width:100%;min-height:120px;background:var(--tb-bg);border:1px solid var(--tb-border);
+                       border-radius:var(--radius);color:var(--tb-text);padding:10px;
+                       font-family:var(--font-mono);font-size:12px;resize:vertical;outline:none;line-height:1.6"
+                placeholder="73 de K1AJD&#10;Tony — Augusta, GA&#10;BPQ Dashboard"></textarea>
+            <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+                <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer">
+                    <input type="checkbox" id="sigEnabledGlobal" style="width:14px;height:14px;accent-color:var(--tb-accent)">
+                    Enable signature by default on new messages
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn secondary" onclick="closeSigEditor()">Cancel</button>
+            <button class="modal-btn primary" onclick="saveSig()">💾 Save Signature</button>
+        </div>
+    </div>
+</div>
+
+<script src="shared/settings-modal.js"></script>
+</body>
+</html>

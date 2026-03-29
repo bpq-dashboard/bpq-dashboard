@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BPQ Dashboard — Log Viewer</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0d1117;--surface:#161b22;--border:#21262d;--border2:#30363d;
+    --text:#e6edf3;--muted:#7d8590;--green:#3fb950;--green-dim:#1a4428;
+    --amber:#d29922;--amber-dim:#3d2b05;--blue:#58a6ff;--blue-dim:#0d2340;
+    --red:#f85149;--red-dim:#3d0c0a;--purple:#bc8cff;--purple-dim:#1e1040;
+    --cyan:#39d0d8;--cyan-dim:#0d3340;--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;padding:32px 24px 64px;max-width:1200px;margin:0 auto;}
+  header{border-bottom:1px solid var(--border2);padding-bottom:20px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+  header h1{font-family:var(--mono);font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;}
+  header h1 span{color:var(--green);}
+  header .meta{font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-align:right;line-height:1.8;}
+  .nav-back{font-family:var(--mono);font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;opacity:0.8;transition:opacity 0.15s;}
+  .nav-back:hover{opacity:1;}
+
+  /* Auth */
+  .auth-gate{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:32px;max-width:400px;margin:80px auto;text-align:center;}
+  .auth-gate h2{font-family:var(--mono);font-size:1rem;margin-bottom:8px;color:var(--amber);}
+  .auth-gate p{color:var(--muted);font-size:0.85rem;margin-bottom:20px;}
+  .auth-input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:10px 14px;font-family:var(--mono);font-size:0.9rem;color:var(--text);margin-bottom:12px;outline:none;}
+  .auth-input:focus{border-color:var(--blue);}
+  .auth-btn{width:100%;background:var(--blue-dim);border:1px solid var(--blue);border-radius:6px;padding:10px;font-family:var(--mono);font-size:0.85rem;font-weight:600;color:var(--blue);cursor:pointer;}
+  .auth-error{color:var(--red);font-size:0.8rem;margin-top:8px;}
+
+  /* Layout */
+  .layout{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start;}
+  @media(max-width:768px){.layout{grid-template-columns:1fr;}}
+
+  /* Sidebar */
+  .sidebar{position:sticky;top:24px;}
+  .log-group{margin-bottom:16px;}
+  .group-label{font-family:var(--mono);font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);padding:0 4px 6px;border-bottom:1px solid var(--border);margin-bottom:6px;}
+  .log-btn{display:flex;align-items:center;gap:8px;width:100%;background:transparent;border:1px solid transparent;border-radius:6px;padding:8px 10px;cursor:pointer;text-align:left;transition:all 0.15s;margin-bottom:3px;}
+  .log-btn:hover{background:var(--surface);border-color:var(--border);}
+  .log-btn.active{background:var(--surface);border-color:var(--border2);}
+  .log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .log-dot.blue{background:var(--blue);}.log-dot.amber{background:var(--amber);}.log-dot.green{background:var(--green);}.log-dot.red{background:var(--red);}.log-dot.purple{background:var(--purple);}.log-dot.cyan{background:var(--cyan);}
+  .log-btn-info{flex:1;min-width:0;}
+  .log-btn-label{font-family:var(--mono);font-size:0.78rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .log-btn.active .log-btn-label{color:var(--blue);}
+  .log-btn-size{font-family:var(--mono);font-size:0.62rem;color:var(--muted);}
+  .log-btn-missing .log-btn-label{color:var(--muted);}.log-btn-missing .log-dot{opacity:0.3;}
+
+  /* Viewer panel */
+  .viewer{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .viewer-toolbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .viewer-title{font-family:var(--mono);font-size:0.82rem;font-weight:700;color:var(--text);flex:1;}
+  .viewer-meta{font-family:var(--mono);font-size:0.68rem;color:var(--muted);}
+  .toolbar-btn{font-family:var(--mono);font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:4px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all 0.15s;white-space:nowrap;}
+  .toolbar-btn:hover{border-color:var(--blue);color:var(--blue);}
+  .toolbar-btn.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue);}
+  .lines-select{font-family:var(--mono);font-size:0.72rem;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--muted);padding:3px 6px;cursor:pointer;}
+  .lines-select:focus{outline:none;border-color:var(--blue);}
+
+  /* Search bar */
+  .search-bar{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg);}
+  .search-input{flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:7px 12px;font-family:var(--mono);font-size:0.8rem;color:var(--text);outline:none;}
+  .search-input:focus{border-color:var(--blue);}
+  .search-btn{font-family:var(--mono);font-size:0.75rem;font-weight:600;background:var(--blue-dim);border:1px solid var(--blue);border-radius:6px;color:var(--blue);padding:6px 14px;cursor:pointer;white-space:nowrap;}
+  .search-btn:hover{background:rgba(88,166,255,0.2);}
+  .clear-btn{font-family:var(--mono);font-size:0.75rem;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);padding:6px 10px;cursor:pointer;}
+
+  /* Date picker for BBS archive */
+  .date-picker{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg);align-items:center;flex-wrap:wrap;}
+  .date-picker label{font-family:var(--mono);font-size:0.72rem;color:var(--muted);}
+  .date-select{font-family:var(--mono);font-size:0.78rem;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);padding:5px 10px;cursor:pointer;}
+  .date-select:focus{outline:none;border-color:var(--blue);}
+
+  /* Log output */
+  .log-output{padding:0;overflow-x:auto;max-height:600px;overflow-y:auto;}
+  .log-lines{font-family:var(--mono);font-size:0.75rem;line-height:1.7;}
+  .log-line{display:flex;padding:1px 0;}
+  .log-line:hover{background:rgba(255,255,255,0.03);}
+  .line-num{color:var(--border2);padding:0 12px 0 12px;min-width:52px;text-align:right;flex-shrink:0;user-select:none;}
+  .line-text{color:var(--text);padding-right:16px;white-space:pre-wrap;word-break:break-all;}
+  .line-text .hl{background:rgba(210,153,34,0.25);color:var(--amber);border-radius:2px;padding:0 1px;}
+
+  /* Log line colorization */
+  .log-line.lvl-error .line-text,.log-line.lvl-crit .line-text{color:var(--red);}
+  .log-line.lvl-warn  .line-text{color:var(--amber);}
+  .log-line.lvl-info  .line-text{color:var(--text);}
+  .log-line.lvl-debug .line-text{color:var(--muted);}
+  .log-line.lvl-pause .line-text{color:var(--amber);}
+  .log-line.lvl-restore .line-text{color:var(--green);}
+  .log-line.search-match{background:rgba(210,153,34,0.08);}
+  .log-line.search-context .line-text{color:var(--muted);}
+
+  /* Search results */
+  .search-results{padding:12px 14px;}
+  .search-hit{margin-bottom:12px;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .search-hit-header{background:var(--border);padding:4px 10px;font-family:var(--mono);font-size:0.65rem;color:var(--muted);}
+
+  /* Empty / loading states */
+  .placeholder{text-align:center;padding:60px 20px;color:var(--muted);font-family:var(--mono);font-size:0.85rem;}
+  .placeholder .icon{font-size:2.5rem;margin-bottom:12px;display:block;}
+  .loading-line{color:var(--muted);font-family:var(--mono);font-size:0.82rem;padding:24px 14px;text-align:center;}
+  .error-msg{background:var(--red-dim);border:1px solid var(--red);border-radius:6px;padding:12px 16px;color:var(--red);font-family:var(--mono);font-size:0.8rem;margin:12px 14px;}
+
+  .section-title{font-family:var(--mono);font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+  .section-title::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+  .section-title.green{color:var(--green);}
+</style>
+</head>
+<body>
+
+<a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
+
+<header>
+  <h1>📋 BPQ Dashboard <span>//</span> Log Viewer</h1>
+  <div class="meta">K1AJD · ARSSYSTEM · Real-time log access<br>BPQ Dashboard · VARA · BPQ Node · System</div>
+</header>
+
+<div id="auth-gate" class="auth-gate" style="display:none;">
+  <h2>🔒 Authentication Required</h2>
+  <p>Enter your BBS password to view system logs</p>
+  <input type="password" id="auth-input" class="auth-input" placeholder="BBS Password">
+  <button class="auth-btn" onclick="attemptAuth()">Unlock</button>
+  <div id="auth-error" class="auth-error" style="display:none;"></div>
+</div>
+
+<div id="main-content" style="display:none;">
+  <div class="layout">
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div id="log-list-container">
+        <div class="loading-line">Loading logs…</div>
+      </div>
+    </div>
+
+    <!-- Viewer panel -->
+    <div class="viewer" id="viewer-panel">
+      <div class="placeholder">
+        <span class="icon">📋</span>
+        Select a log from the left to view it
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="loading" class="placeholder">
+  <span class="icon">⟳</span>
+  Loading…
+</div>
+
+<script>
+const API = 'log-viewer-api.php';
+let savedPw = sessionStorage.getItem('bbs_pw') || '';
+let currentLog = null;
+let currentDate = '';
+let searchMode = false;
+let logCatalogue = [];
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function init() {
+  if (savedPw) loadCatalogue(savedPw);
+  else {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('auth-gate').style.display = 'block';
+    document.getElementById('auth-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') attemptAuth();
+    });
+  }
+}
+
+function attemptAuth() {
+  const pw = document.getElementById('auth-input').value.trim();
+  if (!pw) return;
+  loadCatalogue(pw);
+}
+
+function loadCatalogue(pw) {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('loading').innerHTML = '<span class="icon">⟳</span>Loading…';
+  document.getElementById('auth-gate').style.display = 'none';
+
+  fetch(`${API}?action=list&password=${encodeURIComponent(pw)}`)
+    .then(r => { if(r.status===401) throw new Error('auth'); return r.json(); })
+    .then(data => {
+      if (data.error === 'Unauthorized') throw new Error('auth');
+      savedPw = pw;
+      sessionStorage.setItem('bbs_pw', pw);
+      logCatalogue = data.logs;
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main-content').style.display = 'block';
+      renderSidebar(data.logs);
+    })
+    .catch(err => {
+      document.getElementById('loading').style.display = 'none';
+      if (err.message === 'auth') {
+        document.getElementById('auth-gate').style.display = 'block';
+        document.getElementById('auth-error').textContent = '✗ Invalid password';
+        document.getElementById('auth-error').style.display = 'block';
+        sessionStorage.removeItem('bbs_pw'); savedPw = '';
+      } else {
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('log-list-container').innerHTML =
+          `<div class="error-msg">Could not load log list: ${err.message}</div>`;
+      }
+    });
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function renderSidebar(logs) {
+  const groups = {};
+  logs.forEach(l => {
+    if (!groups[l.group]) groups[l.group] = [];
+    groups[l.group].push(l);
+  });
+
+  let html = '';
+  Object.keys(groups).forEach(grp => {
+    html += `<div class="log-group">
+      <div class="group-label">${grp}</div>`;
+    groups[grp].forEach(l => {
+      const sizeStr = l.exists && l.size ? fmtSize(l.size) : '';
+      const missing = !l.exists ? ' log-btn-missing' : '';
+      const modStr = l.modified ? new Date(l.modified*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '';
+      html += `<button class="log-btn${missing}" onclick="selectLog('${l.key}')">
+        <span class="log-dot ${l.color}"></span>
+        <span class="log-btn-info">
+          <div class="log-btn-label">${l.label}</div>
+          <div class="log-btn-size">${l.exists ? (sizeStr + (modStr?' · '+modStr:'')) : 'not found'}</div>
+        </span>
+      </button>`;
+    });
+    html += `</div>`;
+  });
+
+  document.getElementById('log-list-container').innerHTML = html;
+}
+
+// ── Select log ────────────────────────────────────────────────────────────────
+function selectLog(key) {
+  currentLog = key;
+  currentDate = '';
+  searchMode = false;
+
+  // Update sidebar active state
+  document.querySelectorAll('.log-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  const meta = logCatalogue.find(l => l.key === key);
+  if (!meta) return;
+
+  // Check if archive — show date picker first
+  if (meta.dynamic === 'archive') {
+    renderArchivePicker(meta, key);
+    return;
+  }
+
+  if (!meta.exists) {
+    renderPanel(meta, null);
+    return;
+  }
+
+  renderPanel(meta, null, true);
+  loadLog(key, '', 200);
+}
+
+function renderArchivePicker(meta, key) {
+  const dates = meta.dates || [];
+  const opts = dates.map(d =>
+    `<option value="${d.date}">${d.label} (${fmtSize(d.size)})</option>`
+  ).join('');
+
+  document.getElementById('viewer-panel').innerHTML = `
+    <div class="viewer-toolbar">
+      <div class="viewer-title">📋 ${meta.label}</div>
+      <div class="viewer-meta">${meta.desc}</div>
+    </div>
+    <div class="date-picker">
+      <label>Select date:</label>
+      <select class="date-select" id="date-select" onchange="loadArchiveDate('${key}', this.value)">
+        <option value="">— choose a date —</option>
+        ${opts}
+      </select>
+    </div>
+    <div class="placeholder"><span class="icon">📅</span>Select a date above to view that day's BBS log</div>
+  `;
+}
+
+function loadArchiveDate(key, date) {
+  if (!date) return;
+  currentDate = date;
+  const meta = logCatalogue.find(l => l.key === key);
+  renderPanel(meta, null, true);
+  loadLog(key, date, 200);
+}
+
+function renderPanel(meta, lines, loading=false) {
+  const linesOpts = [100,200,500,1000].map(n =>
+    `<option value="${n}" ${n===200?'selected':''}>${n} lines</option>`
+  ).join('');
+
+  const datePickerHtml = (meta && meta.dynamic === 'archive') ? `
+    <div class="date-picker">
+      <label>Date:</label>
+      <select class="date-select" id="date-select" onchange="loadArchiveDate('${meta.key}', this.value)">
+        <option value="">— choose —</option>
+        ${(meta.dates||[]).map(d=>`<option value="${d.date}" ${d.date===currentDate?'selected':''}>${d.label}</option>`).join('')}
+      </select>
+    </div>` : '';
+
+  document.getElementById('viewer-panel').innerHTML = `
+    <div class="viewer-toolbar">
+      <div class="viewer-title">📋 ${meta ? meta.label : 'Log Viewer'}</div>
+      <select class="lines-select" id="lines-select" onchange="reloadLog()">${linesOpts}</select>
+      <button class="toolbar-btn" onclick="reloadLog()">⟳ Refresh</button>
+      <button class="toolbar-btn ${searchMode?'active':''}" id="search-toggle"
+              onclick="toggleSearch()">🔍 Search</button>
+      <div class="viewer-meta" id="viewer-meta"></div>
+    </div>
+    ${datePickerHtml}
+    <div id="search-bar-container" style="display:${searchMode?'flex':'none'}">
+      <div class="search-bar">
+        <input type="text" class="search-input" id="search-input" placeholder="Search log… (callsign, ERROR, PAUSED, etc.)"
+               onkeydown="if(event.key==='Enter') runSearch()">
+        <button class="search-btn" onclick="runSearch()">Search</button>
+        <button class="clear-btn" onclick="clearSearch()">✕</button>
+      </div>
+    </div>
+    <div id="log-output" class="log-output">
+      ${loading ? '<div class="loading-line">Loading…</div>' : ''}
+    </div>
+  `;
+}
+
+// ── Load log ──────────────────────────────────────────────────────────────────
+function loadLog(key, date, lines) {
+  let url = `${API}?action=read&log=${key}&lines=${lines}&password=${encodeURIComponent(savedPw)}`;
+  if (date) url += `&date=${date}`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('log-output').innerHTML =
+          `<div class="error-msg">${data.error}</div>`;
+        return;
+      }
+      renderLines(data.lines || [], key);
+      const meta = document.getElementById('viewer-meta');
+      if (meta) meta.textContent =
+        `${data.total_shown} lines · ${fmtSize(data.file_size)} · ${data.path}`;
+    })
+    .catch(err => {
+      document.getElementById('log-output').innerHTML =
+        `<div class="error-msg">Failed to load: ${err.message}</div>`;
+    });
+}
+
+function reloadLog() {
+  if (!currentLog) return;
+  const lines = parseInt(document.getElementById('lines-select')?.value || '200');
+  if (searchMode) {
+    runSearch();
+  } else {
+    document.getElementById('log-output').innerHTML = '<div class="loading-line">Loading…</div>';
+    loadLog(currentLog, currentDate, lines);
+  }
+}
+
+// ── Render lines ──────────────────────────────────────────────────────────────
+function classifyLine(text) {
+  const u = text.toUpperCase();
+  if (/\[ERROR\]|\[CRIT\]|ERROR|CRITICAL|FAILED|Permission denied/.test(u)) return 'lvl-error';
+  if (/\[WARNING\]|WARN|WARNING/.test(u)) return 'lvl-warn';
+  if (/PAUSED|Enabled=0/.test(u)) return 'lvl-pause';
+  if (/RESTORED|Enabled=1|RESUMED/.test(u)) return 'lvl-restore';
+  if (/\[DEBUG\]/.test(u)) return 'lvl-debug';
+  return 'lvl-info';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderLines(lines, key, searchTerm='') {
+  if (!lines.length) {
+    document.getElementById('log-output').innerHTML =
+      '<div class="loading-line" style="color:var(--muted)">No content to display</div>';
+    return;
+  }
+
+  const startNum = 1;
+  let html = '<div class="log-lines">';
+  lines.forEach((line, i) => {
+    const lvl = classifyLine(line);
+    let text = escHtml(line);
+    if (searchTerm) {
+      const re = new RegExp(escHtml(searchTerm).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+      text = text.replace(re, m => `<span class="hl">${m}</span>`);
+    }
+    html += `<div class="log-line ${lvl}">
+      <span class="line-num">${startNum + i}</span>
+      <span class="line-text">${text}</span>
+    </div>`;
+  });
+  html += '</div>';
+
+  document.getElementById('log-output').innerHTML = html;
+
+  // Auto-scroll to bottom
+  const out = document.getElementById('log-output');
+  out.scrollTop = out.scrollHeight;
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+function toggleSearch() {
+  searchMode = !searchMode;
+  const bar = document.getElementById('search-bar-container');
+  const btn = document.getElementById('search-toggle');
+  if (bar) bar.style.display = searchMode ? 'flex' : 'none';
+  if (btn) btn.classList.toggle('active', searchMode);
+  if (searchMode) {
+    document.getElementById('search-input')?.focus();
+  } else {
+    clearSearch();
+  }
+}
+
+function runSearch() {
+  const q = document.getElementById('search-input')?.value.trim();
+  if (!q || !currentLog) return;
+
+  document.getElementById('log-output').innerHTML = '<div class="loading-line">Searching…</div>';
+
+  let url = `${API}?action=search&log=${currentLog}&q=${encodeURIComponent(q)}&password=${encodeURIComponent(savedPw)}`;
+  if (currentDate) url += `&date=${currentDate}`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('log-output').innerHTML = `<div class="error-msg">${data.error}</div>`;
+        return;
+      }
+      renderSearchResults(data, q);
+    })
+    .catch(err => {
+      document.getElementById('log-output').innerHTML = `<div class="error-msg">Search failed: ${err.message}</div>`;
+    });
+}
+
+function renderSearchResults(data, q) {
+  const output = document.getElementById('log-output');
+  if (!data.results || !data.results.length) {
+    output.innerHTML = `<div class="loading-line">No matches found for "${escHtml(q)}"</div>`;
+    return;
+  }
+
+  const re = new RegExp(escHtml(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+  let html = `<div class="search-results">
+    <div style="font-family:var(--mono);font-size:0.72rem;color:var(--muted);margin-bottom:12px;">
+      ${data.matches} match${data.matches!==1?'es':''} for "${escHtml(q)}"
+      ${data.matches>=100?' (showing first 100)':''}
+    </div>`;
+
+  data.results.forEach(snip => {
+    const matchLine = snip.find(l => l.match);
+    html += `<div class="search-hit">
+      <div class="search-hit-header">Line ${matchLine?.line_num || '?'}</div>
+      <div class="log-lines">`;
+    snip.forEach(l => {
+      const lvl = classifyLine(l.text);
+      let text = escHtml(l.text).replace(re, m => `<span class="hl">${m}</span>`);
+      const cls = l.match ? `log-line ${lvl} search-match` : `log-line ${lvl} search-context`;
+      html += `<div class="${cls}">
+        <span class="line-num">${l.line_num}</span>
+        <span class="line-text">${text}</span>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  html += '</div>';
+  output.innerHTML = html;
+}
+
+function clearSearch() {
+  const input = document.getElementById('search-input');
+  if (input) input.value = '';
+  reloadLog();
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function fmtSize(bytes) {
+  if (!bytes) return '0B';
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(0) + 'KB';
+  return (bytes/1048576).toFixed(1) + 'MB';
+}
+
+init();
+</script>
+</body>
+</html>

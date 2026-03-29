@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BPQ Traffic Report v1.5.0</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Preconnect for faster CDN loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <style>
+        /* Loading skeleton animation */
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
+        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        body { background: #f3f4f6; min-height: 100vh; }
+        .glass-container { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 8px 32px rgba(31,38,135,0.37); }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.2); }
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .modern-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .modern-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.4); }
+        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+        .status-success { background-color: #10b981; }
+        .status-error { background-color: #ef4444; }
+        .status-loading { background-color: #f59e0b; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #667eea #e5e7eb; }
+        .bbs-badge { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        @media (max-width: 640px) {
+            .glass-container { border-radius: 12px; }
+            .stat-card { padding: 0.75rem !important; }
+            .stat-card .text-4xl { font-size: 1.5rem !important; }
+            .hide-mobile { display: none !important; }
+        }
+    </style>
+    <style id="bpq-dark-mode">
+    /* Dark Mode — auto-detects OS preference, manual toggle in nav */
+    [data-theme="dark"] { background: #111827 !important; color-scheme: dark; }
+    [data-theme="dark"] body { background: #111827 !important; color: #e5e7eb !important; }
+    [data-theme="dark"] .glass-container { background: rgba(31,41,55,0.95) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; border: 1px solid rgba(75,85,99,0.4); }
+    /* Backgrounds */
+    [data-theme="dark"] [class~="bg-white"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-50"] { background-color: #1a2332 !important; }
+    [data-theme="dark"] [class~="bg-gray-100"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-200"] { background-color: #374151 !important; }
+    [data-theme="dark"] [class~="bg-gray-300"] { background-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="bg-green-50"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-green-100"] { background-color: #065f46 !important; }
+    [data-theme="dark"] [class~="bg-blue-50"] { background-color: #1e3a5f !important; }
+    [data-theme="dark"] [class~="bg-blue-100"] { background-color: #1e40af !important; }
+    [data-theme="dark"] [class~="bg-purple-50"] { background-color: #2e1065 !important; }
+    [data-theme="dark"] [class~="bg-purple-100"] { background-color: #3b0764 !important; }
+    [data-theme="dark"] [class~="bg-red-50"] { background-color: #450a0a !important; }
+    [data-theme="dark"] [class~="bg-red-100"] { background-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="bg-amber-50"] { background-color: #451a03 !important; }
+    [data-theme="dark"] [class~="bg-amber-100"] { background-color: #78350f !important; }
+    [data-theme="dark"] [class~="bg-orange-50"] { background-color: #431407 !important; }
+    [data-theme="dark"] [class~="bg-orange-100"] { background-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="bg-emerald-50"] { background-color: #022c22 !important; }
+    [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
+    [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
+    [data-theme="dark"] [class~="bg-sky-200"] { background-color: #0369a1 !important; }
+    [data-theme="dark"] [class~="bg-cyan-50"] { background-color: #083344 !important; }
+    /* Stat card gradients */
+    [data-theme="dark"] [class*="from-green-50"] { background-image: linear-gradient(to bottom right, #064e3b, #065f46) !important; }
+    [data-theme="dark"] [class*="from-blue-50"] { background-image: linear-gradient(to bottom right, #1e3a5f, #1e40af) !important; }
+    [data-theme="dark"] [class*="from-purple-50"] { background-image: linear-gradient(to bottom right, #2e1065, #4c1d95) !important; }
+    [data-theme="dark"] [class*="from-red-50"] { background-image: linear-gradient(to bottom right, #450a0a, #7f1d1d) !important; }
+    [data-theme="dark"] [class*="from-orange-50"] { background-image: linear-gradient(to bottom right, #431407, #7c2d12) !important; }
+    [data-theme="dark"] [class*="from-amber-50"] { background-image: linear-gradient(to bottom right, #451a03, #78350f) !important; }
+    [data-theme="dark"] [class*="from-emerald-50"] { background-image: linear-gradient(to bottom right, #022c22, #064e3b) !important; }
+    [data-theme="dark"] [class*="from-sky-50"] { background-image: linear-gradient(to bottom right, #0c4a6e, #075985) !important; }
+    [data-theme="dark"] [class*="from-cyan-50"] { background-image: linear-gradient(to bottom right, #083344, #155e75) !important; }
+    /* Text colors */
+    [data-theme="dark"] [class~="text-gray-900"] { color: #f3f4f6 !important; }
+    [data-theme="dark"] [class~="text-gray-800"] { color: #e5e7eb !important; }
+    [data-theme="dark"] [class~="text-gray-700"] { color: #d1d5db !important; }
+    [data-theme="dark"] [class~="text-gray-600"] { color: #9ca3af !important; }
+    [data-theme="dark"] [class~="text-gray-500"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-gray-400"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-green-600"] { color: #34d399 !important; }
+    [data-theme="dark"] [class~="text-green-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-green-800"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-blue-600"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-700"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-800"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-purple-600"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-700"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-800"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-red-600"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-700"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-800"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-orange-600"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-orange-700"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-amber-600"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-amber-700"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-yellow-600"] { color: #fde047 !important; }
+    [data-theme="dark"] [class~="text-sky-700"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-sky-800"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-emerald-600"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-emerald-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-cyan-600"] { color: #67e8f9 !important; }
+    /* Borders */
+    [data-theme="dark"] [class~="border-gray-200"] { border-color: #374151 !important; }
+    [data-theme="dark"] [class~="border-gray-300"] { border-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="border-green-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-blue-200"] { border-color: #1e40af !important; }
+    [data-theme="dark"] [class~="border-purple-100"] { border-color: #4c1d95 !important; }
+    [data-theme="dark"] [class~="border-purple-200"] { border-color: #5b21b6 !important; }
+    [data-theme="dark"] [class~="border-red-200"] { border-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="border-amber-200"] { border-color: #78350f !important; }
+    [data-theme="dark"] [class~="border-orange-200"] { border-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="border-emerald-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-sky-200"] { border-color: #0369a1 !important; }
+    /* Forms */
+    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] input::placeholder { color: #6b7280 !important; }
+    /* Tables */
+    [data-theme="dark"] thead { background-color: #1f2937 !important; }
+    [data-theme="dark"] th { color: #d1d5db !important; }
+    [data-theme="dark"] tr:hover { background-color: rgba(55,65,81,0.5) !important; }
+    /* Log viewer */
+    [data-theme="dark"] .log-entry { color: #d1d5db; }
+    [data-theme="dark"] .log-connect { color: #6ee7b7 !important; }
+    [data-theme="dark"] .log-disconnect { color: #fca5a5 !important; }
+    [data-theme="dark"] .log-message { color: #93c5fd !important; }
+    [data-theme="dark"] .log-error { color: #f87171 !important; }
+    /* Nav */
+    [data-theme="dark"] #navLocalClock { background-color: #374151 !important; color: #d1d5db !important; }
+    [data-theme="dark"] .gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #93c5fd 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+    /* Buttons */
+    [data-theme="dark"] .modern-button { background: linear-gradient(135deg, #7c3aed, #2563eb) !important; }
+    /* Leaflet */
+    [data-theme="dark"] .leaflet-control-zoom a { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] .leaflet-popup-content-wrapper, [data-theme="dark"] .leaflet-popup-tip { background-color: #1f2937 !important; color: #e5e7eb !important; }
+    /* Scrollbar */
+    [data-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+    [data-theme="dark"] ::-webkit-scrollbar-track { background: #1f2937; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    /* Toggle */
+    .dark-mode-toggle { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.5rem; border: none; background: transparent; font-size: 1.1rem; line-height: 1; transition: transform 0.3s ease; }
+    .dark-mode-toggle:hover { transform: scale(1.2); }
+    /* Skeleton */
+    [data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%) !important; background-size: 200% 100%; }
+    /* Modals */
+    [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <nav class="glass-container mx-2 sm:mx-4 mt-2 sm:mt-4 mb-4 sm:mb-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-8 py-3 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0">
+            <h2 class="text-lg sm:text-2xl font-bold gradient-text">📡 BPQ Dashboard</h2>
+            <div class="flex items-center gap-2 font-mono text-xs sm:text-sm" id="navClocks">
+                <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold tracking-wider" id="navUtcClock" title="UTC / Zulu">--:--:-- Z</span>
+                <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gray-200 text-gray-700 font-semibold tracking-wider" id="navLocalClock" title="Local time">--:--:-- L</span>
+                    <button id="darkModeToggle" class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
+            </div>
+            <div class="flex gap-1 sm:gap-2 flex-wrap justify-center">
+                <a href="bpq-rf-connections.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">RF</a>
+                <a href="bpq-traffic.html" class="px-2 sm:px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium text-xs sm:text-sm">Traffic</a>
+                <a href="bpq-system-logs.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">System</a>
+                <a href="bpq-connect-log.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Connects</a>
+                <a href="bpq-email-monitor.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Messages</a>
+                <a href="bbs-messages.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">BBS</a>
+                <a href="nws-dashboard.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Weather</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-2 sm:p-4 lg:p-8">
+        <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
+            <!-- Header -->
+            <div class="mb-6 sm:mb-10 flex flex-col lg:flex-row justify-between items-center gap-4">
+                <div class="text-center flex-1">
+                    <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
+                        <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">Traffic Report</h1>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.0</span>
+                    </div>
+                    <p class="text-gray-600 text-sm sm:text-lg">BBS Station Traffic Analytics</p>
+                    <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
+                </div>
+                <div class="w-full sm:w-auto">
+                    <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-100">
+                        <div class="flex items-center mb-2 sm:mb-3">
+                            <span id="statusIndicator" class="status-indicator status-loading"></span>
+                            <span id="statusText" class="text-xs sm:text-sm">Loading...</span>
+                        </div>
+                        <p id="lastUpdate" class="text-xs text-gray-500 mb-2 sm:mb-3"></p>
+                        <button onclick="refreshData()" class="modern-button w-full text-white font-semibold py-2 sm:py-2.5 px-4 sm:px-6 rounded-lg text-xs sm:text-sm">🔄 Refresh</button>
+                        <div class="mt-2 flex gap-1">
+                            <button id="range1w" onclick="setTimeRange(1)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">7D</button>
+                            <button id="range4w" onclick="setTimeRange(4)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white">4W</button>
+                            <button id="range12w" onclick="setTimeRange(12)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">12W</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards Row 1 -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-5 mb-4 sm:mb-6">
+                <div class="stat-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-green-200">
+                    <div class="text-green-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Connections</div>
+                    <div id="totalConnections" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="flex justify-between text-xs mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-green-200">
+                        <span>In: <span id="connectionsIn" class="font-bold text-blue-600">0</span></span>
+                        <span>Out: <span id="connectionsOut" class="font-bold text-orange-600">0</span></span>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-blue-200">
+                    <div class="text-blue-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Messages</div>
+                    <div id="totalMessages" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="flex justify-between text-xs mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-blue-200">
+                        <span>Rx: <span id="messagesRx" class="font-bold text-green-600">0</span></span>
+                        <span>Tx: <span id="messagesTx" class="font-bold text-purple-600">0</span></span>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-cyan-200">
+                    <div class="text-cyan-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Data</div>
+                    <div id="totalBytes" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="flex justify-between text-xs mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-cyan-200">
+                        <span>Rx: <span id="bytesRx" class="font-bold text-green-600">0</span></span>
+                        <span>Tx: <span id="bytesTx" class="font-bold text-purple-600">0</span></span>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-red-50 to-red-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-red-200">
+                    <div class="text-red-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Rejected</div>
+                    <div id="totalRejected" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="flex justify-between text-xs mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-red-200">
+                        <span>In: <span id="rejectedIn" class="font-bold text-orange-600">0</span></span>
+                        <span>Out: <span id="rejectedOut" class="font-bold text-red-600">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards Row 2 -->
+            <div class="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-5 mb-6 sm:mb-10">
+                <div class="stat-card bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-200">
+                    <div class="text-purple-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Active</div>
+                    <div id="activeStations" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="text-xs text-gray-500 mt-1 hidden sm:block">With traffic</div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-orange-200">
+                    <div class="text-orange-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">BBS</div>
+                    <div id="bbsNodes" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="text-xs text-gray-500 mt-1 hidden sm:block">Partners</div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200">
+                    <div class="text-indigo-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Users</div>
+                    <div id="userStations" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="text-xs text-gray-500 mt-1 hidden sm:block">Stations</div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-teal-200">
+                    <div class="text-teal-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Efficiency</div>
+                    <div id="overallEfficiency" class="text-xl sm:text-4xl font-bold text-gray-900">0%</div>
+                    <div class="text-xs text-gray-500 mt-1 hidden sm:block">Success Rate</div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-amber-200">
+                    <div class="text-amber-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">Msg/Conn</div>
+                    <div id="msgPerConn" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="text-xs text-gray-500 mt-1 hidden sm:block">Avg Messages</div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-rose-50 to-rose-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-rose-200">
+                    <div class="text-rose-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">KB/Msg</div>
+                    <div id="bytesPerMsg" class="text-xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div class="text-xs text-gray-500 mt-1 hidden sm:block">Avg Size</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-10">
+                <div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
+                    <h2 class="text-base sm:text-xl font-bold gradient-text mb-3 sm:mb-4">Top Stations by Connections</h2>
+                    <canvas id="connectionsChart"></canvas>
+                </div>
+                <div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
+                    <h2 class="text-base sm:text-xl font-bold gradient-text mb-3 sm:mb-4">Message Distribution</h2>
+                    <canvas id="messagesChart"></canvas>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-10">
+                <div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
+                    <h2 class="text-base sm:text-xl font-bold gradient-text mb-3 sm:mb-4">Data Transfer by Station</h2>
+                    <canvas id="bytesChart"></canvas>
+                </div>
+                <div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
+                    <h2 class="text-base sm:text-xl font-bold gradient-text mb-3 sm:mb-4">Traffic Type Breakdown</h2>
+                    <canvas id="trafficTypeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Station Table -->
+            <div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
+                    <h2 class="text-lg sm:text-2xl font-bold gradient-text">Station Details</h2>
+                    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        <select id="stationFilter" class="border border-gray-300 rounded-lg px-3 py-2 text-xs sm:text-sm" onchange="filterStations()">
+                            <option value="all">All Stations</option>
+                            <option value="active">Active Only</option>
+                            <option value="bbs">BBS Partners</option>
+                            <option value="activebbs">Active BBS Partners</option>
+                            <option value="user">Users Only</option>
+                        </select>
+                        <input type="text" id="stationSearch" placeholder="Search..." class="border border-gray-300 rounded-lg px-3 py-2 text-xs sm:text-sm" onkeyup="filterStations()">
+                    </div>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar max-h-72 sm:max-h-96">
+                    <table class="w-full text-xs sm:text-sm">
+                        <thead class="bg-gray-100 sticky top-0">
+                            <tr>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-left cursor-pointer hover:bg-gray-200" onclick="sortTable('callsign')">Call</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200" onclick="sortTable('connIn')">In</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200" onclick="sortTable('connOut')">Out</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200 hide-mobile" onclick="sortTable('msgRx')">Msg Rx</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200 hide-mobile" onclick="sortTable('msgTx')">Msg Tx</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200 hide-mobile" onclick="sortTable('bytesRx')">Data Rx</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200 hide-mobile" onclick="sortTable('bytesTx')">Data Tx</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200" onclick="sortTable('efficiency')">Eff%</th>
+                                <th class="px-2 sm:px-3 py-2 sm:py-3 text-right cursor-pointer hover:bg-gray-200 hide-mobile" onclick="sortTable('rejected')">Rej</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stationTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500">
+                    <span id="tableStats">Showing 0 stations</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const TRAFFIC_BASE_URL = './logs/';
+        const DAYS_TO_LOAD = 90; // Maximum days to load (for data availability)
+        
+        let selectedDays = 4;   // Default to 4 weeks view (filtered from loaded data)
+        let allStations = {};   // All loaded station data
+        let stations = {};      // Filtered stations for current view
+        let totals = { connIn: 0, connOut: 0, msgRxP: 0, msgRxB: 0, msgTxP: 0, msgTxB: 0, bytesRx: 0, bytesTx: 0, rejIn: 0, rejOut: 0 };
+        let reportDateRange = { from: null, to: null };
+        let currentSort = { column: 'connIn', ascending: false };
+        let filesLoaded = 0;
+        let filteredFileCount = 0;
+        let filesAttempted = 0;
+        let loadedFileData = []; // Store raw file data for re-filtering
+
+        // Generate filename for a date: Traffic_YYMMDD.txt (using UTC)
+        function getTrafficFilename(date) {
+            const yy = String(date.getUTCFullYear()).slice(-2);
+            const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(date.getUTCDate()).padStart(2, '0');
+            return `Traffic_${yy}${mm}${dd}.txt`;
+        }
+
+        // Format date for display
+        function formatDateDisplay(date) {
+            if (!date) return '';
+            const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(date.getUTCDate()).padStart(2, '0');
+            const yyyy = date.getUTCFullYear();
+            return `${mm}/${dd}/${yyyy}`;
+        }
+
+        // Parse P/B/T format (Personal/Bulletin/Traffic)
+        function parsePBT(str) {
+            const match = str.match(/(\d+)\/(\d+)\/(\d+)/);
+            if (match) {
+                return { p: parseInt(match[1]), b: parseInt(match[2]), t: parseInt(match[3]), total: parseInt(match[1]) + parseInt(match[2]) + parseInt(match[3]) };
+            }
+            return { p: 0, b: 0, t: 0, total: 0 };
+        }
+
+        // Format bytes to human readable
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Parse a single traffic file and aggregate data
+        function parseTrafficFile(text, fileDate) {
+            const lines = text.trim().split('\n');
+            
+            // Update date range
+            if (!reportDateRange.from || fileDate < reportDateRange.from) {
+                reportDateRange.from = fileDate;
+            }
+            if (!reportDateRange.to || fileDate > reportDateRange.to) {
+                reportDateRange.to = fileDate;
+            }
+            
+            // Parse station lines
+            for (const line of lines) {
+                const match = line.match(/^\s*(\(B\))?\s*([A-Z0-9]{3,8})\s+(\d+)\s+(\d+)\s+(\d+\/\d+\/\d+)\s+(\d+\/\d+\/\d+)\s+(\d+\/\d+\/\d+)\s+(\d+\/\d+\/\d+)\s+(\d+\/\d+\/\d+)\s+(\d+\/\d+\/\d+)/i);
+                
+                if (match) {
+                    const isBBS = !!match[1];
+                    const callsign = match[2];
+                    const connIn = parseInt(match[3]);
+                    const connOut = parseInt(match[4]);
+                    const msgRx = parsePBT(match[5]);
+                    const msgTx = parsePBT(match[6]);
+                    const bytesRx = parsePBT(match[7]);
+                    const bytesTx = parsePBT(match[8]);
+                    const rejIn = parsePBT(match[9]);
+                    const rejOut = parsePBT(match[10]);
+                    
+                    const bytesRxTotal = bytesRx.p + bytesRx.b + bytesRx.t;
+                    const bytesTxTotal = bytesTx.p + bytesTx.b + bytesTx.t;
+                    
+                    // Aggregate into allStations object
+                    if (!allStations[callsign]) {
+                        allStations[callsign] = {
+                            callsign, isBBS,
+                            connIn: 0, connOut: 0,
+                            msgRx: { p: 0, b: 0, t: 0, total: 0 },
+                            msgTx: { p: 0, b: 0, t: 0, total: 0 },
+                            bytesRx: 0, bytesTx: 0,
+                            rejIn: 0, rejOut: 0
+                        };
+                    }
+                    
+                    const s = allStations[callsign];
+                    s.isBBS = s.isBBS || isBBS; // Keep BBS flag if ever seen
+                    s.connIn += connIn;
+                    s.connOut += connOut;
+                    s.msgRx.p += msgRx.p;
+                    s.msgRx.b += msgRx.b;
+                    s.msgRx.t += msgRx.t;
+                    s.msgRx.total += msgRx.total;
+                    s.msgTx.p += msgTx.p;
+                    s.msgTx.b += msgTx.b;
+                    s.msgTx.t += msgTx.t;
+                    s.msgTx.total += msgTx.total;
+                    s.bytesRx += bytesRxTotal;
+                    s.bytesTx += bytesTxTotal;
+                    s.rejIn += rejIn.total;
+                    s.rejOut += rejOut.total;
+                    
+                    // Update totals
+                    totals.connIn += connIn;
+                    totals.connOut += connOut;
+                    totals.msgRxP += msgRx.p;
+                    totals.msgRxB += msgRx.b;
+                    totals.msgTxP += msgTx.p;
+                    totals.msgTxB += msgTx.b;
+                    totals.bytesRx += bytesRxTotal;
+                    totals.bytesTx += bytesTxTotal;
+                    totals.rejIn += rejIn.total;
+                    totals.rejOut += rejOut.total;
+                }
+            }
+        }
+
+        async function loadTrafficReport() {
+            loadedFileData = [];
+            filesLoaded = 0;
+            filesAttempted = 0;
+            
+            // Generate list of dates to load (using UTC since BPQ32 rotates logs at 00:00 UTC)
+            const now = new Date();
+            const filesToLoad = [];
+            
+            for (let i = 0; i < DAYS_TO_LOAD; i++) {
+                const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+                const yy = String(date.getUTCFullYear()).slice(-2);
+                const yyyy = date.getUTCFullYear();
+                const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const dd = String(date.getUTCDate()).padStart(2, '0');
+                const yymmdd = yy + mm + dd;
+                const yyyymmdd = yyyy * 10000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate(); // Numeric for comparison
+                const filename = `Traffic_${yymmdd}.txt`;
+                filesToLoad.push({ filename, yymmdd, yyyymmdd, date });
+            }
+            
+            // Load all files in parallel
+            const loadPromises = filesToLoad.map(async ({ filename, yymmdd, yyyymmdd, date }) => {
+                try {
+                    const response = await fetch(TRAFFIC_BASE_URL + filename + '?t=' + Date.now());
+                    filesAttempted++;
+                    if (response.ok) {
+                        const text = await response.text();
+                        // Store raw data with numeric YYYYMMDD for proper comparison
+                        loadedFileData.push({ text, yymmdd, yyyymmdd, date });
+                        filesLoaded++;
+                        return true;
+                    }
+                } catch (e) {
+                    // File not found, skip silently
+                }
+                return false;
+            });
+            
+            await Promise.all(loadPromises);
+            
+            
+            if (filesLoaded > 0) {
+                // Sort by yyyymmdd numeric (oldest first for consistent processing)
+                loadedFileData.sort((a, b) => a.yyyymmdd - b.yyyymmdd);
+                // Apply time range filter and update display
+                filterAndProcess();
+            } else {
+                // Zero out all cards
+                stations = [];
+                filteredFileCount = 0;
+                updateStats();
+                updateCharts();
+                
+                // Show detailed warning AFTER updateStats so it doesn't get overwritten
+                updateStatus('error', 'No traffic files found');
+                document.getElementById('dateRange').textContent = '⚠️ No traffic report files found in logs folder';
+                document.getElementById('stationTableBody').innerHTML = 
+                    '<tr><td colspan="9" class="text-center py-8">' +
+                    '<div class="text-amber-500 text-2xl mb-2">⚠️</div>' +
+                    '<div class="text-gray-600 font-semibold mb-2">No Traffic Report Files Found</div>' +
+                    '<div class="text-gray-400 text-xs leading-relaxed">' +
+                    'This page requires BPQ32 weekly traffic report files to display station data.<br><br>' +
+                    '<span class="text-gray-500 font-semibold">Required file:</span> <span class="font-mono font-semibold text-purple-600">Traffic_YYMMDD.txt</span><br>' +
+                    '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br>' +
+                    '<span class="text-gray-500 font-semibold">Example:</span> <span class="font-mono text-gray-500">logs/Traffic_' + String(now.getUTCFullYear()).slice(-2) + String(now.getUTCMonth()+1).padStart(2,'0') + String(now.getUTCDate()).padStart(2,'0') + '.txt</span><br><br>' +
+                    'BPQ32 generates these files automatically each week.<br>' +
+                    'Ensure they are being synced to the dashboard <span class="font-mono font-semibold">logs/</span> folder.' +
+                    '</div>' +
+                    '</td></tr>';
+                document.getElementById('tableStats').textContent = 'No data available';
+            }
+        }
+        
+        // Filter loaded data by selectedDays (weeks) using calendar date range, then reprocess
+        function filterAndProcess() {
+            // Reset aggregation
+            allStations = {};
+            totals = { connIn: 0, connOut: 0, msgRxP: 0, msgRxB: 0, msgTxP: 0, msgTxB: 0, bytesRx: 0, bytesTx: 0, rejIn: 0, rejOut: 0 };
+            reportDateRange = { from: null, to: null };
+            
+            // Calculate the calendar cutoff date based on selected weeks
+            const now = new Date();
+            const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+            const cutoffDays = selectedDays * 7; // 1W=7d, 4W=28d, 12W=84d
+            const cutoffMs = cutoffDays * 24 * 60 * 60 * 1000;
+            const cutoffDate = new Date(todayUTC - cutoffMs);
+            
+            // Filter loaded files to only those within the calendar window
+            const filesInWindow = loadedFileData.filter(({ date }) => date >= cutoffDate);
+            
+            // Further filter to files that have actual station data lines
+            const filesWithData = filesInWindow.filter(({ text }) => {
+                const lines = text.trim().split('\n');
+                for (const line of lines) {
+                    if (line.match(/^\s*(\(B\))?\s*([A-Z0-9]{3,8})\s+(\d+)\s+(\d+)\s+(\d+\/\d+\/\d+)/i)) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            // Sort by date descending (newest first)
+            filesWithData.sort((a, b) => b.yyyymmdd - a.yyyymmdd);
+            
+            const rangeLabel = selectedDays === 1 ? '7 Days' : (selectedDays * 7) + ' Days';
+            const rangeDesc = selectedDays === 1 ? 'last 7 days' : 'last ' + (selectedDays * 7) + ' days';
+            
+            
+            // If no files have data within the date range, show specific warning
+            if (filesWithData.length === 0) {
+                const fromStr = formatDateDisplay(cutoffDate);
+                const toStr = formatDateDisplay(new Date(todayUTC));
+                
+                // Zero out cards and charts first (totals/stations already reset above)
+                stations = [];
+                filteredFileCount = 0;
+                updateStats();
+                updateCharts();
+                
+                // NOW set the warning - after updateStats so it doesn't get overwritten
+                updateStatus('error', 'No data for ' + rangeLabel);
+                document.getElementById('dateRange').textContent = '⚠️ No data available for ' + fromStr + ' – ' + toStr;
+                document.getElementById('stationTableBody').innerHTML = 
+                    '<tr><td colspan="9" class="text-center py-8">' +
+                    '<div class="text-amber-500 text-2xl mb-2">⚠️</div>' +
+                    '<div class="text-gray-600 font-semibold mb-2">No Traffic Report Files Found for the ' + rangeDesc + '</div>' +
+                    '<div class="text-gray-400 text-xs leading-relaxed">' +
+                    'This page requires BPQ32 weekly traffic report files to display station data.<br><br>' +
+                    '<span class="text-gray-500 font-semibold">Required file:</span> <span class="font-mono font-semibold text-purple-600">Traffic_YYMMDD.txt</span><br>' +
+                    '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br>' +
+                    '<span class="text-gray-500 font-semibold">Search range:</span> <span class="font-semibold text-gray-500">' + fromStr + ' – ' + toStr + '</span><br>' +
+                    '<span class="text-gray-500 font-semibold">Example:</span> <span class="font-mono text-gray-500">logs/Traffic_' + new Date().toISOString().slice(2,4) + String(now.getUTCMonth()+1).padStart(2,'0') + String(now.getUTCDate()).padStart(2,'0') + '.txt</span><br><br>' +
+                    'BPQ32 generates these files automatically each week.<br>' +
+                    'Ensure they are being synced to the dashboard <span class="font-mono font-semibold">logs/</span> folder.' +
+                    '</div>' +
+                    '</td></tr>';
+                document.getElementById('tableStats').textContent = 'No data available';
+                return;
+            }
+            
+            let filesProcessed = 0;
+            let oldestDate = null;
+            let newestDate = null;
+            
+            // Process the filtered files
+            filesWithData.forEach(({ text, yymmdd }) => {
+                const yy = parseInt(yymmdd.substring(0, 2));
+                const mm = parseInt(yymmdd.substring(2, 4)) - 1;
+                const dd = parseInt(yymmdd.substring(4, 6));
+                const fileDate = new Date(Date.UTC(2000 + yy, mm, dd));
+                
+                
+                parseTrafficFile(text, fileDate);
+                filesProcessed++;
+                
+                if (!oldestDate || fileDate < oldestDate) oldestDate = fileDate;
+                if (!newestDate || fileDate > newestDate) newestDate = fileDate;
+            });
+            
+            
+            reportDateRange.from = oldestDate;
+            reportDateRange.to = newestDate;
+            
+            // Convert stations object to array and compute derived fields
+            const stationArray = Object.values(allStations).map(s => ({
+                ...s,
+                connTotal: s.connIn + s.connOut,
+                msgTotal: s.msgRx.total + s.msgTx.total,
+                bytesTotal: s.bytesRx + s.bytesTx,
+                rejTotal: s.rejIn + s.rejOut,
+                isActive: s.connIn + s.connOut + s.msgRx.total + s.msgTx.total > 0
+            }));
+            
+            stations = stationArray;
+            
+            updateAll();
+            
+            updateStatus('success', filesProcessed + ' report' + (filesProcessed !== 1 ? 's' : '') + ', ' + stations.length + ' stations (' + rangeLabel + ')');
+            filteredFileCount = filesProcessed;
+        }
+        
+        // Set time range and reprocess data
+        function setTimeRange(weeks) {
+            selectedDays = weeks;
+            
+            // Update button states
+            document.getElementById('range1w').className = weeks === 1 ? 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white' : 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700';
+            document.getElementById('range4w').className = weeks === 4 ? 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white' : 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700';
+            document.getElementById('range12w').className = weeks === 12 ? 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white' : 
+                'flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700';
+            
+            // Reprocess with new filter if data is loaded
+            if (loadedFileData.length > 0) {
+                filterAndProcess();
+            }
+        }
+
+        function updateAll() { updateStats(); updateCharts(); updateTable(); }
+
+        function updateStats() {
+            // Date range display
+            if (reportDateRange.from && reportDateRange.to) {
+                document.getElementById('dateRange').textContent = 
+                    formatDateDisplay(reportDateRange.from) + ' to ' + formatDateDisplay(reportDateRange.to) + 
+                    ' (' + filteredFileCount + ' report' + (filteredFileCount !== 1 ? 's' : '') + ')';
+            } else {
+                document.getElementById('dateRange').textContent = 'No data loaded';
+            }
+            
+            const totalConn = totals.connIn + totals.connOut;
+            document.getElementById('totalConnections').textContent = totalConn.toLocaleString();
+            document.getElementById('connectionsIn').textContent = totals.connIn.toLocaleString();
+            document.getElementById('connectionsOut').textContent = totals.connOut.toLocaleString();
+            
+            const totalMsgRx = totals.msgRxP + totals.msgRxB;
+            const totalMsgTx = totals.msgTxP + totals.msgTxB;
+            const totalMsg = totalMsgRx + totalMsgTx;
+            document.getElementById('totalMessages').textContent = totalMsg.toLocaleString();
+            document.getElementById('messagesRx').textContent = totalMsgRx.toLocaleString();
+            document.getElementById('messagesTx').textContent = totalMsgTx.toLocaleString();
+            
+            const totalBytes = totals.bytesRx + totals.bytesTx;
+            document.getElementById('totalBytes').textContent = formatBytes(totalBytes);
+            document.getElementById('bytesRx').textContent = formatBytes(totals.bytesRx);
+            document.getElementById('bytesTx').textContent = formatBytes(totals.bytesTx);
+            
+            const totalRej = totals.rejIn + totals.rejOut;
+            document.getElementById('totalRejected').textContent = totalRej.toLocaleString();
+            document.getElementById('rejectedIn').textContent = totals.rejIn.toLocaleString();
+            document.getElementById('rejectedOut').textContent = totals.rejOut.toLocaleString();
+            
+            document.getElementById('activeStations').textContent = stations.filter(s => s.isActive).length.toLocaleString();
+            document.getElementById('bbsNodes').textContent = stations.filter(s => s.isBBS).length.toLocaleString();
+            document.getElementById('userStations').textContent = stations.filter(s => !s.isBBS).length.toLocaleString();
+            
+            // Efficiency metrics
+            // Overall efficiency: (total messages + connections) / (total messages + connections + rejections) * 100
+            const totalActivity = totalMsg + totalConn;
+            const overallEff = totalActivity > 0 ? ((totalActivity / (totalActivity + totalRej)) * 100).toFixed(1) : 0;
+            document.getElementById('overallEfficiency').textContent = overallEff + '%';
+            
+            // Messages per connection
+            const msgPerConn = totalConn > 0 ? (totalMsg / totalConn).toFixed(2) : 0;
+            document.getElementById('msgPerConn').textContent = msgPerConn;
+            
+            // Average KB per message
+            const bytesPerMsg = totalMsg > 0 ? ((totalBytes / totalMsg) / 1024).toFixed(1) : 0;
+            document.getElementById('bytesPerMsg').textContent = bytesPerMsg;
+        }
+
+        function updateCharts() {
+            const topByConn = [...stations].filter(s => s.connTotal > 0).sort((a, b) => b.connTotal - a.connTotal).slice(0, 10);
+            window.connectionsChart.data.labels = topByConn.map(s => s.callsign);
+            window.connectionsChart.data.datasets[0].data = topByConn.map(s => s.connIn);
+            window.connectionsChart.data.datasets[1].data = topByConn.map(s => s.connOut);
+            window.connectionsChart.update();
+            
+            window.messagesChart.data.datasets[0].data = [totals.msgRxP, totals.msgRxB, totals.msgTxP, totals.msgTxB];
+            window.messagesChart.update();
+            
+            const topByBytes = [...stations].filter(s => s.bytesTotal > 0).sort((a, b) => b.bytesTotal - a.bytesTotal).slice(0, 10);
+            window.bytesChart.data.labels = topByBytes.map(s => s.callsign);
+            window.bytesChart.data.datasets[0].data = topByBytes.map(s => s.bytesRx);
+            window.bytesChart.data.datasets[1].data = topByBytes.map(s => s.bytesTx);
+            window.bytesChart.update();
+            
+            window.trafficTypeChart.data.datasets[0].data = [
+                stations.filter(s => s.isBBS).reduce((sum, s) => sum + s.connTotal, 0),
+                stations.filter(s => !s.isBBS).reduce((sum, s) => sum + s.connTotal, 0)
+            ];
+            window.trafficTypeChart.update();
+        }
+
+        function updateTable() {
+            const filter = document.getElementById('stationFilter').value;
+            const search = document.getElementById('stationSearch').value.toUpperCase();
+            
+            let filtered = [...stations];
+            if (filter === 'active') filtered = filtered.filter(s => s.isActive);
+            else if (filter === 'bbs') filtered = filtered.filter(s => s.isBBS);
+            else if (filter === 'activebbs') filtered = filtered.filter(s => s.isBBS && s.isActive);
+            else if (filter === 'user') filtered = filtered.filter(s => !s.isBBS);
+            if (search) filtered = filtered.filter(s => s.callsign.includes(search));
+            
+            // Calculate efficiency for each station
+            filtered = filtered.map(s => {
+                const activity = s.connTotal + s.msgTotal;
+                const efficiency = activity > 0 ? ((activity / (activity + s.rejTotal)) * 100) : 0;
+                return { ...s, efficiency };
+            });
+            
+            filtered.sort((a, b) => {
+                let aVal, bVal;
+                switch (currentSort.column) {
+                    case 'callsign': aVal = a.callsign; bVal = b.callsign; break;
+                    case 'connIn': aVal = a.connIn; bVal = b.connIn; break;
+                    case 'connOut': aVal = a.connOut; bVal = b.connOut; break;
+                    case 'msgRx': aVal = a.msgRx.total; bVal = b.msgRx.total; break;
+                    case 'msgTx': aVal = a.msgTx.total; bVal = b.msgTx.total; break;
+                    case 'bytesRx': aVal = a.bytesRx; bVal = b.bytesRx; break;
+                    case 'bytesTx': aVal = a.bytesTx; bVal = b.bytesTx; break;
+                    case 'efficiency': aVal = a.efficiency; bVal = b.efficiency; break;
+                    case 'rejected': aVal = a.rejTotal; bVal = b.rejTotal; break;
+                    default: aVal = a.connIn; bVal = b.connIn;
+                }
+                if (typeof aVal === 'string') return currentSort.ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                return currentSort.ascending ? aVal - bVal : bVal - aVal;
+            });
+            
+            const tbody = document.getElementById('stationTableBody');
+            tbody.innerHTML = filtered.map((s, i) => {
+                const rowClass = i % 2 ? 'bg-gray-50' : 'bg-white';
+                const activeClass = s.isActive ? '' : 'opacity-50';
+                const bbsBadge = s.isBBS ? '<span class="bbs-badge ml-1">BBS</span>' : '';
+                const effColor = s.efficiency >= 95 ? 'text-green-600' : s.efficiency >= 80 ? 'text-yellow-600' : s.efficiency > 0 ? 'text-red-600' : 'text-gray-400';
+                const effDisplay = s.isActive ? s.efficiency.toFixed(1) + '%' : '-';
+                return `<tr class="${rowClass} ${activeClass} hover:bg-purple-50">
+                    <td class="px-3 py-2 font-semibold text-purple-700">${s.callsign}${bbsBadge}</td>
+                    <td class="px-3 py-2 text-right ${s.connIn > 0 ? 'text-blue-600 font-semibold' : 'text-gray-400'}">${s.connIn}</td>
+                    <td class="px-3 py-2 text-right ${s.connOut > 0 ? 'text-orange-600 font-semibold' : 'text-gray-400'}">${s.connOut}</td>
+                    <td class="px-3 py-2 text-right hide-mobile ${s.msgRx.total > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'}">${s.msgRx.total}</td>
+                    <td class="px-3 py-2 text-right hide-mobile ${s.msgTx.total > 0 ? 'text-purple-600 font-semibold' : 'text-gray-400'}">${s.msgTx.total}</td>
+                    <td class="px-3 py-2 text-right hide-mobile ${s.bytesRx > 0 ? 'text-cyan-600 font-semibold' : 'text-gray-400'}">${s.bytesRx > 0 ? formatBytes(s.bytesRx) : '0'}</td>
+                    <td class="px-3 py-2 text-right hide-mobile ${s.bytesTx > 0 ? 'text-indigo-600 font-semibold' : 'text-gray-400'}">${s.bytesTx > 0 ? formatBytes(s.bytesTx) : '0'}</td>
+                    <td class="px-3 py-2 text-right font-semibold ${effColor}">${effDisplay}</td>
+                    <td class="px-3 py-2 text-right hide-mobile ${s.rejTotal > 0 ? 'text-red-600 font-semibold' : 'text-gray-400'}">${s.rejTotal}</td>
+                </tr>`;
+            }).join('');
+            
+            document.getElementById('tableStats').textContent = `Showing ${filtered.length} of ${stations.length} stations`;
+        }
+
+        function filterStations() { updateTable(); }
+        function sortTable(column) {
+            if (currentSort.column === column) currentSort.ascending = !currentSort.ascending;
+            else { currentSort.column = column; currentSort.ascending = false; }
+            updateTable();
+        }
+
+        function updateStatus(type, msg) {
+            document.getElementById('statusIndicator').className = 'status-indicator status-' + type;
+            document.getElementById('statusText').textContent = msg;
+            document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+        }
+
+        function refreshData() { updateStatus('loading', 'Refreshing...'); loadTrafficReport(); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.connectionsChart = new Chart(document.getElementById('connectionsChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [
+                    { label: 'Connections In', data: [], backgroundColor: 'rgba(59, 130, 246, 0.8)' },
+                    { label: 'Connections Out', data: [], backgroundColor: 'rgba(249, 115, 22, 0.8)' }
+                ]},
+                options: { responsive: true, animation: false, plugins: { legend: { position: 'top' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+            });
+            
+            window.messagesChart = new Chart(document.getElementById('messagesChart'), {
+                type: 'doughnut',
+                data: { labels: ['Personal Rx', 'Bulletin Rx', 'Personal Tx', 'Bulletin Tx'], datasets: [{
+                    data: [0, 0, 0, 0],
+                    backgroundColor: ['rgba(16, 185, 129, 0.8)', 'rgba(34, 211, 238, 0.8)', 'rgba(139, 92, 246, 0.8)', 'rgba(236, 72, 153, 0.8)']
+                }]},
+                options: { responsive: true, animation: false, plugins: { legend: { position: 'bottom' } } }
+            });
+            
+            window.bytesChart = new Chart(document.getElementById('bytesChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [
+                    { label: 'Bytes Rx', data: [], backgroundColor: 'rgba(6, 182, 212, 0.8)' },
+                    { label: 'Bytes Tx', data: [], backgroundColor: 'rgba(99, 102, 241, 0.8)' }
+                ]},
+                options: { responsive: true, animation: false, indexAxis: 'y', plugins: { legend: { position: 'top' } } }
+            });
+            
+            window.trafficTypeChart = new Chart(document.getElementById('trafficTypeChart'), {
+                type: 'pie',
+                data: { labels: ['BBS Nodes', 'User Stations'], datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['rgba(249, 115, 22, 0.8)', 'rgba(99, 102, 241, 0.8)']
+                }]},
+                options: { responsive: true, animation: false, plugins: { legend: { position: 'bottom' } } }
+            });
+            
+            loadTrafficReport();
+            setInterval(refreshData, 900000); // 15 min refresh
+            (function updateNavClocks(){var n=new Date(),u=String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0'),l=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'),a=document.getElementById('navUtcClock'),b=document.getElementById('navLocalClock');if(a)a.textContent=u+' Z';if(b)b.textContent=l+' L';setTimeout(updateNavClocks,1000-n.getMilliseconds())})();
+        });
+    </script>
+    <script>
+    (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
+    </script>
+<script src="shared/settings-modal.js"></script>
+</body>
+</html>

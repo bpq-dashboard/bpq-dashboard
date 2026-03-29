@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BPQ Connect Log v1.5.0</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    <style>
+        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
+        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        body { background: #f3f4f6; min-height: 100vh; }
+        .glass-container { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 8px 32px rgba(31,38,135,0.37); }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.2); }
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .modern-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .modern-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.4); }
+        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+        .status-success { background-color: #10b981; }
+        .status-error { background-color: #ef4444; }
+        .status-loading { background-color: #f59e0b; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); }
+        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #667eea #e5e7eb; }
+        .time-range-btn { background: #e5e7eb; color: #374151; }
+        .time-range-btn:hover { background: #d1d5db; }
+        .time-range-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .mode-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+        .mode-VARA { background: #dbeafe; color: #1d4ed8; }
+        .mode-NETROM { background: #dcfce7; color: #166534; }
+        .mode-AX25 { background: #fef3c7; color: #92400e; }
+        .mode-TELNET { background: #f3e8ff; color: #7c3aed; }
+        .mode-OTHER { background: #f1f5f9; color: #475569; }
+        .log-row { transition: background-color 0.15s; }
+        .log-row:hover { background-color: #f8fafc; }
+        .filter-chip { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+        .filter-chip:hover { transform: scale(1.05); }
+        .filter-chip.active { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.3); }
+        .filter-chip.dimmed { opacity: 0.4; }
+        #connectMap { border: 1px solid #e5e7eb; }
+        .connect-marker { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35); cursor: pointer; transition: transform 0.2s; }
+        .connect-marker:hover { transform: scale(1.3); }
+        .callsign-tooltip { font-weight: bold; font-size: 11px; }
+        @media (min-width: 768px) {
+            #connectMap { height: 450px; }
+        }
+        #connectMap { height: 400px; border-radius: 12px; z-index: 1; }
+        .callsign-marker { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 3px 6px; border-radius: 6px; font-weight: bold; font-size: 10px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+        .station-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); cursor: pointer; transition: transform 0.2s; }
+        .station-dot:hover { transform: scale(1.3); }
+        .dot-VARA { background: #2563eb; }
+        .dot-NETROM { background: #16a34a; }
+        .dot-AX25 { background: #d97706; }
+        .dot-TELNET { background: #7c3aed; }
+        .dot-MULTI { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .dot-home { background: linear-gradient(135deg, #ef4444, #dc2626); width: 20px !important; height: 20px !important; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 3px solid white; }
+        .map-legend { background: rgba(255,255,255,0.92); border-radius: 8px; padding: 8px 12px; font-size: 11px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .map-legend-item { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+        .map-legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        @media (max-width: 640px) {
+            .glass-container { border-radius: 12px; }
+            .stat-card { padding: 0.75rem !important; }
+            .stat-card .text-4xl { font-size: 1.5rem !important; }
+            .hide-mobile { display: none !important; }
+        }
+    </style>
+    <style id="bpq-dark-mode">
+    /* Dark Mode — auto-detects OS preference, manual toggle in nav */
+    [data-theme="dark"] { background: #111827 !important; color-scheme: dark; }
+    [data-theme="dark"] body { background: #111827 !important; color: #e5e7eb !important; }
+    [data-theme="dark"] .glass-container { background: rgba(31,41,55,0.95) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; border: 1px solid rgba(75,85,99,0.4); }
+    /* Backgrounds */
+    [data-theme="dark"] [class~="bg-white"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-50"] { background-color: #1a2332 !important; }
+    [data-theme="dark"] [class~="bg-gray-100"] { background-color: #1f2937 !important; }
+    [data-theme="dark"] [class~="bg-gray-200"] { background-color: #374151 !important; }
+    [data-theme="dark"] [class~="bg-gray-300"] { background-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="bg-green-50"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-green-100"] { background-color: #065f46 !important; }
+    [data-theme="dark"] [class~="bg-blue-50"] { background-color: #1e3a5f !important; }
+    [data-theme="dark"] [class~="bg-blue-100"] { background-color: #1e40af !important; }
+    [data-theme="dark"] [class~="bg-purple-50"] { background-color: #2e1065 !important; }
+    [data-theme="dark"] [class~="bg-purple-100"] { background-color: #3b0764 !important; }
+    [data-theme="dark"] [class~="bg-red-50"] { background-color: #450a0a !important; }
+    [data-theme="dark"] [class~="bg-red-100"] { background-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="bg-amber-50"] { background-color: #451a03 !important; }
+    [data-theme="dark"] [class~="bg-amber-100"] { background-color: #78350f !important; }
+    [data-theme="dark"] [class~="bg-orange-50"] { background-color: #431407 !important; }
+    [data-theme="dark"] [class~="bg-orange-100"] { background-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="bg-emerald-50"] { background-color: #022c22 !important; }
+    [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
+    [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
+    [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
+    [data-theme="dark"] [class~="bg-sky-200"] { background-color: #0369a1 !important; }
+    [data-theme="dark"] [class~="bg-cyan-50"] { background-color: #083344 !important; }
+    /* Stat card gradients */
+    [data-theme="dark"] [class*="from-green-50"] { background-image: linear-gradient(to bottom right, #064e3b, #065f46) !important; }
+    [data-theme="dark"] [class*="from-blue-50"] { background-image: linear-gradient(to bottom right, #1e3a5f, #1e40af) !important; }
+    [data-theme="dark"] [class*="from-purple-50"] { background-image: linear-gradient(to bottom right, #2e1065, #4c1d95) !important; }
+    [data-theme="dark"] [class*="from-red-50"] { background-image: linear-gradient(to bottom right, #450a0a, #7f1d1d) !important; }
+    [data-theme="dark"] [class*="from-orange-50"] { background-image: linear-gradient(to bottom right, #431407, #7c2d12) !important; }
+    [data-theme="dark"] [class*="from-amber-50"] { background-image: linear-gradient(to bottom right, #451a03, #78350f) !important; }
+    [data-theme="dark"] [class*="from-emerald-50"] { background-image: linear-gradient(to bottom right, #022c22, #064e3b) !important; }
+    [data-theme="dark"] [class*="from-sky-50"] { background-image: linear-gradient(to bottom right, #0c4a6e, #075985) !important; }
+    [data-theme="dark"] [class*="from-cyan-50"] { background-image: linear-gradient(to bottom right, #083344, #155e75) !important; }
+    /* Text colors */
+    [data-theme="dark"] [class~="text-gray-900"] { color: #f3f4f6 !important; }
+    [data-theme="dark"] [class~="text-gray-800"] { color: #e5e7eb !important; }
+    [data-theme="dark"] [class~="text-gray-700"] { color: #d1d5db !important; }
+    [data-theme="dark"] [class~="text-gray-600"] { color: #9ca3af !important; }
+    [data-theme="dark"] [class~="text-gray-500"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-gray-400"] { color: #6b7280 !important; }
+    [data-theme="dark"] [class~="text-green-600"] { color: #34d399 !important; }
+    [data-theme="dark"] [class~="text-green-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-green-800"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-blue-600"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-700"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-blue-800"] { color: #93c5fd !important; }
+    [data-theme="dark"] [class~="text-purple-600"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-700"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-purple-800"] { color: #c4b5fd !important; }
+    [data-theme="dark"] [class~="text-red-600"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-700"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-red-800"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-orange-600"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-orange-700"] { color: #fdba74 !important; }
+    [data-theme="dark"] [class~="text-amber-600"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-amber-700"] { color: #fcd34d !important; }
+    [data-theme="dark"] [class~="text-yellow-600"] { color: #fde047 !important; }
+    [data-theme="dark"] [class~="text-sky-700"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-sky-800"] { color: #7dd3fc !important; }
+    [data-theme="dark"] [class~="text-emerald-600"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-emerald-700"] { color: #6ee7b7 !important; }
+    [data-theme="dark"] [class~="text-cyan-600"] { color: #67e8f9 !important; }
+    /* Borders */
+    [data-theme="dark"] [class~="border-gray-200"] { border-color: #374151 !important; }
+    [data-theme="dark"] [class~="border-gray-300"] { border-color: #4b5563 !important; }
+    [data-theme="dark"] [class~="border-green-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-blue-200"] { border-color: #1e40af !important; }
+    [data-theme="dark"] [class~="border-purple-100"] { border-color: #4c1d95 !important; }
+    [data-theme="dark"] [class~="border-purple-200"] { border-color: #5b21b6 !important; }
+    [data-theme="dark"] [class~="border-red-200"] { border-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="border-amber-200"] { border-color: #78350f !important; }
+    [data-theme="dark"] [class~="border-orange-200"] { border-color: #7c2d12 !important; }
+    [data-theme="dark"] [class~="border-emerald-200"] { border-color: #065f46 !important; }
+    [data-theme="dark"] [class~="border-sky-200"] { border-color: #0369a1 !important; }
+    /* Forms */
+    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] input::placeholder { color: #6b7280 !important; }
+    /* Tables */
+    [data-theme="dark"] thead { background-color: #1f2937 !important; }
+    [data-theme="dark"] th { color: #d1d5db !important; }
+    [data-theme="dark"] tr:hover { background-color: rgba(55,65,81,0.5) !important; }
+    /* Log viewer */
+    [data-theme="dark"] .log-entry { color: #d1d5db; }
+    [data-theme="dark"] .log-connect { color: #6ee7b7 !important; }
+    [data-theme="dark"] .log-disconnect { color: #fca5a5 !important; }
+    [data-theme="dark"] .log-message { color: #93c5fd !important; }
+    [data-theme="dark"] .log-error { color: #f87171 !important; }
+    /* Nav */
+    [data-theme="dark"] #navLocalClock { background-color: #374151 !important; color: #d1d5db !important; }
+    [data-theme="dark"] .gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #93c5fd 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+    /* Buttons */
+    [data-theme="dark"] .modern-button { background: linear-gradient(135deg, #7c3aed, #2563eb) !important; }
+    /* Leaflet */
+    [data-theme="dark"] .leaflet-control-zoom a { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
+    [data-theme="dark"] .leaflet-popup-content-wrapper, [data-theme="dark"] .leaflet-popup-tip { background-color: #1f2937 !important; color: #e5e7eb !important; }
+    /* Scrollbar */
+    [data-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+    [data-theme="dark"] ::-webkit-scrollbar-track { background: #1f2937; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    /* Toggle */
+    .dark-mode-toggle { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.5rem; border: none; background: transparent; font-size: 1.1rem; line-height: 1; transition: transform 0.3s ease; }
+    .dark-mode-toggle:hover { transform: scale(1.2); }
+    /* Skeleton */
+    [data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%) !important; background-size: 200% 100%; }
+    /* Modals */
+    [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <nav class="glass-container mx-2 sm:mx-4 mt-2 sm:mt-4 mb-4 sm:mb-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-8 py-3 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0">
+            <h2 class="text-lg sm:text-2xl font-bold gradient-text">📡 BPQ Dashboard</h2>
+            <div class="flex items-center gap-2 font-mono text-xs sm:text-sm" id="navClocks">
+                <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold tracking-wider" id="navUtcClock" title="UTC / Zulu">--:--:-- Z</span>
+                <span class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gray-200 text-gray-700 font-semibold tracking-wider" id="navLocalClock" title="Local time">--:--:-- L</span>
+                    <button id="darkModeToggle" class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle dark mode">🌙</button>
+            </div>
+            <div class="flex gap-1 sm:gap-2 flex-wrap justify-center">
+                <a href="bpq-rf-connections.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">RF</a>
+                <a href="bpq-traffic.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Traffic</a>
+                <a href="bpq-system-logs.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">System</a>
+                <a href="bpq-connect-log.html" class="px-2 sm:px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium text-xs sm:text-sm">Connects</a>
+                <a href="bpq-email-monitor.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Messages</a>
+                <a href="bbs-messages.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">BBS</a>
+                <a href="nws-dashboard.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Weather</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="p-2 sm:p-4 lg:p-8">
+        <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
+            <!-- Header -->
+            <div class="mb-6 sm:mb-10 flex flex-col lg:flex-row justify-between items-center gap-4">
+                <div class="text-center flex-1">
+                    <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
+                        <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">Connect Log</h1>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.0</span>
+                    </div>
+                    <p class="text-gray-600 text-sm sm:text-lg">Connection Activity by Mode</p>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
+                <div id="statusMsg" class="text-sm text-gray-500 flex items-center gap-2">
+                    <span class="status-indicator status-loading"></span> Loading connect logs...
+                </div>
+                <!-- Time Range Buttons -->
+                <div class="flex gap-1 sm:gap-2 flex-wrap justify-center">
+                    <button class="time-range-btn active px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(1)" data-days="1">Today</button>
+                    <button class="time-range-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(3)" data-days="3">3 Days</button>
+                    <button class="time-range-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(7)" data-days="7">7 Days</button>
+                    <button class="time-range-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(30)" data-days="30">30 Days</button>
+                </div>
+            </div>
+
+            <!-- Stat Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                <div class="stat-card bg-gradient-to-br from-purple-50 to-white rounded-xl p-3 sm:p-5 text-center border border-purple-100">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Total Connects</div>
+                    <div class="text-2xl sm:text-4xl font-bold text-purple-700" id="statTotal">
+                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-green-50 to-white rounded-xl p-3 sm:p-5 text-center border border-green-100">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">NETROM</div>
+                    <div class="text-2xl sm:text-4xl font-bold text-green-700" id="statNetrom">
+                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-blue-50 to-white rounded-xl p-3 sm:p-5 text-center border border-blue-100">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">VARA</div>
+                    <div class="text-2xl sm:text-4xl font-bold text-blue-700" id="statVara">
+                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-amber-50 to-white rounded-xl p-3 sm:p-5 text-center border border-amber-100">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">AX.25</div>
+                    <div class="text-2xl sm:text-4xl font-bold text-amber-700" id="statAx25">
+                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-violet-50 to-white rounded-xl p-3 sm:p-5 text-center border border-violet-100">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">TELNET</div>
+                    <div class="text-2xl sm:text-4xl font-bold text-violet-700" id="statTelnet">
+                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Station Map -->
+            <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm mb-6 sm:mb-8">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-2 mb-3 sm:mb-4">
+                    <h3 class="text-sm sm:text-base font-bold text-gray-700">🗺️ Station Locations</h3>
+                    <div class="flex items-center gap-3 text-xs">
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> NETROM</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> VARA</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d97706;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> AX.25</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#7c3aed;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> TELNET</span>
+                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> Multiple</span>
+                    </div>
+                </div>
+                <div id="connectMap" style="height: 350px; border-radius: 12px; z-index: 1;"></div>
+                <div class="mt-2 text-xs text-gray-400 text-center" id="mapStatus">Looking up station locations...</div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                <!-- Mode Distribution Pie -->
+                <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm">
+                    <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">📊 Connection Mode Distribution</h3>
+                    <div class="relative" style="height: 260px;">
+                        <canvas id="modeChart"></canvas>
+                    </div>
+                </div>
+                <!-- Hourly Activity -->
+                <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm">
+                    <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">📈 Hourly Activity (UTC)</h3>
+                    <div class="relative" style="height: 260px;">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Trend (multi-day only) -->
+            <div id="dailyChartContainer" class="hidden bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm mb-6 sm:mb-8">
+                <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">📅 Daily Connection Trend</h3>
+                <div class="relative" style="height: 260px;">
+                    <canvas id="dailyChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Mode Filter Chips + Unique Stations -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
+                <div class="flex gap-2 flex-wrap justify-center" id="modeFilters">
+                    <span class="filter-chip active mode-badge mode-NETROM text-xs sm:text-sm px-3 py-1" data-mode="NETROM" onclick="toggleModeFilter(this)">NETROM</span>
+                    <span class="filter-chip active mode-badge mode-VARA text-xs sm:text-sm px-3 py-1" data-mode="VARA" onclick="toggleModeFilter(this)">VARA</span>
+                    <span class="filter-chip active mode-badge mode-AX25 text-xs sm:text-sm px-3 py-1" data-mode="AX.25" onclick="toggleModeFilter(this)">AX.25</span>
+                    <span class="filter-chip active mode-badge mode-TELNET text-xs sm:text-sm px-3 py-1" data-mode="TELNET" onclick="toggleModeFilter(this)">TELNET</span>
+                </div>
+                <div class="text-xs sm:text-sm text-gray-500">
+                    <span class="font-semibold text-purple-600" id="uniqueStationsCount">--</span> unique stations &bull;
+                    <span class="font-semibold text-gray-600" id="filteredCount">--</span> connections shown
+                </div>
+            </div>
+
+            <!-- Top Stations Table -->
+            <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm mb-6 sm:mb-8">
+                <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">🏆 Top Stations by Connection Count</h3>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-xs sm:text-sm">
+                        <thead>
+                            <tr class="border-b-2 border-gray-200">
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">#</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">Callsign</th>
+                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600">Total</th>
+                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">NETROM</th>
+                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">VARA</th>
+                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">AX.25</th>
+                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">TELNET</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">Modes</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">Last Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topStationsBody">
+                            <tr><td colspan="9" class="py-8 text-center text-gray-400">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Connection Log Table -->
+            <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mb-3 sm:mb-4">
+                    <h3 class="text-sm sm:text-base font-bold text-gray-700">📋 Connection Log</h3>
+                    <input type="text" id="searchInput" placeholder="Search callsigns..." 
+                        class="px-3 py-1.5 text-xs sm:text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 w-full sm:w-48"
+                        oninput="renderLogTable()">
+                </div>
+                <div class="overflow-x-auto custom-scrollbar" style="max-height: 500px; overflow-y: auto;">
+                    <table class="w-full text-xs sm:text-sm">
+                        <thead class="sticky top-0 bg-white z-10">
+                            <tr class="border-b-2 border-gray-200">
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('time')">Time ⇅</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('date')">Date ⇅</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('from')">From ⇅</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">Node</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">To</th>
+                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('mode')">Mode ⇅</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody">
+                            <tr><td colspan="6" class="py-8 text-center text-gray-400">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-xs text-gray-400 text-center" id="logFooter"></div>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-6 sm:mt-8 text-center text-xs text-gray-400">
+                <p>BPQ Connect Log Monitor &bull; Data from ConnectLog_YYMMDD.log files</p>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ========== CONFIGURATION ==========
+const LOG_BASE_URL = './logs/';
+let selectedDays = 1;
+let allEntries = [];        // All parsed entries across loaded files
+let filteredEntries = [];   // After mode + search filters
+let activeFilters = new Set(['NETROM', 'VARA', 'AX.25', 'TELNET']);
+let sortField = 'time';
+let sortAsc = false;        // Newest first by default
+
+// Chart instances
+let modeChart = null;
+let hourlyChart = null;
+let dailyChart = null;
+
+// Mode colors
+const MODE_COLORS = {
+    'NETROM': { bg: '#dcfce7', border: '#16a34a', fill: 'rgba(22,163,74,0.7)' },
+    'VARA':   { bg: '#dbeafe', border: '#2563eb', fill: 'rgba(37,99,235,0.7)' },
+    'AX.25':  { bg: '#fef3c7', border: '#d97706', fill: 'rgba(217,119,6,0.7)' },
+    'TELNET': { bg: '#f3e8ff', border: '#7c3aed', fill: 'rgba(124,58,237,0.7)' },
+};
+
+// ========== CLOCKS ==========
+function updateClocks() {
+    const now = new Date();
+    document.getElementById('navUtcClock').textContent = now.toUTCString().slice(17, 25) + ' Z';
+    document.getElementById('navLocalClock').textContent = now.toLocaleTimeString('en-US', { hour12: false }) + ' L';
+}
+setInterval(updateClocks, 1000);
+updateClocks();
+
+// ========== DATA LOADING ==========
+function generateLogFilenames(days) {
+    const files = [];
+    const now = new Date();
+    for (let i = 0; i < days; i++) {
+        const d = new Date(now);
+        d.setUTCDate(d.getUTCDate() - i);
+        const yy = String(d.getUTCFullYear()).slice(2);
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        files.push({
+            filename: `ConnectLog_${yy}${mm}${dd}.log`,
+            dateStr: `${yy}${mm}${dd}`,
+            displayDate: `20${yy}-${mm}-${dd}`
+        });
+    }
+    return files;
+}
+
+function parseLine(line, dateStr, displayDate) {
+    // Format: HH:MM:SS Call from CALLSIGN at Node NODECALL to DEST Mode MODE
+    // Or:     HH:MM:SS Call from CALLSIGN to DEST Mode MODE
+    line = line.trim().replace(/\r/g, '');
+    if (!line || !line.includes('Call from')) return null;
+
+    const timeMatch = line.match(/^(\d{2}:\d{2}:\d{2})\s+Call from\s+(\S+)/);
+    if (!timeMatch) return null;
+
+    const time = timeMatch[1];
+    const from = timeMatch[2];
+
+    // Extract node (optional)
+    let node = '';
+    const nodeMatch = line.match(/at Node\s+(\S+)/);
+    if (nodeMatch) node = nodeMatch[1];
+
+    // Extract destination
+    const toMatch = line.match(/to\s+(\S+)\s+Mode/);
+    const to = toMatch ? toMatch[1] : '';
+
+    // Extract mode
+    const modeMatch = line.match(/Mode\s+(\S+)/);
+    const mode = modeMatch ? modeMatch[1] : 'UNKNOWN';
+
+    return { time, dateStr, displayDate, from, node, to, mode, sortKey: dateStr + time };
+}
+
+async function loadLogs() {
+    const files = generateLogFilenames(selectedDays);
+    allEntries = [];
+    let filesLoaded = 0;
+    let filesTotal = files.length;
+
+    setStatus('loading', `Loading ${filesTotal} log file${filesTotal > 1 ? 's' : ''}...`);
+
+    const fetches = files.map(async (f) => {
+        try {
+            const response = await fetch(LOG_BASE_URL + f.filename);
+            if (!response.ok) return;
+            const text = await response.text();
+            const lines = text.split('\n');
+            lines.forEach(line => {
+                const entry = parseLine(line, f.dateStr, f.displayDate);
+                if (entry) allEntries.push(entry);
+            });
+            filesLoaded++;
+        } catch (e) {
+            // File not found — skip silently
+        }
+    });
+
+    await Promise.all(fetches);
+
+    // Sort all entries by date+time descending
+    allEntries.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
+    if (allEntries.length === 0) {
+        setStatus('error', 'No connect log files found in logs/ directory');
+    } else {
+        setStatus('success', `Loaded ${allEntries.length} connections from ${filesLoaded} file${filesLoaded > 1 ? 's' : ''}`);
+    }
+
+    applyFilters();
+    updateStats();
+    updateCharts();
+    renderTopStations();
+    renderLogTable();
+    updateMap();
+}
+
+// ========== FILTERING ==========
+function toggleModeFilter(el) {
+    const mode = el.dataset.mode;
+    if (activeFilters.has(mode)) {
+        activeFilters.delete(mode);
+        el.classList.remove('active');
+        el.classList.add('dimmed');
+    } else {
+        activeFilters.add(mode);
+        el.classList.add('active');
+        el.classList.remove('dimmed');
+    }
+    applyFilters();
+    updateStats();
+    updateCharts();
+    renderTopStations();
+    renderLogTable();
+    updateMapMarkers();
+}
+
+function applyFilters() {
+    const search = (document.getElementById('searchInput').value || '').toUpperCase();
+    filteredEntries = allEntries.filter(e => {
+        if (!activeFilters.has(e.mode)) return false;
+        if (search && !e.from.toUpperCase().includes(search) && !e.to.toUpperCase().includes(search)) return false;
+        return true;
+    });
+}
+
+// ========== STATS ==========
+function updateStats() {
+    const counts = { total: 0, NETROM: 0, VARA: 0, 'AX.25': 0, TELNET: 0 };
+    // Use allEntries for stat cards (unfiltered by mode)
+    allEntries.forEach(e => {
+        counts.total++;
+        if (counts[e.mode] !== undefined) counts[e.mode]++;
+    });
+
+    document.getElementById('statTotal').textContent = counts.total.toLocaleString();
+    document.getElementById('statNetrom').textContent = counts.NETROM.toLocaleString();
+    document.getElementById('statVara').textContent = counts.VARA.toLocaleString();
+    document.getElementById('statAx25').textContent = counts['AX.25'].toLocaleString();
+    document.getElementById('statTelnet').textContent = counts.TELNET.toLocaleString();
+
+    // Unique stations (filtered)
+    const uniqueSet = new Set();
+    filteredEntries.forEach(e => {
+        uniqueSet.add(e.from);
+    });
+    document.getElementById('uniqueStationsCount').textContent = uniqueSet.size;
+    document.getElementById('filteredCount').textContent = filteredEntries.length.toLocaleString();
+}
+
+// ========== CHARTS ==========
+function updateCharts() {
+    updateModeChart();
+    updateHourlyChart();
+    updateDailyChart();
+}
+
+function updateModeChart() {
+    const counts = {};
+    filteredEntries.forEach(e => {
+        counts[e.mode] = (counts[e.mode] || 0) + 1;
+    });
+
+    const labels = Object.keys(counts);
+    const data = Object.values(counts);
+    const colors = labels.map(m => (MODE_COLORS[m] || MODE_COLORS['NETROM']).fill);
+
+    const ctx = document.getElementById('modeChart').getContext('2d');
+    if (modeChart) modeChart.destroy();
+    modeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { size: 12 } } }
+            }
+        }
+    });
+}
+
+function updateHourlyChart() {
+    // Stacked bar: hour x mode
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const modes = ['NETROM', 'VARA', 'AX.25', 'TELNET'];
+    const modeCounts = {};
+    modes.forEach(m => modeCounts[m] = new Array(24).fill(0));
+
+    filteredEntries.forEach(e => {
+        const h = parseInt(e.time.slice(0, 2), 10);
+        if (modeCounts[e.mode]) modeCounts[e.mode][h]++;
+    });
+
+    const datasets = modes.filter(m => activeFilters.has(m)).map(m => ({
+        label: m,
+        data: modeCounts[m],
+        backgroundColor: (MODE_COLORS[m] || MODE_COLORS['NETROM']).fill,
+        borderRadius: 2,
+    }));
+
+    const ctx = document.getElementById('hourlyChart').getContext('2d');
+    if (hourlyChart) hourlyChart.destroy();
+    hourlyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: hours.map(h => String(h).padStart(2, '0')),
+            datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } }
+            },
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } }
+            }
+        }
+    });
+}
+
+function updateDailyChart() {
+    const container = document.getElementById('dailyChartContainer');
+    if (selectedDays <= 1) {
+        container.classList.add('hidden');
+        return;
+    }
+    container.classList.remove('hidden');
+
+    // Group by date
+    const dateMap = {};
+    const modes = ['NETROM', 'VARA', 'AX.25', 'TELNET'];
+    filteredEntries.forEach(e => {
+        if (!dateMap[e.displayDate]) {
+            dateMap[e.displayDate] = {};
+            modes.forEach(m => dateMap[e.displayDate][m] = 0);
+        }
+        if (dateMap[e.displayDate][e.mode] !== undefined) {
+            dateMap[e.displayDate][e.mode]++;
+        }
+    });
+
+    const dates = Object.keys(dateMap).sort();
+    const datasets = modes.filter(m => activeFilters.has(m)).map(m => ({
+        label: m,
+        data: dates.map(d => dateMap[d][m] || 0),
+        backgroundColor: (MODE_COLORS[m] || MODE_COLORS['NETROM']).fill,
+        borderColor: (MODE_COLORS[m] || MODE_COLORS['NETROM']).border,
+        borderWidth: 1.5,
+        borderRadius: 3,
+    }));
+
+    const ctx = document.getElementById('dailyChart').getContext('2d');
+    if (dailyChart) dailyChart.destroy();
+    dailyChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: dates, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: { stacked: true, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+            },
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } }
+            }
+        }
+    });
+}
+
+// ========== TOP STATIONS ==========
+function renderTopStations() {
+    const stationMap = {};
+    filteredEntries.forEach(e => {
+        const key = e.from;
+        if (!stationMap[key]) {
+            stationMap[key] = { call: key, total: 0, modes: {}, lastSeen: e.sortKey };
+        }
+        stationMap[key].total++;
+        stationMap[key].modes[e.mode] = (stationMap[key].modes[e.mode] || 0) + 1;
+        if (e.sortKey > stationMap[key].lastSeen) stationMap[key].lastSeen = e.sortKey;
+    });
+
+    const sorted = Object.values(stationMap).sort((a, b) => b.total - a.total).slice(0, 20);
+    const tbody = document.getElementById('topStationsBody');
+
+    if (sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400">No data</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = sorted.map((s, i) => {
+        const modeBadges = Object.keys(s.modes).map(m => {
+            const cls = m === 'AX.25' ? 'AX25' : m;
+            return `<span class="mode-badge mode-${cls}">${m}</span>`;
+        }).join(' ');
+
+        const lastDate = s.lastSeen.slice(0, 6);
+        const lastTime = s.lastSeen.slice(6);
+        const displayLast = `20${lastDate.slice(0,2)}-${lastDate.slice(2,4)}-${lastDate.slice(4,6)} ${lastTime}`;
+
+        return `<tr class="log-row border-b border-gray-50">
+            <td class="py-2 px-2 sm:px-3 text-gray-400 font-mono">${i + 1}</td>
+            <td class="py-2 px-2 sm:px-3 font-bold text-gray-800 font-mono">${esc(s.call)}</td>
+            <td class="py-2 px-2 sm:px-3 text-center font-bold text-purple-700">${s.total}</td>
+            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-green-700">${s.modes['NETROM'] || '-'}</td>
+            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-blue-700">${s.modes['VARA'] || '-'}</td>
+            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-amber-700">${s.modes['AX.25'] || '-'}</td>
+            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-violet-700">${s.modes['TELNET'] || '-'}</td>
+            <td class="py-2 px-2 sm:px-3">${modeBadges}</td>
+            <td class="py-2 px-2 sm:px-3 text-gray-500 font-mono text-xs hide-mobile">${displayLast}</td>
+        </tr>`;
+    }).join('');
+}
+
+// ========== LOG TABLE ==========
+function sortLog(field) {
+    if (sortField === field) {
+        sortAsc = !sortAsc;
+    } else {
+        sortField = field;
+        sortAsc = (field === 'from' || field === 'mode');
+    }
+    renderLogTable();
+}
+
+function renderLogTable() {
+    applyFilters();
+    document.getElementById('filteredCount').textContent = filteredEntries.length.toLocaleString();
+
+    // Sort
+    const sorted = [...filteredEntries];
+    sorted.sort((a, b) => {
+        let va, vb;
+        switch (sortField) {
+            case 'time': va = a.sortKey; vb = b.sortKey; break;
+            case 'date': va = a.dateStr; vb = b.dateStr; break;
+            case 'from': va = a.from; vb = b.from; break;
+            case 'mode': va = a.mode; vb = b.mode; break;
+            default: va = a.sortKey; vb = b.sortKey;
+        }
+        const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+        return sortAsc ? cmp : -cmp;
+    });
+
+    // Limit display to 500 rows for performance
+    const display = sorted.slice(0, 500);
+    const tbody = document.getElementById('logTableBody');
+
+    if (display.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">No connections match the current filters</td></tr>';
+        document.getElementById('logFooter').textContent = '';
+        return;
+    }
+
+    tbody.innerHTML = display.map(e => {
+        const modeCls = e.mode === 'AX.25' ? 'AX25' : e.mode;
+        return `<tr class="log-row border-b border-gray-50">
+            <td class="py-1.5 px-2 sm:px-3 font-mono text-gray-600">${esc(e.time)}</td>
+            <td class="py-1.5 px-2 sm:px-3 font-mono text-gray-500 text-xs">${esc(e.displayDate)}</td>
+            <td class="py-1.5 px-2 sm:px-3 font-bold text-gray-800 font-mono">${esc(e.from)}</td>
+            <td class="py-1.5 px-2 sm:px-3 text-gray-500 font-mono text-xs hide-mobile">${esc(e.node)}</td>
+            <td class="py-1.5 px-2 sm:px-3 font-mono text-gray-600">${esc(e.to)}</td>
+            <td class="py-1.5 px-2 sm:px-3"><span class="mode-badge mode-${modeCls}">${esc(e.mode)}</span></td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('logFooter').textContent = sorted.length > 500
+        ? `Showing 500 of ${sorted.length.toLocaleString()} connections. Use filters or search to narrow results.`
+        : `${sorted.length.toLocaleString()} connections`;
+}
+
+// ========== TIME RANGE ==========
+function setDays(d) {
+    selectedDays = d;
+    document.querySelectorAll('.time-range-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.days) === d);
+    });
+    loadLogs();
+}
+
+// ========== UTILS ==========
+function esc(s) {
+    if (!s) return '';
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function setStatus(type, msg) {
+    const el = document.getElementById('statusMsg');
+    const cls = type === 'success' ? 'status-success' : type === 'error' ? 'status-error' : 'status-loading';
+    el.innerHTML = `<span class="status-indicator ${cls}"></span> ${msg}`;
+}
+
+// ========== STATION MAP ==========
+let connectMap = null;
+let mapMarkers = [];
+let mapLines = [];
+let stationLocations = {};
+
+function initMap() {
+    if (connectMap) return;
+    connectMap = L.map('connectMap').setView([39.8, -98.6], 3);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 18
+    }).addTo(connectMap);
+}
+
+async function updateMap() {
+    // Wait for Leaflet to be available (loaded with defer)
+    if (typeof L === 'undefined') {
+        setTimeout(() => updateMap(), 200);
+        return;
+    }
+    
+    initMap();
+    
+    // Collect all unique callsigns from filtered entries (from + to)
+    const callsignModes = {};  // baseCall -> Set of modes
+    const callsignCounts = {}; // baseCall -> total connections
+    
+    filteredEntries.forEach(e => {
+        // From station
+        const baseFrom = e.from.replace(/-\d+$/, '').toUpperCase();
+        if (!callsignModes[baseFrom]) {
+            callsignModes[baseFrom] = new Set();
+            callsignCounts[baseFrom] = 0;
+        }
+        callsignModes[baseFrom].add(e.mode);
+        callsignCounts[baseFrom]++;
+        
+        // To station (destination hub)
+        if (e.to) {
+            const baseTo = e.to.replace(/-\d+$/, '').toUpperCase();
+            if (!callsignModes[baseTo]) {
+                callsignModes[baseTo] = new Set();
+                callsignCounts[baseTo] = 0;
+            }
+        }
+    });
+    
+    const allCalls = Object.keys(callsignModes);
+    
+    // Filter out calls we already have locations for
+    const needLookup = allCalls.filter(c => !stationLocations[c]);
+    
+    if (needLookup.length > 0) {
+        document.getElementById('mapStatus').textContent = `Looking up ${needLookup.length} station locations...`;
+        
+        // Use callsign-lookup.php (handles US + international via QRZ.com with callook.info fallback)
+        // Process in batches to avoid URL length limits
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < needLookup.length; i += BATCH_SIZE) {
+            const batch = needLookup.slice(i, i + BATCH_SIZE);
+            try {
+                const response = await fetch('callsign-lookup.php?calls=' + batch.join(','));
+                const contentType = response.headers.get('content-type') || '';
+                if (response.ok && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    if (data.success && data.data) {
+                        Object.assign(stationLocations, data.data);
+                    }
+                }
+            } catch (e) {
+                // callsign-lookup.php not available — stations will remain unmapped
+            }
+        }
+    }
+    
+    updateMapMarkers();
+    
+    const located = allCalls.filter(c => stationLocations[c]).length;
+    document.getElementById('mapStatus').textContent = `${located} of ${allCalls.length} stations located on map`;
+}
+
+function updateMapMarkers() {
+    if (!connectMap) return;
+    
+    // Clear existing markers and lines
+    mapMarkers.forEach(m => connectMap.removeLayer(m));
+    mapLines.forEach(l => connectMap.removeLayer(l));
+    mapMarkers = [];
+    mapLines = [];
+    
+    // Build station data from filtered entries
+    const stationData = {};  // baseCall -> { modes: Set, count, fullCall, destinations: Set }
+    filteredEntries.forEach(e => {
+        const base = e.from.replace(/-\d+$/, '').toUpperCase();
+        if (!stationData[base]) {
+            stationData[base] = { modes: new Set(), count: 0, fullCall: e.from, destinations: new Set(), destModes: {} };
+        }
+        stationData[base].modes.add(e.mode);
+        stationData[base].count++;
+        if (e.to) {
+            const destBase = e.to.replace(/-\d+$/, '').toUpperCase();
+            stationData[base].destinations.add(destBase);
+            // Track mode per destination for line color
+            if (!stationData[base].destModes[destBase]) stationData[base].destModes[destBase] = new Set();
+            stationData[base].destModes[destBase].add(e.mode);
+        }
+    });
+    
+    const bounds = [];
+    const modeMarkerColors = {
+        'NETROM': '#16a34a',
+        'VARA': '#2563eb',
+        'AX.25': '#d97706',
+        'TELNET': '#7c3aed',
+    };
+    const modeLineColors = {
+        'NETROM': 'rgba(22,163,74,0.5)',
+        'VARA': 'rgba(37,99,235,0.6)',
+        'AX.25': 'rgba(217,119,6,0.5)',
+        'TELNET': 'rgba(124,58,237,0.5)',
+    };
+    const multiLineColor = 'rgba(102,126,234,0.4)';
+    
+    // Track which connections we've drawn to avoid duplicates
+    const drawnLines = new Set();
+    
+    Object.entries(stationData).forEach(([baseCall, data]) => {
+        const loc = stationLocations[baseCall];
+        if (!loc || (!loc.lat && !loc.lon)) return;
+        
+        // Determine marker color
+        const modesArr = [...data.modes];
+        let bgColor;
+        if (modesArr.length === 1) {
+            bgColor = modeMarkerColors[modesArr[0]] || '#6b7280';
+        } else {
+            bgColor = null; // Will use gradient
+        }
+        
+        // Scale marker size by connection count
+        const size = Math.max(10, Math.min(22, 8 + Math.sqrt(data.count) * 2));
+        
+        const bgStyle = bgColor 
+            ? `background:${bgColor};` 
+            : `background:linear-gradient(135deg, #667eea, #764ba2);`;
+        
+        const icon = L.divIcon({
+            className: 'connect-marker-wrapper',
+            html: `<div class="connect-marker" style="${bgStyle}width:${size}px;height:${size}px;"></div>`,
+            iconSize: [size, size],
+            iconAnchor: [size / 2, size / 2]
+        });
+        
+        // Build popup content
+        const modeBadges = modesArr.map(m => {
+            const cls = m === 'AX.25' ? 'AX25' : m;
+            return `<span class="mode-badge mode-${cls}">${m}</span>`;
+        }).join(' ');
+        
+        const locParts = [];
+        if (loc.city) locParts.push(loc.city);
+        if (loc.state) locParts.push(loc.state);
+        if (loc.country && loc.country !== 'USA' && loc.country !== 'United States') locParts.push(loc.country);
+        const locStr = locParts.join(', ');
+        
+        const popupHtml = `
+            <div style="font-family: system-ui; min-width: 160px;">
+                <div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${esc(data.fullCall)}</div>
+                ${locStr ? `<div style="color:#666; font-size:11px; margin-bottom:4px;">${esc(locStr)}</div>` : ''}
+                ${loc.grid ? `<div style="color:#888; font-size:11px; margin-bottom:4px;">Grid: ${esc(loc.grid)}</div>` : ''}
+                <div style="margin-bottom:4px;">${modeBadges}</div>
+                <div style="color:#666; font-size:11px;">${data.count} connection${data.count !== 1 ? 's' : ''}</div>
+            </div>`;
+        
+        const marker = L.marker([loc.lat, loc.lon], { icon })
+            .bindTooltip(data.fullCall, { direction: 'top', offset: [0, -size / 2], className: 'callsign-tooltip' })
+            .bindPopup(popupHtml, { maxWidth: 250 })
+            .addTo(connectMap);
+        
+        mapMarkers.push(marker);
+        bounds.push([loc.lat, loc.lon]);
+        
+        // Draw connection lines to destination hubs
+        data.destinations.forEach(destBase => {
+            const destLoc = stationLocations[destBase];
+            if (!destLoc || (!destLoc.lat && !destLoc.lon)) return;
+            
+            // Avoid duplicate lines (A->B and B->A)
+            const lineKey = [baseCall, destBase].sort().join('|');
+            if (drawnLines.has(lineKey)) return;
+            drawnLines.add(lineKey);
+            
+            // Determine line color from the modes used on this connection
+            const lineModes = data.destModes[destBase] ? [...data.destModes[destBase]] : modesArr;
+            let lineColor;
+            if (lineModes.length === 1) {
+                lineColor = modeLineColors[lineModes[0]] || multiLineColor;
+            } else {
+                lineColor = multiLineColor;
+            }
+            
+            const line = L.polyline(
+                [[loc.lat, loc.lon], [destLoc.lat, destLoc.lon]],
+                { color: lineColor, weight: 1.5, opacity: 0.7, dashArray: '6 4' }
+            ).addTo(connectMap);
+            
+            mapLines.push(line);
+        });
+    });
+    
+    if (bounds.length > 1) {
+        connectMap.fitBounds(bounds, { padding: [40, 40] });
+    } else if (bounds.length === 1) {
+        connectMap.setView(bounds[0], 6);
+    }
+}
+
+// ========== INIT ==========
+document.addEventListener('DOMContentLoaded', () => {
+    loadLogs();
+});
+</script>
+    <script>
+    (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
+    </script>
+<script src="shared/settings-modal.js"></script>
+</body>
+</html>
