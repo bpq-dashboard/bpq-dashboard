@@ -1278,7 +1278,17 @@ function loadData() {
     updateCounts();
     checkServerStorage();
 }
-function persist(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function persist(key, val) {
+    try {
+        localStorage.setItem(key, JSON.stringify(val));
+    } catch(e) {
+        // localStorage quota exceeded — warn user
+        console.error('BBS localStorage quota exceeded for', key, e);
+        if (key === 'bbs_saved_messages') {
+            showToast('⚠ Browser storage full — switch to Server Storage in settings', true);
+        }
+    }
+}
 function updateCounts() {
     const bCnt  = document.getElementById('cntBBS');
     const sCnt  = document.getElementById('cntSaved');
@@ -1323,16 +1333,32 @@ async function loadSavedFromServer() {
             savedMessages = dm.messages || [];
             persist('bbs_saved_messages', savedMessages);
         }
-        // Load folders from server — merge with local to preserve user-created folders
+        // Load folders from server — merge with local
         const rf = await fetch(CONFIG.storageUrl + '?action=folders');
         const df = await rf.json();
         if (df.success) {
             const serverFolders = df.folders || ['Saved'];
-            // Merge: keep all local folders, add any server-only folders
             const localFolders = JSON.parse(localStorage.getItem('bbs_folders') || '["Saved"]');
-            const merged = [...new Set([...localFolders, ...serverFolders])];
-            folders = merged;
+            folders = [...new Set([...localFolders, ...serverFolders])];
             persist('bbs_folders', folders);
+        }
+        // Load rules from server
+        const rr = await fetch(CONFIG.storageUrl + '?action=rules');
+        const dr = await rr.json();
+        if (dr.success && Array.isArray(dr.rules)) {
+            rules = dr.rules;
+            localStorage.setItem('bbs_rules', JSON.stringify(rules));
+        }
+        // Load unread counts from server
+        const ru = await fetch(CONFIG.storageUrl + '?action=unread');
+        const du = await ru.json();
+        if (du.success && du.unread) {
+            // Merge server unread with local (take higher value per folder)
+            const local = unreadFolders;
+            for (const [k, v] of Object.entries(du.unread)) {
+                unreadFolders[k] = Math.max(local[k] || 0, v);
+            }
+            saveUnread();
         }
         updateSidebarFolders();
         updateCounts();
@@ -1374,8 +1400,11 @@ function switchFolder(name) {
     selectedMsg   = null;
     clearPreview();
     setActionBtns(false);
-    // Mark folder as read when opened
-    markFolderRead(name);
+    // For bbs/saved folders mark all read on open.
+    // For rule-delivery folders, unread clears per message (on open).
+    if (name === 'bbs' || name === 'saved') {
+        markFolderRead(name);
+    }
     // Update sidebar active state
     document.getElementById('folderBBS').classList.toggle('active',   name==='bbs');
     document.getElementById('folderSaved').classList.toggle('active', name==='saved');
@@ -1593,8 +1622,10 @@ function renderList() {
 
     body.innerHTML = list.map((msg, i) => {
         const isSaved     = currentFolder === 'bbs' && savedMessages.some(s => s.number === msg.number);
-        const isRuleMatch = !!msg._ruleMatched;
-        const ruleTag     = isRuleMatch ? `<span class="rule-tag" title="Rule: ${escapeHtml(msg._ruleMatched || '')}">⚙ ${escapeHtml(msg._ruleMatched || '')}</span>` : '';
+        const isRuleMatch = !!msg._ruleMatched && !msg._read;
+        const ruleTag     = msg._ruleMatched
+            ? `<span class="rule-tag" title="Rule: ${escapeHtml(msg._ruleMatched || '')}">⚙ ${escapeHtml(msg._ruleMatched || '')}</span>`
+            : '';
         const isSelected= selectedMsg && selectedMsg.number === msg.number && selectedMsg._src === (currentFolder==='bbs'?'bbs':'saved');
         const isChecked = selectedMsgs.has(msg.number);
         const typeClass = `type-${(msg.type||msg.status||'B').charAt(0).toUpperCase()}`;
@@ -1647,17 +1678,31 @@ function selectMsg(index) {
 
     selectedMsg = { ...msg, _src: src, _index: index };
 
-    // Clear rule-matched highlight when message is opened
+    // Clear rule-matched highlight and mark as read when message is opened
     if (src === 'saved' && msg._ruleMatched) {
         const realIdx = savedMessages.findIndex(
             m => m.number === msg.number && (m.folder||'Saved') === (msg.folder||'Saved')
         );
         if (realIdx >= 0) {
             delete savedMessages[realIdx]._ruleMatched;
+            // Mark as read
+            savedMessages[realIdx]._read = true;
             persist('bbs_saved_messages', savedMessages);
         }
         delete selectedMsg._ruleMatched;
-        // Re-render to remove green highlight from this row
+        selectedMsg._read = true;
+
+        // Decrement folder unread count
+        const msgFolder = msg.folder || 'Saved';
+        if (unreadFolders[msgFolder] && unreadFolders[msgFolder] > 0) {
+            unreadFolders[msgFolder]--;
+            if (unreadFolders[msgFolder] <= 0) delete unreadFolders[msgFolder];
+            saveUnread();
+        }
+
+        // Re-render list and sidebar to remove green highlight and update badge
+        updateSidebarFolders();
+        if (isMobile()) mobRenderFolders();
         setTimeout(() => renderList(), 50);
     }
 
@@ -1770,11 +1815,22 @@ async function executeSave(folder) {
             } catch {}
         }
         persist('bbs_saved_messages', savedMessages);
+
+        // Remove saved messages from inbox
+        const savedNums = new Set(nums);
+        const before = messages.length;
+        messages = messages.filter(m => !savedNums.has(m.number));
+        persist('bbs_messages_cache', messages);
+
         hideLoading();
         unreadFolders[folder] = (unreadFolders[folder] || 0) + nums.length;
         localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
-        showToast(`📬 ${nums.length} messages saved to "${folder}"`);
+        const removed = before - messages.length;
+        showToast(`📬 ${nums.length} messages saved to "${folder}", ${removed} removed from inbox`);
         exitMultiSelect();
+        selectedMsg = null;
+        clearPreview();
+        setActionBtns(false);
         updateSidebarFolders(); updateCounts(); renderList();
         return;
     }
@@ -1799,17 +1855,26 @@ async function executeSave(folder) {
     localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
 
     closeSaveModal();
+
+    // Always remove from inbox messages array (it is now in the folder)
+    const savedIdx = messages.findIndex(m => m.number === (selectedMsg.number));
+    if (savedIdx >= 0) {
+        messages.splice(savedIdx, 1);
+        persist('bbs_messages_cache', messages);
+    }
+
+    selectedMsg = null;
+    clearPreview();
+    setActionBtns(false);
     updateSidebarFolders();
     updateCounts();
     renderList();
-    showPreviewHeader(selectedMsg, 'bbs');
-    setActionBtns(true, 'bbs', selectedMsg);
+    showToast(`📬 Saved to "${folder}" and removed from inbox`);
 
+    // Also delete from BBS server if checkbox is ticked
     if (document.getElementById('deleteAfterSave').checked) {
-        deleteTarget = { ...selectedMsg };
+        deleteTarget = { number: msgToSave.number, _src: 'bbs' };
         await executeDeleteFromBBS();
-    } else {
-        showToast(`📬 Saved to "${folder}"`);
     }
 }
 
@@ -2332,14 +2397,41 @@ function buildBody() {
 function loadRules() {
     try { rules = JSON.parse(localStorage.getItem('bbs_rules') || '[]'); } catch { rules = []; }
     try { unreadFolders = JSON.parse(localStorage.getItem('bbs_unread') || '{}'); } catch { unreadFolders = {}; }
+    // Also pull rules from server if server mode active
+    if (storageMode === 'server' && serverStorageAvailable) {
+        fetch(CONFIG.storageUrl + '?action=rules')
+            .then(r => r.json())
+            .then(d => {
+                if (d.success && Array.isArray(d.rules) && d.rules.length > 0) {
+                    rules = d.rules;
+                    localStorage.setItem('bbs_rules', JSON.stringify(rules));
+                    renderRulesList();
+                }
+            }).catch(() => {});
+    }
 }
 
 function saveRules() {
     localStorage.setItem('bbs_rules', JSON.stringify(rules));
+    // Persist to server storage too if enabled
+    if (storageMode === 'server' && serverStorageAvailable) {
+        fetch(CONFIG.storageUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'saveRules', rules })
+        }).catch(() => {});
+    }
 }
 
 function saveUnread() {
     localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
+    if (storageMode === 'server' && serverStorageAvailable) {
+        fetch(CONFIG.storageUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'saveUnread', unread: unreadFolders })
+        }).catch(() => {});
+    }
 }
 
 function matchesRule(msg, rule) {
@@ -2704,7 +2796,22 @@ function mobRenderFolders() {
 
     // Sync storage chip
     const chip = document.getElementById('mobStorageChip');
-    if (chip) chip.textContent = storageMode==='server' ? '☁️ Server storage' : '💻 Browser storage';
+    if (chip) {
+        // Show localStorage usage warning if near limit
+        let usage = '';
+        try {
+            let total = 0;
+            for (let k in localStorage) {
+                if (k.startsWith('bbs_')) total += (localStorage[k]||'').length;
+            }
+            const kb = Math.round(total / 1024);
+            if (kb > 3000) usage = ` ⚠ ${kb}KB`;
+        } catch {}
+        chip.textContent = storageMode==='server'
+            ? '☁️ Server storage'
+            : `💻 Browser storage${usage}`;
+        if (usage) chip.style.color = 'var(--tb-orange, #d29922)';
+    }
 }
 
 function mobUpdateBulkBar() {

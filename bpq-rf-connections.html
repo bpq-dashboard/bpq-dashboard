@@ -2407,9 +2407,18 @@
                 // Parse RADIO commands — handle both YYMMDD and Mon DD date formats
                 const radioMatchOld = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+>([A-Z0-9-]+)\s+RADIO\s+([\d.]+)/i);
                 const radioMatchNew = line.match(/([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+[H>-]*[A-Z0-9-]*\s+[A-Z0-9-]*\s*>?([A-Z0-9-]+)\s+RADIO\s+([\d.]+)/i);
-                const radioMatch = radioMatchOld || null;  // New format BBS logs don't have RADIO lines
-                if (radioMatch) { 
-                    const [, date, h, m, s, call, freq] = radioMatch; 
+                const radioMatch = radioMatchOld || radioMatchNew || null;
+                if (radioMatch) {
+                    let date, h, m, s, call, freq;
+                    if (radioMatchOld) {
+                        [, date, h, m, s, call, freq] = radioMatchOld;
+                    } else {
+                        // New Mon DD format — convert to YYMMDD for consistency
+                        const [, mon, day, hh, mi, ss, c, f] = radioMatchNew;
+                        const mi2 = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'};
+                        date = String(new Date().getFullYear()).slice(-2) + (mi2[mon]||'01') + String(day).padStart(2,'0');
+                        h = hh; m = mi; s = ss; call = c; freq = f;
+                    } 
                     const freqMHz = parseFloat(freq);
                     const baseCall = call.replace(/-\d+$/, '');
                     const cmd = { date, h, m, s: parseInt(s), callsign: baseCall, freqMHz, _sec: parseInt(h) * 3600 + parseInt(m) * 60 + parseInt(s) };
@@ -2428,8 +2437,13 @@
                 // Match incoming connects with frequency: "260107 00:10:49 |KK4DIV-1 Incoming Connect from KK4DIV on Port 3 Freq 7104700 Mode VARA"
                 // Helper to convert Mon DD to YYMMDD key
                 function monDDtoYYMMDD(mon, day) {
-                    const mi = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'};
-                    return String(new Date().getFullYear()).slice(-2) + (mi[mon]||'01') + String(day).padStart(2,'0');
+                    const MONTHS = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'};
+                    const mo = MONTHS[mon] || '01';
+                    // Use current year but roll back if month is December and we are in January
+                    // (handles year-boundary log entries)
+                    let yr = new Date().getFullYear();
+                    if (mon === 'Dec' && new Date().getMonth() === 0) yr -= 1;
+                    return String(yr).slice(-2) + mo + String(day).padStart(2,'0');
                 }
                 const inMatchOld = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+\|([A-Z0-9-]+)\s+Incoming Connect from ([A-Z0-9-]+).*Freq (\d+) Mode VARA/i);
                 const inMatchNew = line.match(/([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+H-[A-Z0-9-]+\s+VARAHF\s+([A-Z0-9-]+)\s+connected VARA HF.*Freq\s+(\d+)/i);
@@ -2444,7 +2458,10 @@
                         h = hh; m = mi; s = ss; baseCall = call.replace(/-\d+$/,''); freqHz = fHz;
                     }
                     const key = date + ':' + h + ':' + m;
-                    const freqMHz = parseInt(freqHz) / 1e6;
+                    // Freq may be Hz integer (7103200) or MHz float (7.103200)
+                    const freqMHz = parseFloat(freqHz) > 1000
+                        ? parseInt(freqHz) / 1e6
+                        : parseFloat(freqHz);
                     incomingFreqs[key] = { callsign: baseCall, freqMHz }; 
                     // Store in frequency events for WL2K inference (date-indexed)
                     const inFreqEvt = { date, _sec: parseInt(h) * 3600 + parseInt(m) * 60 + parseInt(s), freqMHz };
@@ -2705,7 +2722,7 @@
         // Uses allFreqByDate populated during BBS log parsing (outer scope variable)
         function findNearestFrequency(bbsDate, h, m, s) {
             const connSec = h * 3600 + m * 60 + s;
-            const MAX_WINDOW = 900; // 15 minutes
+            const MAX_WINDOW = 1800; // 30 minutes — widened to catch WL2K sessions between scheduled connects
             let bestFreq = null;
             let bestDiff = Infinity;
             
@@ -5902,43 +5919,59 @@
         
         async function fetchGeomagneticData() {
             try {
-                // Fetch K-index data from NOAA (3-day planetary K-index JSON)
-                const kIndexPromise = fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json')
-                    .then(r => r.json())
-                    .catch(() => null);
-                
-                // Fetch 30-day daily geomagnetic indices from NOAA (text format with planetary Ap and Kp)
-                const dgdPromise = fetch('https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt')
-                    .then(r => r.text())
-                    .catch(() => null);
-                
-                // Fetch solar data from HamQSL (A-index, Solar Flux, Sunspot Number)
+                // Use PHP proxy for NOAA K-index — avoids CORS and browser fetch issues
+                const kIndexPromise = fetch('geomag-proxy.php?data=kindex')
+                    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                    .catch(() =>
+                        // Fallback: fetch direct from NOAA
+                        fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json')
+                            .then(r => r.json())
+                            .catch(() => null)
+                    );
+
+                // Use PHP proxy for NOAA DGD text
+                const dgdPromise = fetch('geomag-proxy.php?data=dgd')
+                    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+                    .catch(() =>
+                        fetch('https://services.swpc.noaa.gov/text/daily-geomagnetic-indices.txt')
+                            .then(r => r.text())
+                            .catch(() => null)
+                    );
+
+                // Solar data via existing proxy
                 const solarPromise = fetch('solar-proxy.php')
                     .then(r => r.text())
                     .catch(() => fetch('https://www.hamqsl.com/solarxml.php').then(r => r.text()))
                     .catch(() => null);
-                
+
                 const [kIndexData, dgdText, solarXml] = await Promise.all([kIndexPromise, dgdPromise, solarPromise]);
                 
                 // Process K-index data — show all 3 days of 3-hour intervals
-                if (kIndexData && kIndexData.length > 1) {
-                    const dataRows = kIndexData.slice(1); // skip header row
-                    
-                    // Build chart data from ALL available rows (typically ~3 days)
+                // Supports both new object format {"time_tag","Kp"} and old array format
+                if (kIndexData && kIndexData.length > 0) {
+                    // Detect format: new API returns objects, old returned arrays with header
+                    const isNewFormat = kIndexData.length > 0 && typeof kIndexData[0] === 'object' && !Array.isArray(kIndexData[0]);
+                    const dataRows = isNewFormat ? kIndexData : kIndexData.slice(1); // skip header row for old format
+
+                    // Show only last 3 days (72 hours = 24 rows of 3-hour data)
+                    const recentRows = dataRows.slice(-24);
+
+                    // Build chart data from recent rows
                     const labels = [];
                     const values = [];
                     const colors = [];
                     const stormEvents = [];
-                    
-                    dataRows.forEach(row => {
-                        // Format: ["2026-01-11 00:00:00", "2", "2.33", "observed"]
-                        const time = row[0];
-                        const kp = parseFloat(row[1]);
-                        
-                        // Label: "Jan 11 00Z" for multi-day clarity
+
+                    recentRows.forEach(row => {
+                        // New format: {"time_tag":"2026-04-06T15:00:00","Kp":2.33,"a_running":9}
+                        // Old format: ["2026-01-11 00:00:00", "2", "2.33", "observed"]
+                        const time = isNewFormat ? row.time_tag.replace('T', ' ') : row[0];
+                        const kp   = isNewFormat ? parseFloat(row.Kp) : parseFloat(row[1]);
+
+                        // Label: "Apr 6 15Z"
                         const parts = time.split(' ');
                         const d = new Date(parts[0]);
-                        const hhmm = parts[1].substring(0, 5);
+                        const hhmm = parts[1] ? parts[1].substring(0, 5) : '00:00';
                         const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                         // Show date on the 00:00 bar, just time otherwise
                         labels.push(hhmm === '00:00' ? dayLabel : hhmm);
@@ -5947,7 +5980,7 @@
                         
                         // Track storm events (K >= 5)
                         if (kp >= 5) {
-                            stormEvents.push({ time: dayLabel + ' ' + hhmm + 'Z', kp: kp, level: getStormLevel(kp) });
+                            stormEvents.push({ time: dayLabel + ' ' + hhmm + 'Z', kp: kp.toFixed(2), level: getStormLevel(kp) });
                         }
                     });
                     
@@ -6042,7 +6075,7 @@
                     const dailyData = {};
                     dataRows.forEach(row => {
                         const date = row[0].split(' ')[0];
-                        const kp = Math.round(parseFloat(row[1]));
+                        const kp = Math.round(isNewFormat ? parseFloat(row.Kp) : parseFloat(row[1]));
                         if (!dailyData[date]) dailyData[date] = [];
                         dailyData[date].push(kp);
                     });
@@ -6113,7 +6146,8 @@
                 document.getElementById('geoConditionsUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
             } catch (err) {
                 console.error('Error fetching geomagnetic data:', err);
-                document.getElementById('geoConditionsUpdate').textContent = 'Error loading data';
+                document.getElementById('geoConditionsUpdate').textContent =
+                    'Error loading data — ' + (err.message || 'check console');
             }
         }
         

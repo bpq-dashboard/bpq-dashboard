@@ -7,7 +7,24 @@
  * This replaces browser localStorage for persistent, cross-device storage.
  */
 
-require_once __DIR__ . '/includes/bootstrap.php';
+// Set required server vars if missing (CLI/direct access)
+if (!isset($_SERVER['REQUEST_METHOD'])) $_SERVER['REQUEST_METHOD'] = 'GET';
+if (!isset($_SERVER['PHP_SELF'])) $_SERVER['PHP_SELF'] = '/message-storage.php';
+
+// Load bootstrap if available — skip BBS password check
+if (file_exists(__DIR__ . '/includes/bootstrap.php')) {
+    $SKIP_BBS_CHECK = true;
+    require_once __DIR__ . '/includes/bootstrap.php';
+} else {
+    // Minimal fallback if bootstrap not present
+    function apiError($msg, $code = 400) {
+        http_response_code($code);
+        die(json_encode(['success' => false, 'error' => $msg]));
+    }
+}
+
+// Always return JSON
+header('Content-Type: application/json');
 
 // Storage configuration
 $STORAGE_DIR = __DIR__ . '/data/messages/';
@@ -15,6 +32,8 @@ $FOLDERS_FILE = $STORAGE_DIR . 'folders.json';
 $MESSAGES_FILE = $STORAGE_DIR . 'messages.json';
 $ADDRESSES_FILE = $STORAGE_DIR . 'addresses.json';
 $MAX_STORAGE_SIZE = 10 * 1024 * 1024; // 10MB limit
+$RULES_FILE   = $STORAGE_DIR . 'rules.json';
+$UNREAD_FILE  = $STORAGE_DIR . 'unread.json';
 
 // ===========================
 // HELPER FUNCTIONS
@@ -586,6 +605,22 @@ $action = $_GET['action'] ?? '';
 // Handle GET requests
 if ($method === 'GET') {
     switch ($action) {
+        case 'rules':
+            global $RULES_FILE;
+            echo json_encode([
+                'success' => true,
+                'rules'   => readJsonFile($RULES_FILE, [])
+            ]);
+            exit;
+
+        case 'unread':
+            global $UNREAD_FILE;
+            echo json_encode([
+                'success' => true,
+                'unread'  => readJsonFile($UNREAD_FILE, (object)[])
+            ]);
+            exit;
+
         case 'folders':
             echo json_encode(getFolders());
             break;
@@ -666,8 +701,25 @@ if ($method === 'POST') {
             echo json_encode(importData($input));
             break;
             
-        default:
-            apiError('Unknown action');
+        case 'saveRules':
+                global $RULES_FILE;
+                ensureStorageDir();
+                $rulesData = $input['rules'] ?? [];
+                if (!is_array($rulesData)) apiError('Invalid rules data');
+                file_put_contents($RULES_FILE, json_encode($rulesData, JSON_PRETTY_PRINT));
+                echo json_encode(['success' => true, 'count' => count($rulesData)]);
+                exit;
+
+            case 'saveUnread':
+                global $UNREAD_FILE;
+                ensureStorageDir();
+                $unreadData = $input['unread'] ?? [];
+                file_put_contents($UNREAD_FILE, json_encode($unreadData, JSON_PRETTY_PRINT));
+                echo json_encode(['success' => true]);
+                exit;
+
+            default:
+                apiError('Unknown action');
     }
     exit;
 }

@@ -81,6 +81,19 @@ if (!$logsDir) {
     if (is_dir($tryPath)) $logsDir = realpath($tryPath);
 }
 
+// Resolve DataLog directory — separate config key, falls back to logsDir
+// DataLog*.txt files may be in webroot rather than linbpq logs dir
+$datalogPath = getConfig('paths', 'datalog', null);
+$datalogDir  = false;
+if ($datalogPath && is_dir($datalogPath)) {
+    $datalogDir = realpath($datalogPath);
+} elseif ($datalogPath) {
+    $tryPath = dirname(__DIR__) . '/' . ltrim($datalogPath, './');
+    if (is_dir($tryPath)) $datalogDir = realpath($tryPath);
+}
+// Default datalog dir to web root (where DataLog files often land)
+if (!$datalogDir) $datalogDir = realpath(dirname(__DIR__));
+
 $cacheDir  = dirname(__DIR__) . '/cache';
 $varaFile  = getConfig('logs', 'vara_file', '');
 
@@ -171,7 +184,9 @@ $days   = max(1, min(90, intval($_GET['days'] ?? 1)));
 try {
     switch ($source) {
         case 'datalog':
-            $result = getDataLog($logsDir, $cacheDir, $days, $debug, $datalogTzObj);
+            // Use dedicated datalog dir if configured, otherwise fall back to logsDir
+            $dlDir = $datalogDir ?: $logsDir;
+            $result = getDataLog($dlDir, $cacheDir, $days, $debug, $datalogTzObj);
             break;
 
         case 'connections':
@@ -217,8 +232,20 @@ function getDataLog($logsDir, $cacheDir, $days, $debug = false, $datalogTzObj = 
 
     if ($debug) $diag[] = "logsDir: $logsDir";
 
-    // Find all DataLog*.txt files
+    // Find all DataLog*.txt files — handle both ~ and _ separators
+    // e.g. DataLog~02072026~101742.txt or DataLog_02072026_101742.txt
     $allFiles = @glob($logsDir . '/DataLog*.txt');
+    if (!$allFiles) $allFiles = [];
+    // Also search common fallback locations
+    $webRoot = dirname(__DIR__);
+    foreach ([$webRoot . '/logs', $webRoot] as $extraDir) {
+        if ($extraDir && realpath($extraDir) !== realpath($dlDir ?? $logsDir)) {
+            $extraFiles = @glob($extraDir . '/DataLog*.txt') ?: [];
+            if ($extraFiles) {
+                $allFiles = array_unique(array_merge($allFiles, $extraFiles));
+            }
+        }
+    }
     if (!$allFiles || count($allFiles) === 0) {
         $result = ['samples' => 0, 'files' => 0, 'data' => []];
         if ($debug) {
