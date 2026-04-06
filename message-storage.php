@@ -1,23 +1,13 @@
 <?php
 /**
  * BPQ Dashboard Message Storage API
- * Version: 1.2.1
+ * Version: 1.3.0
  * 
  * Stores saved messages and folders as JSON files on the server.
- * This provides persistent storage that works across devices.
+ * This replaces browser localStorage for persistent, cross-device storage.
  */
 
-// CORS headers
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-header('Content-Type: application/json');
-
-// Handle preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
+require_once __DIR__ . '/includes/bootstrap.php';
 
 // Storage configuration
 $STORAGE_DIR = __DIR__ . '/data/messages/';
@@ -29,23 +19,6 @@ $MAX_STORAGE_SIZE = 10 * 1024 * 1024; // 10MB limit
 // ===========================
 // HELPER FUNCTIONS
 // ===========================
-
-/**
- * Send JSON error response
- */
-function apiError($message, $code = 400) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'error' => $message]);
-    exit;
-}
-
-/**
- * Sanitize user input
- */
-function sanitize($str) {
-    if (!is_string($str)) return '';
-    return htmlspecialchars(trim($str), ENT_QUOTES, 'UTF-8');
-}
 
 /**
  * Ensure storage directory exists
@@ -139,7 +112,7 @@ function generateMessageId() {
 function getFolders() {
     global $FOLDERS_FILE;
     
-    $folders = readJsonFile($FOLDERS_FILE, ['Saved']);
+    $folders = readJsonFile($FOLDERS_FILE, ['Inbox', 'Saved', 'Bulletins']);
     
     return [
         'success' => true,
@@ -153,12 +126,16 @@ function getFolders() {
 function createFolder($name) {
     global $FOLDERS_FILE;
     
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
+    }
+    
     $name = sanitizeFolderName($name);
     if (empty($name)) {
         apiError('Invalid folder name');
     }
     
-    $folders = readJsonFile($FOLDERS_FILE, ['Saved']);
+    $folders = readJsonFile($FOLDERS_FILE, ['Inbox', 'Saved', 'Bulletins']);
     
     if (in_array($name, $folders)) {
         apiError('Folder already exists');
@@ -170,6 +147,8 @@ function createFolder($name) {
     
     $folders[] = $name;
     writeJsonFile($FOLDERS_FILE, $folders);
+    
+    dashboardLog('info', 'Folder created', ['name' => $name]);
     
     return [
         'success' => true,
@@ -184,30 +163,27 @@ function createFolder($name) {
 function deleteFolder($name) {
     global $FOLDERS_FILE, $MESSAGES_FILE;
     
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
+    }
+    
     $name = sanitizeFolderName($name);
+    $protected = ['Inbox', 'Saved', 'Bulletins'];
     
-    if ($name === 'Saved') {
-        apiError('Cannot delete default folder');
+    if (in_array($name, $protected)) {
+        apiError('Cannot delete default folders');
     }
     
-    $folders = readJsonFile($FOLDERS_FILE, ['Saved']);
+    $folders = readJsonFile($FOLDERS_FILE, $protected);
     $folders = array_values(array_filter($folders, fn($f) => $f !== $name));
-    
-    // Ensure 'Saved' always exists
-    if (!in_array('Saved', $folders)) {
-        array_unshift($folders, 'Saved');
-    }
-    
     writeJsonFile($FOLDERS_FILE, $folders);
     
-    // Move messages from deleted folder to 'Saved'
+    // Also delete messages in this folder
     $messages = readJsonFile($MESSAGES_FILE, []);
-    foreach ($messages as &$m) {
-        if (($m['folder'] ?? 'Saved') === $name) {
-            $m['folder'] = 'Saved';
-        }
-    }
+    $messages = array_filter($messages, fn($m) => ($m['folder'] ?? 'Inbox') !== $name);
     writeJsonFile($MESSAGES_FILE, array_values($messages));
+    
+    dashboardLog('info', 'Folder deleted', ['name' => $name]);
     
     return [
         'success' => true,
@@ -226,7 +202,7 @@ function getMessages($folder = null) {
     
     if ($folder !== null) {
         $folder = sanitizeFolderName($folder);
-        $messages = array_filter($messages, fn($m) => ($m['folder'] ?? 'Saved') === $folder);
+        $messages = array_filter($messages, fn($m) => ($m['folder'] ?? 'Inbox') === $folder);
         $messages = array_values($messages);
     }
     
@@ -243,6 +219,10 @@ function getMessages($folder = null) {
 function saveMessage($message, $folder = 'Saved') {
     global $MESSAGES_FILE, $FOLDERS_FILE;
     
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
+    }
+    
     $folder = sanitizeFolderName($folder);
     if (empty($folder)) {
         $folder = 'Saved';
@@ -254,7 +234,7 @@ function saveMessage($message, $folder = 'Saved') {
     }
     
     // Ensure folder exists
-    $folders = readJsonFile($FOLDERS_FILE, ['Saved']);
+    $folders = readJsonFile($FOLDERS_FILE, ['Inbox', 'Saved', 'Bulletins']);
     if (!in_array($folder, $folders)) {
         $folders[] = $folder;
         writeJsonFile($FOLDERS_FILE, $folders);
@@ -277,7 +257,7 @@ function saveMessage($message, $folder = 'Saved') {
     
     $messages = readJsonFile($MESSAGES_FILE, []);
     
-    // Check for duplicate (same BBS message number in same folder)
+    // Check for duplicate (same BBS message number)
     if ($storedMessage['number']) {
         foreach ($messages as $i => $m) {
             if ($m['number'] === $storedMessage['number'] && $m['folder'] === $folder) {
@@ -305,6 +285,8 @@ function saveMessage($message, $folder = 'Saved') {
     
     writeJsonFile($MESSAGES_FILE, $messages);
     
+    dashboardLog('info', 'Message saved', ['id' => $storedMessage['id'], 'folder' => $folder]);
+    
     return [
         'success' => true,
         'message' => 'Message saved',
@@ -315,43 +297,62 @@ function saveMessage($message, $folder = 'Saved') {
 /**
  * Save multiple messages
  */
-function saveMessages($messageList, $folder = 'Saved') {
-    if (!is_array($messageList)) {
+function saveMessages($messages, $folder = 'Saved') {
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
+    }
+    
+    if (!is_array($messages)) {
         apiError('Invalid messages data');
     }
     
     $saved = 0;
-    foreach ($messageList as $msg) {
-        $result = saveMessage($msg, $folder);
-        if ($result['success']) $saved++;
+    $errors = [];
+    
+    foreach ($messages as $msg) {
+        try {
+            saveMessage($msg, $folder);
+            $saved++;
+        } catch (Exception $e) {
+            $errors[] = $e->getMessage();
+        }
     }
     
     return [
         'success' => true,
-        'message' => "$saved messages saved",
-        'count' => $saved
+        'saved' => $saved,
+        'errors' => $errors
     ];
 }
 
 /**
- * Delete a message
+ * Delete a saved message
  */
 function deleteMessage($id) {
     global $MESSAGES_FILE;
     
-    if (empty($id)) {
-        apiError('Message ID required');
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
     }
     
     $messages = readJsonFile($MESSAGES_FILE, []);
-    $original = count($messages);
-    $messages = array_filter($messages, fn($m) => $m['id'] !== $id);
+    $found = false;
     
-    if (count($messages) === $original) {
+    $messages = array_filter($messages, function($m) use ($id, &$found) {
+        if ($m['id'] === $id) {
+            $found = true;
+            return false;
+        }
+        return true;
+    });
+    
+    if (!$found) {
         apiError('Message not found');
     }
     
     writeJsonFile($MESSAGES_FILE, array_values($messages));
+    
+    dashboardLog('info', 'Saved message deleted', ['id' => $id]);
     
     return [
         'success' => true,
@@ -360,13 +361,13 @@ function deleteMessage($id) {
 }
 
 /**
- * Move a message to another folder
+ * Move message to different folder
  */
 function moveMessage($id, $newFolder) {
     global $MESSAGES_FILE;
     
-    if (empty($id)) {
-        apiError('Message ID required');
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
     }
     
     $newFolder = sanitizeFolderName($newFolder);
@@ -419,13 +420,15 @@ function getAddresses() {
 function saveAddress($address) {
     global $ADDRESSES_FILE;
     
-    $address = strtoupper(trim($address));
-    
-    // Basic validation
-    if (empty($address) || strlen($address) > 50) {
-        apiError('Invalid address');
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
     }
     
+    if (!validateAddress($address)) {
+        apiError('Invalid address format');
+    }
+    
+    $address = strtoupper(trim($address));
     $addresses = readJsonFile($ADDRESSES_FILE, []);
     
     if (in_array($address, $addresses)) {
@@ -456,6 +459,10 @@ function saveAddress($address) {
 function deleteAddress($address) {
     global $ADDRESSES_FILE;
     
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
+    }
+    
     $address = strtoupper(trim($address));
     $addresses = readJsonFile($ADDRESSES_FILE, []);
     $addresses = array_values(array_filter($addresses, fn($a) => $a !== $address));
@@ -472,14 +479,14 @@ function deleteAddress($address) {
  * Get storage statistics
  */
 function getStorageStats() {
-    global $STORAGE_DIR, $MESSAGES_FILE, $FOLDERS_FILE, $ADDRESSES_FILE, $MAX_STORAGE_SIZE;
+    global $STORAGE_DIR, $MESSAGES_FILE, $FOLDERS_FILE, $ADDRESSES_FILE;
     
     $stats = [
         'messages' => 0,
         'folders' => 0,
         'addresses' => 0,
         'totalSize' => 0,
-        'maxSize' => $MAX_STORAGE_SIZE,
+        'maxSize' => 10 * 1024 * 1024,
     ];
     
     if (file_exists($MESSAGES_FILE)) {
@@ -509,7 +516,7 @@ function getStorageStats() {
 }
 
 /**
- * Export all data for backup
+ * Export all data
  */
 function exportData() {
     global $MESSAGES_FILE, $FOLDERS_FILE, $ADDRESSES_FILE;
@@ -517,7 +524,7 @@ function exportData() {
     return [
         'success' => true,
         'export' => [
-            'version' => '1.2.1',
+            'version' => '1.3.0',
             'exportedAt' => date('c'),
             'folders' => readJsonFile($FOLDERS_FILE, []),
             'messages' => readJsonFile($MESSAGES_FILE, []),
@@ -527,10 +534,14 @@ function exportData() {
 }
 
 /**
- * Import data from backup
+ * Import data
  */
 function importData($data) {
     global $MESSAGES_FILE, $FOLDERS_FILE, $ADDRESSES_FILE;
+    
+    if (!isFeatureEnabled('bbs_write')) {
+        apiError('Write operations disabled', 403);
+    }
     
     if (!is_array($data) || !isset($data['export'])) {
         apiError('Invalid import data format');
@@ -554,82 +565,11 @@ function importData($data) {
         $imported['addresses'] = count($export['addresses']);
     }
     
+    dashboardLog('info', 'Data imported', $imported);
+    
     return [
         'success' => true,
         'message' => 'Data imported',
-        'imported' => $imported
-    ];
-}
-
-/**
- * Migrate data from localStorage format
- */
-function migrateFromLocalStorage($data) {
-    global $MESSAGES_FILE, $FOLDERS_FILE, $ADDRESSES_FILE;
-    
-    $imported = ['folders' => 0, 'messages' => 0, 'addresses' => 0];
-    
-    // Import folders
-    if (isset($data['folders']) && is_array($data['folders'])) {
-        $existingFolders = readJsonFile($FOLDERS_FILE, ['Saved']);
-        foreach ($data['folders'] as $folder) {
-            $folder = sanitizeFolderName($folder);
-            if (!empty($folder) && !in_array($folder, $existingFolders)) {
-                $existingFolders[] = $folder;
-                $imported['folders']++;
-            }
-        }
-        writeJsonFile($FOLDERS_FILE, $existingFolders);
-    }
-    
-    // Import messages
-    if (isset($data['messages']) && is_array($data['messages'])) {
-        $existingMessages = readJsonFile($MESSAGES_FILE, []);
-        $existingNumbers = array_column($existingMessages, 'number');
-        
-        foreach ($data['messages'] as $msg) {
-            // Skip if we already have this message number
-            if ($msg['number'] && in_array($msg['number'], $existingNumbers)) {
-                continue;
-            }
-            
-            $storedMessage = [
-                'id' => $msg['id'] ?? generateMessageId(),
-                'number' => $msg['number'] ?? null,
-                'date' => $msg['date'] ?? date('d-M'),
-                'type' => $msg['type'] ?? 'P',
-                'size' => $msg['size'] ?? 0,
-                'from' => sanitize($msg['from'] ?? 'Unknown'),
-                'to' => sanitize($msg['to'] ?? ''),
-                'subject' => sanitize($msg['subject'] ?? 'No Subject'),
-                'body' => $msg['body'] ?? '',
-                'folder' => sanitizeFolderName($msg['folder'] ?? 'Saved') ?: 'Saved',
-                'savedAt' => $msg['savedAt'] ?? date('c'),
-            ];
-            
-            $existingMessages[] = $storedMessage;
-            $imported['messages']++;
-        }
-        
-        writeJsonFile($MESSAGES_FILE, $existingMessages);
-    }
-    
-    // Import addresses
-    if (isset($data['addresses']) && is_array($data['addresses'])) {
-        $existingAddresses = readJsonFile($ADDRESSES_FILE, []);
-        foreach ($data['addresses'] as $addr) {
-            $addr = strtoupper(trim($addr));
-            if (!empty($addr) && !in_array($addr, $existingAddresses)) {
-                $existingAddresses[] = $addr;
-                $imported['addresses']++;
-            }
-        }
-        writeJsonFile($ADDRESSES_FILE, $existingAddresses);
-    }
-    
-    return [
-        'success' => true,
-        'message' => 'Migration complete',
         'imported' => $imported
     ];
 }
@@ -638,45 +578,10 @@ function migrateFromLocalStorage($data) {
 // REQUEST HANDLER
 // ===========================
 
+ensureStorageDir();
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
-
-// For stats action, check availability without failing
-if ($method === 'GET' && $action === 'stats') {
-    $available = true;
-    $reason = '';
-    
-    // Check if directory exists or can be created
-    if (!file_exists($STORAGE_DIR)) {
-        if (!@mkdir($STORAGE_DIR, 0755, true)) {
-            $available = false;
-            $reason = 'Cannot create storage directory';
-        } else {
-            // Create .htaccess
-            @file_put_contents($STORAGE_DIR . '.htaccess', "Deny from all\n");
-        }
-    }
-    
-    // Check if writable
-    if ($available && !is_writable($STORAGE_DIR)) {
-        $available = false;
-        $reason = 'Storage directory not writable';
-    }
-    
-    if ($available) {
-        echo json_encode(getStorageStats());
-    } else {
-        echo json_encode([
-            'success' => false,
-            'error' => $reason,
-            'available' => false
-        ]);
-    }
-    exit;
-}
-
-// For all other actions, ensure storage directory exists
-ensureStorageDir();
 
 // Handle GET requests
 if ($method === 'GET') {
@@ -694,6 +599,10 @@ if ($method === 'GET') {
             echo json_encode(getAddresses());
             break;
             
+        case 'stats':
+            echo json_encode(getStorageStats());
+            break;
+            
         case 'export':
             echo json_encode(exportData());
             break;
@@ -702,7 +611,7 @@ if ($method === 'GET') {
             // Return all data
             echo json_encode([
                 'success' => true,
-                'folders' => readJsonFile($FOLDERS_FILE, ['Saved']),
+                'folders' => readJsonFile($FOLDERS_FILE, ['Inbox', 'Saved', 'Bulletins']),
                 'messages' => readJsonFile($MESSAGES_FILE, []),
                 'addresses' => readJsonFile($ADDRESSES_FILE, []),
             ]);
@@ -755,10 +664,6 @@ if ($method === 'POST') {
             
         case 'import':
             echo json_encode(importData($input));
-            break;
-            
-        case 'migrate':
-            echo json_encode(migrateFromLocalStorage($input));
             break;
             
         default:

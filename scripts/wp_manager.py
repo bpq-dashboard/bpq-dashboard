@@ -45,11 +45,11 @@ from collections import defaultdict
 # ─────────────────────────────────────────────────────────────
 
 DEFAULT_WP_PATH      = "/home/tony/linbpq/WP.cfg"
-REVIEW_FILE          = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp_review.txt")
-WHITELIST_FILE       = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp_whitelist.txt")
-BLACKLIST_FILE       = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp_blacklist.txt")
-BASELINE_FILE        = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp_baseline.json")
-LOG_FILE             = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wp_manager.log")
+REVIEW_FILE          = "wp_review.txt"
+WHITELIST_FILE       = "wp_whitelist.txt"
+BLACKLIST_FILE       = "wp_blacklist.txt"
+BASELINE_FILE        = "wp_baseline.json"
+LOG_FILE             = "wp_manager.log"
 STALE_DAYS_DEFAULT   = 730
 
 # ─────────────────────────────────────────────────────────────

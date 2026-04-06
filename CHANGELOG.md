@@ -2,6 +2,213 @@
 
 All notable changes to BPQ Dashboard will be documented in this file.
 
+## [1.5.5-patch2] - 2026-04-06
+
+### Added
+
+- **bpq-aprs.html — APRS Messaging modal** — Send/inbox two-way messaging. Compose tab with 67-char limit. Inbox for messages to K1AJD-1. Reply button. Unread badge. Double-click marker or click list pre-fills callsign.
+- **bpq-aprs.html — Full WX detail panel** — All APRS WX fields in imperial (°F, mph, inHg, inches). Wind direction as compass bearing. Both popup and detail panel updated.
+- **bpq-aprs.html — Station Browser modal** — Categorized by Mobile/WX/Digi/iGate/Fixed/Object. Sorted by distance. Expandable rows with full details. Show on map / Message / aprs.fi links.
+- **bpq-aprs.html — Distance from K1AJD** — Haversine distance + compass bearing for all WX stations in popup, detail panel, browser summary and browser detail.
+- **bpq-aprs.html — PHG/RNG circles** — ⭕ PHG toggle button. Parses PHGpppp and RNGnnnn from comments. Color-coded by station type. Excludes mobiles.
+- **install-check.php — Post-installation troubleshooter** — 16 check categories: PHP, Nginx, HTML files, PHP files, Scripts, Data files, Directories, Config, Service files, Cron jobs, Log files, LinBPQ, Database, Network, Security. Password protected. Daemon heartbeat checks, cron race condition detection, malicious cron detection.
+
+---
+
+## [1.5.5-patch1] - 2026-04-05
+
+### Added
+
+- **bpq-aprs.html — Mobile track trails** — Solid blue polyline with position dots. 2-hour history. Toggle with Tracks button. Loads 12-hour server-side history from daemon on page load.
+- **bpq-aprs.html — Digi path lines** — aprs.fi style: hover station to see green/blue/purple dashed lines to digipeaters and iGate. parseDigiPath() extracts used digis from path field.
+- **bpq-aprs.html — Time filter** — ⏱ Last heard dropdown (1-12 hours). Filters markers, list, and track length simultaneously.
+- **bpq-aprs-daemon.py — APRS-IS daemon** — Persistent Python daemon, stays connected 24/7. Writes stations/history/messages cache every 15s. Auto-reconnect. 12-hour track history server-side.
+- **bpq-aprs.service — systemd service** — enabled, runs as www-data, auto-restart.
+
+### Fixed
+
+- **bpq-aprs-daemon — No packets bug** — APRS-IS requires vers NAME SPACE VERSION. "vers test" invalid. Fixed to "vers BPQ-Dashboard 1.0". Switched to rotate.aprs2.net.
+- **bpq-aprs.php — Simplified** — Now cache-reader only, no direct APRS-IS connection.
+
+---
+
+## [1.5.5] - 2026-04-04
+
+### Added
+
+- **bbs-messages.html — Folder unread indicators** — Icon changes 📁→📬, folder name turns blue/bold with accent border, red unread count badge. Cleared when folder opened.
+- **bbs-messages.html — Sort by column** — All 5 column headers clickable (#, Date, From, To, Subject). Toggle asc/desc with arrow indicators. Default Date ↓.
+- **bbs-messages.html — Rule-matched highlighting** — Green border/background/text on rule-matched messages. ⚙ RuleName badge. Highlight cleared when message opened.
+- **bbs-messages.html — Search feature** — Live search across Subject/From/To/Body/#/Date. Yellow match highlighting. N found counter. ✕ and Escape to clear.
+- **bpq-aprs.html — New APRS dashboard page** — Leaflet map centered on Hephzibah GA with 150km radius. Station list, APRS messages panel, station detail overlay. Auto-refresh every 2 minutes.
+- **bpq-aprs.php — APRS-IS backend** — Connects directly to noam.aprs2.net:14580, parses all packet types, caches stations. No BPQ32 APRSDIGI required.
+- **APRS symbol sprites** — Two local PNG sprite sheets from hessu/aprs-symbols. Primary and alternate symbol tables. 24x24px symbols.
+- **tprfn.conf — Extended timeouts** — bpq-aprs.php (60s) and bpq-chat.php (90s) location blocks added.
+
+---
+
+## [1.5.4-patch6] - 2026-04-04
+
+### Fixed
+
+- **bpq-chat — Who panel 171+ users** — who action was returning entire /U history. Fixed by advancing seq before sending /U so only the fresh response is returned.
+- **bpq-chat — Who panel not updating** — startWhoRefresh() missing from guest and page-resume paths. Added to startReadOnlyPoll() and init check.
+- **bpq-chat — renderWho() null crash** — whoEmpty div destroyed by innerHTML clear. Fixed to rebuild inline. Added null guard at top of renderWho().
+- **bpq-chat — Join/leave regex** — corrected to match actual BPQ format (name after colon for joins).
+
+---
+
+## [1.5.4-patch5] - 2026-04-04
+
+### Added
+
+- **bpq-chat.html — Who Online panel** — Persistent right sidebar showing users grouped by topic. Your callsign highlighted blue, others green. Shows callsign, name, node, idle time. Auto-refreshes every 30 seconds. Manual ⟳ refresh button. Toggleable via Who Panel button. Hidden on mobile.
+
+### Fixed
+
+- **bpq-chat.html — Who panel duplicating users** — whoRefreshPending flag prevents same /U response parsed twice. Tighter detection — only triggers on N Station(s) connected: line. /U output suppressed from server terminal pane.
+
+---
+
+## [1.5.4-patch4] - 2026-04-04
+
+### Fixed
+
+- **bpq-chat.html — Double callsign in messages** — sendRoomMsg() and sendServerCmd() were echoing messages locally AND receiving BPQ's echo via poll causing duplicates (K1AJDK1AJD: text). Removed local echo — BPQ's echo is the single display source.
+- **bpq-chat.html — /B closing entire chat** — /B is BPQ's full chat exit command. In a room tab /B now sends /T General (return to General topic, stay in chat) and closes the tab. /QUIT triggers full disconnect. /B in server pane retains standard BPQ behavior.
+
+---
+
+## [1.5.4-patch3] - 2026-04-04
+
+### Added
+
+- **bpq-chat.html — Auth system** — Auth modal on page load. Three levels: guest (read-only), user (own BPQ credentials), sysop (config.php). Guest mode shows orange banner, disables all send controls. Guest request modal opens mailto: pre-filled to tony@k1ajd.net with callsign/name/note.
+- **bpq-chat.php — Per-user credentials** — Non-sysop users can connect with their own BPQ callsign/password, appearing on network as themselves.
+
+### Fixed
+
+- **bpq-chat.php — config.php not loaded** — $BBS_USER undefined error fixed by loading config.php at top of file.
+- **bpq-chat.php — phantom require_once** — Removed leftover bpq-chat-connect.php reference causing fatal error.
+
+---
+
+## [1.5.4-patch2] - 2026-04-04
+
+### Added
+
+- **bpq-chat.html — Split screen layout** — Complete redesign. Top pane shows chat server output (always active). Bottom pane shows room tabs. Draggable divider to resize split, touch-friendly. Each /T RoomName command opens a new tab automatically. Multiple rooms supported simultaneously with unread badges.
+- **bpq-chat.html — Message routing** — Incoming messages automatically sorted to correct room tab or server pane based on [RoomName] prefix and topic join/leave patterns.
+- **bpq-chat.html — Full BPQ command set** — Quick commands panel updated with all BPQ chat commands: /U /N /Q /T /P /A /E /Keepalive /ShowNames /Time /S /F /B /History. Prompt dialogs for /N, /Q, /History nn, /S CALL msg. Corrected /W to /U for Show Users.
+
+---
+
+## [1.5.4-patch1] - 2026-04-04
+
+### Fixed
+
+- **bpq-chat-daemon.py — persistent connection** — Replaced sock.settimeout with select.select() in reader_thread. Timeout exceptions were breaking the read loop causing disconnects.
+- **bpq-chat — multiple daemon instances** — Removed pkill from PHP connect. Added fcntl single-instance lock to daemon. Systemd manages lifecycle.
+- **bpq-chat — state file going stale** — Added heartbeat_thread() updating state file every 15s. PHP stale threshold raised to 60s.
+- **bpq-chat — messages repeating** — Sequence-number tracking replaces timestamp/cookie approach. Daemon writes incrementing seq on each message. PHP tracks last seen seq per session server-side. Session ID passed in request body.
+- **bpq-chat — JSON parse error on send** — PHP was writing to FIFO, daemon reading from JSON queue. Fixed PHP sendCommand() to write to chat-cmd-queue.json.
+- **bpq-chat — command echo suppressed** — BPQ echoes sent commands back. Added filter for lines matching /^:\s*\//
+
+---
+
+## [1.5.4] - 2026-04-02
+
+### Added
+
+- **bpq-chat.html — BPQ Chat & Terminal client** — Full GUI chat client. Persistent Python daemon (bpq-chat-daemon.py) maintains telnet connection to BPQ node. PHP broker (bpq-chat.php) reads messages from JSON file and sends commands via FIFO pipe. Dark terminal theme, color-coded output, sound alerts, browser notifications, unread badge, quick commands panel, export log, day/night theme toggle.
+- **Chat nav link** — bpq-chat.html added to navigation bar on all dashboard pages.
+
+### Changed
+
+- **Version bump to v1.5.4** — All dashboard pages updated from v1.5.3 to v1.5.4.
+
+---
+
+## [1.5.3-patch16] - 2026-04-02
+
+### Fixed
+
+- **visitor-log.php — tprfn-network-map logging** — Visits to tprfn.k1ajd.net were not being recorded. Fixed by adding 'tprfn-index-log.php' and 'tprfn-network-map' to the allowed pages list, and adding page name resolver (tprfn-index-log.php → tprfn-network-map). Root cause was the @ error suppressor hiding the write result during debugging — logging was actually working after the allowed list fix was applied.
+
+---
+
+## [1.5.3-patch15] - 2026-03-31
+
+### Fixed
+
+- **callsign-lookup.php — QRZ.com primary lookup** — Archived version was outdated (callook.info + HamDB). Live version on ARSSYSTEM uses QRZ.com as primary with callook.info fallback. Updated both archives with live 876-line version. Lookup confirmed working — browser cache was causing apparent failures. Hard refresh resolved all callsigns except N4DGE (not in QRZ database).
+
+---
+
+## [1.5.3-patch14] - 2026-03-31
+
+### Fixed
+
+- **bbs-messages.html — iOS Safari portrait blank screen** — Viewport meta tag was missing `maximum-scale=1.0, user-scalable=no`. Without these iOS Safari applied its own scaling, reporting `window.innerWidth` larger than physical screen width, preventing the `@media (max-width:767px)` mobile layout from triggering. Fixed to match all other dashboard pages. Also added full iOS Safari height chain: `100svh`/`100dvh`/`100vh` cascade, `@supports (-webkit-touch-callout:none)` detection, `-webkit-fill-available`, `-webkit-overflow-scrolling:touch` on scroll containers, and `viewport-fit=cover` for notch/safe area support.
+
+---
+
+## [1.5.3-patch13] - 2026-03-30
+
+### Fixed
+
+- **Visitor tracking restored** — nginx dual-domain reconfiguration broke visitor logging on both domains. Created `tprfn-index-log.php` wrapper to log TPRFN Network Map visits (index.php is pure HTML, cannot include PHP directly). Restored nginx rewrite rules on `bpq.k1ajd.net` to route through `tprfn-rf-log.php`. Both `tprfn.k1ajd.net` and `bpq.k1ajd.net` visits now tracked in visitor-log.php.
+
+---
+
+## [1.5.3-patch12] - 2026-03-30
+
+### Fixed
+
+- **bbs-messages.html — Infinite recursion on Get Mail** — Mobile responsive patch used JS wrapper functions (`const _origX = X; function X() { _origX()... }`) causing infinite recursion. Fixed by injecting mobile sync calls directly into existing function bodies.
+- **bbs-messages.html — Folders wiped on reload** — `loadSavedFromServer()` was replacing the local folder array with the server's list (`['Saved']`), wiping all user-created folders on every page load when server storage mode was active. Fixed to merge local + server folders using Set (no duplicates).
+- **bbs-messages.html — Folder list clipping** — With 18 folders the sidebar and save picker overflowed. Added `overflow-y:auto` scroll to `#folderList` and `max-height:280px` to save picker.
+- **bbs-messages.html — Wrong localStorage key in deleteFolder** — `persist('bbs_saved', ...)` corrected to `persist('bbs_saved_messages', ...)` in three places.
+- **bbs-messages.html — Save picker not updating on folder create** — `createFolder()` now calls `renderSaveFolderList()` to keep save picker in sync.
+- **network-api.php — rename() warnings** — `cache/` directory was missing. Fix: `sudo mkdir -p /var/www/tprfn/cache && sudo chown -R www-data:www-data /var/www/tprfn/cache`.
+
+### Added
+
+- **bbs-messages.html — Rules Test button** — 🔍 Test button in rules modal tests rule against currently loaded inbox, shows match count and preview.
+- **bbs-messages.html — Msg # field in rules** — Added message number as a matchable field in the rules engine.
+
+---
+
+## [1.5.3-patch11] - 2026-03-29
+
+### Added
+
+- **tprfn.conf — Dual domain nginx config** — Complete nginx config serving both tprfn.k1ajd.net (TPRFN Network Map) and bpq.k1ajd.net (BPQ Dashboard) from /var/www/tprfn/. bpq.k1ajd.net root serves bpq-rf-connections.html. All BPQ Dashboard URLs on tprfn.k1ajd.net redirect 301 to bpq.k1ajd.net. All original security rules (bot blocking, rate limiting, headers, directory protection) preserved and applied to both domains. Port 514 syslog unaffected.
+
+---
+
+## [1.5.3-patch10] - 2026-03-29
+
+### Added
+
+- **bpq-rf-connections.html — GitHub download banner** — Deep space themed banner between nav and dashboard with animated stars, feature pill badges (RF Analytics, BBS Client, Storm Monitor, Prop Scheduler), and a "Download Free" button linking to https://github.com/bpq-dashboard/bpq-dashboard. Dismissible with × button that saves preference to localStorage.
+
+---
+
+## [1.5.3-patch9] - 2026-03-29
+
+### Fixed
+
+- **bbs-messages.html — Signature not appending** — `buildBody()` now re-reads localStorage as fallback when `signature.text` is empty in memory. `saveSig()` warns if text is empty while enabled.
+- **bbs-messages.html — Full mobile responsive layout** — At <768px switches to single-pane app layout with bottom tab bar (Inbox/Message/Folders), slide transitions, touch-friendly rows, sheet-style modals, and mobile bulk select. Desktop three-pane layout unchanged.
+- **visitor-log.php — PHP syntax error breaking bpq-rf-connections.html** — Bcrypt hash was truncated by shell `$` expansion during injection, leaving VIEWER_PASSWORD_HASH define unterminated. Fixed with Python. Also fixed placeholder check that was replaced with real hash causing perpetual "not configured" error.
+
+### Added
+
+- **GitHub repository** — Full project published at https://github.com/bpq-dashboard/bpq-dashboard (83 files).
+
+---
+
 ## [1.5.3-patch8] - 2026-03-27
 
 ### Added
@@ -37,6 +244,213 @@ All notable changes to BPQ Dashboard will be documented in this file.
 ### Added
 
 - **connect-watchdog.py — BPQ restart on pause and restore** — `Enabled=0/1` changes to linmail.cfg have no effect until BPQ reloads its config. Added `restart_bpq()` function (stop/wait 3s/start via systemctl) called only when `Enabled` actually changes — not on every failure count update. Added `bpq_stop_cmd` / `bpq_start_cmd` to CONFIG. Full watchdog flow now complete: detect → write Enabled=0 → restart BPQ → notify → restore after 4h → write Enabled=1 → restart BPQ → notify.
+
+---
+
+## [1.5.5-patch2] - 2026-04-06
+
+### Added
+
+- **bpq-aprs.html — APRS Messaging modal** — Send/inbox two-way messaging. Compose tab with 67-char limit. Inbox for messages to K1AJD-1. Reply button. Unread badge. Double-click marker or click list pre-fills callsign.
+- **bpq-aprs.html — Full WX detail panel** — All APRS WX fields in imperial (°F, mph, inHg, inches). Wind direction as compass bearing. Both popup and detail panel updated.
+- **bpq-aprs.html — Station Browser modal** — Categorized by Mobile/WX/Digi/iGate/Fixed/Object. Sorted by distance. Expandable rows with full details. Show on map / Message / aprs.fi links.
+- **bpq-aprs.html — Distance from K1AJD** — Haversine distance + compass bearing for all WX stations in popup, detail panel, browser summary and browser detail.
+- **bpq-aprs.html — PHG/RNG circles** — ⭕ PHG toggle button. Parses PHGpppp and RNGnnnn from comments. Color-coded by station type. Excludes mobiles.
+- **install-check.php — Post-installation troubleshooter** — 16 check categories: PHP, Nginx, HTML files, PHP files, Scripts, Data files, Directories, Config, Service files, Cron jobs, Log files, LinBPQ, Database, Network, Security. Password protected. Daemon heartbeat checks, cron race condition detection, malicious cron detection.
+
+---
+
+## [1.5.5-patch1] - 2026-04-05
+
+### Added
+
+- **bpq-aprs.html — Mobile track trails** — Solid blue polyline with position dots. 2-hour history. Toggle with Tracks button. Loads 12-hour server-side history from daemon on page load.
+- **bpq-aprs.html — Digi path lines** — aprs.fi style: hover station to see green/blue/purple dashed lines to digipeaters and iGate. parseDigiPath() extracts used digis from path field.
+- **bpq-aprs.html — Time filter** — ⏱ Last heard dropdown (1-12 hours). Filters markers, list, and track length simultaneously.
+- **bpq-aprs-daemon.py — APRS-IS daemon** — Persistent Python daemon, stays connected 24/7. Writes stations/history/messages cache every 15s. Auto-reconnect. 12-hour track history server-side.
+- **bpq-aprs.service — systemd service** — enabled, runs as www-data, auto-restart.
+
+### Fixed
+
+- **bpq-aprs-daemon — No packets bug** — APRS-IS requires vers NAME SPACE VERSION. "vers test" invalid. Fixed to "vers BPQ-Dashboard 1.0". Switched to rotate.aprs2.net.
+- **bpq-aprs.php — Simplified** — Now cache-reader only, no direct APRS-IS connection.
+
+---
+
+## [1.5.5] - 2026-04-04
+
+### Added
+
+- **bbs-messages.html — Folder unread indicators** — Icon changes 📁→📬, folder name turns blue/bold with accent border, red unread count badge. Cleared when folder opened.
+- **bbs-messages.html — Sort by column** — All 5 column headers clickable (#, Date, From, To, Subject). Toggle asc/desc with arrow indicators. Default Date ↓.
+- **bbs-messages.html — Rule-matched highlighting** — Green border/background/text on rule-matched messages. ⚙ RuleName badge. Highlight cleared when message opened.
+- **bbs-messages.html — Search feature** — Live search across Subject/From/To/Body/#/Date. Yellow match highlighting. N found counter. ✕ and Escape to clear.
+- **bpq-aprs.html — New APRS dashboard page** — Leaflet map centered on Hephzibah GA with 150km radius. Station list, APRS messages panel, station detail overlay. Auto-refresh every 2 minutes.
+- **bpq-aprs.php — APRS-IS backend** — Connects directly to noam.aprs2.net:14580, parses all packet types, caches stations. No BPQ32 APRSDIGI required.
+- **APRS symbol sprites** — Two local PNG sprite sheets from hessu/aprs-symbols. Primary and alternate symbol tables. 24x24px symbols.
+- **tprfn.conf — Extended timeouts** — bpq-aprs.php (60s) and bpq-chat.php (90s) location blocks added.
+
+---
+
+## [1.5.4-patch6] - 2026-04-04
+
+### Fixed
+
+- **bpq-chat — Who panel 171+ users** — who action was returning entire /U history. Fixed by advancing seq before sending /U so only the fresh response is returned.
+- **bpq-chat — Who panel not updating** — startWhoRefresh() missing from guest and page-resume paths. Added to startReadOnlyPoll() and init check.
+- **bpq-chat — renderWho() null crash** — whoEmpty div destroyed by innerHTML clear. Fixed to rebuild inline. Added null guard at top of renderWho().
+- **bpq-chat — Join/leave regex** — corrected to match actual BPQ format (name after colon for joins).
+
+---
+
+## [1.5.4-patch5] - 2026-04-04
+
+### Added
+
+- **bpq-chat.html — Who Online panel** — Persistent right sidebar showing users grouped by topic. Your callsign highlighted blue, others green. Shows callsign, name, node, idle time. Auto-refreshes every 30 seconds. Manual ⟳ refresh button. Toggleable via Who Panel button. Hidden on mobile.
+
+### Fixed
+
+- **bpq-chat.html — Who panel duplicating users** — whoRefreshPending flag prevents same /U response parsed twice. Tighter detection — only triggers on N Station(s) connected: line. /U output suppressed from server terminal pane.
+
+---
+
+## [1.5.4-patch4] - 2026-04-04
+
+### Fixed
+
+- **bpq-chat.html — Double callsign in messages** — sendRoomMsg() and sendServerCmd() were echoing messages locally AND receiving BPQ's echo via poll causing duplicates (K1AJDK1AJD: text). Removed local echo — BPQ's echo is the single display source.
+- **bpq-chat.html — /B closing entire chat** — /B is BPQ's full chat exit command. In a room tab /B now sends /T General (return to General topic, stay in chat) and closes the tab. /QUIT triggers full disconnect. /B in server pane retains standard BPQ behavior.
+
+---
+
+## [1.5.4-patch3] - 2026-04-04
+
+### Added
+
+- **bpq-chat.html — Auth system** — Auth modal on page load. Three levels: guest (read-only), user (own BPQ credentials), sysop (config.php). Guest mode shows orange banner, disables all send controls. Guest request modal opens mailto: pre-filled to tony@k1ajd.net with callsign/name/note.
+- **bpq-chat.php — Per-user credentials** — Non-sysop users can connect with their own BPQ callsign/password, appearing on network as themselves.
+
+### Fixed
+
+- **bpq-chat.php — config.php not loaded** — $BBS_USER undefined error fixed by loading config.php at top of file.
+- **bpq-chat.php — phantom require_once** — Removed leftover bpq-chat-connect.php reference causing fatal error.
+
+---
+
+## [1.5.4-patch2] - 2026-04-04
+
+### Added
+
+- **bpq-chat.html — Split screen layout** — Complete redesign. Top pane shows chat server output (always active). Bottom pane shows room tabs. Draggable divider to resize split, touch-friendly. Each /T RoomName command opens a new tab automatically. Multiple rooms supported simultaneously with unread badges.
+- **bpq-chat.html — Message routing** — Incoming messages automatically sorted to correct room tab or server pane based on [RoomName] prefix and topic join/leave patterns.
+- **bpq-chat.html — Full BPQ command set** — Quick commands panel updated with all BPQ chat commands: /U /N /Q /T /P /A /E /Keepalive /ShowNames /Time /S /F /B /History. Prompt dialogs for /N, /Q, /History nn, /S CALL msg. Corrected /W to /U for Show Users.
+
+---
+
+## [1.5.4-patch1] - 2026-04-04
+
+### Fixed
+
+- **bpq-chat-daemon.py — persistent connection** — Replaced sock.settimeout with select.select() in reader_thread. Timeout exceptions were breaking the read loop causing disconnects.
+- **bpq-chat — multiple daemon instances** — Removed pkill from PHP connect. Added fcntl single-instance lock to daemon. Systemd manages lifecycle.
+- **bpq-chat — state file going stale** — Added heartbeat_thread() updating state file every 15s. PHP stale threshold raised to 60s.
+- **bpq-chat — messages repeating** — Sequence-number tracking replaces timestamp/cookie approach. Daemon writes incrementing seq on each message. PHP tracks last seen seq per session server-side. Session ID passed in request body.
+- **bpq-chat — JSON parse error on send** — PHP was writing to FIFO, daemon reading from JSON queue. Fixed PHP sendCommand() to write to chat-cmd-queue.json.
+- **bpq-chat — command echo suppressed** — BPQ echoes sent commands back. Added filter for lines matching /^:\s*\//
+
+---
+
+## [1.5.4] - 2026-04-02
+
+### Added
+
+- **bpq-chat.html — BPQ Chat & Terminal client** — Full GUI chat client. Persistent Python daemon (bpq-chat-daemon.py) maintains telnet connection to BPQ node. PHP broker (bpq-chat.php) reads messages from JSON file and sends commands via FIFO pipe. Dark terminal theme, color-coded output, sound alerts, browser notifications, unread badge, quick commands panel, export log, day/night theme toggle.
+- **Chat nav link** — bpq-chat.html added to navigation bar on all dashboard pages.
+
+### Changed
+
+- **Version bump to v1.5.4** — All dashboard pages updated from v1.5.3 to v1.5.4.
+
+---
+
+## [1.5.3-patch16] - 2026-04-02
+
+### Fixed
+
+- **visitor-log.php — tprfn-network-map logging** — Visits to tprfn.k1ajd.net were not being recorded. Fixed by adding 'tprfn-index-log.php' and 'tprfn-network-map' to the allowed pages list, and adding page name resolver (tprfn-index-log.php → tprfn-network-map). Root cause was the @ error suppressor hiding the write result during debugging — logging was actually working after the allowed list fix was applied.
+
+---
+
+## [1.5.3-patch15] - 2026-03-31
+
+### Fixed
+
+- **callsign-lookup.php — QRZ.com primary lookup** — Archived version was outdated (callook.info + HamDB). Live version on ARSSYSTEM uses QRZ.com as primary with callook.info fallback. Updated both archives with live 876-line version. Lookup confirmed working — browser cache was causing apparent failures. Hard refresh resolved all callsigns except N4DGE (not in QRZ database).
+
+---
+
+## [1.5.3-patch14] - 2026-03-31
+
+### Fixed
+
+- **bbs-messages.html — iOS Safari portrait blank screen** — Viewport meta tag was missing `maximum-scale=1.0, user-scalable=no`. Without these iOS Safari applied its own scaling, reporting `window.innerWidth` larger than physical screen width, preventing the `@media (max-width:767px)` mobile layout from triggering. Fixed to match all other dashboard pages. Also added full iOS Safari height chain: `100svh`/`100dvh`/`100vh` cascade, `@supports (-webkit-touch-callout:none)` detection, `-webkit-fill-available`, `-webkit-overflow-scrolling:touch` on scroll containers, and `viewport-fit=cover` for notch/safe area support.
+
+---
+
+## [1.5.3-patch13] - 2026-03-30
+
+### Fixed
+
+- **Visitor tracking restored** — nginx dual-domain reconfiguration broke visitor logging on both domains. Created `tprfn-index-log.php` wrapper to log TPRFN Network Map visits (index.php is pure HTML, cannot include PHP directly). Restored nginx rewrite rules on `bpq.k1ajd.net` to route through `tprfn-rf-log.php`. Both `tprfn.k1ajd.net` and `bpq.k1ajd.net` visits now tracked in visitor-log.php.
+
+---
+
+## [1.5.3-patch12] - 2026-03-30
+
+### Fixed
+
+- **bbs-messages.html — Infinite recursion on Get Mail** — Mobile responsive patch used JS wrapper functions (`const _origX = X; function X() { _origX()... }`) causing infinite recursion. Fixed by injecting mobile sync calls directly into existing function bodies.
+- **bbs-messages.html — Folders wiped on reload** — `loadSavedFromServer()` was replacing the local folder array with the server's list (`['Saved']`), wiping all user-created folders on every page load when server storage mode was active. Fixed to merge local + server folders using Set (no duplicates).
+- **bbs-messages.html — Folder list clipping** — With 18 folders the sidebar and save picker overflowed. Added `overflow-y:auto` scroll to `#folderList` and `max-height:280px` to save picker.
+- **bbs-messages.html — Wrong localStorage key in deleteFolder** — `persist('bbs_saved', ...)` corrected to `persist('bbs_saved_messages', ...)` in three places.
+- **bbs-messages.html — Save picker not updating on folder create** — `createFolder()` now calls `renderSaveFolderList()` to keep save picker in sync.
+- **network-api.php — rename() warnings** — `cache/` directory was missing. Fix: `sudo mkdir -p /var/www/tprfn/cache && sudo chown -R www-data:www-data /var/www/tprfn/cache`.
+
+### Added
+
+- **bbs-messages.html — Rules Test button** — 🔍 Test button in rules modal tests rule against currently loaded inbox, shows match count and preview.
+- **bbs-messages.html — Msg # field in rules** — Added message number as a matchable field in the rules engine.
+
+---
+
+## [1.5.3-patch11] - 2026-03-29
+
+### Added
+
+- **tprfn.conf — Dual domain nginx config** — Complete nginx config serving both tprfn.k1ajd.net (TPRFN Network Map) and bpq.k1ajd.net (BPQ Dashboard) from /var/www/tprfn/. bpq.k1ajd.net root serves bpq-rf-connections.html. All BPQ Dashboard URLs on tprfn.k1ajd.net redirect 301 to bpq.k1ajd.net. All original security rules (bot blocking, rate limiting, headers, directory protection) preserved and applied to both domains. Port 514 syslog unaffected.
+
+---
+
+## [1.5.3-patch10] - 2026-03-29
+
+### Added
+
+- **bpq-rf-connections.html — GitHub download banner** — Deep space themed banner between nav and dashboard with animated stars, feature pill badges (RF Analytics, BBS Client, Storm Monitor, Prop Scheduler), and a "Download Free" button linking to https://github.com/bpq-dashboard/bpq-dashboard. Dismissible with × button that saves preference to localStorage.
+
+---
+
+## [1.5.3-patch9] - 2026-03-29
+
+### Fixed
+
+- **bbs-messages.html — Signature not appending** — `buildBody()` now re-reads localStorage as fallback when `signature.text` is empty in memory. `saveSig()` warns if text is empty while enabled.
+- **bbs-messages.html — Full mobile responsive layout** — At <768px switches to single-pane app layout with bottom tab bar (Inbox/Message/Folders), slide transitions, touch-friendly rows, sheet-style modals, and mobile bulk select. Desktop three-pane layout unchanged.
+- **visitor-log.php — PHP syntax error breaking bpq-rf-connections.html** — Bcrypt hash was truncated by shell `$` expansion during injection, leaving VIEWER_PASSWORD_HASH define unterminated. Fixed with Python. Also fixed placeholder check that was replaced with real hash causing perpetual "not configured" error.
+
+### Added
+
+- **GitHub repository** — Full project published at https://github.com/bpq-dashboard/bpq-dashboard (83 files).
 
 ---
 

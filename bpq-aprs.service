@@ -1,0 +1,18 @@
+[Unit]
+Description=BPQ APRS-IS Daemon for BPQ Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/python3 /var/www/tprfn/scripts/bpq-aprs-daemon.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bpq-aprs
+
+[Install]
+WantedBy=multi-user.target

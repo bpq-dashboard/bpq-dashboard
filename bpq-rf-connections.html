@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPQ RF Connections v1.5.1</title>
+    <title>BPQ RF Connections v1.5.4</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Preconnect to CDNs for faster loading -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -200,17 +200,107 @@
                 <a href="bpq-email-monitor.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Messages</a>
                     <a href="bbs-messages.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">BBS</a>
                     <a href="nws-dashboard.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Weather</a>
+                    <a href="bpq-chat.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Chat</a>
                 </div>
             </div>
         </div>
     </nav>
+
+    <!-- ═══ GITHUB BANNER ══════════════════════════════════════════════════ -->
+    <div id="githubBanner" style="
+        margin: 0 0.5rem 1rem;
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        border-radius: 14px;
+        padding: 18px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(139,92,246,0.3);
+    ">
+        <!-- Animated background stars -->
+        <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden">
+            <div style="position:absolute;width:2px;height:2px;background:#fff;border-radius:50%;top:20%;left:10%;opacity:.6;animation:twinkle 2.1s infinite"></div>
+            <div style="position:absolute;width:1px;height:1px;background:#fff;border-radius:50%;top:60%;left:25%;opacity:.4;animation:twinkle 1.7s infinite .5s"></div>
+            <div style="position:absolute;width:2px;height:2px;background:#a78bfa;border-radius:50%;top:30%;left:80%;opacity:.7;animation:twinkle 2.4s infinite .3s"></div>
+            <div style="position:absolute;width:1px;height:1px;background:#fff;border-radius:50%;top:70%;left:60%;opacity:.5;animation:twinkle 1.9s infinite .8s"></div>
+            <div style="position:absolute;width:2px;height:2px;background:#93c5fd;border-radius:50%;top:15%;left:50%;opacity:.5;animation:twinkle 2.2s infinite 1s"></div>
+            <div style="position:absolute;width:1px;height:1px;background:#fff;border-radius:50%;top:80%;left:88%;opacity:.4;animation:twinkle 2.6s infinite .2s"></div>
+        </div>
+        <style>
+            @keyframes twinkle { 0%,100%{opacity:.2} 50%{opacity:1} }
+            @keyframes pulse-glow { 0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,.4)} 50%{box-shadow:0 0 0 8px rgba(139,92,246,0)} }
+            #githubBanner .gh-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,92,246,.5) !important; }
+            #githubBanner .gh-btn { transition: all .2s ease; }
+            #githubBannerClose:hover { opacity: 1 !important; }
+        </style>
+
+        <!-- Left — text -->
+        <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                <svg height="22" width="22" viewBox="0 0 16 16" fill="white" style="flex-shrink:0">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                <span style="color:#e2e8f0;font-weight:700;font-size:15px;letter-spacing:-.2px">BPQ Dashboard is open source!</span>
+                <span style="background:linear-gradient(90deg,#7c3aed,#2563eb);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px">FREE</span>
+            </div>
+            <p style="color:#94a3b8;font-size:12px;margin:0;line-height:1.5">
+                Like what you see? Run this dashboard on your own BPQ32 or LinBPQ station.
+                Full install guides for Linux &amp; Windows included.
+            </p>
+        </div>
+
+        <!-- Center — feature pills -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+            <span style="background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);color:#c4b5fd;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600">📡 RF Analytics</span>
+            <span style="background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.4);color:#93c5fd;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600">✉️ BBS Client</span>
+            <span style="background:rgba(16,185,129,.2);border:1px solid rgba(16,185,129,.4);color:#6ee7b7;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600">🌩️ Storm Monitor</span>
+            <span style="background:rgba(245,158,11,.2);border:1px solid rgba(245,158,11,.4);color:#fcd34d;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600">☀️ Prop Scheduler</span>
+        </div>
+
+        <!-- Right — button -->
+        <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+            <a href="https://github.com/bpq-dashboard/bpq-dashboard"
+               target="_blank"
+               class="gh-btn"
+               style="
+                   display:inline-flex;align-items:center;gap:8px;
+                   background:linear-gradient(135deg,#7c3aed,#2563eb);
+                   color:#fff;text-decoration:none;
+                   padding:10px 20px;border-radius:10px;
+                   font-size:13px;font-weight:700;
+                   box-shadow:0 4px 12px rgba(139,92,246,.35);
+                   white-space:nowrap;
+               ">
+                <svg height="16" width="16" viewBox="0 0 16 16" fill="white">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                Download Free
+            </a>
+            <button id="githubBannerClose"
+                    onclick="document.getElementById('githubBanner').style.display='none';localStorage.setItem('bpq_banner_dismissed','1')"
+                    style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;padding:4px;line-height:1;opacity:.6"
+                    title="Dismiss">×</button>
+        </div>
+    </div>
+    <script>
+        // Don't show banner if user already dismissed it
+        if (localStorage.getItem('bpq_banner_dismissed') === '1') {
+            document.getElementById('githubBanner').style.display = 'none';
+        }
+    </script>
+
     <div class="p-2 sm:p-4 lg:p-8">
         <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
             <div class="mb-6 sm:mb-10 flex flex-col lg:flex-row justify-between items-center gap-4">
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">RF Connections</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.1</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.4</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">VARA HF Analytics with Frequency Tracking</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -5784,7 +5874,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.1 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.4 | HF Efficiency Report
                 </p>
             `;
             

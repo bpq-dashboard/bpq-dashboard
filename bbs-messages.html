@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>BPQ BBS — K1AJD</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -92,8 +94,16 @@
         #authScreen.hidden { display: none; }
 
         /* ── App shell ──────────────────────────────────────────── */
-        #app { display: none; height: 100%; flex-direction: column; }
+        html, body { height: 100%; margin: 0; }
+        body { overflow: hidden; }
+        #app { display: none; height: 100%; flex-direction: column; overflow: hidden; }
         #app.visible { display: flex; }
+
+        /* iOS Safari portrait — relax fixed height, let it flow */
+        @supports (-webkit-touch-callout: none) {
+            html, body { height: -webkit-fill-available; }
+            #app.visible { min-height: -webkit-fill-available; }
+        }
 
         /* ── Top nav bar ────────────────────────────────────────── */
         #topbar {
@@ -132,6 +142,30 @@
         .tb-btn.success { color: var(--tb-green); }
         .tb-btn:disabled { opacity: .4; cursor: not-allowed; }
         .tb-sep { width: 1px; height: 24px; background: var(--tb-border); margin: 0 4px; }
+        #searchBar {
+            display: flex; align-items: center; gap: 4px;
+            background: var(--tb-bg); border: 1px solid var(--tb-border);
+            border-radius: var(--radius); padding: 2px 8px;
+            transition: border .15s; flex-shrink: 0;
+        }
+        #searchBar:focus-within { border-color: var(--tb-accent); }
+        #searchInput {
+            background: none; border: none; outline: none;
+            color: var(--tb-text); font-size: 12px; width: 180px;
+            font-family: var(--font-ui);
+        }
+        #searchInput::placeholder { color: var(--tb-muted); }
+        #searchClear {
+            background: none; border: none; color: var(--tb-muted);
+            cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1;
+        }
+        #searchClear:hover { color: var(--tb-text); }
+        .search-match { background: rgba(255,200,0,.2); }
+        .search-match-active { background: rgba(255,200,0,.5); }
+        #searchCount {
+            font-size: 10px; color: var(--tb-muted); white-space: nowrap;
+            font-family: var(--font-mono);
+        }
         .tb-count-select {
             background: var(--tb-bg); border: 1px solid var(--tb-border); color: var(--tb-text);
             border-radius: var(--radius); padding: 4px 8px; font-size: 12px; outline: none;
@@ -157,6 +191,10 @@
             overflow: hidden;
         }
         .sidebar-section { padding: 8px 0; }
+        .sidebar-section.folders-section {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
+        }
+        #folderList { overflow-y: auto; flex: 1; min-height: 0; }
         .sidebar-heading {
             font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
             color: var(--tb-muted); padding: 6px 12px 4px;
@@ -178,10 +216,21 @@
         }
         .folder-count.zero { background: transparent; color: var(--tb-muted); }
         .folder-count.unread {
-            background: var(--tb-accent); color: #fff;
+            background: var(--tb-red, #e53e3e); color: #fff;
             animation: pulse-badge .3s ease;
         }
-        .folder-item.has-unread { font-weight: 700; }
+        .folder-item.has-unread {
+            font-weight: 700;
+            color: var(--tb-accent);
+            background: rgba(74,158,255,.06);
+            border-left: 3px solid var(--tb-accent);
+        }
+        .folder-item.has-unread .folder-icon-new {
+            display: inline !important;
+        }
+        .folder-item.has-unread .folder-icon-normal {
+            display: none !important;
+        }
         @keyframes pulse-badge {
             0%   { transform: scale(1); }
             50%  { transform: scale(1.25); }
@@ -202,6 +251,13 @@
             height: 45%; flex-shrink: 0; border-bottom: 1px solid var(--tb-border);
             display: flex; flex-direction: column; overflow: hidden; background: var(--tb-list-bg);
         }
+        .list-hdr.sortable {
+            cursor: pointer; user-select: none;
+        }
+        .list-hdr.sortable:hover { color: var(--tb-accent); }
+        .list-hdr.sort-active { color: var(--tb-accent); font-weight: 700; }
+        .sort-arrow { font-size: 9px; margin-left: 3px; opacity: 0.7; }
+
         #listHeader {
             display: grid; grid-template-columns: 28px 52px 58px 90px 90px 1fr 54px;
             gap: 0; padding: 0 4px; height: 26px; align-items: center;
@@ -223,6 +279,17 @@
         .msg-row.selected { background: var(--tb-list-sel) !important; }
         .msg-row.unread .msg-subject { font-weight: 700; color: var(--tb-text); }
         .msg-row.saved-msg .msg-from { color: var(--tb-green); }
+        .msg-row.rule-matched {
+            background: rgba(63,185,80,.08) !important;
+            border-left: 3px solid #3fb950;
+        }
+        .msg-row.rule-matched .msg-subject { color: #3fb950; font-weight: 700; }
+        .rule-tag {
+            display: inline-block; font-size: 9px; font-weight: 700;
+            background: rgba(63,185,80,.2); color: #3fb950;
+            border-radius: 8px; padding: 1px 5px; margin-left: 5px;
+            vertical-align: middle;
+        }
         .msg-cell { padding: 0 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--tb-muted); }
         .msg-cell.msg-num  { font-family: var(--font-mono); font-size: 10px; }
         .msg-cell.msg-date { font-family: var(--font-mono); font-size: 10px; color: var(--tb-muted); }
@@ -424,6 +491,187 @@
         #bulkBarCount { font-size: 12px; font-weight: 600; color: var(--tb-accent); min-width: 80px; }
         .cb-all { width: 14px; height: 14px; cursor: pointer; accent-color: var(--tb-accent); }
 
+        /* ── Responsive / Mobile ───────────────────────────────── */
+
+        /* Mobile bottom tab bar */
+        #mobileTabBar {
+            display: none;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 52px; background: var(--tb-toolbar);
+            border-top: 1px solid var(--tb-border);
+            z-index: 100;
+        }
+        .mob-tab {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 2px; padding: 4px 0;
+            background: none; border: none; color: var(--tb-muted);
+            font-size: 10px; font-weight: 600; letter-spacing: .3px;
+            cursor: pointer; transition: color .15s;
+        }
+        .mob-tab .mob-icon { font-size: 18px; line-height: 1; }
+        .mob-tab.active { color: var(--tb-accent); }
+
+        /* Mobile pane switcher */
+        #mobileView { display: none; flex: 1; overflow: hidden; position: relative; }
+        .mob-pane {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; overflow: hidden;
+            transition: transform .25s ease, opacity .25s ease;
+        }
+        .mob-pane.hidden-left  { transform: translateX(-100%); opacity: 0; pointer-events: none; }
+        .mob-pane.hidden-right { transform: translateX(100%);  opacity: 0; pointer-events: none; }
+        .mob-pane.active       { transform: translateX(0);     opacity: 1; }
+
+        /* Mobile toolbar — compact icon row */
+        #mobileToolbar {
+            display: none; height: 44px; background: var(--tb-toolbar);
+            border-bottom: 1px solid var(--tb-border);
+            align-items: center; padding: 0 6px; gap: 2px; flex-shrink: 0;
+        }
+        .mob-tb-btn {
+            display: flex; flex-direction: column; align-items: center; gap: 1px;
+            padding: 4px 7px; background: none; border: none;
+            color: var(--tb-muted); font-size: 9px; font-weight: 600;
+            cursor: pointer; border-radius: var(--radius); transition: all .12s;
+            white-space: nowrap;
+        }
+        .mob-tb-btn .icon { font-size: 16px; line-height: 1; }
+        .mob-tb-btn:active { background: var(--tb-border); color: var(--tb-text); }
+        .mob-tb-btn.accent { color: var(--tb-accent); }
+
+        /* Mobile message row — simplified, touch-friendly */
+        .mob-msg-row {
+            display: flex; flex-direction: column; padding: 10px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer;
+            transition: background .1s; min-height: 60px;
+        }
+        .mob-msg-row:active { background: var(--tb-list-hover); }
+        .mob-msg-row.selected { background: var(--tb-list-sel) !important; }
+        .mob-msg-row.ms-checked { background: rgba(74,158,255,.12) !important; }
+        [data-theme="light"] .mob-msg-row { border-bottom-color: rgba(0,0,0,.06); }
+        [data-theme="light"] .mob-msg-row.ms-checked { background: rgba(10,110,219,.08) !important; }
+        .mob-row-top { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+        .mob-row-from { font-size: 13px; font-weight: 600; color: var(--tb-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mob-row-date { font-size: 10px; color: var(--tb-muted); font-family: var(--font-mono); flex-shrink: 0; }
+        .mob-row-subj { font-size: 12px; color: var(--tb-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mob-row-to   { font-size: 10px; color: var(--tb-accent); margin-top: 2px; }
+        .mob-saved-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tb-green); flex-shrink: 0; }
+
+        /* Mobile folder list */
+        .mob-folder-row {
+            display: flex; align-items: center; gap: 10px; padding: 13px 14px;
+            border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer;
+            font-size: 14px; transition: background .1s;
+        }
+        .mob-folder-row:active { background: var(--tb-list-hover); }
+        .mob-folder-row.active { color: var(--tb-accent); font-weight: 600; background: var(--tb-folder-sel); }
+        [data-theme="light"] .mob-folder-row { border-bottom-color: rgba(0,0,0,.06); }
+
+        /* Mobile preview back button */
+        #mobBackBtn {
+            display: none; align-items: center; gap: 6px; padding: 8px 12px;
+            background: var(--tb-toolbar); border-bottom: 1px solid var(--tb-border);
+            color: var(--tb-accent); font-size: 13px; font-weight: 600;
+            cursor: pointer; flex-shrink: 0;
+        }
+
+        @media (max-width: 767px) {
+            /* Hide desktop layout */
+            #toolbar  { display: none !important; }
+            #panes    { display: none !important; }
+            #topbar .nav-link  { display: none !important; }
+            #topbar .nav-sep   { display: none !important; }
+            #topbar { padding: 0 8px; height: 44px; flex-shrink: 0; }
+            #topbar .nav-title { font-size: 14px; }
+            #themeToggle { font-size: 15px; padding: 2px 6px; }
+            .nav-clock { font-size: 10px; }
+
+            /* App fills viewport */
+            #app {
+                height: 100svh !important;  /* small viewport height — excludes browser chrome */
+                height: 100dvh !important;  /* dynamic — updates as chrome shows/hides */
+                height: 100vh !important;   /* fallback */
+                overflow: hidden !important;
+                padding-bottom: 0 !important;
+            }
+            /* iOS Safari specific override */
+            @supports (-webkit-touch-callout: none) {
+                #app {
+                    height: -webkit-fill-available !important;
+                    min-height: -webkit-fill-available !important;
+                }
+            }
+
+            /* Mobile toolbar — fixed height, never shrinks */
+            #mobileToolbar {
+                display: flex !important;
+                flex-shrink: 0 !important;
+                height: 48px;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Mobile pane area — fills ALL remaining space */
+            #mobileView {
+                display: flex !important;
+                flex: 1 1 0 !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+                position: relative !important;
+                /* Leave room for fixed tab bar at bottom */
+                padding-bottom: 52px;
+                /* iOS Safari fix — explicit height calculation */
+                -webkit-flex: 1 1 0 !important;
+            }
+
+            /* Auth screen full height on iOS */
+            #authScreen {
+                min-height: 100vh;
+                min-height: -webkit-fill-available;
+            }
+
+            /* Each pane fills the mobileView */
+            .mob-pane {
+                position: absolute !important;
+                top: 0; left: 0; right: 0; bottom: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+                overflow: hidden !important;
+            }
+
+            /* Tab bar — fixed at bottom, above everything */
+            #mobileTabBar {
+                display: flex !important;
+                position: fixed !important;
+                bottom: 0; left: 0; right: 0;
+                height: 52px;
+                z-index: 200;
+            }
+
+            /* Back button */
+            #mobBackBtn { display: flex !important; }
+
+            /* Full-width sheet modals */
+            .modal-box {
+                width: 100% !important; max-width: 100% !important;
+                margin: 0 !important;
+                border-radius: 16px 16px 0 0 !important;
+                position: fixed !important;
+                bottom: 0 !important; left: 0 !important;
+                max-height: 85vh !important;
+                overflow-y: auto !important;
+            }
+            .modal-backdrop { align-items: flex-end !important; }
+        }
+
+        @media (min-width: 768px) {
+            #mobileToolbar { display: none !important; }
+            #mobileView    { display: none !important; }
+            #mobileTabBar  { display: none !important; }
+            #mobBackBtn    { display: none !important; }
+        }
+
         /* ── Scrollbars ─────────────────────────────────────────── */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -513,6 +761,7 @@
         <a href="bpq-email-monitor.html"   class="nav-link">Messages</a>
         <a href="bbs-messages.html"        class="nav-link active">BBS</a>
         <a href="nws-dashboard.html"       class="nav-link">Weather</a>
+        <a href="bpq-chat.html"           class="nav-link">Chat</a>
         <div class="nav-spacer"></div>
         <button id="themeToggle" onclick="toggleTheme()" title="Toggle day/night" style="background:none;border:none;cursor:pointer;font-size:16px;padding:4px 8px;border-radius:var(--radius);transition:background .12s;color:var(--tb-muted)" onmouseover="this.style.background='var(--tb-border)'" onmouseout="this.style.background='none'">🌙</button>
         <span class="nav-clock nav-utc" id="navUtcClock">--:--:-- Z</span>
@@ -542,6 +791,15 @@
         <div class="tb-sep"></div>
         <button class="tb-btn" id="multiSelectBtn" onclick="toggleMultiSelect()"><span class="icon">☑</span> Select</button>
         <button class="tb-btn" onclick="openRulesModal()"><span class="icon">⚙</span> Rules</button>
+        <div class="tb-sep"></div>
+        <div id="searchBar">
+            <span style="color:var(--tb-muted);font-size:13px">🔍</span>
+            <input id="searchInput" type="text" placeholder="Search messages…"
+                   oninput="onSearchInput()" onkeydown="onSearchKey(event)"
+                   autocomplete="off" autocorrect="off" autocapitalize="off">
+            <span id="searchCount"></span>
+            <button id="searchClear" onclick="clearSearch()" title="Clear search">✕</button>
+        </div>
         <div id="statusChip">Ready</div>
     </div>
 
@@ -561,7 +819,7 @@
                     <span class="folder-count zero" id="cntSaved">0</span>
                 </div>
             </div>
-            <div class="sidebar-section">
+            <div class="sidebar-section folders-section">
                 <div class="sidebar-heading">Folders</div>
                 <div id="folderList"></div>
                 <div style="padding:6px 12px">
@@ -591,11 +849,11 @@
                 </div>
                 <div id="listHeader">
                     <div class="list-hdr" id="hdrCb"></div>
-                    <div class="list-hdr">#</div>
-                    <div class="list-hdr">Date</div>
-                    <div class="list-hdr">From</div>
-                    <div class="list-hdr">To</div>
-                    <div class="list-hdr">Subject</div>
+                    <div class="list-hdr sortable" onclick="setSort('number')" id="hdrNum"># <span class="sort-arrow" id="arrNum"></span></div>
+                    <div class="list-hdr sortable sort-active" onclick="setSort('date')" id="hdrDate">Date <span class="sort-arrow" id="arrDate">↓</span></div>
+                    <div class="list-hdr sortable" onclick="setSort('from')" id="hdrFrom">From <span class="sort-arrow" id="arrFrom"></span></div>
+                    <div class="list-hdr sortable" onclick="setSort('to')" id="hdrTo">To <span class="sort-arrow" id="arrTo"></span></div>
+                    <div class="list-hdr sortable" onclick="setSort('subject')" id="hdrSubject">Subject <span class="sort-arrow" id="arrSubject"></span></div>
                     <div class="list-hdr" style="text-align:right">Size</div>
                 </div>
                 <div id="listBody">
@@ -628,6 +886,77 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- ═══ MOBILE TOOLBAR ══════════════════════════════════════════ -->
+<div id="mobileToolbar">
+    <button class="mob-tb-btn accent" onclick="fetchMessages()"><span class="icon">⟳</span>Get Mail</button>
+    <button class="mob-tb-btn" onclick="openComposeModal()"><span class="icon">✎</span>Write</button>
+    <button class="mob-tb-btn" id="mobReplyBtn" onclick="replyToSelected()" style="display:none"><span class="icon">↩</span>Reply</button>
+    <button class="mob-tb-btn" id="mobSaveBtn"  onclick="saveSelected()"   style="display:none"><span class="icon">⬇</span>Save</button>
+    <button class="mob-tb-btn" id="mobDeleteBtn" onclick="deleteSelected()" style="display:none"><span class="icon">🗑</span>Delete</button>
+    <button class="mob-tb-btn" onclick="openBulletinModal()"><span class="icon">📢</span>Bulletins</button>
+    <button class="mob-tb-btn" onclick="openRulesModal()"><span class="icon">⚙</span>Rules</button>
+    <button class="mob-tb-btn" onclick="openAddressBook()"><span class="icon">👤</span>Contacts</button>
+    <div style="flex:1"></div>
+    <div id="mobStatusChip" style="font-size:10px;color:var(--tb-muted);padding:0 6px">Ready</div>
+</div>
+
+<!-- ═══ MOBILE THREE-PANE VIEW ══════════════════════════════════ -->
+<div id="mobileView">
+    <!-- Mobile inbox pane -->
+    <div id="mobInboxPane" class="mob-pane active">
+        <!-- Bulk bar for mobile -->
+        <div id="mobBulkBar" style="display:none;align-items:center;gap:8px;padding:6px 10px;background:var(--tb-toolbar);border-bottom:1px solid var(--tb-border);flex-shrink:0">
+            <input type="checkbox" id="mobCbAll" style="width:14px;height:14px;accent-color:var(--tb-accent)" onclick="toggleSelectAll()">
+            <span id="mobBulkCount" style="font-size:12px;font-weight:600;color:var(--tb-accent);flex:1">0 selected</span>
+            <button class="mob-tb-btn success" onclick="bulkSaveSelected()" style="flex-direction:row;gap:4px"><span>⬇</span>Save</button>
+            <button class="mob-tb-btn" style="color:var(--tb-red);flex-direction:row;gap:4px" onclick="bulkDeleteSelected()"><span>🗑</span>Del</button>
+            <button class="mob-tb-btn" onclick="exitMultiSelect()" style="flex-direction:row;gap:4px"><span>✕</span></button>
+        </div>
+        <div id="mobListBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0"></div>
+    </div>
+
+    <!-- Mobile preview pane -->
+    <div id="mobPreviewPane" class="mob-pane hidden-right">
+        <div id="mobBackBtn" onclick="mobShowPane('inbox')">‹ Back to messages</div>
+        <div id="mobPreviewHeader" style="padding:12px 14px;border-bottom:1px solid var(--tb-border);background:var(--tb-sidebar);flex-shrink:0">
+            <div id="mobPreviewSubject" style="font-size:15px;font-weight:700;margin-bottom:8px;line-height:1.3">—</div>
+            <div id="mobPreviewMeta" style="display:flex;flex-wrap:wrap;gap:12px"></div>
+        </div>
+        <div id="mobPreviewActions" style="padding:6px 8px;border-bottom:1px solid var(--tb-border);background:var(--tb-toolbar);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0"></div>
+        <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;min-height:0">
+            <pre id="mobPreviewBodyText" style="font-family:var(--font-mono);font-size:12px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:var(--tb-text);margin:0"></pre>
+        </div>
+    </div>
+
+    <!-- Mobile folders pane -->
+    <div id="mobFoldersPane" class="mob-pane hidden-right">
+        <div style="padding:10px 14px;border-bottom:1px solid var(--tb-border);background:var(--tb-toolbar);flex-shrink:0">
+            <div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--tb-muted);margin-bottom:8px">Folders</div>
+            <div style="display:flex;gap:6px">
+                <input class="inline-input" id="mobNewFolderInput" placeholder="New folder…" style="flex:1" onkeypress="if(event.key==='Enter'){createFolder();document.getElementById('mobNewFolderInput').value=document.getElementById('newFolderInput').value}">
+                <button class="icon-btn" onclick="document.getElementById('newFolderInput').value=document.getElementById('mobNewFolderInput').value;createFolder();document.getElementById('mobNewFolderInput').value=''" title="Create">＋</button>
+            </div>
+        </div>
+        <div id="mobFolderList" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0"></div>
+        <div style="padding:8px 14px;border-top:1px solid var(--tb-border);font-size:10px;color:var(--tb-muted)">
+            <span id="mobStorageChip" onclick="toggleStorageMode()" style="cursor:pointer">💻 Browser storage</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MOBILE TAB BAR ═══════════════════════════════════════════ -->
+<div id="mobileTabBar">
+    <button class="mob-tab active" id="tabInbox"   onclick="mobShowPane('inbox')">
+        <span class="mob-icon">📥</span>Inbox
+    </button>
+    <button class="mob-tab" id="tabPreview" onclick="mobShowPane('preview')">
+        <span class="mob-icon">✉️</span>Message
+    </button>
+    <button class="mob-tab" id="tabFolders" onclick="mobShowPane('folders')">
+        <span class="mob-icon">📁</span>Folders
+    </button>
 </div>
 
 <!-- ═══ COMPOSE MODAL ═══════════════════════════════════════════ -->
@@ -688,7 +1017,7 @@
             <button class="modal-close" onclick="closeSaveModal()">×</button>
         </div>
         <div class="modal-body">
-            <div id="saveFolderList"></div>
+            <div id="saveFolderList" style="max-height:280px;overflow-y:auto;margin:0 -4px"></div>
             <div style="margin-top:8px;display:flex;gap:4px;align-items:center;border-top:1px solid var(--tb-border);padding-top:10px">
                 <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tb-muted);cursor:pointer">
                     <input type="checkbox" id="deleteAfterSave" style="width:13px;height:13px">
@@ -818,6 +1147,10 @@ let selectedMsgs    = new Set(); // set of message numbers
 let rules           = [];        // message filing rules
 let signature       = { text: '', enabled: false }; // user signature
 let unreadFolders   = {};        // folderName → unread count
+let sortField  = 'date';         // current sort field
+let sortAsc    = false;          // sort direction (false = newest first)
+let searchQuery = '';            // current search query
+let searchResults = [];          // indices of matching messages
 let selectedMsg   = null;    // the selected message object
 let deleteTarget  = null;
 let storageMode   = 'browser';
@@ -894,6 +1227,10 @@ function unlockInterface() {
     document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('app').classList.add('visible');
     loadData();
+    // Init mobile layout after load
+    if (isMobile()) {
+        setTimeout(() => { mobRenderList(); mobRenderFolders(); }, 100);
+    }
 }
 async function initAuth() {
     try {
@@ -945,10 +1282,9 @@ function persist(key, val) { try { localStorage.setItem(key, JSON.stringify(val)
 function updateCounts() {
     const bCnt  = document.getElementById('cntBBS');
     const sCnt  = document.getElementById('cntSaved');
-    bCnt.textContent  = messages.length;
-    bCnt.className    = 'folder-count' + (messages.length ? '' : ' zero');
-    sCnt.textContent  = savedMessages.length;
-    sCnt.className    = 'folder-count' + (savedMessages.length ? '' : ' zero');
+    if (bCnt) { bCnt.textContent = messages.length; bCnt.className = 'folder-count' + (messages.length ? '' : ' zero'); }
+    if (sCnt) { sCnt.textContent = savedMessages.length; sCnt.className = 'folder-count' + (savedMessages.length ? '' : ' zero'); }
+    if (isMobile()) mobRenderFolders();
 }
 async function checkServerStorage() {
     try {
@@ -987,11 +1323,15 @@ async function loadSavedFromServer() {
             savedMessages = dm.messages || [];
             persist('bbs_saved_messages', savedMessages);
         }
-        // Load folders from server
+        // Load folders from server — merge with local to preserve user-created folders
         const rf = await fetch(CONFIG.storageUrl + '?action=folders');
         const df = await rf.json();
         if (df.success) {
-            folders = df.folders || ['Saved'];
+            const serverFolders = df.folders || ['Saved'];
+            // Merge: keep all local folders, add any server-only folders
+            const localFolders = JSON.parse(localStorage.getItem('bbs_folders') || '["Saved"]');
+            const merged = [...new Set([...localFolders, ...serverFolders])];
+            folders = merged;
             persist('bbs_folders', folders);
         }
         updateSidebarFolders();
@@ -1004,6 +1344,7 @@ async function loadSavedFromServer() {
 //  SIDEBAR FOLDERS
 // ═══════════════════════════════════════════════════════════════
 function updateSidebarFolders() {
+    if (isMobile()) { mobRenderFolders(); return; }
     const counts = {};
     savedMessages.forEach(m => {
         const f = m.folder || 'Saved';
@@ -1018,7 +1359,7 @@ function updateSidebarFolders() {
         return `
         <div class="folder-item ${currentFolder===f?'active':''} ${hasUnread?'has-unread':''}"
              onclick="switchFolder('${escapeHtml(f)}')">
-            <span class="folder-icon">📁</span>
+            <span class="folder-icon"><span class="folder-icon-normal">📁</span><span class="folder-icon-new" style="display:none">📬</span></span>
             <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f)}</span>
             ${hasUnread
                 ? `<span class="folder-count unread" title="${unreadCnt} unread">${unreadCnt}</span>`
@@ -1056,6 +1397,7 @@ async function createFolder() {
         const sorted = [...folders].sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
         ruleFolderSel.innerHTML = sorted.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
     }
+    renderSaveFolderList();  // Keep save picker in sync
     showToast(`Folder "${name}" created`);
 }
 async function deleteFolder(name) {
@@ -1064,7 +1406,7 @@ async function deleteFolder(name) {
     folders = folders.filter(f => f!==name);
     savedMessages.forEach(m => { if (m.folder===name) m.folder='Saved'; });
     persist('bbs_folders', folders);
-    persist('bbs_saved', savedMessages);
+    persist('bbs_saved_messages', savedMessages);
     if (currentFolder === name) switchFolder('saved');
     updateSidebarFolders();
     updateCounts();
@@ -1085,6 +1427,8 @@ async function fetchMessages() {
         if (d.success) {
             messages = (d.messages || []).sort((a,b) => b.number - a.number);
             setStatus('ready', `${messages.length} msgs`);
+            const mobChip = document.getElementById('mobStatusChip');
+            if (mobChip) mobChip.textContent = `${messages.length} msgs`;
             document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
             updateCounts();
             if (currentFolder === 'bbs') { selectedMsg = null; clearPreview(); setActionBtns(false); renderList(); }
@@ -1121,6 +1465,102 @@ async function fetchMessageBody(num) {
 // ═══════════════════════════════════════════════════════════════
 //  RENDER LIST
 // ═══════════════════════════════════════════════════════════════
+// ── Search ──────────────────────────────────────────────────────
+function onSearchInput() {
+    searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+    document.getElementById('searchClear').style.display = searchQuery ? 'block' : 'none';
+    renderList();
+}
+
+function onSearchKey(e) {
+    if (e.key === 'Escape') clearSearch();
+    if (e.key === 'Enter')  e.preventDefault(); // prevent form submit
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    searchQuery = '';
+    document.getElementById('searchClear').style.display = 'none';
+    document.getElementById('searchCount').textContent = '';
+    renderList();
+}
+
+function applySearch(list) {
+    if (!searchQuery) return list;
+    return list.filter(msg => {
+        return (msg.subject || '').toLowerCase().includes(searchQuery) ||
+               (msg.from    || '').toLowerCase().includes(searchQuery) ||
+               (msg.to      || '').toLowerCase().includes(searchQuery) ||
+               (msg.body    || '').toLowerCase().includes(searchQuery) ||
+               String(msg.number || '').includes(searchQuery) ||
+               (msg.date    || '').toLowerCase().includes(searchQuery);
+    });
+}
+
+function highlightText(text, query) {
+    if (!query || !text) return escapeHtml(text || '');
+    const escaped = escapeHtml(text);
+    const escapedQ = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escaped.replace(new RegExp('(' + escapedQ + ')', 'gi'),
+        '<mark style="background:rgba(255,200,0,.35);border-radius:2px">$1</mark>');
+}
+
+function setSort(field) {
+    if (sortField === field) {
+        sortAsc = !sortAsc; // toggle direction
+    } else {
+        sortField = field;
+        sortAsc = field === 'subject' || field === 'from' || field === 'to'; // alpha asc, dates desc
+    }
+    // Update header indicators
+    ['number','date','from','to','subject'].forEach(f => {
+        const hdr = document.getElementById('hdr' + f.charAt(0).toUpperCase() + f.slice(1));
+        const arr = document.getElementById('arr' + f.charAt(0).toUpperCase() + f.slice(1));
+        if (!hdr || !arr) return;
+        if (f === sortField) {
+            hdr.classList.add('sort-active');
+            arr.textContent = sortAsc ? '↑' : '↓';
+        } else {
+            hdr.classList.remove('sort-active');
+            arr.textContent = '';
+        }
+    });
+    renderList();
+}
+
+function applySort(list) {
+    return [...list].sort((a, b) => {
+        let av, bv;
+        switch (sortField) {
+            case 'number':
+                av = parseInt(a.number) || 0;
+                bv = parseInt(b.number) || 0;
+                break;
+            case 'date':
+                av = new Date(a.date || 0).getTime() || parseInt(a.number) || 0;
+                bv = new Date(b.date || 0).getTime() || parseInt(b.number) || 0;
+                break;
+            case 'from':
+                av = (a.from || '').toLowerCase();
+                bv = (b.from || '').toLowerCase();
+                break;
+            case 'to':
+                av = (a.to || '').toLowerCase();
+                bv = (b.to || '').toLowerCase();
+                break;
+            case 'subject':
+                av = (a.subject || '').toLowerCase();
+                bv = (b.subject || '').toLowerCase();
+                break;
+            default:
+                return 0;
+        }
+        if (av < bv) return sortAsc ? -1 : 1;
+        if (av > bv) return sortAsc ? 1 : -1;
+        return 0;
+    });
+}
+
 function renderList() {
     const body  = document.getElementById('listBody');
     const empty = document.getElementById('listEmpty');
@@ -1133,6 +1573,17 @@ function renderList() {
     } else {
         list = savedMessages.filter(m => (m.folder||'Saved') === currentFolder);
     }
+    list = applySort(list);
+    list = applySearch(list);
+
+    // Update search count
+    if (searchQuery) {
+        const cnt = document.getElementById('searchCount');
+        if (cnt) cnt.textContent = list.length + ' found';
+    } else {
+        const cnt = document.getElementById('searchCount');
+        if (cnt) cnt.textContent = '';
+    }
 
     if (list.length === 0) {
         body.innerHTML = '';
@@ -1141,13 +1592,15 @@ function renderList() {
     }
 
     body.innerHTML = list.map((msg, i) => {
-        const isSaved   = currentFolder === 'bbs' && savedMessages.some(s => s.number === msg.number);
+        const isSaved     = currentFolder === 'bbs' && savedMessages.some(s => s.number === msg.number);
+        const isRuleMatch = !!msg._ruleMatched;
+        const ruleTag     = isRuleMatch ? `<span class="rule-tag" title="Rule: ${escapeHtml(msg._ruleMatched || '')}">⚙ ${escapeHtml(msg._ruleMatched || '')}</span>` : '';
         const isSelected= selectedMsg && selectedMsg.number === msg.number && selectedMsg._src === (currentFolder==='bbs'?'bbs':'saved');
         const isChecked = selectedMsgs.has(msg.number);
         const typeClass = `type-${(msg.type||msg.status||'B').charAt(0).toUpperCase()}`;
         const typeLbl   = (msg.type||msg.status||'B').charAt(0).toUpperCase();
         const savedIcon = isSaved ? '<span style="color:var(--tb-green);font-size:9px;margin-left:3px" title="Saved">●</span>' : '';
-        return `<div class="msg-row ${isSelected?'selected':''} ${isSaved?'saved-msg':''} ${isChecked?'ms-checked':''}"
+        return `<div class="msg-row ${isSelected?'selected':''} ${isSaved?'saved-msg':''} ${isRuleMatch?'rule-matched':''} ${isChecked?'ms-checked':''}"
                      onclick="multiSelectMode ? toggleRowCheck(${msg.number}, event) : selectMsg(${i})"
                      data-index="${i}" data-num="${msg.number}">
             <div class="msg-cell" style="display:flex;align-items:center;justify-content:center">
@@ -1155,12 +1608,16 @@ function renderList() {
             </div>
             <div class="msg-cell msg-num">#${msg.number}${savedIcon}</div>
             <div class="msg-cell msg-date">${escapeHtml(msg.date||'--')}</div>
-            <div class="msg-cell msg-from">${escapeHtml(msg.from||'--')}</div>
+            <div class="msg-cell msg-from">${searchQuery ? highlightText(msg.from||'--', searchQuery) : escapeHtml(msg.from||'--')}</div>
             <div class="msg-cell msg-to">${escapeHtml(msg.to||'--')}</div>
-            <div class="msg-cell msg-subject">${escapeHtml(msg.subject||'(No Subject)')}</div>
+            <div class="msg-cell msg-subject">${searchQuery ? highlightText(msg.subject||'(No Subject)', searchQuery) : escapeHtml(msg.subject||'(No Subject)')}${ruleTag}</div>
             <div class="msg-cell msg-size">${fmtSize(msg.size)}</div>
         </div>`;
     }).join('');
+    // Sync mobile layout
+    if (typeof isMobile === 'function' && isMobile()) {
+        mobRenderList(); mobRenderFolders(); mobUpdateBulkBar();
+    }
 }
 function makeEmptyState(folder) {
     const div = document.createElement('div');
@@ -1189,6 +1646,20 @@ function selectMsg(index) {
     if (!msg) return;
 
     selectedMsg = { ...msg, _src: src, _index: index };
+
+    // Clear rule-matched highlight when message is opened
+    if (src === 'saved' && msg._ruleMatched) {
+        const realIdx = savedMessages.findIndex(
+            m => m.number === msg.number && (m.folder||'Saved') === (msg.folder||'Saved')
+        );
+        if (realIdx >= 0) {
+            delete savedMessages[realIdx]._ruleMatched;
+            persist('bbs_saved_messages', savedMessages);
+        }
+        delete selectedMsg._ruleMatched;
+        // Re-render to remove green highlight from this row
+        setTimeout(() => renderList(), 50);
+    }
 
     // Highlight row
     document.querySelectorAll('.msg-row').forEach(r => r.classList.remove('selected'));
@@ -1300,7 +1771,9 @@ async function executeSave(folder) {
         }
         persist('bbs_saved_messages', savedMessages);
         hideLoading();
-        showToast(`${nums.length} messages saved to "${folder}"`);
+        unreadFolders[folder] = (unreadFolders[folder] || 0) + nums.length;
+        localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
+        showToast(`📬 ${nums.length} messages saved to "${folder}"`);
         exitMultiSelect();
         updateSidebarFolders(); updateCounts(); renderList();
         return;
@@ -1318,8 +1791,12 @@ async function executeSave(folder) {
         } catch(e) { showToast('Server error: '+e.message, true); return; }
     } else {
         savedMessages.unshift(msgToSave);
-        persist('bbs_saved', savedMessages);
+        persist('bbs_saved_messages', savedMessages);
     }
+
+    // Mark folder as having new mail
+    unreadFolders[folder] = (unreadFolders[folder] || 0) + 1;
+    localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
 
     closeSaveModal();
     updateSidebarFolders();
@@ -1332,7 +1809,7 @@ async function executeSave(folder) {
         deleteTarget = { ...selectedMsg };
         await executeDeleteFromBBS();
     } else {
-        showToast(`Saved to "${folder}"`);
+        showToast(`📬 Saved to "${folder}"`);
     }
 }
 
@@ -1375,7 +1852,7 @@ async function executeDelete() {
     }
     if (deleteTarget._src === 'saved') {
         savedMessages = savedMessages.filter(m => !(m.number===deleteTarget.number && m.savedAt===deleteTarget.savedAt));
-        persist('bbs_saved', savedMessages);
+        persist('bbs_saved_messages', savedMessages);
         showToast('Message removed from saved');
         selectedMsg = null; clearPreview(); setActionBtns(false);
         updateSidebarFolders(); updateCounts(); renderList();
@@ -1683,6 +2160,7 @@ function exitMultiSelect() {
     document.getElementById('multiSelectBtn').style.background = '';
     document.getElementById('cbAll').checked = false;
     renderList();
+    if (isMobile()) mobUpdateBulkBar();
 }
 function toggleRowCheck(num, e) {
     if (e) e.stopPropagation();
@@ -1696,6 +2174,7 @@ function toggleRowCheck(num, e) {
         }
         if (el.type === 'checkbox') el.checked = selectedMsgs.has(num);
     });
+    if (isMobile()) mobUpdateBulkBar();
 }
 function toggleSelectAll() {
     const list = getCurrentList();
@@ -1976,7 +2455,7 @@ function renderRulesList() {
     }
     empty.style.display = 'none';
 
-    const fieldLabels = { from:'From', to:'To', subject:'Subject' };
+    const fieldLabels = { from:'From', to:'To', subject:'Subject', number:'Msg #' };
     const opLabels    = { contains:'contains', starts:'starts with', equals:'equals' };
 
     container.innerHTML = rules.map((rule, i) => `
@@ -2004,6 +2483,23 @@ function renderRulesList() {
         </div>`).join('');
 }
 
+function testRule() {
+    const field  = document.getElementById('ruleField').value;
+    const op     = document.getElementById('ruleOp').value;
+    const value  = document.getElementById('ruleValue').value.trim();
+    if (!value) { showToast('Enter a match value first', true); return; }
+    const testRule = { field, op, value };
+    const matches = messages.filter(msg => matchesRule(msg, testRule));
+    if (matches.length === 0) {
+        showToast(`No messages in inbox match this rule`, true);
+    } else {
+        const preview = matches.slice(0,3).map(m => `#${m.number} ${m.from} — ${m.subject||'(no subject)'}`).join('\n');
+        const more = matches.length > 3 ? `\n…and ${matches.length-3} more` : '';
+        showToast(`✓ Matches ${matches.length} message${matches.length>1?'s':''} in inbox`);
+        alert(`Rule matches ${matches.length} message${matches.length>1?'s':''}:\n\n${preview}${more}`);
+    }
+}
+
 function addRule() {
     const field  = document.getElementById('ruleField').value;
     const op     = document.getElementById('ruleOp').value;
@@ -2014,7 +2510,7 @@ function addRule() {
     if (!value) { showToast('Enter a match value', true); return; }
     if (!folder) { showToast('Select a destination folder', true); return; }
 
-    const fieldLabels = { from:'From', to:'To', subject:'Subject' };
+    const fieldLabels = { from:'From', to:'To', subject:'Subject', number:'Msg #' };
     const opLabels    = { contains:'contains', starts:'starts with', equals:'equals' };
     const name = `${fieldLabels[field]} ${opLabels[op]} "${value}" → ${folder}`;
 
@@ -2053,8 +2549,193 @@ function markFolderRead(folderName) {
         delete unreadFolders[folderName];
         saveUnread();
         updateSidebarFolders();
+        if (isMobile()) mobRenderFolders();
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  MOBILE LAYOUT ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+const isMobile = () => window.innerWidth < 768;
+
+function mobShowPane(name) {
+    const panes = { inbox: 'mobInboxPane', preview: 'mobPreviewPane', folders: 'mobFoldersPane' };
+    const tabs  = { inbox: 'tabInbox',     preview: 'tabPreview',     folders: 'tabFolders'    };
+
+    Object.entries(panes).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (key === name) {
+            el.className = 'mob-pane active';
+        } else {
+            // Slide direction: folders always from right, preview from right, inbox from left
+            el.className = 'mob-pane ' + (key === 'inbox' ? 'hidden-left' : 'hidden-right');
+        }
+    });
+    Object.entries(tabs).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.className = 'mob-tab' + (key === name ? ' active' : '');
+    });
+}
+
+function mobRenderList() {
+    if (!isMobile()) return;
+    const body = document.getElementById('mobListBody');
+    if (!body) return;
+
+    let list = [];
+    if (currentFolder === 'bbs')        list = messages;
+    else if (currentFolder === 'saved') list = savedMessages;
+    else list = savedMessages.filter(m => (m.folder||'Saved') === currentFolder);
+
+    if (list.length === 0) {
+        body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--tb-muted);gap:8px">
+            <div style="font-size:36px">${currentFolder==='bbs'?'📭':'📁'}</div>
+            <div style="font-size:12px">${currentFolder==='bbs'?'Tap Get Mail to load messages':'No messages in this folder'}</div>
+        </div>`;
+        return;
+    }
+
+    body.innerHTML = list.map((msg, i) => {
+        const isSaved   = currentFolder==='bbs' && savedMessages.some(s=>s.number===msg.number);
+        const isChecked = selectedMsgs.has(msg.number);
+        const isSelected= selectedMsg && selectedMsg.number===msg.number;
+        return `<div class="mob-msg-row ${isSelected?'selected':''} ${isChecked?'ms-checked':''}"
+                     onclick="multiSelectMode ? toggleRowCheck(${msg.number},event) : mobSelectMsg(${i})"
+                     data-num="${msg.number}">
+            <div class="mob-row-top">
+                ${multiSelectMode ? `<input type="checkbox" class="row-cb" ${isChecked?'checked':''} style="display:block;width:15px;height:15px;accent-color:var(--tb-accent)" onclick="event.stopPropagation();toggleRowCheck(${msg.number},event)">` : ''}
+                ${isSaved ? '<div class="mob-saved-dot" title="Saved"></div>' : ''}
+                <div class="mob-row-from">${escapeHtml(msg.from||'—')}</div>
+                <div class="mob-row-date">${escapeHtml(msg.date||'')}</div>
+            </div>
+            <div class="mob-row-subj">${escapeHtml(msg.subject||'(No Subject)')}</div>
+            <div class="mob-row-to">To: ${escapeHtml(msg.to||'—')} · #${msg.number}</div>
+        </div>`;
+    }).join('');
+}
+
+function mobSelectMsg(index) {
+    let list, src;
+    if (currentFolder==='bbs')        { list=messages;      src='bbs'; }
+    else if (currentFolder==='saved') { list=savedMessages; src='saved'; }
+    else { list=savedMessages.filter(m=>(m.folder||'Saved')===currentFolder); src='saved'; }
+
+    const msg = list[index];
+    if (!msg) return;
+    selectedMsg = { ...msg, _src: src, _index: index };
+
+    // Highlight in list
+    document.querySelectorAll('.mob-msg-row').forEach(r => r.classList.remove('selected'));
+    const rows = document.querySelectorAll('.mob-msg-row');
+    if (rows[index]) rows[index].classList.add('selected');
+
+    // Fill preview
+    document.getElementById('mobPreviewSubject').textContent = msg.subject || '(No Subject)';
+    document.getElementById('mobPreviewMeta').innerHTML = `
+        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--tb-muted)">From</div>
+             <div style="font-size:12px;font-family:var(--font-mono)">${escapeHtml(msg.from||'—')}</div></div>
+        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--tb-muted)">To</div>
+             <div style="font-size:12px;font-family:var(--font-mono)">${escapeHtml(msg.to||'—')}</div></div>
+        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--tb-muted)">Date</div>
+             <div style="font-size:12px;font-family:var(--font-mono)">${escapeHtml(msg.date||'—')}</div></div>
+        <div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--tb-muted)">Msg#</div>
+             <div style="font-size:12px;font-family:var(--font-mono)">${msg.number}</div></div>`;
+
+    const isSaved = src==='bbs' && savedMessages.some(s=>s.number===msg.number);
+    const savedFldr = isSaved ? savedMessages.find(s=>s.number===msg.number)?.folder : null;
+    document.getElementById('mobPreviewActions').innerHTML = `
+        <button class="act-btn primary" onclick="replyToSelected()">↩ Reply</button>
+        ${src==='bbs' ? (isSaved
+            ? `<button class="act-btn saved-state" disabled>✓ ${escapeHtml(savedFldr||'Saved')}</button>`
+            : `<button class="act-btn" onclick="saveSelected()">⬇ Save</button>`)
+            : ''}
+        <button class="act-btn danger" onclick="deleteSelected()">${src==='bbs'?'🗑 Delete':'🗑 Remove'}</button>`;
+
+    document.getElementById('mobPreviewBodyText').textContent = 'Loading…';
+
+    // Show mobile preview toolbar buttons
+    const mobReply  = document.getElementById('mobReplyBtn');
+    const mobSave   = document.getElementById('mobSaveBtn');
+    const mobDelete = document.getElementById('mobDeleteBtn');
+    if (mobReply)  mobReply.style.display  = '';
+    if (mobSave)   mobSave.style.display   = src==='bbs'&&!isSaved ? '' : 'none';
+    if (mobDelete) mobDelete.style.display = '';
+
+    // Switch to preview pane
+    mobShowPane('preview');
+
+    // Load body
+    if (src==='bbs') {
+        const bodyEl = document.getElementById('mobPreviewBodyText');
+        fetch(`${CONFIG.apiUrl}?action=read&msg=${msg.number}`)
+            .then(r=>r.json())
+            .then(d=>{ bodyEl.textContent = d.success?(d.body||'(Empty)'):'Error: '+(d.error||'Failed'); selectedMsg._body=d.body||''; })
+            .catch(e=>{ bodyEl.textContent='Error: '+e.message; });
+    } else {
+        document.getElementById('mobPreviewBodyText').textContent = msg.body||'(No content)';
+        selectedMsg._body = msg.body||'';
+    }
+}
+
+function mobRenderFolders() {
+    if (!isMobile()) return;
+    const container = document.getElementById('mobFolderList');
+    if (!container) return;
+    const counts = {};
+    savedMessages.forEach(m => { const f=m.folder||'Saved'; counts[f]=(counts[f]||0)+1; });
+
+    const allFolders = ['bbs', 'saved', ...folders.filter(f=>f!=='Saved'), 'Saved'];
+    const unique = [...new Set(allFolders)];
+
+    container.innerHTML = unique.map(f => {
+        const isSpecial = f==='bbs'||f==='saved';
+        const label = f==='bbs'?'📥 Inbox':f==='saved'?'💾 Saved':'📁 '+f;
+        const cnt   = f==='bbs' ? messages.length : (counts[f==='saved'?'Saved':f]||0);
+        const active= currentFolder===f || (f==='saved'&&currentFolder==='saved');
+        const unread= unreadFolders[f]||0;
+        return `<div class="mob-folder-row ${active?'active':''}" onclick="switchFolder('${f==='saved'?'saved':escapeHtml(f)}');mobShowPane('inbox')">
+            <span style="flex:1">${label}</span>
+            ${unread>0 ? `<span style="font-size:10px;background:var(--tb-accent);color:#fff;border-radius:10px;padding:1px 7px;font-weight:700">${unread}</span>`
+                       : (cnt>0?`<span style="font-size:11px;color:var(--tb-muted)">${cnt}</span>`:'')}
+        </div>`;
+    }).join('');
+
+    // Sync storage chip
+    const chip = document.getElementById('mobStorageChip');
+    if (chip) chip.textContent = storageMode==='server' ? '☁️ Server storage' : '💻 Browser storage';
+}
+
+function mobUpdateBulkBar() {
+    const bar = document.getElementById('mobBulkBar');
+    const cnt = document.getElementById('mobBulkCount');
+    const cbAll = document.getElementById('mobCbAll');
+    if (!bar) return;
+    if (multiSelectMode) {
+        bar.style.display = 'flex';
+        if (cnt) cnt.textContent = selectedMsgs.size === 1 ? '1 selected' : `${selectedMsgs.size} selected`;
+        if (cbAll) {
+            const list = getCurrentList();
+            cbAll.checked = list.length>0 && list.every(m=>selectedMsgs.has(m.number));
+            cbAll.indeterminate = selectedMsgs.size>0 && !cbAll.checked;
+        }
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+// ── Mobile sync hooks — called directly from existing functions ───────────────
+// These are called at the END of renderList, switchFolder, exitMultiSelect
+// and toggleRowCheck via direct injection below — no wrapper recursion.
+
+// Handle resize — switch between desktop/mobile layout
+window.addEventListener('resize', () => {
+    if (isMobile()) {
+        mobRenderList();
+        mobRenderFolders();
+    }
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  HIDE PREVIEW SECTIONS INITIALLY
@@ -2105,6 +2786,7 @@ initAuth();
                         <option value="from">From</option>
                         <option value="to">To</option>
                         <option value="subject">Subject</option>
+                        <option value="number">Msg #</option>
                     </select>
                     <select class="form-select" id="ruleOp" style="width:100%">
                         <option value="contains">contains</option>
@@ -2114,7 +2796,10 @@ initAuth();
                     <input class="inline-input" id="ruleValue" placeholder="Match text…" style="width:100%">
                     <select class="form-select" id="ruleFolder" style="width:100%">
                     </select>
-                    <button class="modal-btn primary" onclick="addRule()" style="white-space:nowrap;padding:7px 14px">＋ Add</button>
+                    <div style="display:flex;gap:6px">
+                        <button class="modal-btn secondary" onclick="testRule()" style="white-space:nowrap;padding:7px 12px" title="Test rule against loaded messages">🔍 Test</button>
+                        <button class="modal-btn primary" onclick="addRule()" style="white-space:nowrap;padding:7px 14px">＋ Add</button>
+                    </div>
                 </div>
                 <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
                     <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--tb-muted);cursor:pointer">

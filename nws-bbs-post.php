@@ -1,37 +1,32 @@
 <?php
 /**
  * NWS Alert BBS Poster
+ * Version: 1.3.0
  * 
  * This script receives NWS alert data via POST and sends it to the BPQ BBS
  * via telnet connection.
- * 
- * Configuration: Edit the settings below or create a nws-config.php file
  */
 
-// ================================
-// CONFIGURATION
-// ================================
+// Load configuration and security
+require_once __DIR__ . '/includes/bootstrap.php';
 
-// Default configuration (can be overridden by nws-config.php)
-$config = [
-    'bbs_host' => 'localhost',
-    'bbs_port' => 8010,
-    'bbs_user' => 'TonyD',
-    'bbs_pass' => 'Dawgs!958',
-    'from_call' => 'N0CALL',
-    'to_addr' => 'WX@ALLUS',
-    'timeout' => 30,
-    'enabled' => false,  // Set to true to enable posting
-    'log_file' => '/var/log/nws-bbs-post.log'
-];
-
-// Load custom config if exists
-if (file_exists(__DIR__ . '/nws-config.php')) {
-    $custom = include(__DIR__ . '/nws-config.php');
-    if (is_array($custom)) {
-        $config = array_merge($config, $custom);
-    }
+// Check if NWS posting is enabled
+if (!isFeatureEnabled('nws_post')) {
+    apiError('Weather posting is disabled', 403);
 }
+
+// Get BBS config from main config
+$config = [
+    'bbs_host'  => getConfig('bbs', 'host', 'localhost'),
+    'bbs_port'  => getConfig('bbs', 'port', 8010),
+    'bbs_user'  => getConfig('bbs', 'user', 'SYSOP'),
+    'bbs_pass'  => getConfig('bbs', 'pass'),
+    'from_call' => getConfig('station', 'callsign', 'N0CALL'),
+    'to_addr'   => getConfig('nws', 'post_destination', 'WX@ALLUS'),
+    'timeout'   => getConfig('bbs', 'timeout', 30),
+    'enabled'   => isFeatureEnabled('nws_post'),
+    'log_file'  => getConfig('logging', 'file', './logs/dashboard.log'),
+];
 
 // ================================
 // HELPER FUNCTIONS
@@ -40,16 +35,11 @@ if (file_exists(__DIR__ . '/nws-config.php')) {
 function logMessage($msg) {
     global $config;
     $timestamp = date('Y-m-d H:i:s');
-    $logLine = "[$timestamp] $msg\n";
+    $logLine = "[$timestamp] [NWS] $msg\n";
     @file_put_contents($config['log_file'], $logLine, FILE_APPEND);
 }
 
 function sendResponse($success, $message, $data = null) {
-    header('Content-Type: application/json');
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
-    
     echo json_encode([
         'success' => $success,
         'message' => $message,
@@ -112,13 +102,13 @@ function postToBBS($subject, $message) {
             throw new Exception("Failed to connect to BBS: " . cleanLog($response));
         }
         
-        // Step 8: Send SB command (Send Bulletin)
-        fwrite($socket, "SB " . $config['to_addr'] . "\r\n");
-        logMessage("Sent: SB " . $config['to_addr']);
+        // Step 8: Send SP command
+        fwrite($socket, "SP " . $config['to_addr'] . "\r\n");
+        logMessage("Sent: SP " . $config['to_addr']);
         
         // Step 9: Wait for "Enter Title" prompt
         $response = readUntilPrompt($socket, 5);
-        logMessage("After SB: " . cleanLog($response));
+        logMessage("After SP: " . cleanLog($response));
         
         if (stripos($response, 'Title') === false && 
             stripos($response, 'ubject') === false) {
@@ -225,44 +215,32 @@ function cleanLog($str) {
 // MAIN REQUEST HANDLER
 // ================================
 
-// Handle CORS preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
-    exit;
-}
+// CORS preflight is handled by bootstrap.php
 
 // Only accept POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    sendResponse(false, 'Only POST method allowed');
+    apiError('Only POST method allowed', 405);
 }
 
 // Get JSON input
 $input = json_decode(file_get_contents('php://input'), true);
 
 if (!$input) {
-    sendResponse(false, 'Invalid JSON input');
+    apiError('Invalid JSON input');
 }
 
 // Check required fields
 if (empty($input['subject']) || empty($input['message'])) {
-    sendResponse(false, 'Missing required fields: subject, message');
+    apiError('Missing required fields: subject, message');
 }
 
 // Check if this is just a status check
 if (isset($input['action']) && $input['action'] === 'status') {
     sendResponse(true, 'BBS Poster Status', [
         'enabled' => $config['enabled'],
-        'bbs_host' => $config['bbs_host'],
-        'bbs_port' => $config['bbs_port'],
+        'mode' => isPublicMode() ? 'public' : 'local',
         'to_addr' => $config['to_addr']
     ]);
-}
-
-// Allow override of to_addr from POST
-if (!empty($input['to_addr'])) {
-    $config['to_addr'] = $input['to_addr'];
 }
 
 // Post the message

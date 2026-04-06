@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>APRS Map — K1AJD</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        :root {
+            --bg:#0d1117; --surface:#161b22; --border:#30363d;
+            --text:#e6edf3; --muted:#8b949e; --accent:#4a9eff;
+            --green:#3fb950; --red:#f85149; --orange:#d29922;
+            --purple:#bc8cff; --yellow:#e3b341;
+            --font-ui:"IBM Plex Sans",system-ui,sans-serif;
+            --font-mono:"IBM Plex Mono",monospace;
+            --radius:6px;
+        }
+        [data-theme="light"] {
+            --bg:#f6f8fa; --surface:#fff; --border:#d0d7de;
+            --text:#1f2328; --muted:#57606a; --accent:#0969da;
+            --green:#1a7f37; --red:#cf222e;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+        html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:13px;}
+
+        /* ── Nav ── */
+        #topbar{height:42px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:6px;flex-shrink:0;}
+        .nav-title{font-weight:700;font-size:14px;color:var(--accent);margin-right:4px;}
+        .nav-link{padding:4px 8px;border-radius:var(--radius);color:var(--muted);text-decoration:none;font-size:12px;font-weight:600;transition:all .12s;}
+        .nav-link:hover{color:var(--text);background:var(--border);}
+        .nav-link.active{color:var(--accent);background:rgba(74,158,255,.12);}
+        .nav-spacer{flex:1;}
+        .nav-clock{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
+        .theme-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:var(--radius);color:var(--muted);}
+
+        /* ── App ── */
+        #app{display:flex;flex-direction:column;height:calc(100% - 42px);}
+
+        /* ── Toolbar ── */
+        #toolbar{height:38px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:6px;flex-shrink:0;}
+        .tb-btn{padding:4px 10px;border-radius:var(--radius);border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;}
+        .tb-btn:hover{border-color:var(--accent);color:var(--accent);}
+        .tb-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+        .tb-sep{width:1px;height:20px;background:var(--border);margin:0 2px;}
+        #stationCount{font-size:11px;color:var(--muted);font-family:var(--font-mono);}
+        #lastUpdate{font-size:10px;color:var(--muted);margin-left:4px;}
+        #filterInput{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 8px;font-size:11px;outline:none;width:140px;}
+        #filterInput:focus{border-color:var(--accent);}
+
+        /* ── Main layout ── */
+        #main{display:flex;flex:1;overflow:hidden;}
+
+        /* ── Map ── */
+        #mapContainer{flex:1;position:relative;}
+        #map{width:100%;height:100%;}
+
+        /* ── Right panel ── */
+        #rightPanel{width:320px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--border);overflow:hidden;}
+
+        /* ── Station list ── */
+        #stationPanel{flex:0 0 55%;display:flex;flex-direction:column;border-bottom:1px solid var(--border);overflow:hidden;}
+        .panel-hdr{height:30px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:6px;flex-shrink:0;}
+        .panel-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;}
+        .label-stations{color:var(--green);}
+        .label-messages{color:var(--purple);}
+        #stationList{flex:1;overflow-y:auto;}
+        #stationList::-webkit-scrollbar{width:4px;}
+        #stationList::-webkit-scrollbar-thumb{background:var(--border);}
+        .st-row{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s;display:flex;align-items:flex-start;gap:8px;}
+        .st-row:hover{background:rgba(255,255,255,.04);}
+        .st-row.selected{background:rgba(74,158,255,.1);border-left:2px solid var(--accent);}
+        .st-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+        .st-info{flex:1;min-width:0;}
+        .st-call{font-weight:700;font-family:var(--font-mono);font-size:12px;color:var(--text);}
+        .st-call.mobile{color:var(--accent);}
+        .st-call.wx{color:var(--yellow);}
+        .st-call.fixed{color:var(--green);}
+        .st-comment{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;}
+        .st-age{font-size:9px;color:var(--muted);font-family:var(--font-mono);flex-shrink:0;}
+
+        /* ── Messages panel ── */
+        #msgPanel{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+        #msgList{flex:1;overflow-y:auto;padding:4px 0;}
+        #msgList::-webkit-scrollbar{width:4px;}
+        #msgList::-webkit-scrollbar-thumb{background:var(--border);}
+        .msg-row{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px;}
+        .msg-from{font-weight:700;font-family:var(--font-mono);color:var(--purple);font-size:10px;}
+        .msg-to{color:var(--muted);font-size:10px;}
+        .msg-text{color:var(--text);margin-top:2px;word-break:break-word;}
+        .msg-time{font-size:9px;color:var(--muted);font-family:var(--font-mono);}
+
+        /* ── Station detail popup ── */
+        #detailPanel{position:absolute;bottom:10px;left:10px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;max-width:280px;font-size:11px;display:none;box-shadow:0 4px 20px rgba(0,0,0,.4);}
+        #detailPanel.visible{display:block;}
+        #detailClose{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;}
+        .detail-call{font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--accent);margin-bottom:6px;}
+        .detail-row{display:flex;gap:8px;margin-bottom:3px;}
+        .detail-label{color:var(--muted);width:70px;flex-shrink:0;}
+        .detail-val{color:var(--text);}
+
+        /* ── Leaflet overrides ── */
+        .leaflet-popup-content-wrapper{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);}
+        .leaflet-popup-tip{background:var(--surface);}
+        .leaflet-popup-content{margin:10px 14px;font-size:11px;font-family:var(--font-ui);}
+        .aprs-popup-call{font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--accent);margin-bottom:4px;}
+        .aprs-popup-row{color:var(--muted);line-height:1.7;}
+        .aprs-popup-row span{color:var(--text);}
+
+        /* ── APRS symbol sprites ── */
+        .leaflet-div-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+        .aprs-sprite {
+            width: 24px; height: 24px;
+            background-repeat: no-repeat;
+            image-rendering: pixelated;
+            display: block;
+        }
+        .aprs-sprite-pri { background-image: url('/img/aprs-symbols-pri.png'); }
+        .aprs-sprite-alt { background-image: url('/img/aprs-symbols-alt.png'); }
+        .aprs-marker-wrap {
+            position: relative;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6));
+        }
+
+        /* ── Track lines ── */
+        .track-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #4a9eff; border: 2px solid rgba(255,255,255,0.7);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        /* ── Messaging Modal ── */
+        #msgModal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:2000; }
+        #msgModal.hidden { display:none; }
+        #msgModalBox { background:var(--surface); border:1px solid var(--border); border-radius:10px; width:440px; max-width:95vw; box-shadow:0 16px 48px rgba(0,0,0,.5); display:flex; flex-direction:column; max-height:85vh; }
+        .mm-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+        .mm-title { font-weight:700; font-size:14px; }
+        .mm-tabs { display:flex; gap:2px; padding:8px 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+        .mm-tab { padding:4px 14px; border-radius:20px; border:1px solid var(--border); background:none; color:var(--muted); font-size:11px; font-weight:700; cursor:pointer; transition:all .15s; }
+        .mm-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+        .mm-body { flex:1; overflow-y:auto; padding:14px 16px; }
+        .mm-body::-webkit-scrollbar { width:4px; }
+        .mm-body::-webkit-scrollbar-thumb { background:var(--border); }
+        .mm-compose { display:flex; flex-direction:column; gap:10px; }
+        .mm-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:3px; display:block; }
+        .mm-input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); padding:8px 10px; font-size:12px; outline:none; font-family:var(--font-mono); }
+        .mm-input:focus { border-color:var(--accent); }
+        .mm-textarea { resize:vertical; min-height:80px; font-family:var(--font-ui); }
+        .mm-charcount { font-size:10px; color:var(--muted); text-align:right; margin-top:-6px; }
+        .mm-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:flex-end; flex-shrink:0; }
+        .btn-primary { padding:8px 18px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); font-weight:700; font-size:12px; cursor:pointer; }
+        .btn-primary:hover { background:#6ab0ff; }
+        .btn-primary:disabled { opacity:.4; cursor:not-allowed; }
+        .btn-secondary { padding:8px 18px; background:none; border:1px solid var(--border); color:var(--muted); border-radius:var(--radius); font-size:12px; cursor:pointer; }
+        /* Inbox */
+        .inbox-msg { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.05); font-size:11px; }
+        .inbox-msg:last-child { border-bottom:none; }
+        .inbox-msg.unread { background:rgba(74,158,255,.06); border-left:2px solid var(--accent); }
+        .inbox-from { font-family:var(--font-mono); font-weight:700; color:var(--accent); font-size:11px; }
+        .inbox-time { font-size:9px; color:var(--muted); font-family:var(--font-mono); float:right; }
+        .inbox-text { color:var(--text); margin-top:3px; word-break:break-word; }
+        .inbox-reply { background:none; border:none; color:var(--muted); cursor:pointer; font-size:10px; margin-top:4px; padding:0; }
+        .inbox-reply:hover { color:var(--accent); }
+        .inbox-empty { padding:30px; text-align:center; color:var(--muted); font-size:12px; }
+
+        /* Msg button badge */
+        #msgModalBtn { position:relative; }
+        #msgBadge { position:absolute; top:-4px; right:-4px; background:var(--red); color:#fff; border-radius:8px; padding:0 4px; font-size:9px; font-weight:700; display:none; }
+
+        /* ── Station Browser ── */
+        #browserModal { position:fixed; inset:0; background:rgba(0,0,0,.65); display:flex; align-items:center; justify-content:center; z-index:2000; }
+        #browserModal.hidden { display:none; }
+        #browserBox { background:var(--surface); border:1px solid var(--border); border-radius:10px; width:820px; max-width:97vw; height:85vh; display:flex; flex-direction:column; box-shadow:0 16px 48px rgba(0,0,0,.5); }
+        .bw-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+        .bw-title  { font-weight:700; font-size:14px; }
+        .bw-toolbar { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+        .bw-tab { padding:3px 12px; border-radius:20px; border:1px solid var(--border); background:none; color:var(--muted); font-size:11px; font-weight:700; cursor:pointer; transition:all .15s; white-space:nowrap; }
+        .bw-tab:hover { border-color:var(--accent); color:var(--accent); }
+        .bw-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+        .bw-search { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); padding:3px 8px; font-size:11px; outline:none; width:140px; margin-left:auto; }
+        .bw-search:focus { border-color:var(--accent); }
+        #browserContent { flex:1; overflow-y:auto; padding:0; }
+        #browserContent::-webkit-scrollbar { width:5px; }
+        #browserContent::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+        /* Category headers */
+        .bw-cat-header { position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--border); padding:6px 14px; display:flex; align-items:center; gap:8px; z-index:10; }
+        .bw-cat-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
+        .bw-cat-count { font-size:10px; color:var(--muted); background:var(--border); border-radius:10px; padding:1px 7px; }
+
+        /* Station rows */
+        .bw-row { border-bottom:1px solid rgba(255,255,255,.04); cursor:pointer; transition:background .1s; }
+        .bw-row:hover { background:rgba(255,255,255,.04); }
+        .bw-row.expanded { background:rgba(74,158,255,.05); }
+        .bw-row-header { display:flex; align-items:center; gap:10px; padding:8px 14px; }
+        .bw-icon { flex-shrink:0; }
+        .bw-call { font-family:var(--font-mono); font-weight:700; font-size:12px; min-width:90px; }
+        .bw-call.mobile { color:var(--accent); }
+        .bw-call.wx     { color:var(--yellow); }
+        .bw-call.fixed  { color:var(--green); }
+        .bw-call.digi   { color:var(--purple); }
+        .bw-call.igate  { color:var(--orange); }
+        .bw-call.object { color:var(--red); }
+        .bw-summary { flex:1; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bw-age { font-size:10px; color:var(--muted); font-family:var(--font-mono); flex-shrink:0; }
+        .bw-chevron { font-size:10px; color:var(--muted); flex-shrink:0; transition:transform .2s; }
+        .bw-row.expanded .bw-chevron { transform:rotate(90deg); }
+
+        /* Expanded detail */
+        .bw-detail { display:none; padding:10px 14px 14px 114px; font-size:11px; }
+        .bw-row.expanded .bw-detail { display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+        .bw-field { display:flex; gap:6px; align-items:baseline; }
+        .bw-field-label { color:var(--muted); flex-shrink:0; min-width:90px; }
+        .bw-field-val { color:var(--text); word-break:break-all; }
+        .bw-actions { grid-column:1/-1; display:flex; gap:8px; margin-top:8px; }
+        .bw-action-btn { padding:3px 10px; border-radius:var(--radius); border:1px solid var(--border); background:none; color:var(--muted); font-size:10px; cursor:pointer; }
+        .bw-action-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+        /* ── Toast ── */
+        #toast{position:fixed;top:54px;right:14px;z-index:2000;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);}
+        #toast.hidden{display:none;}
+        #toast.ok{border-left:3px solid var(--green);}
+        #toast.error{border-left:3px solid var(--red);}
+        #toast.info{border-left:3px solid var(--accent);}
+
+        /* ── Mobile ── */
+        @media(max-width:700px){
+            #rightPanel{display:none;}
+            .nav-link{display:none;}
+        }
+    </style>
+</head>
+<body>
+
+<!-- Nav -->
+<div id="topbar">
+    <span class="nav-title">📡 BPQ Dashboard</span>
+    <a href="bpq-rf-connections.html" class="nav-link">RF</a>
+    <a href="bpq-traffic.html"        class="nav-link">Traffic</a>
+    <a href="bpq-system-logs.html"    class="nav-link">System</a>
+    <a href="bpq-connect-log.html"    class="nav-link">Connects</a>
+    <a href="bpq-email-monitor.html"  class="nav-link">Messages</a>
+    <a href="bbs-messages.html"       class="nav-link">BBS</a>
+    <a href="nws-dashboard.html"      class="nav-link">Weather</a>
+    <a href="bpq-chat.html"           class="nav-link">Chat</a>
+    <a href="bpq-aprs.html"           class="nav-link active">APRS</a>
+    <div class="nav-spacer"></div>
+    <button class="theme-btn" onclick="toggleTheme()">🌙</button>
+    <span class="nav-clock" id="utcClock">--:--:-- Z</span>
+</div>
+
+<div id="app">
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+        <button class="tb-btn active" id="btnAll"     onclick="setFilter('all')">All</button>
+        <button class="tb-btn"        id="btnMobile"  onclick="setFilter('mobile')">🚗 Mobile</button>
+        <button class="tb-btn"        id="btnWx"      onclick="setFilter('wx')">🌡 WX</button>
+        <button class="tb-btn"        id="btnFixed"   onclick="setFilter('fixed')">📡 Fixed</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="refreshData()">⟳ Refresh</button>
+        <button class="tb-btn" onclick="resetView()">⊡ Reset View</button>
+        <button class="tb-btn active" id="btnTracks" onclick="toggleTracks()">🛤 Tracks</button>
+        <button class="tb-btn" id="btnPhg" onclick="togglePhg()">⭕ PHG</button>
+        <div class="tb-sep"></div>
+        <span style="font-size:11px;color:var(--muted);margin-right:2px">⏱ Last heard:</span>
+        <select id="ageFilter" onchange="setAgeFilter(this.value)"
+                style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
+                       color:var(--text);padding:2px 6px;font-size:11px;outline:none;cursor:pointer">
+            <option value="1">1 hour</option>
+            <option value="2" selected>2 hours</option>
+            <option value="3">3 hours</option>
+            <option value="4">4 hours</option>
+            <option value="6">6 hours</option>
+            <option value="8">8 hours</option>
+            <option value="10">10 hours</option>
+            <option value="12">12 hours</option>
+        </select>
+        <div class="tb-sep"></div>
+        <input id="filterInput" type="text" placeholder="🔍 Filter callsign…" oninput="applyFilter()">
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="openBrowser()">📋 Browse</button>
+        <button class="tb-btn" id="msgModalBtn" onclick="openMsgModal()" style="position:relative">
+            ✉ Message <span id="msgBadge">0</span>
+        </button>
+        <div class="tb-sep"></div>
+        <span id="stationCount">— stations</span>
+        <span id="lastUpdate"></span>
+    </div>
+
+    <!-- Main -->
+    <div id="main">
+
+        <!-- Map -->
+        <div id="mapContainer">
+            <div id="map"></div>
+            <!-- Station detail -->
+            <div id="detailPanel">
+                <button id="detailClose" onclick="closeDetail()">×</button>
+                <div id="detailContent"></div>
+            </div>
+        </div>
+
+        <!-- Right panel -->
+        <div id="rightPanel">
+            <!-- Station list -->
+            <div id="stationPanel">
+                <div class="panel-hdr">
+                    <span class="panel-label label-stations">📡 Stations</span>
+                    <span id="listCount" style="font-size:10px;color:var(--muted);margin-left:4px"></span>
+                </div>
+                <div id="stationList"><div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">Loading…</div></div>
+            </div>
+            <!-- Messages panel -->
+            <div id="msgPanel">
+                <div class="panel-hdr">
+                    <span class="panel-label label-messages">💬 APRS Messages</span>
+                    <span id="msgCount" style="font-size:10px;color:var(--muted);margin-left:4px"></span>
+                </div>
+                <div id="msgList"><div style="padding:12px;text-align:center;color:var(--muted);font-size:11px">No messages</div></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<!-- ── Station Browser Modal ───────────────────────────── -->
+<div id="browserModal" class="hidden">
+    <div id="browserBox">
+        <div class="bw-header">
+            <span class="bw-title">📋 Station Browser</span>
+            <button onclick="closeBrowser()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">×</button>
+        </div>
+        <div class="bw-toolbar">
+            <button class="bw-tab active" id="bwtAll"    onclick="setBwFilter('all')">All</button>
+            <button class="bw-tab"        id="bwtMobile" onclick="setBwFilter('mobile')">🚗 Mobile</button>
+            <button class="bw-tab"        id="bwtWx"     onclick="setBwFilter('wx')">🌡 WX</button>
+            <button class="bw-tab"        id="bwtFixed"  onclick="setBwFilter('fixed')">📡 Fixed</button>
+            <button class="bw-tab"        id="bwtDigi"   onclick="setBwFilter('digi')">🔁 Digi</button>
+            <button class="bw-tab"        id="bwtIgate"  onclick="setBwFilter('igate')">🌐 iGate</button>
+            <button class="bw-tab"        id="bwtObject" onclick="setBwFilter('object')">📌 Object</button>
+            <input class="bw-search" id="bwSearch" type="text" placeholder="🔍 Search…"
+                   oninput="renderBrowser()" autocomplete="off">
+        </div>
+        <div id="browserContent"></div>
+    </div>
+</div>
+
+<!-- ── APRS Messaging Modal ──────────────────────────────── -->
+<div id="msgModal" class="hidden">
+    <div id="msgModalBox">
+        <div class="mm-header">
+            <span class="mm-title">✉ APRS Messaging — K1AJD-1</span>
+            <button onclick="closeMsgModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">×</button>
+        </div>
+        <div class="mm-tabs">
+            <button class="mm-tab active" id="tabCompose" onclick="switchMsgTab('compose')">📤 Compose</button>
+            <button class="mm-tab"         id="tabInbox"   onclick="switchMsgTab('inbox')">📥 Inbox <span id="inboxBadge" style="display:none;background:var(--red);color:#fff;border-radius:8px;padding:0 4px;font-size:9px;font-weight:700;margin-left:3px">0</span></button>
+        </div>
+        <div class="mm-body">
+            <!-- Compose tab -->
+            <div id="tabComposeBody" class="mm-compose">
+                <div>
+                    <label class="mm-label">To (callsign)</label>
+                    <input class="mm-input" id="msgTo" placeholder="W4ECM-3" maxlength="9"
+                           style="text-transform:uppercase" autocomplete="off" autocapitalize="characters"
+                           oninput="this.value=this.value.toUpperCase()">
+                </div>
+                <div>
+                    <label class="mm-label">Message</label>
+                    <textarea class="mm-input mm-textarea" id="msgText" placeholder="Type your APRS message…"
+                              maxlength="67" oninput="updateCharCount()"></textarea>
+                    <div class="mm-charcount"><span id="charCount">0</span>/67</div>
+                </div>
+                <div style="font-size:10px;color:var(--muted);line-height:1.6">
+                    Message sent via APRS-IS as <strong style="color:var(--accent)">K1AJD-1</strong>.
+                    Max 67 characters per APRS spec.
+                </div>
+            </div>
+            <!-- Inbox tab -->
+            <div id="tabInboxBody" style="display:none">
+                <div id="inboxList"><div class="inbox-empty">📭 No messages for K1AJD-1</div></div>
+            </div>
+        </div>
+        <div class="mm-footer">
+            <button class="btn-secondary" onclick="closeMsgModal()">Close</button>
+            <button class="btn-primary" id="sendMsgBtn" onclick="sendAprsMsg()">📤 Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════════════
+const API     = 'bpq-aprs.php';
+const CENTER  = [33.4259, -82.0099]; // Hephzibah GA
+const ZOOM    = 9;
+const RADIUS_MILES = 50;
+const RADIUS_KM    = RADIUS_MILES * 1.60934;
+
+let stations    = {};
+let markers     = {};
+let trackHistory = {};   // call -> [{lat,lon,ts,path}] up to 2hrs
+let trackLines  = {};    // call -> L.layerGroup of polyline+dots
+let pathLines   = [];    // current digi path lines shown on hover
+let filterType  = 'all';
+let filterCall  = '';
+let selectedCall = null;
+let showTracks  = true;
+let ageFilterHours = 2;    // show stations heard within N hours
+let map, radiusCircle;
+let phgCircles  = {};    // call -> L.circle
+let showPhg     = false; // PHG circles off by default
+let refreshTimer = null;
+const TRACK_MAX_AGE = 43200; // 12 hours max track history
+
+// ═══════════════════════════════════════════════════════
+//  THEME
+// ═══════════════════════════════════════════════════════
+function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    document.querySelector('.theme-btn').textContent = t==='light'?'🌑':'🌙';
+    if (map) {
+        map.eachLayer(l => { if (l._url) map.removeLayer(l); });
+        addTileLayer();
+    }
+}
+function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme')||'dark';
+    const nxt = cur==='dark'?'light':'dark';
+    localStorage.setItem('aprs_theme', nxt); applyTheme(nxt);
+}
+function addTileLayer() {
+    const dark  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    const light = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    const theme = document.documentElement.getAttribute('data-theme')||'dark';
+    L.tileLayer(theme==='dark'?dark:light, {
+        attribution:'© OpenStreetMap © CARTO',
+        maxZoom:18, subdomains:'abcd'
+    }).addTo(map);
+}
+
+// ═══════════════════════════════════════════════════════
+//  MAP INIT
+// ═══════════════════════════════════════════════════════
+function initMap() {
+    map = L.map('map', { center: CENTER, zoom: ZOOM, zoomControl: true });
+    addTileLayer();
+
+    // 50-mile radius circle
+    radiusCircle = L.circle(CENTER, {
+        radius: RADIUS_KM * 1000,
+        color: '#4a9eff', weight: 1, opacity: 0.4,
+        fillColor: '#4a9eff', fillOpacity: 0.04
+    }).addTo(map);
+
+    // Home marker
+    const homeIcon = L.divIcon({
+        html: '<div style="background:#4a9eff;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px #4a9eff"></div>',
+        iconSize:[12,12], iconAnchor:[6,6]
+    });
+    L.marker(CENTER, {icon: homeIcon})
+     .addTo(map)
+     .bindPopup('<div class="aprs-popup-call">K1AJD</div><div class="aprs-popup-row">Hephzibah, GA</div>');
+
+    map.on('click', () => { closeDetail(); deselectStation(); });
+}
+
+// ═══════════════════════════════════════════════════════
+//  SYMBOL → ICON
+// ═══════════════════════════════════════════════════════
+// APRS symbol sprites — two separate 16x6 PNG files (24x24 each)
+// /img/aprs-symbols-pri.png = primary table '/'
+// /img/aprs-symbols-alt.png = alternate table '\'
+function getSymbolOffset(table, symbol) {
+    const code = symbol ? symbol.charCodeAt(0) : 62; // default '>'
+    const idx  = code - 33; // ASCII 33='!' maps to index 0
+    if (idx < 0 || idx > 95) return { x: 0, y: 0, cls: 'aprs-sprite-pri' };
+    const col = idx % 16;
+    const row = Math.floor(idx / 16);
+    const isAlt = (table === '\\' || table === '\\\\' ||
+                   (table && table.charCodeAt(0) !== 47)); // '/' = 47
+    return { x: col * 24, y: row * 24, cls: isAlt ? 'aprs-sprite-alt' : 'aprs-sprite-pri' };
+}
+
+function getStationIcon(st) {
+    try {
+        const table  = st.symtbl || '/';
+        const symbol = st.symbol || '>';
+        const off    = getSymbolOffset(table, symbol);
+        const html   = `<div class="aprs-marker-wrap"><div class="aprs-sprite ${off.cls}" style="background-position:-${off.x}px -${off.y}px"></div></div>`;
+        return L.divIcon({
+            html,
+            iconSize:[24,24], iconAnchor:[12,12], popupAnchor:[0,-14]
+        });
+    } catch(e) {
+        // Fallback to simple colored circle
+        const color = st.wx ? '#d29922' : st.type==='mobile' ? '#4a9eff' : '#3fb950';
+        return L.divIcon({
+            html: `<div style="width:18px;height:18px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.7);box-shadow:0 2px 4px rgba(0,0,0,0.4)"></div>`,
+            iconSize:[18,18], iconAnchor:[9,9], popupAnchor:[0,-10],
+        });
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//  TRACK HISTORY
+// ═══════════════════════════════════════════════════════
+function updateTrackHistory(st) {
+    if (!st.lat || !st.lon) return;
+    if (!trackHistory[st.call]) trackHistory[st.call] = [];
+    const hist = trackHistory[st.call];
+    const cutoff = (Date.now()/1000) - TRACK_MAX_AGE;
+
+    // Prune old points
+    trackHistory[st.call] = hist.filter(p => p.ts > cutoff);
+
+    // Add new point if position changed or first point
+    const last = trackHistory[st.call].slice(-1)[0];
+    if (!last || last.lat !== st.lat || last.lon !== st.lon) {
+        trackHistory[st.call].push({
+            lat: st.lat, lon: st.lon, ts: st.ts,
+            path: st.path || '', speed: st.speed
+        });
+    }
+}
+
+function renderTrack(call) {
+    // Remove old track layer
+    if (trackLines[call]) {
+        map.removeLayer(trackLines[call]);
+        delete trackLines[call];
+    }
+    const cutoff = (Date.now()/1000) - (ageFilterHours * 3600);
+    const hist = (trackHistory[call] || []).filter(p => p.ts > cutoff);
+    if (!hist || hist.length < 2 || !showTracks) return;
+    const st = stations[call];
+    if (!st || st.type === 'wx') return; // no tracks for WX stations
+
+    const group = L.layerGroup();
+    const coords = hist.map(p => [p.lat, p.lon]);
+
+    // Draw track line
+    L.polyline(coords, {
+        color: '#4a9eff', weight: 2,
+        opacity: 0.7, dashArray: null
+    }).addTo(group);
+
+    // Draw dots at each position (except last — that's the marker)
+    hist.slice(0, -1).forEach(p => {
+        const dot = L.divIcon({
+            html: '<div class="track-dot"></div>',
+            iconSize:[8,8], iconAnchor:[4,4], className:''
+        });
+        L.marker([p.lat, p.lon], {icon: dot, zIndexOffset: -100})
+         .bindTooltip(`${call}<br>${ageStr(p.ts)}${p.speed?'<br>'+p.speed+' km/h':''}`,
+                      {sticky:true, className:'leaflet-tooltip'})
+         .addTo(group);
+    });
+
+    group.addTo(map);
+    trackLines[call] = group;
+}
+
+// ── PHG Circles ──────────────────────────────────────────────────
+// PHG = Power Height Gain — estimated coverage circles for fixed stations
+// Format in comment: PHGpppp where p = power/height/gain/directivity digits
+// Also handles RNG (range in miles) format: RNGnnnn
+function parsePHG(comment, path) {
+    if (!comment) return null;
+
+    // RNG format: RNGnnnn = range in miles directly
+    const rng = comment.match(/RNG(\d{4})/);
+    if (rng) {
+        const miles = parseInt(rng[1]);
+        return miles > 0 ? miles : null;
+    }
+
+    // PHG format: PHGpppp
+    // p[0] = power code (0-9): watts = (code^2) e.g. 3=9w, 7=49w
+    // p[1] = height code (0-9): feet = 10*(2^code) e.g. 4=160ft
+    // p[2] = gain code (0-9): dB gain e.g. 3=3dB
+    // p[3] = directivity (0=omni, 1-8=45deg increments)
+    const phg = comment.match(/PHG(\d)(\d)(\d)(\d)/);
+    if (phg) {
+        const power  = Math.pow(parseInt(phg[1]), 2);        // watts
+        const height = 10 * Math.pow(2, parseInt(phg[2]));   // feet HAAT
+        const gain   = Math.pow(10, parseInt(phg[3])/10);    // linear gain
+        // APRS PHG radius formula (miles)
+        const miles = Math.sqrt(2 * height * Math.sqrt((power/10) * (gain/2)));
+        return Math.round(miles * 10) / 10;
+    }
+    return null;
+}
+
+function getPhgColor(cat) {
+    const colors = {
+        digi:   '#bc8cff',  // purple
+        igate:  '#d29922',  // orange
+        fixed:  '#3fb950',  // green
+        object: '#f85149',  // red
+        wx:     '#e3b341',  // yellow
+    };
+    return colors[cat] || '#8b949e';
+}
+
+function drawPhgCircles() {
+    // Clear existing
+    Object.values(phgCircles).forEach(c => map.removeLayer(c));
+    phgCircles = {};
+    if (!showPhg) return;
+
+    Object.values(stations).forEach(st => {
+        if (!st.lat || !st.lon) return;
+        const cat = classifyStation(st);
+        if (cat === 'mobile') return; // skip mobiles per spec
+
+        const miles = parsePHG(st.comment, st.path);
+        if (!miles || miles <= 0 || miles > 300) return;
+
+        const color = getPhgColor(cat);
+        const circle = L.circle([st.lat, st.lon], {
+            radius:      miles * 1609.34,  // miles to meters
+            color:       color,
+            weight:      1.5,
+            opacity:     0.7,
+            fillColor:   color,
+            fillOpacity: 0.06,
+            dashArray:   '4,4',
+        }).bindTooltip(
+            `<strong>${st.call}</strong><br>Range: ${miles} mi`,
+            {sticky: true}
+        );
+        circle.addTo(map);
+        phgCircles[st.call] = circle;
+    });
+
+    const count = Object.keys(phgCircles).length;
+    if (count === 0) showToast('No PHG/RNG data found in current stations', 'info');
+    else showToast(`${count} PHG/RNG circle${count>1?'s':''} shown`, 'ok');
+}
+
+function togglePhg() {
+    showPhg = !showPhg;
+    document.getElementById('btnPhg').classList.toggle('active', showPhg);
+    drawPhgCircles();
+}
+
+function toggleTracks() {
+    showTracks = !showTracks;
+    document.getElementById('btnTracks').classList.toggle('active', showTracks);
+    if (!showTracks) {
+        Object.values(trackLines).forEach(l => map.removeLayer(l));
+        trackLines = {};
+    } else {
+        Object.keys(stations).forEach(call => renderTrack(call));
+    }
+}
+
+function setAgeFilter(hours) {
+    ageFilterHours = parseInt(hours);
+    // Prune track history to new max age
+    const cutoff = (Date.now()/1000) - (ageFilterHours * 3600);
+    Object.keys(trackHistory).forEach(call => {
+        trackHistory[call] = trackHistory[call].filter(p => p.ts > cutoff);
+    });
+    // Re-render everything
+    renderStations([]);
+    showToast('Showing stations heard in last ' + hours + ' hour' + (hours>1?'s':''), 'info');
+}
+
+// ═══════════════════════════════════════════════════════
+//  DIGI PATH LINES (aprs.fi style)
+// ═══════════════════════════════════════════════════════
+function parseDigiPath(pathStr) {
+    // Extract digipeaters that have been used (marked with *)
+    // Path like: "TCPIP*,qAC,SERVER" or "WIDE1-1,K4ABC*,WIDE2-1"
+    if (!pathStr) return { digis: [], igate: '' };
+    const parts = pathStr.split(',');
+    const digis = [];
+    let igate = '';
+
+    parts.forEach(p => {
+        const call = p.replace('*','').trim();
+        if (!call) return;
+        // qAC qAR etc = APRS-IS gateways
+        if (call.startsWith('q')) {
+            // next part after qXX is igate
+        } else if (p.includes('*') || parts.indexOf(p) === parts.length-2) {
+            // Marked as used — this is a real digi
+            if (!call.startsWith('WIDE') && !call.startsWith('TRACE') &&
+                !call.startsWith('RELAY') && call.length > 2) {
+                digis.push(call);
+            }
+        }
+    });
+    // iGate is typically last meaningful callsign before/after qAC
+    const qIdx = parts.findIndex(p => p.startsWith('q'));
+    if (qIdx >= 0 && parts[qIdx+1]) {
+        igate = parts[qIdx+1].trim();
+    }
+    return { digis, igate };
+}
+
+function showPathLines(call) {
+    clearPathLines();
+    const st = stations[call];
+    if (!st || !st.path) return;
+
+    const { digis, igate } = parseDigiPath(st.path);
+
+    // Draw line to each digi that we know position of
+    digis.forEach((digiCall, idx) => {
+        const digi = stations[digiCall];
+        if (!digi || !digi.lat) return;
+        const color = idx === 0 ? '#3fb950' : '#4a9eff'; // green=first, blue=others
+        const line = L.polyline([[st.lat, st.lon],[digi.lat, digi.lon]], {
+            color, weight: 2, opacity: 0.8, dashArray: '6,4'
+        }).bindTooltip(`Via: ${digiCall}`, {sticky:true})
+          .addTo(map);
+        pathLines.push(line);
+    });
+
+    // Draw line to iGate (purple, like aprs.fi)
+    if (igate) {
+        const igSt = stations[igate];
+        if (igSt && igSt.lat) {
+            const line = L.polyline([[st.lat, st.lon],[igSt.lat, igSt.lon]], {
+                color: '#bc8cff', weight: 2, opacity: 0.8, dashArray: '4,4'
+            }).bindTooltip(`iGate: ${igate}`, {sticky:true})
+              .addTo(map);
+            pathLines.push(line);
+        }
+    }
+}
+
+function clearPathLines() {
+    pathLines.forEach(l => map.removeLayer(l));
+    pathLines = [];
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER STATIONS
+// ═══════════════════════════════════════════════════════
+function renderStations(data) {
+    // Merge into local store
+    data.forEach(st => { stations[st.call] = st; });
+
+    // Update track history for incoming data
+    data.forEach(st => { if (st.lat && st.lon) updateTrackHistory(st); });
+
+    // Clear old markers and track lines
+    Object.values(markers).forEach(m => map.removeLayer(m));
+    Object.values(trackLines).forEach(l => map.removeLayer(l));
+    markers = {};
+    trackLines = {};
+
+    const filtered = getFiltered();
+    filtered.forEach(st => {
+        const lat = parseFloat(st.lat);
+        const lon = parseFloat(st.lon);
+        if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
+        try {
+            const marker = L.marker([lat, lon], { icon: getStationIcon(st) });
+            marker.bindPopup(buildPopup(st));
+            marker.on('click', () => selectStation(st.call));
+            marker.on('dblclick', () => openMsgModal(st.call));
+            // Show path lines on hover
+            marker.on('mouseover', () => showPathLines(st.call));
+            marker.on('mouseout', () => clearPathLines());
+            marker.addTo(map);
+            markers[st.call] = marker;
+            // Render track
+            renderTrack(st.call);
+        } catch(e) {
+            console.warn('Marker error for', st.call, e);
+        }
+    });
+
+    renderStationList(filtered);
+    updateCounts(filtered.length);
+    if (showPhg) drawPhgCircles();
+}
+
+function getFiltered() {
+    const cutoff = (Date.now()/1000) - (ageFilterHours * 3600);
+    return Object.values(stations).filter(st => {
+        if (filterType !== 'all' && st.type !== filterType) return false;
+        if (filterCall && !st.call.toUpperCase().includes(filterCall.toUpperCase())) return false;
+        if ((st.ts || 0) < cutoff) return false; // age filter
+        return true;
+    }).sort((a,b) => (b.ts||0)-(a.ts||0));
+}
+
+function buildPopup(st) {
+    const age = ageStr(st.ts);
+    const wx  = st.wx_data || {};
+    let rows  = `<div class="aprs-popup-call">${st.call}</div>
+        <div class="aprs-popup-row">Last heard: <span>${age}</span></div>`;
+    if (st.wx) {
+        const dist = distanceMiles(st.lat, st.lon);
+        const bear = bearingTo(st.lat, st.lon);
+        if (dist !== null) rows += `<div class="aprs-popup-row">📏 Distance: <span>${dist} mi ${bear}</span></div>`;
+    }
+    if (st.wx && wx.temp_f !== undefined)
+        rows += `<div class="aprs-popup-row">🌡 Temp: <span>${wx.temp_f}°F</span></div>`;
+    if (st.wx && wx.wind_speed !== undefined)
+        rows += `<div class="aprs-popup-row">💨 Wind: <span>${wx.wind_speed} mph @ ${wx.wind_dir}°</span></div>`;
+    if (st.wx && wx.humidity !== undefined)
+        rows += `<div class="aprs-popup-row">💧 Humidity: <span>${wx.humidity}%</span></div>`;
+    if (!st.wx && st.speed)
+        rows += `<div class="aprs-popup-row">Speed: <span>${st.speed} mph</span></div>`;
+    if (!st.wx && st.altitude)
+        rows += `<div class="aprs-popup-row">Alt: <span>${st.altitude} ft</span></div>`;
+    if (st.comment)
+        rows += `<div class="aprs-popup-row">Comment: <span>${escHtml(st.comment)}</span></div>`;
+    rows += `<div class="aprs-popup-row" style="font-size:9px;margin-top:4px;color:var(--muted)">${st.lat.toFixed(4)}, ${st.lon.toFixed(4)}</div>`;
+    return rows;
+}
+
+function renderStationList(list) {
+    const el = document.getElementById('stationList');
+    if (!list.length) {
+        el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">No stations</div>';
+        return;
+    }
+    el.innerHTML = list.map(st => {
+        const off   = getSymbolOffset(st.symtbl||'/', st.symbol||'>');
+        const spriteHtml = `<div class="aprs-sprite ${off.cls}" style="background-position:-${off.x}px -${off.y}px;width:16px;height:16px;background-size:384px auto"></div>`;
+        const cls   = st.type || 'fixed';
+        const age   = ageStr(st.ts);
+        const sel   = selectedCall === st.call ? ' selected' : '';
+        return `<div class="st-row${sel}" onclick="selectStation('${escHtml(st.call)}')">
+            <div class="st-icon">${spriteHtml}</div>
+            <div class="st-info">
+                <div class="st-call ${cls}">${escHtml(st.call)}</div>
+                <div class="st-comment">${escHtml(st.comment||'—')}</div>
+            </div>
+            <div class="st-age">${age}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderMessages(msgs) {
+    const el = document.getElementById('msgList');
+    document.getElementById('msgCount').textContent = msgs.length ? `(${msgs.length})` : '';
+    if (!msgs.length) {
+        el.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted);font-size:11px">No messages</div>';
+        return;
+    }
+    el.innerHTML = msgs.slice(0,50).map(m => {
+        const t = new Date(m.ts*1000).toUTCString().split(' ')[4];
+        return `<div class="msg-row">
+            <div style="display:flex;justify-content:space-between">
+                <span class="msg-from">${escHtml(m.call)}</span>
+                ${m.msgDest?`<span class="msg-to">→ ${escHtml(m.msgDest)}</span>`:''}
+                <span class="msg-time">${t}Z</span>
+            </div>
+            <div class="msg-text">${escHtml(m.msgText||'')}</div>
+        </div>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  STATION SELECTION
+// ═══════════════════════════════════════════════════════
+function selectStation(call) {
+    selectedCall = call;
+    const st = stations[call];
+    if (!st) return;
+
+    // Pan map to station
+    if (st.lat && st.lon) map.panTo([st.lat, st.lon]);
+
+    // Open marker popup
+    if (markers[call]) markers[call].openPopup();
+
+    // Show path lines on selection
+    showPathLines(call);
+    // Update compose To field if modal open
+    if (!document.getElementById('msgModal').classList.contains('hidden')) {
+        document.getElementById('msgTo').value = call;
+    }
+
+    // Show detail panel
+    showDetail(st);
+
+    // Highlight list row
+    document.querySelectorAll('.st-row').forEach(r => r.classList.remove('selected'));
+    const rows = document.querySelectorAll('.st-row');
+    rows.forEach(r => { if (r.textContent.includes(call)) r.classList.add('selected'); });
+}
+
+function deselectStation() {
+    selectedCall = null;
+    document.querySelectorAll('.st-row').forEach(r => r.classList.remove('selected'));
+}
+
+// K1AJD station location
+const HOME_LAT = 33.4259;
+const HOME_LON = -82.0099;
+
+function distanceMiles(lat, lon) {
+    if (!lat || !lon) return null;
+    const R    = 3958.8; // Earth radius in miles
+    const dLat = (lat - HOME_LAT) * Math.PI / 180;
+    const dLon = (lon - HOME_LON) * Math.PI / 180;
+    const a    = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                 Math.cos(HOME_LAT * Math.PI/180) * Math.cos(lat * Math.PI/180) *
+                 Math.sin(dLon/2) * Math.sin(dLon/2);
+    return Math.round(3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 10) / 10;
+}
+
+function bearingTo(lat, lon) {
+    if (!lat || !lon) return '';
+    const dLon  = (lon - HOME_LON) * Math.PI / 180;
+    const lat1  = HOME_LAT * Math.PI / 180;
+    const lat2  = lat * Math.PI / 180;
+    const y     = Math.sin(dLon) * Math.cos(lat2);
+    const x     = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+    const deg   = (Math.atan2(y, x) * 180/Math.PI + 360) % 360;
+    const dirs  = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    return dirs[Math.round(deg/22.5) % 16];
+}
+
+function windDir(deg) {
+    if (deg === null || deg === undefined) return '';
+    const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    return dirs[Math.round(deg/22.5) % 16] + ' (' + deg + '°)';
+}
+
+function showDetail(st) {
+    const age = ageStr(st.ts);
+    const wx  = st.wx_data || {};
+    let rows  = '';
+
+    rows += `<div class="detail-call">${escHtml(st.call)}</div>`;
+    rows += `<div class="detail-row"><span class="detail-label">Last heard</span><span class="detail-val">${age}</span></div>`;
+    rows += `<div class="detail-row"><span class="detail-label">Type</span><span class="detail-val">${st.wx?'🌡 WX Station':st.type}</span></div>`;
+    rows += `<div class="detail-row"><span class="detail-label">Position</span><span class="detail-val" style="font-family:var(--font-mono);font-size:10px">${st.lat?.toFixed(4)}, ${st.lon?.toFixed(4)}</span></div>`;
+
+    if (st.wx && Object.keys(wx).length > 0) {
+        // Full WX display in imperial
+        const dist = distanceMiles(st.lat, st.lon);
+        const bear = bearingTo(st.lat, st.lon);
+        const distStr = dist !== null ? `${dist} mi ${bear} of K1AJD` : '';
+        rows += `<div style="margin:8px 0 4px;font-size:10px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px">Weather Data${distStr ? ' <span style="color:var(--muted);font-weight:400;text-transform:none">— ' + distStr + '</span>' : ''}</div>`;
+        if (wx.temp_f !== undefined)
+            rows += `<div class="detail-row"><span class="detail-label">🌡 Temp</span><span class="detail-val">${wx.temp_f}°F (${((wx.temp_f-32)*5/9).toFixed(1)}°C)</span></div>`;
+        if (wx.humidity !== undefined)
+            rows += `<div class="detail-row"><span class="detail-label">💧 Humidity</span><span class="detail-val">${wx.humidity}%</span></div>`;
+        if (wx.wind_speed !== undefined)
+            rows += `<div class="detail-row"><span class="detail-label">💨 Wind</span><span class="detail-val">${windDir(wx.wind_dir)} @ ${wx.wind_speed} mph</span></div>`;
+        if (wx.gust !== undefined && wx.gust > 0)
+            rows += `<div class="detail-row"><span class="detail-label">💨 Gust</span><span class="detail-val">${wx.gust} mph</span></div>`;
+        if (wx.pressure !== undefined)
+            rows += `<div class="detail-row"><span class="detail-label">📊 Pressure</span><span class="detail-val">${wx.pressure} mbar (${(wx.pressure * 0.02953).toFixed(2)} inHg)</span></div>`;
+        if (wx.rain_1h !== undefined && wx.rain_1h > 0)
+            rows += `<div class="detail-row"><span class="detail-label">🌧 Rain 1hr</span><span class="detail-val">${wx.rain_1h}" (${(wx.rain_1h*25.4).toFixed(1)} mm)</span></div>`;
+        if (wx.rain_24h !== undefined && wx.rain_24h > 0)
+            rows += `<div class="detail-row"><span class="detail-label">🌧 Rain 24hr</span><span class="detail-val">${wx.rain_24h}" (${(wx.rain_24h*25.4).toFixed(1)} mm)</span></div>`;
+        if (wx.rain_midnight !== undefined && wx.rain_midnight > 0)
+            rows += `<div class="detail-row"><span class="detail-label">🌧 Rain today</span><span class="detail-val">${wx.rain_midnight}" (${(wx.rain_midnight*25.4).toFixed(1)} mm)</span></div>`;
+        if (wx.snow !== undefined && wx.snow > 0)
+            rows += `<div class="detail-row"><span class="detail-label">❄ Snow</span><span class="detail-val">${wx.snow}"</span></div>`;
+        if (wx.luminosity !== undefined)
+            rows += `<div class="detail-row"><span class="detail-label">☀ Luminosity</span><span class="detail-val">${wx.luminosity} W/m²</span></div>`;
+    } else {
+        // Non-WX station
+        if (st.speed !== undefined && st.speed !== null)
+            rows += `<div class="detail-row"><span class="detail-label">Speed</span><span class="detail-val">${st.speed} mph</span></div>`;
+        if (st.course !== undefined && st.course !== null)
+            rows += `<div class="detail-row"><span class="detail-label">Course</span><span class="detail-val">${windDir(st.course)}</span></div>`;
+        if (st.altitude !== undefined && st.altitude !== null)
+            rows += `<div class="detail-row"><span class="detail-label">Altitude</span><span class="detail-val">${st.altitude} ft (${Math.round(st.altitude*0.3048)} m)</span></div>`;
+    }
+
+    if (st.comment)
+        rows += `<div class="detail-row"><span class="detail-label">Comment</span><span class="detail-val">${escHtml(st.comment)}</span></div>`;
+    if (st.path)
+        rows += `<div class="detail-row"><span class="detail-label">Path</span><span class="detail-val" style="font-family:var(--font-mono);font-size:10px">${escHtml(st.path)}</span></div>`;
+
+    rows += `<div class="detail-row" style="margin-top:6px">
+        <a href="https://aprs.fi/#!call=${encodeURIComponent(st.call)}" target="_blank" style="color:var(--accent);font-size:10px">View on aprs.fi ↗</a>
+        &nbsp;|&nbsp;
+        <a href="#" onclick="openMsgModal('${escHtml(st.call)}');return false" style="color:var(--purple);font-size:10px">✉ Message</a>
+    </div>`;
+
+    if (trackHistory[st.call] && trackHistory[st.call].length > 1) {
+        const pts = trackHistory[st.call];
+        const mins = Math.round((pts[pts.length-1].ts - pts[0].ts) / 60);
+        rows += `<div class="detail-row"><span class="detail-label">Track</span><span class="detail-val">${pts.length} pts over ${mins}m</span></div>`;
+    }
+
+    document.getElementById('detailContent').innerHTML = rows;
+    document.getElementById('detailPanel').classList.add('visible');
+}
+
+function closeDetail() {
+    document.getElementById('detailPanel').classList.remove('visible');
+}
+
+// ═══════════════════════════════════════════════════════
+//  FILTER
+// ═══════════════════════════════════════════════════════
+function setFilter(type) {
+    filterType = type;
+    ['all','mobile','wx','fixed'].forEach(t => {
+        document.getElementById('btn'+t.charAt(0).toUpperCase()+t.slice(1))
+            .classList.toggle('active', t===type);
+    });
+    renderStations([]);
+}
+
+function applyFilter() {
+    filterCall = document.getElementById('filterInput').value.trim();
+    renderStations([]);
+}
+
+// ═══════════════════════════════════════════════════════
+//  DATA FETCH
+// ═══════════════════════════════════════════════════════
+async function loadStations() {
+    try {
+        const r = await fetch(API + '?action=stations');
+        const d = await r.json();
+        if (d.success) {
+            stations = {};
+            renderStations(d.stations || []);
+            if (d.updated) {
+                const dt = new Date(d.updated*1000);
+                const daemonStatus = d.daemon ? '🟢 Daemon live' : '🔴 Daemon offline';
+                document.getElementById('lastUpdate').textContent =
+                    'Updated ' + dt.toUTCString().split(' ')[4] + 'Z  ' + daemonStatus;
+            }
+        }
+    } catch(e) { showToast('Failed to load stations', 'error'); }
+}
+
+async function loadHistory() {
+    // Load server-side track history from daemon
+    try {
+        const r = await fetch(API + '?action=history');
+        const d = await r.json();
+        if (d.success && d.history) {
+            // Merge daemon history into browser trackHistory
+            Object.entries(d.history).forEach(([call, pts]) => {
+                if (!trackHistory[call]) trackHistory[call] = [];
+                // Merge, deduplicate by ts
+                const existing = new Set(trackHistory[call].map(p => p.ts));
+                pts.forEach(p => { if (!existing.has(p.ts)) trackHistory[call].push(p); });
+                trackHistory[call].sort((a,b) => a.ts - b.ts);
+            });
+        }
+    } catch(e) { console.log('History load error:', e); }
+}
+
+async function loadMessages() {
+    try {
+        const r = await fetch(API + '?action=messages');
+        const d = await r.json();
+        if (d.success) {
+            renderMessages(d.messages || []);
+            updateInbox(d.messages || []);
+        }
+    } catch {}
+}
+
+async function refreshData() {
+    showToast('Refreshing from daemon cache…', 'info');
+    await loadStations();
+    await loadHistory();
+    await loadMessages();
+    showToast('Refreshed — ' + Object.keys(stations).length + ' stations', 'ok');
+}
+
+function resetView() {
+    map.setView(CENTER, ZOOM);
+    closeDetail();
+}
+
+function updateCounts(n) {
+    document.getElementById('stationCount').textContent = `${n} station${n!==1?'s':''}`;
+    document.getElementById('listCount').textContent = `(${n})`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  STATION BROWSER
+// ═══════════════════════════════════════════════════════
+let bwFilter   = 'all';
+let bwExpanded = new Set();
+
+function openBrowser() {
+    document.getElementById('browserModal').classList.remove('hidden');
+    renderBrowser();
+}
+function closeBrowser() {
+    document.getElementById('browserModal').classList.add('hidden');
+}
+function setBwFilter(f) {
+    bwFilter = f;
+    document.querySelectorAll('.bw-tab').forEach(t => t.classList.remove('active'));
+    const id = 'bwt' + f.charAt(0).toUpperCase() + f.slice(1);
+    document.getElementById(id)?.classList.add('active');
+    bwExpanded.clear();
+    renderBrowser();
+}
+
+function classifyStation(st) {
+    const call = st.call || '';
+    const path = (st.path || '').toUpperCase();
+    const sym  = st.symbol || '';
+    const tbl  = st.symtbl || '/';
+    // iGate — path contains qAR/qAS or symbol is &
+    if (path.includes('QAR') || path.includes('QAS') || sym === '&') return 'igate';
+    // Digi — symbol is # (primary) or path has WIDE
+    if ((tbl === '/' && sym === '#') || (tbl === '\\' && sym === '#') ||
+        path.includes('WIDE') || call.endsWith('-D') || call.endsWith('-10')) return 'digi';
+    // Object/Item — to field starts with ; or )
+    if (st.isObject) return 'object';
+    // WX
+    if (st.wx) return 'wx';
+    // Mobile
+    if (st.type === 'mobile') return 'mobile';
+    return 'fixed';
+}
+
+function getBwSummary(st, cat) {
+    const wx = st.wx_data || {};
+    if (cat === 'wx') {
+        const parts = [];
+        const dist = distanceMiles(st.lat, st.lon);
+        if (dist !== null) parts.push(dist + ' mi');
+        if (wx.temp_f !== undefined) parts.push(wx.temp_f + '°F');
+        if (wx.humidity !== undefined) parts.push(wx.humidity + '% RH');
+        if (wx.wind_speed !== undefined) parts.push(wx.wind_speed + ' mph');
+        return parts.join(' · ') || st.comment || '—';
+    }
+    if (cat === 'mobile') {
+        const parts = [];
+        if (st.speed !== undefined && st.speed !== null) parts.push(st.speed + ' mph');
+        if (st.course !== undefined && st.course !== null) parts.push(windDir(st.course));
+        if (st.altitude !== undefined && st.altitude !== null) parts.push(st.altitude + ' ft');
+        return parts.join(' · ') || st.comment || '—';
+    }
+    return st.comment || st.path || '—';
+}
+
+function getBwDetail(st, cat) {
+    const wx  = st.wx_data || {};
+    const fields = [];
+    const f = (label, val) => val !== undefined && val !== null && val !== ''
+        ? `<div class="bw-field"><span class="bw-field-label">${label}</span><span class="bw-field-val">${escHtml(String(val))}</span></div>`
+        : '';
+
+    fields.push(f('📍 Position', st.lat?.toFixed(5) + ', ' + st.lon?.toFixed(5)));
+    fields.push(f('⏱ Last heard', ageStr(st.ts)));
+    fields.push(f('📡 Path', st.path));
+
+    if (cat === 'wx') {
+        const dist = distanceMiles(st.lat, st.lon);
+        const bear = bearingTo(st.lat, st.lon);
+        if (dist !== null) fields.push(f('📏 Distance', dist + ' mi ' + bear + ' of K1AJD'));
+        if (wx.temp_f !== undefined) fields.push(f('🌡 Temp', wx.temp_f + '°F (' + ((wx.temp_f-32)*5/9).toFixed(1) + '°C)'));
+        if (wx.humidity !== undefined) fields.push(f('💧 Humidity', wx.humidity + '%'));
+        if (wx.wind_speed !== undefined) fields.push(f('💨 Wind', windDir(wx.wind_dir) + ' @ ' + wx.wind_speed + ' mph'));
+        if (wx.gust !== undefined && wx.gust > 0) fields.push(f('💨 Gust', wx.gust + ' mph'));
+        if (wx.pressure !== undefined) fields.push(f('📊 Pressure', wx.pressure + ' mbar (' + (wx.pressure*0.02953).toFixed(2) + ' inHg)'));
+        if (wx.rain_1h !== undefined && wx.rain_1h >= 0) fields.push(f('🌧 Rain 1hr', wx.rain_1h + '"'));
+        if (wx.rain_24h !== undefined && wx.rain_24h >= 0) fields.push(f('🌧 Rain 24hr', wx.rain_24h + '"'));
+        if (wx.rain_midnight !== undefined && wx.rain_midnight >= 0) fields.push(f('🌧 Rain today', wx.rain_midnight + '"'));
+        if (wx.snow !== undefined && wx.snow > 0) fields.push(f('❄ Snow', wx.snow + '"'));
+        if (wx.luminosity !== undefined) fields.push(f('☀ Luminosity', wx.luminosity + ' W/m²'));
+    } else if (cat === 'mobile') {
+        if (st.speed !== undefined && st.speed !== null) fields.push(f('🚗 Speed', st.speed + ' mph'));
+        if (st.course !== undefined && st.course !== null) fields.push(f('🧭 Course', windDir(st.course)));
+        if (st.altitude !== undefined && st.altitude !== null) fields.push(f('⬆ Altitude', st.altitude + ' ft (' + Math.round(st.altitude*0.3048) + ' m)'));
+        const hist = trackHistory[st.call];
+        if (hist && hist.length > 1) {
+            const mins = Math.round((hist[hist.length-1].ts - hist[0].ts) / 60);
+            fields.push(f('🛤 Track', hist.length + ' points over ' + mins + 'm'));
+        }
+    } else {
+        if (st.comment) fields.push(f('💬 Comment', st.comment));
+    }
+
+    if (st.comment && cat !== 'mobile') fields.push(f('💬 Comment', st.comment));
+
+    const actions = `<div class="bw-actions">
+        <button class="bw-action-btn" onclick="closeBrowser();selectStation('${escHtml(st.call)}')">🗺 Show on map</button>
+        <button class="bw-action-btn" onclick="openMsgModal('${escHtml(st.call)}')">✉ Message</button>
+        <a class="bw-action-btn" href="https://aprs.fi/#!call=${encodeURIComponent(st.call)}" target="_blank">aprs.fi ↗</a>
+    </div>`;
+
+    return fields.filter(Boolean).join('') + actions;
+}
+
+function renderBrowser() {
+    const search = (document.getElementById('bwSearch')?.value || '').toUpperCase();
+    const cutoff = (Date.now()/1000) - (ageFilterHours * 3600);
+
+    // Categorize and filter
+    const cats = { mobile:[], wx:[], digi:[], igate:[], fixed:[], object:[] };
+    Object.values(stations).forEach(st => {
+        if (st.ts < cutoff) return;
+        if (search && !st.call.includes(search) && !(st.comment||'').toUpperCase().includes(search)) return;
+        const cat = classifyStation(st);
+        if (!cats[cat]) cats[cat] = [];
+        cats[cat].push({...st, _cat: cat});
+    });
+
+    // Sort each category by distance closest to farthest
+    Object.values(cats).forEach(arr => arr.sort((a,b) => {
+        const da = distanceMiles(a.lat, a.lon) ?? 9999;
+        const db = distanceMiles(b.lat, b.lon) ?? 9999;
+        return da - db;
+    }));
+
+    const catOrder = ['mobile','wx','digi','igate','fixed','object'];
+    const catLabels = {
+        mobile: '🚗 Mobile',  wx:     '🌡 Weather Stations',
+        digi:   '🔁 Digipeaters', igate: '🌐 iGates',
+        fixed:  '📡 Fixed Stations', object:'📌 Objects & Items'
+    };
+
+    let html = '';
+    const showCats = bwFilter === 'all' ? catOrder : [bwFilter];
+
+    showCats.forEach(cat => {
+        const list = cats[cat] || [];
+        if (!list.length) return;
+        html += `<div class="bw-cat-header">
+            <span class="bw-cat-label" style="color:var(--${cat==='wx'?'yellow':cat==='mobile'?'accent':cat==='digi'?'purple':cat==='igate'?'orange':cat==='object'?'red':'green'})">${catLabels[cat]}</span>
+            <span class="bw-cat-count">${list.length}</span>
+        </div>`;
+        list.forEach(st => {
+            const id  = 'bwr_' + st.call.replace(/[^A-Z0-9]/g,'_');
+            const exp = bwExpanded.has(st.call);
+            const sym = `<div class="aprs-sprite ${(st.symtbl==='\\')?'aprs-sprite-alt':'aprs-sprite-pri'}" style="background-position:-${getSymbolOffset(st.symtbl||'/',st.symbol||'>').x}px -${getSymbolOffset(st.symtbl||'/',st.symbol||'>').y}px;width:20px;height:20px;background-size:320px auto;flex-shrink:0"></div>`;
+            html += `<div class="bw-row${exp?' expanded':''}" id="${id}">
+                <div class="bw-row-header" onclick="toggleBwRow('${escHtml(st.call)}','${id}')">
+                    <div class="bw-icon">${sym}</div>
+                    <span class="bw-call ${cat}">${escHtml(st.call)}</span>
+                    <span class="bw-summary">${escHtml(getBwSummary(st, cat))}</span>
+                    <span class="bw-age">${ageStr(st.ts)}</span>
+                    <span class="bw-chevron">▶</span>
+                </div>
+                <div class="bw-detail">${exp ? getBwDetail(st, cat) : ''}</div>
+            </div>`;
+        });
+    });
+
+    if (!html) {
+        html = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:12px">No stations match current filter</div>';
+    }
+    document.getElementById('browserContent').innerHTML = html;
+}
+
+function toggleBwRow(call, id) {
+    const row = document.getElementById(id);
+    if (!row) return;
+    if (bwExpanded.has(call)) {
+        bwExpanded.delete(call);
+        row.classList.remove('expanded');
+        row.querySelector('.bw-detail').innerHTML = '';
+    } else {
+        bwExpanded.add(call);
+        row.classList.add('expanded');
+        const st  = stations[call];
+        const cat = classifyStation(st);
+        row.querySelector('.bw-detail').innerHTML = getBwDetail(st, cat);
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//  APRS MESSAGING
+// ═══════════════════════════════════════════════════════
+let msgSeq     = 1;
+let inboxMsgs  = [];
+let inboxUnread= 0;
+
+function openMsgModal(toCall) {
+    document.getElementById('msgModal').classList.remove('hidden');
+    if (toCall) {
+        document.getElementById('msgTo').value = toCall.toUpperCase();
+        switchMsgTab('compose');
+        document.getElementById('msgText').focus();
+    }
+}
+function closeMsgModal() {
+    document.getElementById('msgModal').classList.add('hidden');
+}
+function switchMsgTab(tab) {
+    document.getElementById('tabComposeBody').style.display = tab==='compose' ? 'flex' : 'none';
+    document.getElementById('tabInboxBody').style.display   = tab==='inbox'   ? 'block' : 'none';
+    document.getElementById('tabCompose').classList.toggle('active', tab==='compose');
+    document.getElementById('tabInbox').classList.toggle('active',   tab==='inbox');
+    if (tab==='inbox') {
+        inboxUnread = 0;
+        updateMsgBadge();
+    }
+}
+function updateCharCount() {
+    const len = document.getElementById('msgText').value.length;
+    document.getElementById('charCount').textContent = len;
+    document.getElementById('charCount').style.color = len > 60 ? 'var(--orange)' : '';
+}
+function updateMsgBadge() {
+    const badge  = document.getElementById('msgBadge');
+    const ibadge = document.getElementById('inboxBadge');
+    if (inboxUnread > 0) {
+        badge.textContent  = inboxUnread;
+        ibadge.textContent = inboxUnread;
+        badge.style.display  = 'inline';
+        ibadge.style.display = 'inline';
+    } else {
+        badge.style.display  = 'none';
+        ibadge.style.display = 'none';
+    }
+}
+
+async function sendAprsMsg() {
+    const to  = document.getElementById('msgTo').value.trim().toUpperCase();
+    const txt = document.getElementById('msgText').value.trim();
+    if (!to)  { showToast('Enter recipient callsign', 'error'); return; }
+    if (!txt) { showToast('Enter a message', 'error'); return; }
+    if (txt.length > 67) { showToast('Message too long (max 67 chars)', 'error'); return; }
+
+    const btn = document.getElementById('sendMsgBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Sending…';
+
+    try {
+        const r = await fetch(API, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({
+                action: 'sendmsg',
+                to:     to,
+                text:   txt,
+                seq:    msgSeq++
+            })
+        });
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('msgText').value = '';
+            updateCharCount();
+            showToast('Message sent to ' + to, 'ok');
+            // Add to sent log in inbox
+            inboxMsgs.unshift({
+                call: 'K1AJD-1', msgDest: to, msgText: txt,
+                ts: Math.floor(Date.now()/1000), sent: true
+            });
+            renderInbox();
+        } else {
+            showToast('Send failed: ' + (d.error||'unknown'), 'error');
+        }
+    } catch(e) {
+        showToast('Send error: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = '📤 Send';
+}
+
+function renderInbox() {
+    const el = document.getElementById('inboxList');
+    if (!inboxMsgs.length) {
+        el.innerHTML = '<div class="inbox-empty">📭 No messages for K1AJD-1</div>';
+        return;
+    }
+    el.innerHTML = inboxMsgs.map(m => {
+        const t   = new Date(m.ts*1000).toUTCString().split(' ')[4] + 'Z';
+        const sent = m.sent;
+        const from = sent ? `→ ${m.msgDest}` : m.call;
+        const color = sent ? 'var(--muted)' : 'var(--accent)';
+        return `<div class="inbox-msg ${!sent&&!m.read?'unread':''}">
+            <span class="inbox-from" style="color:${color}">${escHtml(from)}</span>
+            <span class="inbox-time">${t}</span>
+            <div class="inbox-text">${escHtml(m.msgText||'')}</div>
+            ${!sent ? `<button class="inbox-reply" onclick="openMsgModal('${escHtml(m.call)}')">↩ Reply</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function updateInbox(messages) {
+    // Find messages addressed to K1AJD-1
+    const myCall = 'K1AJD-1';
+    const incoming = messages.filter(m =>
+        m.isMsg && m.msgDest &&
+        m.msgDest.trim().toUpperCase() === myCall
+    );
+    // Add new ones not already in inbox
+    const existing = new Set(inboxMsgs.filter(m=>!m.sent).map(m => m.ts + m.call + m.msgText));
+    let newCount = 0;
+    incoming.forEach(m => {
+        const key = m.ts + m.call + (m.msgText||'');
+        if (!existing.has(key)) {
+            inboxMsgs.unshift({...m, read: false});
+            newCount++;
+        }
+    });
+    if (newCount > 0) {
+        inboxUnread += newCount;
+        updateMsgBadge();
+        renderInbox();
+        showToast(`${newCount} new APRS message${newCount>1?'s':''}`, 'ok');
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════
+function ageStr(ts) {
+    if (!ts) return '?';
+    const s = Math.floor(Date.now()/1000) - ts;
+    if (s < 60)   return s + 's ago';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    return Math.floor(s/3600) + 'h ago';
+}
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+let toastTimer;
+function showToast(msg, type='ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+// Clock
+setInterval(() => {
+    document.getElementById('utcClock').textContent = new Date().toUTCString().split(' ')[4] + ' Z';
+}, 1000);
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+(async function init() {
+    const saved = localStorage.getItem('aprs_theme');
+    applyTheme(saved || (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark'));
+    initMap();
+    await loadStations();
+    await loadHistory();
+    await loadMessages();
+    // Auto-refresh every 30 seconds (daemon keeps data fresh)
+    refreshTimer = setInterval(async () => {
+        await loadStations();
+        await loadMessages();
+    }, 30000);
+    // Reload history every 5 minutes
+    setInterval(loadHistory, 300000);
+})();
+</script>
+</body>
+</html>
