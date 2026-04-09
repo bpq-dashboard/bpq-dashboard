@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>APRS Map — K1AJD</title>
+    <title>APRS Map — YOURCALL</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -356,7 +356,7 @@
 <div id="msgModal" class="hidden">
     <div id="msgModalBox">
         <div class="mm-header">
-            <span class="mm-title">✉ APRS Messaging — K1AJD-1</span>
+            <span class="mm-title">✉ APRS Messaging — YOURCALL-1</span>
             <button onclick="closeMsgModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">×</button>
         </div>
         <div class="mm-tabs">
@@ -379,13 +379,13 @@
                     <div class="mm-charcount"><span id="charCount">0</span>/67</div>
                 </div>
                 <div style="font-size:10px;color:var(--muted);line-height:1.6">
-                    Message sent via APRS-IS as <strong style="color:var(--accent)">K1AJD-1</strong>.
+                    Message sent via APRS-IS as <strong style="color:var(--accent)">YOURCALL-1</strong>.
                     Max 67 characters per APRS spec.
                 </div>
             </div>
             <!-- Inbox tab -->
             <div id="tabInboxBody" style="display:none">
-                <div id="inboxList"><div class="inbox-empty">📭 No messages for K1AJD-1</div></div>
+                <div id="inboxList"><div class="inbox-empty">📭 No messages for YOURCALL-1</div></div>
             </div>
         </div>
         <div class="mm-footer">
@@ -400,7 +400,7 @@
 //  CONFIG
 // ═══════════════════════════════════════════════════════
 const API     = 'bpq-aprs.php';
-const CENTER  = [33.4259, -82.0099]; // Hephzibah GA
+const CENTER  = [0.0000, 0.0000]; // Your City GA
 const ZOOM    = 9;
 const RADIUS_MILES = 50;
 const RADIUS_KM    = RADIUS_MILES * 1.60934;
@@ -468,7 +468,7 @@ function initMap() {
     });
     L.marker(CENTER, {icon: homeIcon})
      .addTo(map)
-     .bindPopup('<div class="aprs-popup-call">K1AJD</div><div class="aprs-popup-row">Hephzibah, GA</div>');
+     .bindPopup('<div class="aprs-popup-call">YOURCALL</div><div class="aprs-popup-row">Your City, GA</div>');
 
     map.on('click', () => { closeDetail(); deselectStation(); });
 }
@@ -903,9 +903,9 @@ function deselectStation() {
     document.querySelectorAll('.st-row').forEach(r => r.classList.remove('selected'));
 }
 
-// K1AJD station location
-const HOME_LAT = 33.4259;
-const HOME_LON = -82.0099;
+// YOURCALL station location
+const HOME_LAT = 0.0000;
+const HOME_LON = 0.0000;
 
 function distanceMiles(lat, lon) {
     if (!lat || !lon) return null;
@@ -950,7 +950,7 @@ function showDetail(st) {
         // Full WX display in imperial
         const dist = distanceMiles(st.lat, st.lon);
         const bear = bearingTo(st.lat, st.lon);
-        const distStr = dist !== null ? `${dist} mi ${bear} of K1AJD` : '';
+        const distStr = dist !== null ? `${dist} mi ${bear} of YOURCALL` : '';
         rows += `<div style="margin:8px 0 4px;font-size:10px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px">Weather Data${distStr ? ' <span style="color:var(--muted);font-weight:400;text-transform:none">— ' + distStr + '</span>' : ''}</div>`;
         if (wx.temp_f !== undefined)
             rows += `<div class="detail-row"><span class="detail-label">🌡 Temp</span><span class="detail-val">${wx.temp_f}°F (${((wx.temp_f-32)*5/9).toFixed(1)}°C)</span></div>`;
@@ -1167,7 +1167,7 @@ function getBwDetail(st, cat) {
     if (cat === 'wx') {
         const dist = distanceMiles(st.lat, st.lon);
         const bear = bearingTo(st.lat, st.lon);
-        if (dist !== null) fields.push(f('📏 Distance', dist + ' mi ' + bear + ' of K1AJD'));
+        if (dist !== null) fields.push(f('📏 Distance', dist + ' mi ' + bear + ' of YOURCALL'));
         if (wx.temp_f !== undefined) fields.push(f('🌡 Temp', wx.temp_f + '°F (' + ((wx.temp_f-32)*5/9).toFixed(1) + '°C)'));
         if (wx.humidity !== undefined) fields.push(f('💧 Humidity', wx.humidity + '%'));
         if (wx.wind_speed !== undefined) fields.push(f('💨 Wind', windDir(wx.wind_dir) + ' @ ' + wx.wind_speed + ' mph'));
@@ -1355,7 +1355,7 @@ async function sendAprsMsg() {
             showToast('Message sent to ' + to, 'ok');
             // Add to sent log in inbox
             inboxMsgs.unshift({
-                call: 'K1AJD-1', msgDest: to, msgText: txt,
+                call: 'YOURCALL-1', msgDest: to, msgText: txt,
                 ts: Math.floor(Date.now()/1000), sent: true
             });
             renderInbox();
@@ -1372,7 +1372,7 @@ async function sendAprsMsg() {
 function renderInbox() {
     const el = document.getElementById('inboxList');
     if (!inboxMsgs.length) {
-        el.innerHTML = '<div class="inbox-empty">📭 No messages for K1AJD-1</div>';
+        el.innerHTML = '<div class="inbox-empty">📭 No messages for YOURCALL-1</div>';
         return;
     }
     el.innerHTML = inboxMsgs.map(m => {
@@ -1390,8 +1390,8 @@ function renderInbox() {
 }
 
 function updateInbox(messages) {
-    // Find messages addressed to K1AJD-1
-    const myCall = 'K1AJD-1';
+    // Find messages addressed to YOURCALL-1
+    const myCall = 'YOURCALL-1';
     const incoming = messages.filter(m =>
         m.isMsg && m.msgDest &&
         m.msgDest.trim().toUpperCase() === myCall

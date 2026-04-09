@@ -6,10 +6,10 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Added
 
-- **bpq-aprs.html — APRS Messaging modal** — Send/inbox two-way messaging. Compose tab with 67-char limit. Inbox for messages to K1AJD-1. Reply button. Unread badge. Double-click marker or click list pre-fills callsign.
+- **bpq-aprs.html — APRS Messaging modal** — Send/inbox two-way messaging. Compose tab with 67-char limit. Inbox for messages to YOURCALL-1. Reply button. Unread badge. Double-click marker or click list pre-fills callsign.
 - **bpq-aprs.html — Full WX detail panel** — All APRS WX fields in imperial (°F, mph, inHg, inches). Wind direction as compass bearing. Both popup and detail panel updated.
 - **bpq-aprs.html — Station Browser modal** — Categorized by Mobile/WX/Digi/iGate/Fixed/Object. Sorted by distance. Expandable rows with full details. Show on map / Message / aprs.fi links.
-- **bpq-aprs.html — Distance from K1AJD** — Haversine distance + compass bearing for all WX stations in popup, detail panel, browser summary and browser detail.
+- **bpq-aprs.html — Distance from YOURCALL** — Haversine distance + compass bearing for all WX stations in popup, detail panel, browser summary and browser detail.
 - **bpq-aprs.html — PHG/RNG circles** — ⭕ PHG toggle button. Parses PHGpppp and RNGnnnn from comments. Color-coded by station type. Excludes mobiles.
 - **install-check.php — Post-installation troubleshooter** — 16 check categories: PHP, Nginx, HTML files, PHP files, Scripts, Data files, Directories, Config, Service files, Cron jobs, Log files, LinBPQ, Database, Network, Security. Password protected. Daemon heartbeat checks, cron race condition detection, malicious cron detection.
 
@@ -40,10 +40,10 @@ All notable changes to BPQ Dashboard will be documented in this file.
 - **bbs-messages.html — Sort by column** — All 5 column headers clickable (#, Date, From, To, Subject). Toggle asc/desc with arrow indicators. Default Date ↓.
 - **bbs-messages.html — Rule-matched highlighting** — Green border/background/text on rule-matched messages. ⚙ RuleName badge. Highlight cleared when message opened.
 - **bbs-messages.html — Search feature** — Live search across Subject/From/To/Body/#/Date. Yellow match highlighting. N found counter. ✕ and Escape to clear.
-- **bpq-aprs.html — New APRS dashboard page** — Leaflet map centered on Hephzibah GA with 150km radius. Station list, APRS messages panel, station detail overlay. Auto-refresh every 2 minutes.
+- **bpq-aprs.html — New APRS dashboard page** — Leaflet map centered on Your City GA with 150km radius. Station list, APRS messages panel, station detail overlay. Auto-refresh every 2 minutes.
 - **bpq-aprs.php — APRS-IS backend** — Connects directly to noam.aprs2.net:14580, parses all packet types, caches stations. No BPQ32 APRSDIGI required.
 - **APRS symbol sprites** — Two local PNG sprite sheets from hessu/aprs-symbols. Primary and alternate symbol tables. 24x24px symbols.
-- **tprfn.conf — Extended timeouts** — bpq-aprs.php (60s) and bpq-chat.php (90s) location blocks added.
+- **bpqdash.conf — Extended timeouts** — bpq-aprs.php (60s) and bpq-chat.php (90s) location blocks added.
 
 ---
 
@@ -83,7 +83,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Added
 
-- **bpq-chat.html — Auth system** — Auth modal on page load. Three levels: guest (read-only), user (own BPQ credentials), sysop (config.php). Guest mode shows orange banner, disables all send controls. Guest request modal opens mailto: pre-filled to tony@k1ajd.net with callsign/name/note.
+- **bpq-chat.html — Auth system** — Auth modal on page load. Three levels: guest (read-only), user (own BPQ credentials), sysop (config.php). Guest mode shows orange banner, disables all send controls. Guest request modal opens mailto: pre-filled to sysop@example.com with callsign/name/note.
 - **bpq-chat.php — Per-user credentials** — Non-sysop users can connect with their own BPQ callsign/password, appearing on network as themselves.
 
 ### Fixed
@@ -133,7 +133,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **visitor-log.php — tprfn-network-map logging** — Visits to tprfn.k1ajd.net were not being recorded. Fixed by adding 'tprfn-index-log.php' and 'tprfn-network-map' to the allowed pages list, and adding page name resolver (tprfn-index-log.php → tprfn-network-map). Root cause was the @ error suppressor hiding the write result during debugging — logging was actually working after the allowed list fix was applied.
+- **visitor-log.php — bpqdash-network-map logging** — Visits to your-domain.com were not being recorded. Fixed by adding 'bpqdash-index-log.php' and 'bpqdash-network-map' to the allowed pages list, and adding page name resolver (bpqdash-index-log.php → bpqdash-network-map). Root cause was the @ error suppressor hiding the write result during debugging — logging was actually working after the allowed list fix was applied.
 
 ---
 
@@ -141,7 +141,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **callsign-lookup.php — QRZ.com primary lookup** — Archived version was outdated (callook.info + HamDB). Live version on ARSSYSTEM uses QRZ.com as primary with callook.info fallback. Updated both archives with live 876-line version. Lookup confirmed working — browser cache was causing apparent failures. Hard refresh resolved all callsigns except N4DGE (not in QRZ database).
+- **callsign-lookup.php — QRZ.com primary lookup** — Archived version was outdated (callook.info + HamDB). Live version on BPQSERVER uses QRZ.com as primary with callook.info fallback. Updated both archives with live 876-line version. Lookup confirmed working — browser cache was causing apparent failures. Hard refresh resolved all callsigns except N4DGE (not in QRZ database).
 
 ---
 
@@ -157,7 +157,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **Visitor tracking restored** — nginx dual-domain reconfiguration broke visitor logging on both domains. Created `tprfn-index-log.php` wrapper to log TPRFN Network Map visits (index.php is pure HTML, cannot include PHP directly). Restored nginx rewrite rules on `bpq.k1ajd.net` to route through `tprfn-rf-log.php`. Both `tprfn.k1ajd.net` and `bpq.k1ajd.net` visits now tracked in visitor-log.php.
+- **Visitor tracking restored** — nginx dual-domain reconfiguration broke visitor logging on both domains. Created `bpqdash-index-log.php` wrapper to log BPQ Network Map visits (index.php is pure HTML, cannot include PHP directly). Restored nginx rewrite rules on `your-domain.com` to route through `bpqdash-rf-log.php`. Both `your-domain.com` and `your-domain.com` visits now tracked in visitor-log.php.
 
 ---
 
@@ -170,7 +170,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 - **bbs-messages.html — Folder list clipping** — With 18 folders the sidebar and save picker overflowed. Added `overflow-y:auto` scroll to `#folderList` and `max-height:280px` to save picker.
 - **bbs-messages.html — Wrong localStorage key in deleteFolder** — `persist('bbs_saved', ...)` corrected to `persist('bbs_saved_messages', ...)` in three places.
 - **bbs-messages.html — Save picker not updating on folder create** — `createFolder()` now calls `renderSaveFolderList()` to keep save picker in sync.
-- **network-api.php — rename() warnings** — `cache/` directory was missing. Fix: `sudo mkdir -p /var/www/tprfn/cache && sudo chown -R www-data:www-data /var/www/tprfn/cache`.
+- **network-api.php — rename() warnings** — `cache/` directory was missing. Fix: `sudo mkdir -p /var/www/bpqdash/cache && sudo chown -R www-data:www-data /var/www/bpqdash/cache`.
 
 ### Added
 
@@ -183,7 +183,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Added
 
-- **tprfn.conf — Dual domain nginx config** — Complete nginx config serving both tprfn.k1ajd.net (TPRFN Network Map) and bpq.k1ajd.net (BPQ Dashboard) from /var/www/tprfn/. bpq.k1ajd.net root serves bpq-rf-connections.html. All BPQ Dashboard URLs on tprfn.k1ajd.net redirect 301 to bpq.k1ajd.net. All original security rules (bot blocking, rate limiting, headers, directory protection) preserved and applied to both domains. Port 514 syslog unaffected.
+- **bpqdash.conf — Dual domain nginx config** — Complete nginx config serving both your-domain.com (BPQ Network Map) and your-domain.com (BPQ Dashboard) from /var/www/bpqdash/. your-domain.com root serves bpq-rf-connections.html. All BPQ Dashboard URLs on your-domain.com redirect 301 to your-domain.com. All original security rules (bot blocking, rate limiting, headers, directory protection) preserved and applied to both domains. Port 514 syslog unaffected.
 
 ---
 
@@ -251,10 +251,10 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Added
 
-- **bpq-aprs.html — APRS Messaging modal** — Send/inbox two-way messaging. Compose tab with 67-char limit. Inbox for messages to K1AJD-1. Reply button. Unread badge. Double-click marker or click list pre-fills callsign.
+- **bpq-aprs.html — APRS Messaging modal** — Send/inbox two-way messaging. Compose tab with 67-char limit. Inbox for messages to YOURCALL-1. Reply button. Unread badge. Double-click marker or click list pre-fills callsign.
 - **bpq-aprs.html — Full WX detail panel** — All APRS WX fields in imperial (°F, mph, inHg, inches). Wind direction as compass bearing. Both popup and detail panel updated.
 - **bpq-aprs.html — Station Browser modal** — Categorized by Mobile/WX/Digi/iGate/Fixed/Object. Sorted by distance. Expandable rows with full details. Show on map / Message / aprs.fi links.
-- **bpq-aprs.html — Distance from K1AJD** — Haversine distance + compass bearing for all WX stations in popup, detail panel, browser summary and browser detail.
+- **bpq-aprs.html — Distance from YOURCALL** — Haversine distance + compass bearing for all WX stations in popup, detail panel, browser summary and browser detail.
 - **bpq-aprs.html — PHG/RNG circles** — ⭕ PHG toggle button. Parses PHGpppp and RNGnnnn from comments. Color-coded by station type. Excludes mobiles.
 - **install-check.php — Post-installation troubleshooter** — 16 check categories: PHP, Nginx, HTML files, PHP files, Scripts, Data files, Directories, Config, Service files, Cron jobs, Log files, LinBPQ, Database, Network, Security. Password protected. Daemon heartbeat checks, cron race condition detection, malicious cron detection.
 
@@ -285,10 +285,10 @@ All notable changes to BPQ Dashboard will be documented in this file.
 - **bbs-messages.html — Sort by column** — All 5 column headers clickable (#, Date, From, To, Subject). Toggle asc/desc with arrow indicators. Default Date ↓.
 - **bbs-messages.html — Rule-matched highlighting** — Green border/background/text on rule-matched messages. ⚙ RuleName badge. Highlight cleared when message opened.
 - **bbs-messages.html — Search feature** — Live search across Subject/From/To/Body/#/Date. Yellow match highlighting. N found counter. ✕ and Escape to clear.
-- **bpq-aprs.html — New APRS dashboard page** — Leaflet map centered on Hephzibah GA with 150km radius. Station list, APRS messages panel, station detail overlay. Auto-refresh every 2 minutes.
+- **bpq-aprs.html — New APRS dashboard page** — Leaflet map centered on Your City GA with 150km radius. Station list, APRS messages panel, station detail overlay. Auto-refresh every 2 minutes.
 - **bpq-aprs.php — APRS-IS backend** — Connects directly to noam.aprs2.net:14580, parses all packet types, caches stations. No BPQ32 APRSDIGI required.
 - **APRS symbol sprites** — Two local PNG sprite sheets from hessu/aprs-symbols. Primary and alternate symbol tables. 24x24px symbols.
-- **tprfn.conf — Extended timeouts** — bpq-aprs.php (60s) and bpq-chat.php (90s) location blocks added.
+- **bpqdash.conf — Extended timeouts** — bpq-aprs.php (60s) and bpq-chat.php (90s) location blocks added.
 
 ---
 
@@ -328,7 +328,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Added
 
-- **bpq-chat.html — Auth system** — Auth modal on page load. Three levels: guest (read-only), user (own BPQ credentials), sysop (config.php). Guest mode shows orange banner, disables all send controls. Guest request modal opens mailto: pre-filled to tony@k1ajd.net with callsign/name/note.
+- **bpq-chat.html — Auth system** — Auth modal on page load. Three levels: guest (read-only), user (own BPQ credentials), sysop (config.php). Guest mode shows orange banner, disables all send controls. Guest request modal opens mailto: pre-filled to sysop@example.com with callsign/name/note.
 - **bpq-chat.php — Per-user credentials** — Non-sysop users can connect with their own BPQ callsign/password, appearing on network as themselves.
 
 ### Fixed
@@ -378,7 +378,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **visitor-log.php — tprfn-network-map logging** — Visits to tprfn.k1ajd.net were not being recorded. Fixed by adding 'tprfn-index-log.php' and 'tprfn-network-map' to the allowed pages list, and adding page name resolver (tprfn-index-log.php → tprfn-network-map). Root cause was the @ error suppressor hiding the write result during debugging — logging was actually working after the allowed list fix was applied.
+- **visitor-log.php — bpqdash-network-map logging** — Visits to your-domain.com were not being recorded. Fixed by adding 'bpqdash-index-log.php' and 'bpqdash-network-map' to the allowed pages list, and adding page name resolver (bpqdash-index-log.php → bpqdash-network-map). Root cause was the @ error suppressor hiding the write result during debugging — logging was actually working after the allowed list fix was applied.
 
 ---
 
@@ -386,7 +386,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **callsign-lookup.php — QRZ.com primary lookup** — Archived version was outdated (callook.info + HamDB). Live version on ARSSYSTEM uses QRZ.com as primary with callook.info fallback. Updated both archives with live 876-line version. Lookup confirmed working — browser cache was causing apparent failures. Hard refresh resolved all callsigns except N4DGE (not in QRZ database).
+- **callsign-lookup.php — QRZ.com primary lookup** — Archived version was outdated (callook.info + HamDB). Live version on BPQSERVER uses QRZ.com as primary with callook.info fallback. Updated both archives with live 876-line version. Lookup confirmed working — browser cache was causing apparent failures. Hard refresh resolved all callsigns except N4DGE (not in QRZ database).
 
 ---
 
@@ -402,7 +402,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **Visitor tracking restored** — nginx dual-domain reconfiguration broke visitor logging on both domains. Created `tprfn-index-log.php` wrapper to log TPRFN Network Map visits (index.php is pure HTML, cannot include PHP directly). Restored nginx rewrite rules on `bpq.k1ajd.net` to route through `tprfn-rf-log.php`. Both `tprfn.k1ajd.net` and `bpq.k1ajd.net` visits now tracked in visitor-log.php.
+- **Visitor tracking restored** — nginx dual-domain reconfiguration broke visitor logging on both domains. Created `bpqdash-index-log.php` wrapper to log BPQ Network Map visits (index.php is pure HTML, cannot include PHP directly). Restored nginx rewrite rules on `your-domain.com` to route through `bpqdash-rf-log.php`. Both `your-domain.com` and `your-domain.com` visits now tracked in visitor-log.php.
 
 ---
 
@@ -415,7 +415,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 - **bbs-messages.html — Folder list clipping** — With 18 folders the sidebar and save picker overflowed. Added `overflow-y:auto` scroll to `#folderList` and `max-height:280px` to save picker.
 - **bbs-messages.html — Wrong localStorage key in deleteFolder** — `persist('bbs_saved', ...)` corrected to `persist('bbs_saved_messages', ...)` in three places.
 - **bbs-messages.html — Save picker not updating on folder create** — `createFolder()` now calls `renderSaveFolderList()` to keep save picker in sync.
-- **network-api.php — rename() warnings** — `cache/` directory was missing. Fix: `sudo mkdir -p /var/www/tprfn/cache && sudo chown -R www-data:www-data /var/www/tprfn/cache`.
+- **network-api.php — rename() warnings** — `cache/` directory was missing. Fix: `sudo mkdir -p /var/www/bpqdash/cache && sudo chown -R www-data:www-data /var/www/bpqdash/cache`.
 
 ### Added
 
@@ -428,7 +428,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Added
 
-- **tprfn.conf — Dual domain nginx config** — Complete nginx config serving both tprfn.k1ajd.net (TPRFN Network Map) and bpq.k1ajd.net (BPQ Dashboard) from /var/www/tprfn/. bpq.k1ajd.net root serves bpq-rf-connections.html. All BPQ Dashboard URLs on tprfn.k1ajd.net redirect 301 to bpq.k1ajd.net. All original security rules (bot blocking, rate limiting, headers, directory protection) preserved and applied to both domains. Port 514 syslog unaffected.
+- **bpqdash.conf — Dual domain nginx config** — Complete nginx config serving both your-domain.com (BPQ Network Map) and your-domain.com (BPQ Dashboard) from /var/www/bpqdash/. your-domain.com root serves bpq-rf-connections.html. All BPQ Dashboard URLs on your-domain.com redirect 301 to your-domain.com. All original security rules (bot blocking, rate limiting, headers, directory protection) preserved and applied to both domains. Port 514 syslog unaffected.
 
 ---
 
@@ -496,7 +496,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **connect-watchdog.py — set_enabled using connect_call instead of partner_key** — Watchdog correctly detected 3 failures for N4VAD at 23:40 UTC but failed to write `Enabled=0` because `set_enabled()` searched linmail.cfg for `N4VAD-7 :` (the connect_call with SSID) instead of `N4VAD :` (the actual block name). All five `set_enabled()` call sites updated to use partner_key (`partner_key`, `call`, or `pk`) instead of `connect_call`.
+- **connect-watchdog.py — set_enabled using connect_call instead of partner_key** — Watchdog correctly detected 3 failures for PARTNER3 at 23:40 UTC but failed to write `Enabled=0` because `set_enabled()` searched linmail.cfg for `PARTNER3-7 :` (the connect_call with SSID) instead of `PARTNER3 :` (the actual block name). All five `set_enabled()` call sites updated to use partner_key (`partner_key`, `call`, or `pk`) instead of `connect_call`.
 
 ---
 
@@ -506,7 +506,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 - **bpq-rf-connections.html — WL2K sessions completely invisible** — WL2K stations (direct Winlink HF users e.g. WB2HJQ, W4BLW) connect to RMS port 10 and are logged only in `CMSAccess_YYYYMMDD.log`. The VARA log never emits a `connected VARA HF` line for them — only `Average S/N` and `Disconnected`. Without a connected line `curr` was never created so sessions were silently dropped.
 
-  Fix: CMSAccess parser now builds a `wl2kSessions{}` dict with callsign, time, and seconds. The `Average S/N` handler checks `wl2kSessions` within ±5 minutes when `curr` is null, creates a synthetic `curr` with `band: 'WL2K'` and inferred frequency from `findNearestFrequency()`. WL2K sessions now appear in the connections table with correct callsign, time, S/N, bytes transferred and inferred frequency (marked `~`). Own outbound CMS connections (K1AJD-7) correctly excluded.
+  Fix: CMSAccess parser now builds a `wl2kSessions{}` dict with callsign, time, and seconds. The `Average S/N` handler checks `wl2kSessions` within ±5 minutes when `curr` is null, creates a synthetic `curr` with `band: 'WL2K'` and inferred frequency from `findNearestFrequency()`. WL2K sessions now appear in the connections table with correct callsign, time, S/N, bytes transferred and inferred frequency (marked `~`). Own outbound CMS connections (YOURCALL-7) correctly excluded.
 
 ---
 
@@ -514,7 +514,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Fixed
 
-- **bpq-rf-connections.html + hub-ops.html — VARA log dual date format** — k1ajd.vara contains two date formats: old LinBPQ `YYMMDD HH:MM:SS` and new `Mon DD HH:MM:SS`. Both parsers were silently skipping half the log. Added dual-format detection to `varaLogs.forEach()` and `bbsLogs.forEach()` in both files. YYMMDD format converted to Mon DD internally for compatibility.
+- **bpq-rf-connections.html + hub-ops.html — VARA log dual date format** — yourcall.vara contains two date formats: old LinBPQ `YYMMDD HH:MM:SS` and new `Mon DD HH:MM:SS`. Both parsers were silently skipping half the log. Added dual-format detection to `varaLogs.forEach()` and `bbsLogs.forEach()` in both files. YYMMDD format converted to Mon DD internally for compatibility.
 
 - **bpq-rf-connections.html — WL2K frequency resolution** — `allFreqByDate` was declared with `let` inside `findNearestFrequency`'s scope, shadowing the outer variable populated during BBS log parsing. WL2K sessions now correctly resolve to inferred frequency and band within ±15 minutes of known RF activity.
 
@@ -547,7 +547,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 - **partners-api.php** — PHP backend for Partners Editor. Actions: load (GET), save (POST with validation), validate. Creates timestamped backup on every save. BBS password auth.
 
-- **tprfn-hub-report.php** — Live HTML hub health report with PDF print support. Queries MariaDB `tprfn` database directly. 10 sections: network overview, hub performance table, today's activity, hubs requiring attention, hub-to-hub link quality, top polling stations, 14-day trend, VARA speed distribution, prop scheduler decision history, schedule change impact (pre/post 7-day correlation). Uses `tprfn_app` credentials. Print/Save PDF via browser native print dialog with full `@media print` stylesheet.
+- **bpqdash-hub-report.php** — Live HTML hub health report with PDF print support. Queries MariaDB `bpqdash` database directly. 10 sections: network overview, hub performance table, today's activity, hubs requiring attention, hub-to-hub link quality, top polling stations, 14-day trend, VARA speed distribution, prop scheduler decision history, schedule change impact (pre/post 7-day correlation). Uses `bpqdash_user` credentials. Print/Save PDF via browser native print dialog with full `@media print` stylesheet.
 
 - **prop_decisions table** (`data/prop-decisions-schema.sql`) — MariaDB table tracking every prop-scheduler.py decision run. 14 columns including run_at, mode (dry/apply), SFI, Kp, season, partner, changed flag, old/new ConnectScript, historical band stats summary, and time block assignments as JSON. One row per partner per run, both changed and unchanged partners recorded. Enables correlation analysis between scheduling decisions and session success rates.
 
@@ -561,7 +561,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 - **bpq-maintenance.html** — Removed `document.execCommand('copy')` which triggered Google Safe Browsing false positive virus warning. Replaced with safer clipboard fallback using `setSelectionRange()`. All admin/maintenance pages should be restricted to LAN only via nginx (see `nginx-maintenance-block.conf`).
 
-- **wp_manager.py blacklist** — Fixed relative path issue causing blacklist file to resolve to different locations depending on run directory. All file paths (`BLACKLIST_FILE`, `WHITELIST_FILE`, `REVIEW_FILE`, `BASELINE_FILE`, `LOG_FILE`) now use `os.path.join(os.path.dirname(os.path.abspath(__file__)), ...)` for consistent resolution regardless of working directory. Merged duplicate `/root/wp_blacklist.txt` into `/var/www/tprfn/scripts/wp_blacklist.txt`.
+- **wp_manager.py blacklist** — Fixed relative path issue causing blacklist file to resolve to different locations depending on run directory. All file paths (`BLACKLIST_FILE`, `WHITELIST_FILE`, `REVIEW_FILE`, `BASELINE_FILE`, `LOG_FILE`) now use `os.path.join(os.path.dirname(os.path.abspath(__file__)), ...)` for consistent resolution regardless of working directory. Merged duplicate `/root/wp_blacklist.txt` into `/var/www/bpqdash/scripts/wp_blacklist.txt`.
 
 - **storm-monitor.py** — `state['suspended_partners']` list added to storm-state.json so suspended partners are correctly unsuspended on restore (previously only 80m-switched scripts were restored, suspended partners stayed disabled).
 
@@ -628,7 +628,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - Collapsible panel below the Forwarding Partners card showing actual FBB protocol message transfers
   - Parses all FBB proposal variants: `FA` (accept), `FB` (basic), `FC` (compressed/LZH), `FF` (forced)
   - FC compressed format uses different field order — parser handles both FA and FC layouts
-  - Hierarchical BBS addressing supported in To/Category fields: dotted paths (`KD8NOA.MI.USA.NOAM`), hash separators (`K1AJD#AUG.GA.USA.NOAM`), and @ routing (`KM2E@WA2UET.#ENY.NY.USA.NOAM`)
+  - Hierarchical BBS addressing supported in To/Category fields: dotted paths (`KD8NOA.MI.USA.NOAM`), hash separators (`YOURCALL#AUG.GA.USA.NOAM`), and @ routing (`KM2E@WA2UET.#ENY.NY.USA.NOAM`)
   - Summary cards: received count, forwarded count, bulletin/personal/traffic breakdown, total transfer size
   - Filterable by forwarding partner and message type (Bulletin, Personal, Traffic)
   - **Time range aware** — respects Today/7 Day/30 Day selection; badge, summary cards, partner dropdown, and table all update when range changes
@@ -648,9 +648,9 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - Hardening checklists for LAN-only and internet-facing deployments
   - Cross-referenced with existing `PUBLIC-DEPLOYMENT.md` and `CODE-REVIEW.md`
 
-- **Nginx Security Hardening** (`nginx-tprfn.conf`)
-  - Complete server block replacement for `tprfn.k1ajd.net` with access controls
-  - Blocks direct access to config files (config.php, bbs-config.php, tprfn-config.php) — previously exposed BBS credentials and API keys to the public
+- **Nginx Security Hardening** (`nginx-bpqdash.conf`)
+  - Complete server block replacement for `your-domain.com` with access controls
+  - Blocks direct access to config files (config.php, bbs-config.php, bpqdash-config.php) — previously exposed BBS credentials and API keys to the public
   - Blocks protected directories: `includes/`, `scripts/`, `data/`, `cache/`, `archives/`
   - Blocks documentation files (.md), backup files (.bak, .old, .example), and hidden files (.git, .env)
   - Blocks PHP execution in `logs/` directory — prevents uploaded malicious scripts from running
@@ -663,7 +663,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 ### Changed
 
 - **Message Counting Algorithm** (RF Connections)
-  - Threshold raised from 175 bytes (per-direction) to 446 bytes (total TX+RX), aligned with TPRFN Network Map CMS ground truth
+  - Threshold raised from 175 bytes (per-direction) to 446 bytes (total TX+RX), aligned with BPQ Network Map CMS ground truth
   - Sessions below 446 total bytes are FBB handshakes/negotiations, not actual messages
   - Direction now determined by which is larger: TX > RX = sent, otherwise received
   - Applied consistently across all 8 counting locations: parseConnections (×2), filterAndProcess (×2), propagation report per-station/per-band/per-day/global
@@ -699,9 +699,9 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ### Added
 
-- **Best Paths Visualization** (`bpq-rf-connections.html`) — Quality-scored station-to-home links on Station Map, adapted from TPRFN Network Map. Toggle button in map header. Scoring: S/N (40%), VARA throughput (35%), reliability (25%). Color-coded lines (red→green) with thickness proportional to score. Animated particles on top 5 paths. Click paths for popup with score, S/N, sessions, avg/peak speed, primary band. Time-range aware — updates with Today/7 Day/30 Day selection. Dark mode supported.
+- **Best Paths Visualization** (`bpq-rf-connections.html`) — Quality-scored station-to-home links on Station Map, adapted from BPQ Network Map. Toggle button in map header. Scoring: S/N (40%), VARA throughput (35%), reliability (25%). Color-coded lines (red→green) with thickness proportional to score. Animated particles on top 5 paths. Click paths for popup with score, S/N, sessions, avg/peak speed, primary band. Time-range aware — updates with Today/7 Day/30 Day selection. Dark mode supported.
 
-- **Propagation-Based Forwarding Scheduler** (`scripts/prop-scheduler.py`) — Automatically adjusts HF forwarding ConnectScript schedules in linmail.cfg based on NOAA solar flux, Kp index, seasonal NVIS models, and historical BBS connection data. Combines propagation model (25% weight) with historical per-band success rates (75%). Generates optimized time blocks with fallback bands per partner. Supports `fixed_schedule` flag for stations with published scanning schedules (e.g., K7EK). Uses stop → write → start sequence to avoid BPQ config-on-shutdown overwrite. Sends report as BBS personal message. Runs via cron every 48 hours.
+- **Propagation-Based Forwarding Scheduler** (`scripts/prop-scheduler.py`) — Automatically adjusts HF forwarding ConnectScript schedules in linmail.cfg based on NOAA solar flux, Kp index, seasonal NVIS models, and historical BBS connection data. Combines propagation model (25% weight) with historical per-band success rates (75%). Generates optimized time blocks with fallback bands per partner. Supports `fixed_schedule` flag for stations with published scanning schedules (e.g., PARTNER5). Uses stop → write → start sequence to avoid BPQ config-on-shutdown overwrite. Sends report as BBS personal message. Runs via cron every 48 hours.
 
 - **Geomagnetic Storm Monitor** (`scripts/storm-monitor.py`) — Lightweight hourly companion to prop-scheduler. Monitors NOAA Kp index and forces all HF forwarding to 80m-only when Kp ≥ 5 (G1+ storm). Saves current schedules before overriding. Auto-restores optimized schedules when Kp drops below 3 for 2 consecutive hours. Sends BBS alerts for both storm activation and recovery. Runs via cron every hour.
 
@@ -1121,7 +1121,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 ## [1.0.4] - 2025-01-10
 
 ### Added
-- TPRFN Hub Stations identification
+- BPQDash Hub Stations identification
 - Station location caching and manual entry
 
 ## [1.0.3] - 2025-01-05

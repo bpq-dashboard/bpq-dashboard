@@ -1238,7 +1238,7 @@
                 for (const line of logFile.lines) {
                     totalLines++;
                     
-                    // Match "Connected to CMS" lines: "00:28:09 10 K1AJD-7 Connected to CMS"
+                    // Match "Connected to CMS" lines: "00:28:09 10 YOURCALL-7 Connected to CMS"
                     const connMatch = line.match(/^\d{2}:\d{2}:\d{2}\s+\d+\s+([A-Z0-9-]+)\s+Connected to CMS/i);
                     if (connMatch) {
                         const callsign = connMatch[1].replace(/-\d+$/, '');  // Remove SSID
@@ -1607,16 +1607,16 @@
                     }
                     // Method 2: Keyword detection (works with ? and | lines)
                     else {
-                        // SPECIAL CASE: "Routing Trace To K1AJD" means RECEIVED (message coming TO us)
-                        if ((lowerLine.includes('routing trace to k1ajd') || 
-                             lowerLine.includes('trace to k1ajd') ||
-                             lowerLine.includes('routing to k1ajd'))) {
+                        // SPECIAL CASE: "Routing Trace To YOURCALL" means RECEIVED (message coming TO us)
+                        if ((lowerLine.includes('routing trace to yourcall') || 
+                             lowerLine.includes('trace to yourcall') ||
+                             lowerLine.includes('routing to yourcall'))) {
                             isReceived = true;
-                            detectionMethod = 'routing TO K1AJD (received)';
+                            detectionMethod = 'routing TO YOURCALL (received)';
                             if (stats.messagesReceived < 5) {
                             }
                         }
-                        // Forwarded keywords - look for "to" direction indicators (but NOT to K1AJD)
+                        // Forwarded keywords - look for "to" direction indicators (but NOT to YOURCALL)
                         else if (lowerLine.includes('forwarding') || 
                             lowerLine.includes('forward to') ||
                             lowerLine.includes('routing to') ||
@@ -3649,11 +3649,11 @@
         // ===================================
         
         // Sample log data (first 100 lines from recent logs)
-        const sampleLogs = `251227 00:01:43 |KK4DIV    Connecting to BBS KK4DIV
-251227 00:01:43 <KK4DIV    *** CONNECTED 
-251227 00:01:43 ?KK4DIV    Script MSGTYPES B5000 P5000 T5000
-251227 00:01:43 ?KK4DIV    Nothing to do - quitting
-251227 00:01:43 |KK4DIV    KK4DIV Disconnected
+        const sampleLogs = `251227 00:01:43 |PARTNER2    Connecting to BBS PARTNER2
+251227 00:01:43 <PARTNER2    *** CONNECTED 
+251227 00:01:43 ?PARTNER2    Script MSGTYPES B5000 P5000 T5000
+251227 00:01:43 ?PARTNER2    Nothing to do - quitting
+251227 00:01:43 |PARTNER2    PARTNER2 Disconnected
 251227 00:03:45 |KA3VSP    Connecting to BBS KA3VSP
 251227 00:03:45 <KA3VSP    *** CONNECTED 
 251227 00:03:45 ?KA3VSP    Script MSGTYPES B5000 P5000 T5000
@@ -3665,18 +3665,18 @@
 251227 00:04:23 |KE4QCM    KE4QCM Disconnected
 251227 00:10:02 |RMS       Connecting to BBS RMS
 251227 00:10:02 <RMS       *** CONNECTED 
-251227 00:10:03 <RMS       *** K1AJD-7 Connected to CMS
+251227 00:10:03 <RMS       *** YOURCALL-7 Connected to CMS
 251227 00:10:10 |RMS       RMS Disconnected
 251227 00:23:38 |N3HYM     Incoming Connect from N3HYM
 251227 00:23:42 |VE3CGR-1  Incoming Connect from VE3CGR
 251227 00:23:52 ?VE3CGR-1  Msg 7978 Routing Trace To KEPS Via AMSAT
 251227 00:24:15 |VE3CGR-1  VE3CGR Disconnected
-251227 01:15:23 |KK4DIV    Connecting to BBS KK4DIV
-251227 01:15:23 <KK4DIV    *** CONNECTED 
-251227 01:15:23 |KK4DIV    KK4DIV Disconnected
-251227 02:30:45 |N4SFL     Incoming Connect from N4SFL
-251227 02:30:45 <N4SFL     *** CONNECTED 
-251227 02:30:52 |N4SFL     N4SFL Disconnected
+251227 01:15:23 |PARTNER2    Connecting to BBS PARTNER2
+251227 01:15:23 <PARTNER2    *** CONNECTED 
+251227 01:15:23 |PARTNER2    PARTNER2 Disconnected
+251227 02:30:45 |PARTNER7     Incoming Connect from PARTNER7
+251227 02:30:45 <PARTNER7     *** CONNECTED 
+251227 02:30:52 |PARTNER7     PARTNER7 Disconnected
 251227 03:45:12 |KE0GB     Connecting to BBS KE0GB
 251227 03:45:12 <KE0GB     *** CONNECTED 
 251227 03:45:12 |KE0GB     KE0GB Disconnected

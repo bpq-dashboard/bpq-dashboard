@@ -357,11 +357,11 @@
                 </div>
             </div>
 
-            <!-- TPRFN Hub Station Forwarding Partners Card -->
+            <!-- BPQDash Hub Station Forwarding Partners Card -->
             <div class="mb-6 sm:mb-10">
                 <div class="stat-card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
-                        <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase">🌐 TPRFN Hub Station Forwarding Partners</div>
+                        <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase">🌐 BPQDash Hub Station Forwarding Partners</div>
                         <div class="flex gap-2">
                             <button onclick="showAddPartnerModal()" class="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold rounded transition-colors">+ Add</button>
                             <button onclick="showManagePartnersModal()" class="px-2 py-1 bg-gray-400 hover:bg-gray-500 text-white text-xs font-semibold rounded transition-colors">Manage</button>
@@ -427,7 +427,7 @@
                 <div class="stat-card bg-gradient-to-br from-indigo-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200">
                     <div class="flex flex-col sm:flex-row justify-between items-center gap-3">
                         <div>
-                            <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase mb-1">📊 TPRFN Hub Station Propagation Report</div>
+                            <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase mb-1">📊 BPQDash Hub Station Propagation Report</div>
                             <p class="text-xs text-gray-600">7-day connection analysis for forwarding partners</p>
                         </div>
                         <button onclick="showPropagationReport()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg">
@@ -850,7 +850,7 @@
             <div class="mt-4 space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Callsign (with SSID if applicable)</label>
-                    <input type="text" id="addPartnerCallsign" placeholder="e.g., N3MEL-2 or K7EK" class="w-full px-4 py-2 border rounded-lg uppercase" onkeyup="this.value = this.value.toUpperCase()">
+                    <input type="text" id="addPartnerCallsign" placeholder="e.g., PARTNER1-2 or PARTNER5" class="w-full px-4 py-2 border rounded-lg uppercase" onkeyup="this.value = this.value.toUpperCase()">
                     <p class="text-xs text-gray-500 mt-1">Enter the callsign exactly as it appears in your BPQ forwarding config</p>
                 </div>
                 <div id="addPartnerError" class="hidden text-red-500 text-sm"></div>
@@ -870,7 +870,7 @@
                 <button onclick="closeManagePartnersModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             <div class="mt-4">
-                <p class="text-sm text-gray-600 mb-3" id="partnerStorageStatus">These are the TPRFN hub stations you connect to for message forwarding.</p>
+                <p class="text-sm text-gray-600 mb-3" id="partnerStorageStatus">These are the BPQDash hub stations you connect to for message forwarding.</p>
                 <div class="overflow-auto max-h-72 custom-scrollbar">
                     <div id="partnersListContainer" class="space-y-2"></div>
                 </div>
@@ -889,7 +889,7 @@
                 <div class="flex items-center gap-3">
                     <span class="text-3xl">📊</span>
                     <div>
-                        <h3 class="text-xl font-bold gradient-text">TPRFN Hub Station Propagation Report</h3>
+                        <h3 class="text-xl font-bold gradient-text">BPQDash Hub Station Propagation Report</h3>
                         <p class="text-sm text-gray-500" id="reportDateRange">7-Day Connection Analysis</p>
                     </div>
                 </div>
@@ -911,14 +911,14 @@
     </div>
     <script>
         // Configuration
-        const VARA_LOG_FILE = 'k1ajd.vara';
+        const VARA_LOG_FILE = 'yourcall.vara';
         const BBS_LOG_BASE_URL = './logs/';
         const VARA_LOG_BASE_URL = './logs/';
         const CMS_LOG_BASE_URL = './logs/';
         const BBS_DAYS_TO_LOAD = 30; // Load 30 days of BBS logs for time range filtering
-        const HOME_STATION = { callsign: 'K1AJD', lat: 33.4735, lon: -82.0105, grid: 'EM83pl' }; // Augusta, GA area
+        const HOME_STATION = { callsign: 'YOURCALL', lat: 33.4735, lon: -82.0105, grid: 'EM83pl' }; // Augusta, GA area
         
-        // Message detection threshold (total bytes TX+RX) — aligned with TPRFN Network Map
+        // Message detection threshold (total bytes TX+RX) — aligned with BPQ Network Map
         // CMS ground truth: real messages always have TX+RX >= 446 bytes
         // Sessions below 446 total are FBB handshakes/negotiations only
         const MSG_THRESHOLD = 446;
@@ -929,15 +929,15 @@
         
         // === OPTIMIZATION INDEXES (populated during parsing, used for O(1) lookups) ===
         // radioCommands indexed by callsign for fast frequency lookups
-        let radioCommandsByCall = {};      // { 'K7EK': [{h,m,s,freqMHz,date}, ...], ... }
+        let radioCommandsByCall = {};      // { 'PARTNER5': [{h,m,s,freqMHz,date}, ...], ... }
         // connections indexed by callsign for fast station lookups  
-        let connectionsByCallsign = {};    // { 'K7EK-1': [conn, conn, ...], ... }
+        let connectionsByCallsign = {};    // { 'PARTNER5-1': [conn, conn, ...], ... }
         // Pre-parsed UTC timestamp on each connection for fast date filtering
         // (stored as conn._ts on each connection object during parseConnections)
         
-        // TPRFN Hub stations that this station connects to regularly
+        // BPQDash Hub stations that this station connects to regularly
         // Default stations (used to initialize localStorage if empty)
-        const DEFAULT_TPRFN_HUB_STATIONS = ['WP4OH-11', 'N3MEL-2', 'NP4JN-11', 'K7EK', 'KK4DIV-1', 'N9SEO-1', 'N4SFL-1'];
+        const DEFAULT_TPRFN_HUB_STATIONS = ['WP4OH-11', 'PARTNER1-2', 'NP4JN-11', 'PARTNER5', 'PARTNER2-1', 'PARTNER6-1', 'PARTNER7-1'];
         
         // localStorage key for forwarding partners
         const FORWARDING_PARTNERS_KEY = 'bpq_forwarding_partners';
@@ -1027,7 +1027,7 @@
             populatePartnersListModal();
             // Show storage status
             const statusEl = document.getElementById('partnerStorageStatus');
-            const baseText = 'TPRFN hub stations you connect to for message forwarding.';
+            const baseText = 'BPQDash hub stations you connect to for message forwarding.';
             if (_serverStorageAvailable) {
                 statusEl.innerHTML = baseText + ' <span class="inline-flex items-center gap-1 text-green-700"><span class="inline-block w-2 h-2 rounded-full bg-green-500"></span> Saved to server</span>';
             } else {
@@ -1206,7 +1206,7 @@
             totalMsgsSent: 0, totalMsgsRecv: 0, allBitrates: []
         };
         let allStationsData = [], currentSort = { column: 'successful', ascending: false };
-        let hubLastConnect = {};  // Track last connection time for TPRFN hub stations
+        let hubLastConnect = {};  // Track last connection time for BPQDash hub stations
         let stationMap = null, stationMarkers = [], stationLocations = {};
         let lastConnectingLine = null;  // Track last "Connecting to" line for timeout detection
         
@@ -2009,7 +2009,7 @@
         
         // ====================================================================
         // Best Paths — Quality-scored station links with animated particles
-        // Adapted from TPRFN Network Map v1.0.3
+        // Adapted from BPQ Network Map v1.0.3
         // ====================================================================
         let showBestPaths = false;
         let bestPathsLines = [];
@@ -2326,8 +2326,8 @@
                             if (match) {
                                 const [, h, m, s, call] = match;
                                 const baseCall = call.replace(/-\d+$/, '');
-                                // Skip K1AJD-7 — that is our own hub connecting to CMS outbound
-                                if (baseCall === 'K1AJD') return;
+                                // Skip YOURCALL-7 — that is our own hub connecting to CMS outbound
+                                if (baseCall === 'YOURCALL') return;
                                 const key = result.dateKey + ':' + h + ':' + m + ':' + baseCall;
                                 cmsCallsigns[key] = true;
                                 if (!cmsCallsigns['call:' + baseCall]) cmsCallsigns['call:' + baseCall] = [];
@@ -2378,11 +2378,11 @@
                         '<span class="text-gray-500 font-semibold">Required file:</span> <span class="font-mono font-semibold text-purple-600">YOURCALL.vara</span><br>' +
                         '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br><br>' +
                         '<span class="text-gray-500 font-semibold">Where does this file come from?</span><br>' +
-                        'If you are part of the TPRFN network, your VARA log is available at:<br>' +
-                        '<span class="font-mono text-purple-600">https://tprfn.k1ajd.net/YOURCALL.vara</span><br><br>' +
-                        'Use the included <span class="font-mono font-semibold">fetch-vara-tprfn</span> script to download and<br>' +
+                        'If you are part of the BPQDash network, your VARA log is available at:<br>' +
+                        '<span class="font-mono text-purple-600">https://your-domain.com/YOURCALL.vara</span><br><br>' +
+                        'Use the included <span class="font-mono font-semibold">fetch-vara-bpqdash</span> script to download and<br>' +
                         'append new entries every 15 minutes. See INSTALL documentation for setup.<br><br>' +
-                        '<span class="text-gray-500 font-semibold">Not part of TPRFN?</span> The dashboard will still show BBS forwarding data<br>' +
+                        '<span class="text-gray-500 font-semibold">Not part of BPQDash?</span> The dashboard will still show BBS forwarding data<br>' +
                         'if <span class="font-mono font-semibold text-purple-600">log_' + yy + mm + dd + '_BBS.txt</span> files are available.' +
                         '</div>';
                     warningDiv.classList.remove('hidden');
@@ -2403,7 +2403,7 @@
             radioCommandsByCall = {};  // Reset index
             
             bbsLogs.forEach(line => {
-                // Match RADIO commands for outgoing frequency: "260107 00:33:22 >K7EK RADIO 3.597000"
+                // Match RADIO commands for outgoing frequency: "260107 00:33:22 >PARTNER5 RADIO 3.597000"
                 // Parse RADIO commands — handle both YYMMDD and Mon DD date formats
                 const radioMatchOld = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+>([A-Z0-9-]+)\s+RADIO\s+([\d.]+)/i);
                 const radioMatchNew = line.match(/([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+[H>-]*[A-Z0-9-]*\s+[A-Z0-9-]*\s*>?([A-Z0-9-]+)\s+RADIO\s+([\d.]+)/i);
@@ -2434,7 +2434,7 @@
                     radioCount++;
                 }
                 
-                // Match incoming connects with frequency: "260107 00:10:49 |KK4DIV-1 Incoming Connect from KK4DIV on Port 3 Freq 7104700 Mode VARA"
+                // Match incoming connects with frequency: "260107 00:10:49 |PARTNER2-1 Incoming Connect from PARTNER2 on Port 3 Freq 7104700 Mode VARA"
                 // Helper to convert Mon DD to YYMMDD key
                 function monDDtoYYMMDD(mon, day) {
                     const MONTHS = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'};
@@ -2491,7 +2491,7 @@
                 }
                 
                 // Match "Error - Port in use (Session Attached)" failures
-                // Format: "260114 06:06:48 <K7EK      AGNODE:K1AJD-4} Error - Port in use (Session Attached"
+                // Format: "260114 06:06:48 <PARTNER5      AGNODE:YOURCALL-4} Error - Port in use (Session Attached"
                 const portInUseMatch = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+<([A-Z0-9-]+)\s+.*Error\s*-\s*Port\s+in\s+use/i);
                 if (portInUseMatch) {
                     const [, date, h, m, s, call] = portInUseMatch;
@@ -2508,8 +2508,8 @@
                 }
                 
                 // Match "} Failure with" patterns (VARA or AGNODE connection failures)
-                // Format: "260114 00:12:35 <LU4ECL    AGNODE:K1AJD-4} Failure with LU4ECL-4"
-                // Format: "260114 20:34:45 <N4SFL     VARA} Failure with K1AJD-7 N4SFL-D-7"
+                // Format: "260114 00:12:35 <LU4ECL    AGNODE:YOURCALL-4} Failure with LU4ECL-4"
+                // Format: "260114 20:34:45 <PARTNER7     VARA} Failure with YOURCALL-7 PARTNER7-D-7"
                 const varaFailureMatch = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+<([A-Z0-9-]+)\s+.*}\s*Failure\s+with/i);
                 if (varaFailureMatch) {
                     const [, date, h, m, s, call] = varaFailureMatch;
@@ -2811,7 +2811,7 @@
 
             varaLogs.forEach(line => {
                 // Handle both VARA log date formats:
-                //   New format: "Mar 25 17:44:39 H-K1AJD-7 VARAHF ..."  (Mon DD HH:MM:SS)
+                //   New format: "Mar 25 17:44:39 H-YOURCALL-7 VARAHF ..."  (Mon DD HH:MM:SS)
                 //   Old format: "251226 00:06:02 <NP4JN ..."              (YYMMDD HH:MM:SS)
                 let mon, day, h, m, s, dateStr, ts;
 
@@ -3008,7 +3008,7 @@
                     if (!connectionsByCallsign[conn.callsign]) connectionsByCallsign[conn.callsign] = [];
                     connectionsByCallsign[conn.callsign].push(conn);
                     
-                    // Track TPRFN hub station connections
+                    // Track BPQDash hub station connections
                     if (isSuccess && forwardingPartners.includes(curr.callsign)) {
                         // Use pre-computed _ts timestamp instead of re-parsing date
                         const connTimestamp = new Date(conn._ts);
@@ -5060,7 +5060,7 @@
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>TPRFN Hub Station HF Efficiency Report</title>
+                    <title>BPQDash Hub Station HF Efficiency Report</title>
                     <style>
                         body { font-family: Arial, sans-serif; margin: 20px; color: #333; font-size: 11px; }
                         h1 { color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; font-size: 18px; }
@@ -5340,7 +5340,7 @@
             // BUILD HTML REPORT
             let html = `
                 <h1 style="font-size: 1.5rem; font-weight: bold; color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 20px;">
-                    📊 TPRFN Hub Station HF Efficiency Report
+                    📊 BPQDash Hub Station HF Efficiency Report
                 </h1>
                 <p style="color: #666; margin-bottom: 5px;">
                     <strong>Data Period:</strong> ${dateRangeStr} (7 days) | 
@@ -5594,7 +5594,7 @@
             html += `
                 <h2 style="font-size: 1.25rem; font-weight: bold; color: #764ba2; margin-top: 25px; margin-bottom: 5px;">📅 Daily Performance</h2>
                 <p style="font-size: 0.8rem; color: #888; margin-bottom: 10px; line-height: 1.5;">
-                    Day-by-day breakdown of forwarding partner connections. Msgs = messages detected (TX+RX &gt;= ${MSG_THRESHOLD} total bytes, aligned with TPRFN Network Map threshold).
+                    Day-by-day breakdown of forwarding partner connections. Msgs = messages detected (TX+RX &gt;= ${MSG_THRESHOLD} total bytes, aligned with BPQ Network Map threshold).
                 </p>
                 <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 0.8rem;">

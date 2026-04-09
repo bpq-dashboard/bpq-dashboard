@@ -43,11 +43,11 @@ This guide walks you through installing BPQ Dashboard on a Linux computer (Raspb
 
 | Item | Where to find it | Example |
 |------|-----------------|---------|
-| Your callsign | Your FCC/Ofcom licence | `K1AJD` |
+| Your callsign | Your FCC/Ofcom licence | `YOURCALL` |
 | Grid square | qrz.com or online calculator | `EM73kj` |
 | Latitude / Longitude | Google Maps — right-click your location | `33.4735, -82.0105` |
 | LinBPQ telnet port | LinBPQ config → TELNET section | `8010` |
-| BBS sysop username | LinBPQ config | `K1AJD` |
+| BBS sysop username | LinBPQ config | `YOURCALL` |
 | BBS password | LinBPQ config | `mypassword` |
 | LinBPQ log directory | Where LinBPQ writes `log_*_BBS.txt` | `/home/tony/linbpq/` |
 | LinBPQ config file | Path to `linmail.cfg` | `/home/tony/linbpq/linmail.cfg` |
@@ -84,7 +84,7 @@ hostname -I
 
 Open a browser and go to `http://YOUR_IP/` — you should see the Apache default page.
 
-> **Using nginx instead?** See the included `nginx-tprfn.conf` for a working nginx virtual host configuration. The dashboard works identically under nginx.
+> **Using nginx instead?** See the included `nginx-bpqdash.conf` for a working nginx virtual host configuration. The dashboard works identically under nginx.
 
 ---
 
@@ -149,7 +149,7 @@ sudo nano /var/www/html/bpq/config.php
 ```php
 // ── Your station ──────────────────────────────────────────────
 'station' => [
-    'callsign'  => 'K1AJD',          // ← Your callsign
+    'callsign'  => 'YOURCALL',          // ← Your callsign
     'latitude'  => 33.4735,           // ← Your latitude
     'longitude' => -82.0105,          // ← Your longitude
     'grid'      => 'EM73kj',          // ← Your 6-char grid square
@@ -159,7 +159,7 @@ sudo nano /var/www/html/bpq/config.php
 'bbs' => [
     'host'    => 'localhost',
     'port'    => 8010,                // ← Your LinBPQ telnet port
-    'user'    => 'K1AJD',            // ← Your BBS sysop username
+    'user'    => 'YOURCALL',            // ← Your BBS sysop username
     'pass'    => 'CHANGEME',          // ← ⚠️ Your BBS password
     'alias'   => 'bbs',
     'timeout' => 30,
@@ -227,7 +227,7 @@ sudo ln -sf /home/tony/linbpq/log_*_TCP.txt .
 
 # VARA session log (required for RF Connections frequency data)
 # The filename matches your callsign — adjust accordingly
-sudo ln -sf /home/tony/linbpq/k1ajd.vara .
+sudo ln -sf /home/tony/linbpq/yourcall.vara .
 
 # CMS Access log (required for Winlink/WL2K session display)
 sudo ln -sf /home/tony/linbpq/CMSAccess_*.log .
@@ -269,7 +269,7 @@ Edit the variables at the top:
 REMOTE_USER="tony"                      # Windows username
 REMOTE_HOST="192.168.1.100"            # Windows machine IP
 REMOTE_PATH="/c/Users/tony/AppData/Roaming/VARA HF/VARAHF.txt"
-LOCAL_PATH="/var/www/html/bpq/logs/k1ajd.vara"
+LOCAL_PATH="/var/www/html/bpq/logs/yourcall.vara"
 ```
 
 ### Schedule with cron (every 5 minutes)
@@ -336,16 +336,16 @@ sudo nano /var/www/html/bpq/data/partners.json
 ```json
 [
   {
-    "call": "N4VAD",
-    "connect_call": "N4VAD-7",
+    "call": "PARTNER3",
+    "connect_call": "PARTNER3-7",
     "distance_mi": 87,
     "active": true,
     "suspend_kp": 7.0,
     "attach_port": 3
   },
   {
-    "call": "N3MEL",
-    "connect_call": "N3MEL-2",
+    "call": "PARTNER1",
+    "connect_call": "PARTNER1-2",
     "distance_mi": 571,
     "active": true,
     "suspend_kp": 6.0,
@@ -356,7 +356,7 @@ sudo nano /var/www/html/bpq/data/partners.json
 
 **Fields:**
 - `call` — Partner's base callsign (must match the block name in `linmail.cfg`)
-- `connect_call` — The SSID used in the ConnectScript (e.g. `N4VAD-7`)
+- `connect_call` — The SSID used in the ConnectScript (e.g. `PARTNER3-7`)
 - `distance_mi` — Distance from your station in miles (used by storm-monitor for tiered suspension)
 - `active` — Set `false` to skip this partner in all scripts
 - `suspend_kp` — Kp threshold above which storm-monitor suspends this partner
@@ -414,9 +414,9 @@ BBS_CONFIG = {
     'enabled':   True,
     'host':      'localhost',
     'port':      8010,
-    'user':      'K1AJD',       # ← Your callsign
+    'user':      'YOURCALL',       # ← Your callsign
     'password':  'mypassword',  # ← Your BBS password
-    'notify_to': 'K1AJD',       # ← Who to send notifications to
+    'notify_to': 'YOURCALL',       # ← Who to send notifications to
 }
 ```
 
@@ -424,13 +424,13 @@ And update the `PARTNERS` dict to match your `partners.json`:
 
 ```python
 PARTNERS = {
-    'N4VAD':  {'connect_call': 'N4VAD-7',  'attach_port': 3},
-    'N3MEL':  {'connect_call': 'N3MEL-2',  'attach_port': 3},
+    'PARTNER3':  {'connect_call': 'PARTNER3-7',  'attach_port': 3},
+    'PARTNER1':  {'connect_call': 'PARTNER1-2',  'attach_port': 3},
     # Add all your partners here
 }
 ```
 
-> **Important:** The key in `PARTNERS` (e.g. `'N4VAD'`) must exactly match the block name in `linmail.cfg`. The `connect_call` value is only used for log scanning — `linmail.cfg` block matching always uses the bare callsign key.
+> **Important:** The key in `PARTNERS` (e.g. `'PARTNER3'`) must exactly match the block name in `linmail.cfg`. The `connect_call` value is only used for log scanning — `linmail.cfg` block matching always uses the bare callsign key.
 
 ### Test
 
@@ -439,10 +439,10 @@ PARTNERS = {
 python3 /var/www/html/bpq/scripts/connect-watchdog.py --status
 
 # Manual pause (for testing)
-sudo python3 /var/www/html/bpq/scripts/connect-watchdog.py --pause N4VAD
+sudo python3 /var/www/html/bpq/scripts/connect-watchdog.py --pause PARTNER3
 
 # Manual resume
-sudo python3 /var/www/html/bpq/scripts/connect-watchdog.py --resume N4VAD
+sudo python3 /var/www/html/bpq/scripts/connect-watchdog.py --resume PARTNER3
 
 # Run once manually
 sudo python3 /var/www/html/bpq/scripts/connect-watchdog.py
@@ -498,7 +498,7 @@ CONFIG = {
     'backup_dir':    '/var/www/html/bpq/data/backups',
     'bbs_host':      'localhost',
     'bbs_port':      8010,
-    'bbs_user':      'K1AJD',
+    'bbs_user':      'YOURCALL',
     'bbs_pass':      'mypassword',
     'bpq_stop_cmd':  'systemctl stop bpq',
     'bpq_start_cmd': 'systemctl start bpq',
@@ -753,10 +753,10 @@ sudo chmod -R 755 /var/www/html/bpq/data
 
 ### VARA log not loading (RF Connections shows no frequency data)
 
-The RF Connections page reads `k1ajd.vara` (your callsign + `.vara`) from the `logs/` directory. The VARA log contains two date formats depending on LinBPQ version — both are handled automatically:
+The RF Connections page reads `yourcall.vara` (your callsign + `.vara`) from the `logs/` directory. The VARA log contains two date formats depending on LinBPQ version — both are handled automatically:
 
 - Old format: `251226 00:06:02 <NP4JN VARA} Failure...`
-- New format: `Mar 25 17:44:39 H-K1AJD-7 VARAHF WB2HJQ Average S/N...`
+- New format: `Mar 25 17:44:39 H-YOURCALL-7 VARAHF WB2HJQ Average S/N...`
 
 Check the symlink exists:
 ```bash
@@ -819,4 +819,4 @@ sudo systemctl restart apache2
 
 ---
 
-*BPQ Dashboard v1.5.3 — K1AJD | TPRFN Network | [https://www.tprfn.net](https://www.tprfn.net)*
+*BPQ Dashboard v1.5.3 — YOURCALL | BPQ Network | [https://www.bpqdash.net](https://www.bpqdash.net)*

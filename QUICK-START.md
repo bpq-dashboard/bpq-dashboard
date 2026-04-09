@@ -79,7 +79,7 @@ Schedule to run every 5 minutes.
 
 > **Note:** Each dashboard requires specific files:
 > - System Logs: `log_YYMMDD_BBS.txt` (daily)
-> - RF Connections: `*.vara` (VARA log from TPRFN)
+> - RF Connections: `*.vara` (VARA log from BPQDash)
 > - Message Monitor: `log_YYMMDD_TCP.txt` (daily)
 > - Traffic: `Traffic_YYMMDD.txt` (weekly)
 > - System Logs MHeard: `MHSave.txt`

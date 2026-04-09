@@ -19,12 +19,12 @@ from datetime import datetime
 # ── Config ─────────────────────────────────────────────────────────
 APRS_HOST    = 'rotate.aprs2.net'
 APRS_PORT    = 14580
-APRS_CALL    = 'K1AJD-1'
+APRS_CALL    = 'YOURCALL-1'
 APRS_PASS    = '15769'
-APRS_FILTER  = 'r/33.4259/-82.0100/300'
+APRS_FILTER  = 'r/0.0000/-0.0000/300'
 APRS_VERSION = 'BPQ-Dashboard 1.0'   # Must be: name SPACE version
 
-CACHE_DIR    = '/var/www/tprfn/cache/aprs'
+CACHE_DIR    = '/var/www/bpqdash/cache/aprs'
 STATIONS_FILE= os.path.join(CACHE_DIR, 'stations.json')
 HISTORY_FILE = os.path.join(CACHE_DIR, 'history.json')
 MESSAGES_FILE= os.path.join(CACHE_DIR, 'messages.json')

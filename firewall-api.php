@@ -1,6 +1,6 @@
 <?php
 /**
- * firewall-api.php — Firewall status API for ARSSYSTEM
+ * firewall-api.php — Firewall status API for BPQSERVER
  * Version: 1.0.0
  *
  * Returns iptables rules parsed into structured JSON.
@@ -17,7 +17,7 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
 // ── Auth — require BBS password ───────────────────────────────────────────────
-$configFile = __DIR__ . '/tprfn-config.php';
+$configFile = __DIR__ . '/bpqdash-config.php';
 if (file_exists($configFile)) {
     $cfg = include $configFile;
     $bbsPassword = $cfg['bbs_password'] ?? $cfg['password'] ?? null;

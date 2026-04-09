@@ -1,6 +1,6 @@
 <?php
 /**
- * system-audit-api.php — System health audit API for ARSSYSTEM
+ * system-audit-api.php — System health audit API for BPQSERVER
  * Version: 1.0.0
  *
  * Runs system checks across 6 categories and returns structured JSON
@@ -20,7 +20,7 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-$configFile = __DIR__ . '/tprfn-config.php';
+$configFile = __DIR__ . '/bpqdash-config.php';
 if (file_exists($configFile)) {
     $cfg = include $configFile;
     $bbsPassword = $cfg['bbs_password'] ?? $cfg['password'] ?? null;
@@ -92,7 +92,7 @@ if (strpos($webminBind, '10.0.') !== false || strpos($webminBind, '192.168.') !=
 } elseif ($webminBind) {
     $findings[] = finding('webmin','security','warn','Webmin bind address check',
         "Webmin bind: $webminBind — verify this is LAN-only.",
-        'Set bind=10.0.0.133 in /etc/webmin/miniserv.conf and restart webmin.');
+        'Set bind=10.0.0.XXX in /etc/webmin/miniserv.conf and restart webmin.');
 } else {
     $findings[] = finding('webmin','security','warn','Webmin may be internet-exposed',
         'Could not confirm Webmin bind address. Webmin on port 10000 may be accessible from internet.',
@@ -327,7 +327,7 @@ if ($logMB > 5000) {
     $topLogs = sh('du -sh /var/log/* 2>/dev/null | sort -rh | head -5');
     $findings[] = finding('log-size','logs','warn',"/var/log is {$logMB}MB",
         "Log directory is large. Top consumers:\n$topLogs",
-        'Check for unrotated logs. Verify /etc/logrotate.d/arssystem is in place.');
+        'Check for unrotated logs. Verify /etc/logrotate.d/bpqserver is in place.');
 } else {
     $findings[] = finding('log-size','logs','ok',"/var/log is {$logMB}MB",
         'Log directory size is reasonable.');
@@ -344,15 +344,15 @@ if ((int)$authFails > 100) {
         'Auth failure count is within normal range.');
 }
 
-// Logrotate arssystem config
-$lrConfig = file_exists('/etc/logrotate.d/arssystem');
+// Logrotate bpqserver config
+$lrConfig = file_exists('/etc/logrotate.d/bpqserver');
 if ($lrConfig) {
-    $findings[] = finding('logrotate','logs','ok','ARSSYSTEM logrotate config present',
-        'Custom log rotation is configured at /etc/logrotate.d/arssystem.');
+    $findings[] = finding('logrotate','logs','ok','BPQSERVER logrotate config present',
+        'Custom log rotation is configured at /etc/logrotate.d/bpqserver.');
 } else {
-    $findings[] = finding('logrotate','logs','warn','ARSSYSTEM logrotate config missing',
-        'No custom logrotate config found. TPRFN/BPQ/VARA logs may grow unchecked.',
-        'Deploy /etc/logrotate.d/arssystem — see BPQ Dashboard maintenance reference.');
+    $findings[] = finding('logrotate','logs','warn','BPQSERVER logrotate config missing',
+        'No custom logrotate config found. BPQDash/BPQ/VARA logs may grow unchecked.',
+        'Deploy /etc/logrotate.d/bpqserver — see BPQ Dashboard maintenance reference.');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -414,22 +414,22 @@ if ($nwsMon === 'active') {
         'sudo systemctl start nws-monitor');
 }
 
-// TPRFN web root permissions
-$webRoot = '/var/www/tprfn';
+// BPQDash web root permissions
+$webRoot = '/var/www/bpqdash';
 if (is_dir($webRoot)) {
     $owner = sh("stat -c '%U' $webRoot");
     if ($owner === 'www-data') {
         $findings[] = finding('webroot-perms','application','ok','Web root owned by www-data',
-            "TPRFN web root ($webRoot) is correctly owned by www-data.");
+            "BPQDash web root ($webRoot) is correctly owned by www-data.");
     } else {
         $findings[] = finding('webroot-perms','application','warn',"Web root owned by $owner",
-            "TPRFN web root is owned by $owner instead of www-data — may cause permission errors.",
+            "BPQDash web root is owned by $owner instead of www-data — may cause permission errors.",
             "sudo chown -R www-data:www-data $webRoot");
     }
 }
 
 // SSL cert expiry
-$certExpiry = sh('echo | openssl s_client -connect tprfn.k1ajd.net:443 -servername tprfn.k1ajd.net 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2');
+$certExpiry = sh('echo | openssl s_client -connect your-domain.com:443 -servername your-domain.com 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2');
 if ($certExpiry) {
     $expiryTs = strtotime($certExpiry);
     $daysLeft = round(($expiryTs - time()) / 86400);

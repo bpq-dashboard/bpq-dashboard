@@ -4,7 +4,7 @@ bpq-chat-daemon.py — Persistent BPQ telnet connection broker
 Stays connected to BPQ chat/terminal and writes output to a shared
 message file that bpq-chat.php reads. Accepts commands via a FIFO pipe.
 
-Run as: python3 /var/www/tprfn/scripts/bpq-chat-daemon.py
+Run as: python3 /var/www/bpqdash/scripts/bpq-chat-daemon.py
 Or via systemd service.
 """
 
@@ -14,10 +14,10 @@ from pathlib import Path
 # ── Config ────────────────────────────────────────────────────────
 BPQ_HOST   = 'localhost'
 BPQ_PORT   = 8010
-BPQ_USER   = 'K1AJD'
-BPQ_PASS   = 'dawgs1958'
+BPQ_USER   = 'YOURCALL'
+BPQ_PASS   = 'YOURPASSWORD'
 
-STATE_DIR  = '/var/www/tprfn/cache/chat-sessions'
+STATE_DIR  = '/var/www/bpqdash/cache/chat-sessions'
 MSG_FILE   = STATE_DIR + '/chat-messages.json'
 CMD_FIFO   = STATE_DIR + '/chat-commands.fifo'
 STATE_FILE = STATE_DIR + '/chat-daemon.json'
@@ -37,14 +37,14 @@ seq_counter = 0
 
 # ── Noise filter ──────────────────────────────────────────────────
 NOISE = [
-    'K1AJD BPQ32 Telnet Server',
+    'YOURCALL BPQ32 Telnet Server',
     'Enter ? for list of commands',
-    'K1AJD-4} Connected to BBS',
-    'K1AJD-4} Connected to CHAT',
+    'YOURCALL-4} Connected to BBS',
+    'YOURCALL-4} Connected to CHAT',
     'Returned to Node',
-    '73 de K1AJD',
-    'de K1AJD>',
-    'de K1AJD',
+    '73 de YOURCALL',
+    'de YOURCALL>',
+    'de YOURCALL',
 ]
 
 def is_noise(line):

@@ -14,9 +14,9 @@ Logic:
   - State is persisted in a JSON file so it survives across cron runs.
 
 Cron (every 5 minutes):
-    */5 * * * * /usr/bin/python3 /var/www/tprfn/scripts/connect-watchdog.py
+    */5 * * * * /usr/bin/python3 /var/www/bpqdash/scripts/connect-watchdog.py
 
-Author: K1AJD BPQ Dashboard Project
+Author: YOURCALL BPQ Dashboard Project
 Version: 1.0.0
 """
 
@@ -44,15 +44,15 @@ CONFIG = {
     ),
     'bbs_log_dir': (
         'C:\\UniServerZ\\www\\bpq\\logs'
-        if IS_WINDOWS else '/var/www/tprfn/logs'
+        if IS_WINDOWS else '/var/www/bpqdash/logs'
     ),
     'state_file': (
         'C:\\UniServerZ\\www\\bpq\\cache\\watchdog-state.json'
-        if IS_WINDOWS else '/var/www/tprfn/cache/watchdog-state.json'
+        if IS_WINDOWS else '/var/www/bpqdash/cache/watchdog-state.json'
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\connect-watchdog.log'
-        if IS_WINDOWS else '/var/www/tprfn/logs/connect-watchdog.log'
+        if IS_WINDOWS else '/var/www/bpqdash/logs/connect-watchdog.log'
     ),
 
     # Detection settings
@@ -64,16 +64,16 @@ CONFIG = {
 }
 
 # Partners — must match prop-scheduler.py PARTNERS keys and connect_call values
-# The watchdog matches on the connect_call (e.g. N3MEL-2, KD4WLE-3) as that's
+# The watchdog matches on the connect_call (e.g. PARTNER1-2, PARTNER4-3) as that's
 # what appears in the BBS log.
 PARTNERS = {
-    'N3MEL':   {'connect_call': 'N3MEL-2',   'attach_port': 3},
-    'N4VAD':   {'connect_call': 'N4VAD-7',   'attach_port': 3},
-    'KD4WLE':  {'connect_call': 'KD4WLE-3',  'attach_port': 3},
-    'N4SFL':   {'connect_call': 'N4SFL-1',   'attach_port': 3},
-    'K7EK':    {'connect_call': 'K7EK',      'attach_port': 3},
-    'N9SEO':   {'connect_call': 'N9SEO-1',   'attach_port': 3},
-    'KK4DIV':  {'connect_call': 'KK4DIV-1',  'attach_port': 3},
+    'PARTNER1':   {'connect_call': 'PARTNER1-2',   'attach_port': 3},
+    'PARTNER3':   {'connect_call': 'PARTNER3-7',   'attach_port': 3},
+    'PARTNER4':  {'connect_call': 'PARTNER4-3',  'attach_port': 3},
+    'PARTNER7':   {'connect_call': 'PARTNER7-1',   'attach_port': 3},
+    'PARTNER5':    {'connect_call': 'PARTNER5',      'attach_port': 3},
+    'PARTNER6':   {'connect_call': 'PARTNER6-1',   'attach_port': 3},
+    'PARTNER2':  {'connect_call': 'PARTNER2-1',  'attach_port': 3},
 }
 
 # Pause mechanism — toggle Enabled = 0 / Enabled = 1 in linmail.cfg
@@ -85,10 +85,10 @@ BBS_CONFIG = {
     'enabled':   True,
     'host':      'localhost',
     'port':      8010,
-    'user':      'K1AJD',
-    'password':  'dawgs1958',
-    'alias':     'K1AJD',
-    'notify_to': 'K1AJD',
+    'user':      'YOURCALL',
+    'password':  'YOURPASSWORD',
+    'alias':     'YOURCALL',
+    'notify_to': 'YOURCALL',
 }
 
 # ============================================================================
@@ -328,9 +328,9 @@ def scan_log_for_failures(partner_call: str, connect_call: str,
         return []
 
     # Build match patterns — match both bare callsign and connect_call
-    # e.g. partner_call=N4VAD, connect_call=N4VAD-7
-    # Log shows: "|N4VAD     Connecting to BBS N4VAD"
-    # and:       "|N4VAD     N4VAD Disconnected"
+    # e.g. partner_call=PARTNER3, connect_call=PARTNER3-7
+    # Log shows: "|PARTNER3     Connecting to BBS PARTNER3"
+    # and:       "|PARTNER3     PARTNER3 Disconnected"
     base_call = partner_call.split('-')[0].upper()
     connect_base = connect_call.split('-')[0].upper()
 
@@ -683,9 +683,9 @@ if __name__ == '__main__':
     parser.add_argument('--status', action='store_true',
                         help='Show current pause state without making changes')
     parser.add_argument('--resume', type=str, metavar='CALLSIGN',
-                        help='Manually resume a paused partner (e.g. --resume N4VAD)')
+                        help='Manually resume a paused partner (e.g. --resume PARTNER3)')
     parser.add_argument('--pause', type=str, metavar='CALLSIGN',
-                        help='Manually pause a partner (e.g. --pause N4VAD)')
+                        help='Manually pause a partner (e.g. --pause PARTNER3)')
     parser.add_argument('--reset', action='store_true',
                         help='Clear all pause state and restore all scripts')
     args = parser.parse_args()
@@ -743,7 +743,7 @@ if __name__ == '__main__':
             sys.exit(1)
         state = load_state()
         cfg_content = read_linmail_cfg()
-        # Use partner_key (call) not connect_call — linmail.cfg block named 'N4VAD' not 'N4VAD-7'
+        # Use partner_key (call) not connect_call — linmail.cfg block named 'PARTNER3' not 'PARTNER3-7'
         new_cfg = set_enabled(cfg_content, call, False)
         if new_cfg:
             write_linmail_cfg(new_cfg)

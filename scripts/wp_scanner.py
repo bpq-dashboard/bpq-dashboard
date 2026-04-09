@@ -14,7 +14,7 @@ Options:
     --stale-days N  Flag entries not seen in N days (default: 730 / 2 years)
     --dry-run       Show what would be removed without writing files
 
-Author: K1AJD — generated for TPRFN / Winlink WP maintenance
+Author: YOURCALL — generated for BPQDash / Winlink WP maintenance
 """
 
 import re
@@ -259,7 +259,7 @@ def main():
 
     # ── Console summary ──
     print(f"\n{'═'*60}")
-    print(f"  WP.cfg Scanner — K1AJD")
+    print(f"  WP.cfg Scanner — YOURCALL")
     print(f"  File   : {args.wpfile}")
     print(f"  Scanned: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'═'*60}")

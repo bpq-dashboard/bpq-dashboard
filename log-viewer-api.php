@@ -1,6 +1,6 @@
 <?php
 /**
- * log-viewer-api.php — Log file reader API for ARSSYSTEM
+ * log-viewer-api.php — Log file reader API for BPQSERVER
  * Version: 1.0.0
  */
 
@@ -8,7 +8,7 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
 // Auth
-$configFile = __DIR__ . '/tprfn-config.php';
+$configFile = __DIR__ . '/bpqdash-config.php';
 if (file_exists($configFile)) {
     $cfg = include $configFile;
     $bbsPassword = $cfg['bbs_password'] ?? $cfg['password'] ?? null;
@@ -24,14 +24,14 @@ if ($bbsPassword && $providedPassword !== $bbsPassword) {
 
 // Log catalogue
 $LOGS = [
-    'prop-scheduler'   => ['path' => '/var/www/tprfn/logs/prop-scheduler.log',   'label' => 'Prop Scheduler',    'group' => 'BPQ Dashboard', 'color' => 'blue',   'desc' => 'Propagation-based forwarding schedule updates'],
-    'connect-watchdog' => ['path' => '/var/www/tprfn/logs/connect-watchdog.log', 'label' => 'Connect Watchdog',  'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Failed connect detection and pause/restore'],
+    'prop-scheduler'   => ['path' => '/var/www/bpqdash/logs/prop-scheduler.log',   'label' => 'Prop Scheduler',    'group' => 'BPQ Dashboard', 'color' => 'blue',   'desc' => 'Propagation-based forwarding schedule updates'],
+    'connect-watchdog' => ['path' => '/var/www/bpqdash/logs/connect-watchdog.log', 'label' => 'Connect Watchdog',  'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Failed connect detection and pause/restore'],
     'wp-auto-clean'    => ['path' => '/var/log/wp-auto-clean.log',               'label' => 'WP Auto Clean',     'group' => 'BPQ Dashboard', 'color' => 'green',  'desc' => 'Winlink White Pages automatic cleanup'],
-    'watchdog-state'   => ['path' => '/var/www/tprfn/cache/watchdog-state.json', 'label' => 'Watchdog State',    'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Current connect-watchdog pause state (JSON)'],
+    'watchdog-state'   => ['path' => '/var/www/bpqdash/cache/watchdog-state.json', 'label' => 'Watchdog State',    'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Current connect-watchdog pause state (JSON)'],
     'vara-validator'   => ['path' => '/var/log/vara-validator.log',              'label' => 'VARA Validator',    'group' => 'VARA',          'color' => 'purple', 'desc' => 'VARA callsign validator proxy log'],
-    'vara-sessions'    => ['path' => '/var/www/tprfn/logs/k1ajd.vara',          'label' => 'VARA Sessions',     'group' => 'VARA',          'color' => 'purple', 'desc' => 'Raw VARA HF session data'],
-    'bbs-today'        => ['path' => null, 'dir' => '/var/www/tprfn/logs',       'label' => 'BBS Log (Today)',   'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => "Today's BPQ BBS activity log", 'dynamic' => 'today'],
-    'bbs-archive'      => ['path' => null, 'dir' => '/var/www/tprfn/logs',       'label' => 'BBS Log (Archive)', 'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => 'Historical BPQ BBS logs — select a date', 'dynamic' => 'archive'],
+    'vara-sessions'    => ['path' => '/var/www/bpqdash/logs/yourcall.vara',          'label' => 'VARA Sessions',     'group' => 'VARA',          'color' => 'purple', 'desc' => 'Raw VARA HF session data'],
+    'bbs-today'        => ['path' => null, 'dir' => '/var/www/bpqdash/logs',       'label' => 'BBS Log (Today)',   'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => "Today's BPQ BBS activity log", 'dynamic' => 'today'],
+    'bbs-archive'      => ['path' => null, 'dir' => '/var/www/bpqdash/logs',       'label' => 'BBS Log (Archive)', 'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => 'Historical BPQ BBS logs — select a date', 'dynamic' => 'archive'],
     'nws-monitor'      => ['path' => '/var/log/nws-monitor.log',                 'label' => 'NWS Monitor',       'group' => 'System',        'color' => 'red',    'desc' => 'NWS weather alert monitor'],
     'nginx-error'      => ['path' => '/var/log/nginx/error.log',                 'label' => 'NGINX Errors',      'group' => 'System',        'color' => 'red',    'desc' => 'nginx web server error log'],
     'auth'             => ['path' => '/var/log/auth.log',                        'label' => 'Auth Log',          'group' => 'System',        'color' => 'amber',  'desc' => 'SSH and system authentication events'],
@@ -39,7 +39,7 @@ $LOGS = [
 
 function get_today_bbs_path(): string {
     $now = new DateTime('now', new DateTimeZone('UTC'));
-    return sprintf('/var/www/tprfn/logs/log_%s_BBS.txt', $now->format('ymd'));
+    return sprintf('/var/www/bpqdash/logs/log_%s_BBS.txt', $now->format('ymd'));
 }
 
 function list_bbs_dates(string $dir): array {
@@ -101,7 +101,7 @@ function search_log(string $path, string $q): array {
 
 function resolve_path(array $meta, string $date = ''): ?string {
     if (($meta['dynamic'] ?? '') === 'today')   return get_today_bbs_path();
-    if (($meta['dynamic'] ?? '') === 'archive') return $date ? "/var/www/tprfn/logs/log_{$date}_BBS.txt" : null;
+    if (($meta['dynamic'] ?? '') === 'archive') return $date ? "/var/www/bpqdash/logs/log_{$date}_BBS.txt" : null;
     return $meta['path'] ?? null;
 }
 
@@ -155,7 +155,7 @@ if ($action === 'search') {
 }
 
 if ($action === 'dates') {
-    echo json_encode(['dates' => list_bbs_dates('/var/www/tprfn/logs')], JSON_PRETTY_PRINT);
+    echo json_encode(['dates' => list_bbs_dates('/var/www/bpqdash/logs')], JSON_PRETTY_PRINT);
     exit;
 }
 

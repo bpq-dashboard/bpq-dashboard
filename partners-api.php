@@ -1,7 +1,7 @@
 <?php
 /**
- * partners-api.php — Read / write /var/www/tprfn/data/partners.json
- * Deploy to: /var/www/tprfn/partners-api.php
+ * partners-api.php — Read / write /var/www/bpqdash/data/partners.json
+ * Deploy to: /var/www/bpqdash/partners-api.php
  *
  * Actions:
  *   GET  ?action=load&password=...          → returns partners.json content
@@ -13,7 +13,7 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
 // ── Auth ───────────────────────────────────────────────────────────────────
-$configFile = __DIR__ . '/tprfn-config.php';
+$configFile = __DIR__ . '/bpqdash-config.php';
 $bbsPassword = null;
 if (file_exists($configFile)) {
     $cfg = include $configFile;

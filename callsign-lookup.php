@@ -11,8 +11,8 @@
  *   - Negative cache for callsigns not found (avoids repeated failed API calls)
  *   - QRZ.com session key caching to minimize login requests
  * 
- * Usage: callsign-lookup.php?call=K1AJD
- *        callsign-lookup.php?calls=K1AJD,N3MEL,KP3FT  (batch lookup)
+ * Usage: callsign-lookup.php?call=YOURCALL
+ *        callsign-lookup.php?calls=YOURCALL,PARTNER1,KP3FT  (batch lookup)
  */
 
 header('Access-Control-Allow-Origin: *');
@@ -27,8 +27,8 @@ $NEGATIVE_CACHE_EXPIRY = 86400 * 7; // 7 days for "not found" entries
 $QRZ_SESSION_FILE = __DIR__ . '/cache/qrz-session.json';
 
 // ========== QRZ.COM CONFIGURATION ==========
-// Load QRZ credentials from tprfn-config.php
-$config = file_exists(__DIR__ . '/tprfn-config.php') ? include(__DIR__ . '/tprfn-config.php') : [];
+// Load QRZ credentials from bpqdash-config.php
+$config = file_exists(__DIR__ . '/bpqdash-config.php') ? include(__DIR__ . '/bpqdash-config.php') : [];
 $QRZ_USERNAME = $config['qrz_username'] ?? '';
 $QRZ_PASSWORD = $config['qrz_password'] ?? '';
 $QRZ_API_URL = 'https://xmldata.qrz.com/xml/current/';
@@ -163,7 +163,7 @@ function getQRZSessionKey() {
     
     // Login to QRZ.com
     $loginUrl = $QRZ_API_URL . '?username=' . urlencode($QRZ_USERNAME) . '&password=' . urlencode($QRZ_PASSWORD);
-    $ctx = stream_context_create(['http' => ['timeout' => 10, 'user_agent' => 'TPRFN-Network-Map/1.0']]);
+    $ctx = stream_context_create(['http' => ['timeout' => 10, 'user_agent' => 'BPQDash-Network-Map/1.0']]);
     $response = @file_get_contents($loginUrl, false, $ctx);
     
     if (!$response) return null;
@@ -299,7 +299,7 @@ function lookupQRZ($callsign) {
     if (!$sessionKey) return null;
     
     $url = $QRZ_API_URL . '?s=' . urlencode($sessionKey) . '&callsign=' . urlencode($callsign);
-    $ctx = stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'TPRFN-Network-Map/1.0']]);
+    $ctx = stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'BPQDash-Network-Map/1.0']]);
     $response = @file_get_contents($url, false, $ctx);
     if (!$response) return null;
     
@@ -344,7 +344,7 @@ function parallelQRZ($callsigns) {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 10,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_USERAGENT => 'TPRFN-Network-Map/1.0',
+            CURLOPT_USERAGENT => 'BPQDash-Network-Map/1.0',
             CURLOPT_FOLLOWLOCATION => true,
         ]);
         curl_multi_add_handle($mh, $ch);
@@ -398,7 +398,7 @@ function parallelQRZ($callsigns) {
                         CURLOPT_RETURNTRANSFER => true,
                         CURLOPT_TIMEOUT => 10,
                         CURLOPT_CONNECTTIMEOUT => 5,
-                        CURLOPT_USERAGENT => 'TPRFN-Network-Map/1.0',
+                        CURLOPT_USERAGENT => 'BPQDash-Network-Map/1.0',
                         CURLOPT_FOLLOWLOCATION => true,
                     ]);
                     curl_multi_add_handle($mh, $ch);
@@ -452,7 +452,7 @@ function parallelCallook($callsigns) {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 5,
             CURLOPT_CONNECTTIMEOUT => 3,
-            CURLOPT_USERAGENT => 'TPRFN-Network-Map/1.0',
+            CURLOPT_USERAGENT => 'BPQDash-Network-Map/1.0',
             CURLOPT_FOLLOWLOCATION => true,
         ]);
         curl_multi_add_handle($mh, $ch);
@@ -524,7 +524,7 @@ function parseCallookResponse($callsign, $response) {
 
 // Legacy single-call functions (used by single-callsign endpoint)
 function lookupCallook($callsign) {
-    $ctx = stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'TPRFN-Network-Map/1.0']]);
+    $ctx = stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'BPQDash-Network-Map/1.0']]);
     $response = @file_get_contents("https://callook.info/{$callsign}/json", false, $ctx);
     if (!$response) return null;
     return parseCallookResponse($callsign, $response);

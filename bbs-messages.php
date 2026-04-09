@@ -449,7 +449,7 @@ function parseBulletinList($response) {
         
         // Skip prompts and headers
         if (preg_match('/^[A-Z0-9-]+:\S*>/', $line)) continue; // BBS prompt
-        if (preg_match('/de [A-Z0-9]+>/', $line)) continue; // BBS prompt like "de K1AJD>"
+        if (preg_match('/de [A-Z0-9]+>/', $line)) continue; // BBS prompt like "de YOURCALL>"
         if (preg_match('/^\s*Msg/', $line)) continue; // Header line
         if (strpos($line, '---') !== false) continue;
         if (strpos($line, 'No ') === 0) continue;
@@ -459,8 +459,8 @@ function parseBulletinList($response) {
         
         // BPQ Format: MsgNo Date Status Size TO @AREA FROM Subject
         // Example:    9216 17-Jan B$ 8571 NEWS @WW LU9DCE STORM PREDICTION CENTER 17-JAN
-        // Or:         9009 16-Jan BN 1531 WX @K1AJD N4SD Special Weather Statement
-        // Or:         761 28-Jan BN 1854 WX @K1AJD N4SD Hazardous Weather Outlook
+        // Or:         9009 16-Jan BN 1531 WX @YOURCALL N4SD Special Weather Statement
+        // Or:         761 28-Jan BN 1854 WX @YOURCALL N4SD Hazardous Weather Outlook
         
         // Match: number, date (DD-Mon), status (B$, BN, BF, BK, etc), size, to, @area, from, subject
         // Status can be: B followed by optional letter/symbol ($, N, F, K, etc)
@@ -623,9 +623,24 @@ function sendMessage($to, $type, $subject, $body) {
         fwrite($socket, $subject . "\r\n");
         logMessage("  >> $subject");
         
-        // Step 11: Wait for "Enter Message Text" prompt — CRITICAL
-        $response = readUntilBBSPrompt($socket, 10);
-        logMessage("After title: " . cleanLog($response));
+        // Step 11: Brief pause for "Enter Message Text" prompt
+        // Don't use readUntilBBSPrompt here — the prompt ends with ")" 
+        // which doesn't match the prompt regex, causing a long timeout.
+        // The BBS has a short window for body input; a long wait causes
+        // it to cancel the message. Just drain whatever the BBS sends.
+        usleep(500000);
+        stream_set_blocking($socket, false);
+        $bodyPrompt = '';
+        $promptStart = time();
+        while ((time() - $promptStart) < 2) {
+            $chunk = @fread($socket, 4096);
+            if ($chunk !== false && $chunk !== '') {
+                $bodyPrompt .= $chunk;
+            }
+            usleep(50000);
+        }
+        stream_set_blocking($socket, true);
+        logMessage("After title: " . cleanLog($bodyPrompt));
         
         // Step 12: Send message body line by line
         $lines = explode("\n", $body);

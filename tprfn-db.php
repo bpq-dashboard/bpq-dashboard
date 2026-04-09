@@ -1,22 +1,22 @@
 <?php
 /**
- * tprfn-db.php — Shared database connection helper
+ * bpqdash-db.php — Shared database connection helper
  * Version: 1.0.0
  *
- * Include this file in any TPRFN PHP script that needs database access.
+ * Include this file in any BPQDash PHP script that needs database access.
  * Usage:
- *   require_once __DIR__ . '/tprfn-db.php';
+ *   require_once __DIR__ . '/bpqdash-db.php';
  *   $pdo = tprfn_db();
- *   $rows = tprfn_query($pdo, "SELECT * FROM sessions WHERE hub = ?", ['K1AJD-7']);
+ *   $rows = tprfn_query($pdo, "SELECT * FROM sessions WHERE hub = ?", ['YOURCALL-7']);
  *
  * The connection is a singleton — multiple require_once calls share one PDO.
  */
 
 // ── Credentials ───────────────────────────────────────────────────────────────
 define('TPRFN_DB_HOST', 'localhost');
-define('TPRFN_DB_NAME', 'tprfn');
-define('TPRFN_DB_USER', 'tprfn_app');
-define('TPRFN_DB_PASS', 'TprfnDb2026!');
+define('TPRFN_DB_NAME', 'bpqdash');
+define('TPRFN_DB_USER', 'bpqdash_user');
+define('TPRFN_DB_PASS', 'YOURDBPASSWORD');
 define('TPRFN_DB_PORT', 3306);
 
 /**

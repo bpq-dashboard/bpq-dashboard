@@ -1,15 +1,15 @@
 <?php
 /**
- * TPRFN Visitor Log
+ * BPQDash Visitor Log
  *
  * Logs HTTPS visits to index.php and bpq-rf-connections.html.
  * Include at the top of index.php:
  *   require_once __DIR__ . '/visitor-log.php'; logVisit();
  *
- * For bpq-rf-connections.html, a companion PHP wrapper is used — see tprfn-rf-log.php.
+ * For bpq-rf-connections.html, a companion PHP wrapper is used — see bpqdash-rf-log.php.
  *
- * Log file: /var/www/tprfn/logs/visitor-log.csv
- * Viewer:   https://tprfn.k1ajd.net/visitor-log.php?view=1
+ * Log file: /var/www/bpqdash/logs/visitor-log.csv
+ * Viewer:   https://your-domain.com/visitor-log.php?view=1
  *
  * GeoIP: Uses MaxMind GeoLite2 local database.
  * Install:
@@ -17,13 +17,13 @@
  *   Download GeoLite2-City.mmdb from https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
  *   Place at: /var/lib/GeoIP/GeoLite2-City.mmdb
  *
- * To generate the viewer password hash, run on ARSSYSTEM:
+ * To generate the viewer password hash, run on BPQSERVER:
  *   php -r "echo password_hash('LogTprfn2026', PASSWORD_DEFAULT) . PHP_EOL;"
  * Then paste the output into VIEWER_PASSWORD_HASH below.
  */
 
-define('LOG_FILE',             '/var/www/tprfn/logs/visitor-log.csv');
-define('LOG_DIR',              '/var/www/tprfn/logs');
+define('LOG_FILE',             '/var/www/bpqdash/logs/visitor-log.csv');
+define('LOG_DIR',              '/var/www/bpqdash/logs');
 define('VIEWER_SESSION_TTL',   3600); // seconds — viewer session lifetime
 define('GEOIP_DB',             '/var/lib/GeoIP/GeoLite2-City.mmdb');
 
@@ -31,7 +31,7 @@ define('GEOIP_DB',             '/var/lib/GeoIP/GeoLite2-City.mmdb');
 define('VIEWER_PASSWORD_HASH', '$2y$10$qA.BvJWR9.SZHDKoi1Kv0u7v/uVTourLQhwzNBWBRd.4zbQ6azFtS');
 
 // ---------------------------------------------------------------------------
-// LOGGING FUNCTION — called by index.php and tprfn-rf-log.php
+// LOGGING FUNCTION — called by index.php and bpqdash-rf-log.php
 // ---------------------------------------------------------------------------
 
 /**
@@ -43,7 +43,7 @@ function geoipLookup(string $ip): array {
     if (!file_exists(GEOIP_DB)) return $result;
 
     // Use geoip2 Reader if Composer autoload is available
-    $autoload = '/var/www/tprfn/vendor/autoload.php';
+    $autoload = '/var/www/bpqdash/vendor/autoload.php';
     if (file_exists($autoload)) {
         try {
             require_once $autoload;
@@ -90,12 +90,12 @@ function logVisit(string $page = '') {
     }
 
     // Only log the two target pages
-    $allowed = ['index.php', 'bpq-rf-connections.html', 'tprfn-rf-log.php', 'tprfn-index-log.php', 'tprfn-network-map'];
+    $allowed = ['index.php', 'bpq-rf-connections.html', 'bpqdash-rf-log.php', 'bpqdash-index-log.php', 'bpqdash-network-map'];
     if (!in_array($page, $allowed, true)) return;
 
     // Resolve real page name for wrappers
-    if ($page === 'tprfn-rf-log.php') $page = 'bpq-rf-connections.html';
-    if ($page === 'tprfn-index-log.php') $page = 'tprfn-network-map';
+    if ($page === 'bpqdash-rf-log.php') $page = 'bpq-rf-connections.html';
+    if ($page === 'bpqdash-index-log.php') $page = 'bpqdash-network-map';
 
     // Collect visitor info
     $timestamp = gmdate('Y-m-d H:i:s') . ' UTC';
@@ -149,7 +149,7 @@ if (isset($_GET['view'])) {
     if (isset($_POST['password'])) {
         if (VIEWER_PASSWORD_HASH === '%%VIEWER_HASH%%') {
             http_response_code(500);
-            die('<pre>Viewer password hash not configured. Run on ARSSYSTEM:
+            die('<pre>Viewer password hash not configured. Run on BPQSERVER:
   php -r "echo password_hash(\'LogTprfn2026\', PASSWORD_DEFAULT) . PHP_EOL;"
 Then paste the output into visitor-log.php as VIEWER_PASSWORD_HASH.</pre>');
         }
@@ -185,7 +185,7 @@ Then paste the output into visitor-log.php as VIEWER_PASSWORD_HASH.</pre>');
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TPRFN Visitor Log</title>
+<title>BPQDash Visitor Log</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
@@ -238,8 +238,8 @@ Then paste the output into visitor-log.php as VIEWER_PASSWORD_HASH.</pre>');
 <body>
 <div class="header">
   <div>
-    <div class="h1">📋 TPRFN Visitor Log</div>
-    <div class="sub">tprfn.k1ajd.net — index.php &amp; bpq-rf-connections.html</div>
+    <div class="h1">📋 BPQDash Visitor Log</div>
+    <div class="sub">your-domain.com — index.php &amp; bpq-rf-connections.html</div>
   </div>
   <?php if ($authed): ?>
   <form method="post" style="margin:0">

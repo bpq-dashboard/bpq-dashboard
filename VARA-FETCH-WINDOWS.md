@@ -1,6 +1,6 @@
 # VARA Log Fetcher Setup Guide (Windows)
 
-This guide explains how to automatically fetch your VARA connection log from the TPRFN server to use with the BPQ Dashboard RF Connections page.
+This guide explains how to automatically fetch your VARA connection log from the BPQDash server to use with the BPQ Dashboard RF Connections page.
 
 ## What is the VARA Log?
 
@@ -8,15 +8,15 @@ The RF Connections dashboard displays your VARA HF connection history — which 
 
 **Where does this file come from?**
 
-If you're part of the **TPRFN (Texas Packet Radio Forwarding Network)**, the network's central server logs all your VARA connections. Your personal log is available at:
+If you're part of the **BPQDash (Texas Packet Radio Forwarding Network)**, the network's central server logs all your VARA connections. Your personal log is available at:
 
 ```
-https://tprfn.k1ajd.net/YOURCALL.vara
+https://your-domain.com/YOURCALL.vara
 ```
 
 The fetch script downloads new entries from this URL and **appends** them to your local `.vara` file every 15 minutes, building up a complete connection history over time.
 
-> **Not part of TPRFN?** If your node doesn't connect through TPRFN, you won't have a log file on their server (you'll get a 404 error). The RF Connections dashboard will still work with BBS logs, just without VARA-specific metrics. Contact TPRFN if you'd like to join the network.
+> **Not part of BPQDash?** If your node doesn't connect through BPQDash, you won't have a log file on their server (you'll get a 404 error). The RF Connections dashboard will still work with BBS logs, just without VARA-specific metrics. Contact BPQDash if you'd like to join the network.
 
 ---
 
@@ -26,15 +26,15 @@ PowerShell is built into Windows - no additional software needed.
 
 ### Step 1: Download the Script
 
-Save `fetch-vara-tprfn.ps1` to `C:\Scripts\`
+Save `fetch-vara-bpqdash.ps1` to `C:\Scripts\`
 
 ### Step 2: Edit Your Callsign
 
-Open `C:\Scripts\fetch-vara-tprfn.ps1` in Notepad and change:
+Open `C:\Scripts\fetch-vara-bpqdash.ps1` in Notepad and change:
 ```powershell
 $CALLSIGN = "YOURCALL"
 ```
-to your callsign (e.g., `$CALLSIGN = "K1AJD"`)
+to your callsign (e.g., `$CALLSIGN = "YOURCALL"`)
 
 Also verify the log directory matches your web server:
 ```powershell
@@ -46,13 +46,13 @@ $LOG_DIR = "C:\UniServerZ\www\bpq\logs"
 Open PowerShell as Administrator and run:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-C:\Scripts\fetch-vara-tprfn.ps1
+C:\Scripts\fetch-vara-bpqdash.ps1
 ```
 
 You should see:
 ```
-Fetching VARA log for K1AJD from TPRFN server...
-Created C:\UniServerZ\www\bpq\logs\K1AJD.vara
+Fetching VARA log for YOURCALL from BPQDash server...
+Created C:\UniServerZ\www\bpq\logs\YOURCALL.vara
 SUCCESS: VARA log updated at 01/22/2026 10:30:00
 ```
 
@@ -60,11 +60,11 @@ SUCCESS: VARA log updated at 01/22/2026 10:30:00
 
 1. Open **Task Scheduler** (search in Start menu)
 2. Click **Create Basic Task**
-3. Name: `Fetch VARA Log from TPRFN`
+3. Name: `Fetch VARA Log from BPQDash`
 4. Trigger: **Daily**
 5. Action: **Start a program**
 6. Program: `powershell.exe`
-7. Arguments: `-ExecutionPolicy Bypass -File "C:\Scripts\fetch-vara-tprfn.ps1"`
+7. Arguments: `-ExecutionPolicy Bypass -File "C:\Scripts\fetch-vara-bpqdash.ps1"`
 8. Click **Finish**
 
 **Set 15-minute repeat:**
@@ -89,7 +89,7 @@ Extract `wget.exe` to `C:\Windows\System32\` or add it to your PATH.
 
 ### Step 2: Use the Batch Script
 
-Save `fetch-vara-tprfn.bat` to `C:\Scripts\` and edit:
+Save `fetch-vara-bpqdash.bat` to `C:\Scripts\` and edit:
 ```batch
 set CALLSIGN=YOURCALL
 set LOG_DIR=C:\UniServerZ\www\bpq\logs
@@ -98,7 +98,7 @@ set LOG_DIR=C:\UniServerZ\www\bpq\logs
 ### Step 3: Schedule in Task Scheduler
 
 Same as above, but use:
-- Program: `C:\Scripts\fetch-vara-tprfn.bat`
+- Program: `C:\Scripts\fetch-vara-bpqdash.bat`
 
 ---
 
@@ -107,7 +107,7 @@ Same as above, but use:
 Edit `bpq-rf-connections.html` and set your VARA log filename:
 
 ```javascript
-const VARA_LOG_FILE = 'K1AJD.vara';  // Change to your callsign
+const VARA_LOG_FILE = 'YOURCALL.vara';  // Change to your callsign
 ```
 
 This is near the top of the `<script>` section (around line 629).
@@ -132,8 +132,8 @@ This is near the top of the `<script>` section (around line 629).
 ### Download Fails
 - Check your internet connection
 - Verify your callsign has a log on the server:
-  - Open browser to `https://tprfn.k1ajd.net/YOURCALL.vara`
-  - If you get 404, contact TPRFN to set up your log
+  - Open browser to `https://your-domain.com/YOURCALL.vara`
+  - If you get 404, contact BPQDash to set up your log
 
 ### Script Won't Run
 - PowerShell: Run `Set-ExecutionPolicy RemoteSigned` as Administrator
@@ -149,8 +149,8 @@ This is near the top of the `<script>` section (around line 629).
 
 | File | Location |
 |------|----------|
-| PowerShell script | `C:\Scripts\fetch-vara-tprfn.ps1` |
-| Batch script (alt) | `C:\Scripts\fetch-vara-tprfn.bat` |
+| PowerShell script | `C:\Scripts\fetch-vara-bpqdash.ps1` |
+| Batch script (alt) | `C:\Scripts\fetch-vara-bpqdash.bat` |
 | VARA log output | `C:\UniServerZ\www\bpq\logs\YOURCALL.vara` |
 | Dashboard HTML | `C:\UniServerZ\www\bpq\bpq-rf-connections.html` |
 
@@ -158,5 +158,5 @@ This is near the top of the `<script>` section (around line 629).
 
 ## Support
 
-- TPRFN Network: https://tprfn.net/
+- BPQ Network: https://bpqdash.net/
 - BPQ Dashboard Issues: Check CHANGELOG.md and README.md

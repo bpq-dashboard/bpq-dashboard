@@ -39,7 +39,7 @@ ALERT_TYPES="tornado,severe,winter"
 FETCH_INTERVAL=300
 
 # Your station info (for BBS message formatting)
-FROM_CALLSIGN="K1AJD"
+FROM_CALLSIGN="YOURCALL"
 TO_ADDRESS="WX@ALLUS"
 
 # Auto-post to BBS (0=disabled, 1=enabled)
@@ -116,7 +116,7 @@ fetch_alerts() {
     log "Fetching alerts from NWS API..."
     log "URL: $url"
     
-    local response=$(curl -s -H "User-Agent: K1AJD-NWS-Monitor/1.0 (Amateur Radio Emergency Comms)" "$url")
+    local response=$(curl -s -H "User-Agent: YOURCALL-NWS-Monitor/1.0 (Amateur Radio Emergency Comms)" "$url")
     
     if [ -z "$response" ]; then
         log "ERROR: Empty response from NWS API"
@@ -239,7 +239,7 @@ expect ":" {
     send "PROTECTIVE ACTIONS:\r$instruction\r\r"
     send "---\r"
     send "Alert ID: $short_id\r"
-    send "Auto-posted by K1AJD NWS Monitor\r"
+    send "Auto-posted by YOURCALL NWS Monitor\r"
     send "73 de $FROM_CALLSIGN\r"
     send "/EX\r"
 }

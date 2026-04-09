@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>BPQ Chat — K1AJD</title>
+    <title>BPQ Chat — YOURCALL</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -358,7 +358,7 @@
         <div class="modal-body">
             <div class="form-row">
                 <label class="form-label">Your callsign / handle</label>
-                <input type="text" class="form-input" id="handleInput" placeholder="K1AJD">
+                <input type="text" class="form-input" id="handleInput" placeholder="YOURCALL">
             </div>
             <div style="font-size:11px;color:var(--muted);line-height:1.6">
                 Connects to BPQ node chat server using credentials from <code style="color:var(--accent)">config.php</code>.
@@ -424,11 +424,11 @@
 <div id="authModal" class="modal-backdrop">
     <div class="modal-box" style="width:400px">
         <div class="modal-header">
-            <span class="modal-title">📡 BPQ Chat — K1AJD Node</span>
+            <span class="modal-title">📡 BPQ Chat — YOURCALL Node</span>
         </div>
         <div class="modal-body">
             <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">
-                Welcome to the <strong style="color:var(--accent)">K1AJD BPQ Chat</strong> gateway.<br>
+                Welcome to the <strong style="color:var(--accent)">YOURCALL BPQ Chat</strong> gateway.<br>
                 Authorized amateur radio operators may connect using their BPQ node credentials.<br>
                 Guests may view chat traffic in read-only mode.
             </p>
@@ -463,7 +463,7 @@
         </div>
         <div class="modal-body">
             <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">
-                To request a BPQ account on the K1AJD node, email the sysop with your callsign and intended use.
+                To request a BPQ account on the YOURCALL node, email the sysop with your callsign and intended use.
             </p>
             <div class="form-row">
                 <label class="form-label">Your Callsign</label>
@@ -476,7 +476,7 @@
             </div>
             <div class="form-row">
                 <label class="form-label">Brief note (optional)</label>
-                <input type="text" class="form-input" id="reqNote" placeholder="TPRFN member, VARA HF operator...">
+                <input type="text" class="form-input" id="reqNote" placeholder="BPQDash member, VARA HF operator...">
             </div>
         </div>
         <div class="modal-footer">
@@ -501,7 +501,7 @@
 const API = 'bpq-chat.php';
 let connected  = false;
 let soundOn    = true;
-let handle     = localStorage.getItem('bpq_chat_handle') || 'K1AJD';
+let handle     = localStorage.getItem('bpq_chat_handle') || 'YOURCALL';
 let pollTimer  = null;
 let msgLog     = [];
 
@@ -834,7 +834,7 @@ function setConnected(v) {
     const cs = document.getElementById('connStatus');
     cs.className = v ? 's-connected' : 's-disconnected';
     document.getElementById('connStatusText').textContent = v ? 'Connected' : 'Disconnected';
-    document.getElementById('serverNodeLabel').textContent = v ? 'K1AJD-4 Chat' : '';
+    document.getElementById('serverNodeLabel').textContent = v ? 'YOURCALL-4 Chat' : '';
 }
 
 function openConnectModal() {
@@ -844,7 +844,7 @@ function openConnectModal() {
 
 async function startConnect(callOverride, passOverride) {
     if (!callOverride) {
-        handle = document.getElementById('handleInput').value.trim().toUpperCase() || 'K1AJD';
+        handle = document.getElementById('handleInput').value.trim().toUpperCase() || 'YOURCALL';
         localStorage.setItem('bpq_chat_handle', handle);
         closeModal('connectModal');
     }
@@ -1056,7 +1056,7 @@ function parseWhoOutput(raw) {
 
     lines.forEach(line => {
         line = line.trim();
-        // Match: "K1AJD at AGCHAT Tony, Augusta, GA [General] Idle for 578 seconds"
+        // Match: "YOURCALL at AGCHAT Tony, Augusta, GA [General] Idle for 578 seconds"
         const m = line.match(/^([A-Z0-9\-\/]+)\s+at\s+(\S+)\s+(.+?)\s+\[(.+?)\]\s+Idle for (\d+)/i);
         if (!m) return;
         const call  = m[1].toUpperCase();
@@ -1240,7 +1240,7 @@ function submitAuth() {
     handle    = call;
     authCall  = call;
     authPass  = pass;
-    authLevel = call === 'K1AJD' ? 'sysop' : 'user';
+    authLevel = call === 'YOURCALL' ? 'sysop' : 'user';
     localStorage.setItem('bpq_chat_handle', handle);
     closeModal('authModal');
     startConnect(call, pass);
@@ -1255,13 +1255,13 @@ async function sendAccessRequest() {
     // Build mailto link
     const subject = encodeURIComponent(`BPQ Chat Access Request — ${call}`);
     const body    = encodeURIComponent(
-        `Hello Tony K1AJD,\n\nI would like to request a BPQ account on your node.\n\n` +
+        `Hello Tony YOURCALL,\n\nI would like to request a BPQ account on your node.\n\n` +
         `Callsign: ${call}\n` +
         (name ? `Name: ${name}\n` : '') +
         (note ? `Note: ${note}\n` : '') +
         `\nThank you 73`
     );
-    window.location.href = `mailto:tony@k1ajd.net?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:sysop@example.com?subject=${subject}&body=${body}`;
     closeModal('guestRequestModal');
     showToast('Opening email client…', 'ok');
 }
@@ -1269,7 +1269,7 @@ async function sendAccessRequest() {
 // ═══════════════════════════════════════════════════════
 //  Init
 (async()=>{
-    handle = localStorage.getItem('bpq_chat_handle') || 'K1AJD';
+    handle = localStorage.getItem('bpq_chat_handle') || 'YOURCALL';
     if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
     // Check if daemon already connected — auto-resume
     try {

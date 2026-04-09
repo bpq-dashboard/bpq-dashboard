@@ -10,7 +10,7 @@ immediately disconnected before BPQ32 ever sees the session.
 
 Architecture:
 
-    VARA HF on Windows  (10.0.0.213 :9025/:9026)
+    VARA HF on Windows  (10.0.0.XXX :9025/:9026)
             ^  outbound TCP from Linux
     [this proxy on Linux, listening on 0.0.0.0:9025/:9026]
             ^  BPQ32 connects to localhost
@@ -33,7 +33,7 @@ import sys
 # CONFIGURATION
 # =============================================================================
 
-VARA_HOST      = "10.0.0.213"
+VARA_HOST      = "10.0.0.XXX"
 VARA_CMD_PORT  = 9025
 VARA_DATA_PORT = 9026
 

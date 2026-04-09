@@ -60,7 +60,7 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_FOLLOWLOCATION => true,
     CURLOPT_TIMEOUT        => 15,
-    CURLOPT_USERAGENT      => 'BPQ-Dashboard/1.5.5 (K1AJD; tony@k1ajd.net)',
+    CURLOPT_USERAGENT      => 'BPQ-Dashboard/1.5.5 (YOURCALL; sysop@example.com)',
     CURLOPT_SSL_VERIFYPEER => true,
     CURLOPT_HTTPHEADER     => ['Accept: */*'],
 ]);

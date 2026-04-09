@@ -3,7 +3,7 @@
  * DataLog File Lister
  * Returns a list of DataLog*.txt files for the RF Power Monitor dashboard
  * 
- * Place this file in /var/www/tprfn/logs/ (same directory as your DataLog files)
+ * Place this file in /var/www/bpqdash/logs/ (same directory as your DataLog files)
  * Or adjust the $logDir path below
  */
 
@@ -14,7 +14,7 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 $logDir = __DIR__;  // Same directory as this PHP file
 
 // If this script is elsewhere, use absolute path:
-// $logDir = '/var/www/tprfn/logs';
+// $logDir = '/var/www/bpqdash/logs';
 
 $files = [];
 $error = null;

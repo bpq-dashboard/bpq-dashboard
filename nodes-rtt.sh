@@ -15,9 +15,9 @@
 # Configuration
 TELNET_HOST="localhost"
 TELNET_PORT="8010"
-TELNET_USER="TonyD"
-TELNET_PASS="Dawgs!958"
-OUTPUT_FILE="/var/www/tprfn/logs/nodesrtt.txt"
+TELNET_USER="YOURCALL"
+TELNET_PASS="YOURPASSWORD"
+OUTPUT_FILE="/var/www/bpqdash/logs/nodesrtt.txt"
 
 # Ensure output directory exists
 mkdir -p "$(dirname "$OUTPUT_FILE")"
@@ -38,15 +38,15 @@ spawn telnet localhost 8010
 
 # Wait for login prompt and send username
 expect {
-    -re {[Cc]allsign:} { send "TonyD\r" }
-    -re {[Ll]ogin:} { send "TonyD\r" }
-    -re {[Uu]sername:} { send "TonyD\r" }
+    -re {[Cc]allsign:} { send "YOURCALL\r" }
+    -re {[Ll]ogin:} { send "YOURCALL\r" }
+    -re {[Uu]sername:} { send "YOURCALL\r" }
     timeout { puts "Timeout waiting for login prompt"; exit 1 }
 }
 
 # Wait for password prompt and send password
 expect {
-    -re {[Pp]assword:} { send "Dawgs!958\r" }
+    -re {[Pp]assword:} { send "YOURPASSWORD\r" }
     timeout { puts "Timeout waiting for password prompt"; exit 1 }
 }
 

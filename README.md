@@ -118,7 +118,7 @@ See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 | [QUICK-START.md](QUICK-START.md) | Get running in 5 minutes (experienced users) |
 | [DATA-ARCHIVAL.md](DATA-ARCHIVAL.md) | Automated backup and archival system |
 | [PUBLIC-DEPLOYMENT.md](PUBLIC-DEPLOYMENT.md) | Security guide for internet exposure |
-| [VARA-FETCH-WINDOWS.md](VARA-FETCH-WINDOWS.md) | TPRFN VARA log fetching setup |
+| [VARA-FETCH-WINDOWS.md](VARA-FETCH-WINDOWS.md) | BPQDash VARA log fetching setup |
 | [NWS-WEATHER-README.md](NWS-WEATHER-README.md) | Weather alerts configuration |
 | [CODE-REVIEW.md](CODE-REVIEW.md) | Security recommendations |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
@@ -428,7 +428,7 @@ See [INSTALL.md](INSTALL.md) for more troubleshooting tips.
 - **BPQ32 Documentation:** https://www.cantab.net/users/john.wiseman/Documents/
 - **LinBPQ:** https://www.intermanual.com/bpq32
 - **VARA Modem:** https://rosmodem.wordpress.com/
-- **TPRFN Network:** https://tprfn.net/
+- **BPQ Network:** https://bpqdash.net/
 
 ---
 

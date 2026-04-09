@@ -42,11 +42,11 @@ This guide walks you through installing BPQ Dashboard on a Windows 10 or 11 comp
 
 | Item | Where to find it | Example |
 |------|-----------------|---------|
-| Your callsign | Your FCC licence | `K1AJD` |
+| Your callsign | Your FCC licence | `YOURCALL` |
 | Grid square | qrz.com or online calculator | `EM73kj` |
 | Latitude / Longitude | Google Maps — right-click your location | `33.4735, -82.0105` |
 | BPQ32 telnet port | BPQ32 config → TELNET section | `8010` |
-| BBS sysop username | BPQ32 config | `K1AJD` |
+| BBS sysop username | BPQ32 config | `YOURCALL` |
 | BBS password | BPQ32 config | `mypassword` |
 | BPQ32 log directory | Where BPQ32 writes `log_*_BBS.txt` | `C:\BPQ32\` |
 
@@ -119,7 +119,7 @@ Open `C:\UniServerZ\www\bpq\config.php` in Notepad or any text editor.
 ```php
 // ── Your station ──────────────────────────────────────────────
 'station' => [
-    'callsign'  => 'K1AJD',          // ← Your callsign
+    'callsign'  => 'YOURCALL',          // ← Your callsign
     'latitude'  => 33.4735,           // ← Your latitude
     'longitude' => -82.0105,          // ← Your longitude
     'grid'      => 'EM73kj',          // ← Your 6-char grid square
@@ -129,7 +129,7 @@ Open `C:\UniServerZ\www\bpq\config.php` in Notepad or any text editor.
 'bbs' => [
     'host'    => 'localhost',
     'port'    => 8010,                // ← Your BPQ32 telnet port
-    'user'    => 'K1AJD',            // ← Your BBS sysop username
+    'user'    => 'YOURCALL',            // ← Your BBS sysop username
     'pass'    => 'CHANGEME',          // ← ⚠️ Your BBS password
     'alias'   => 'bbs',
     'timeout' => 30,
@@ -191,7 +191,7 @@ Look for files named `log_YYMMDD_BBS.txt`.
 :: Copy BPQ32 logs to dashboard
 xcopy "C:\BPQ32\log_*.txt" "C:\UniServerZ\www\bpq\logs\" /Y /Q
 xcopy "C:\BPQ32\CMSAccess_*.log" "C:\UniServerZ\www\bpq\logs\" /Y /Q
-xcopy "C:\Users\%USERNAME%\AppData\Roaming\VARA HF\VARAHF.txt" "C:\UniServerZ\www\bpq\logs\k1ajd.vara" /Y /Q 2>nul
+xcopy "C:\Users\%USERNAME%\AppData\Roaming\VARA HF\VARAHF.txt" "C:\UniServerZ\www\bpq\logs\yourcall.vara" /Y /Q 2>nul
 ```
 
 2. Open **Task Scheduler** (search in Start menu)
@@ -227,7 +227,7 @@ Open `C:\UniServerZ\www\bpq\fetch-vara.bat` in Notepad:
 ```batch
 :: Edit these values:
 set VARA_LOG=C:\Users\%USERNAME%\AppData\Roaming\VARA HF\VARAHF.txt
-set DEST=C:\UniServerZ\www\bpq\logs\k1ajd.vara
+set DEST=C:\UniServerZ\www\bpq\logs\yourcall.vara
 ```
 
 Or use the PowerShell version (`fetch-vara.ps1`) for more options including remote machine support over SSH.
@@ -278,16 +278,16 @@ Edit this file to match your station's partners:
 ```json
 [
   {
-    "call": "N4VAD",
-    "connect_call": "N4VAD-7",
+    "call": "PARTNER3",
+    "connect_call": "PARTNER3-7",
     "distance_mi": 87,
     "active": true,
     "suspend_kp": 7.0,
     "attach_port": 3
   },
   {
-    "call": "N3MEL",
-    "connect_call": "N3MEL-2",
+    "call": "PARTNER1",
+    "connect_call": "PARTNER1-2",
     "distance_mi": 571,
     "active": true,
     "suspend_kp": 6.0,
@@ -298,7 +298,7 @@ Edit this file to match your station's partners:
 
 **Fields:**
 - `call` — Partner's base callsign (must match block name in `linmail.cfg`)
-- `connect_call` — The SSID used in ConnectScript (e.g. `N4VAD-7`)
+- `connect_call` — The SSID used in ConnectScript (e.g. `PARTNER3-7`)
 - `distance_mi` — Distance from your station in miles
 - `active` — Set `false` to skip this partner in all scripts
 - `suspend_kp` — Kp threshold for storm-monitor suspension
@@ -347,9 +347,9 @@ BBS_CONFIG = {
     'enabled':   True,
     'host':      'localhost',
     'port':      8010,
-    'user':      'K1AJD',       # ← Your callsign
+    'user':      'YOURCALL',       # ← Your callsign
     'password':  'mypassword',  # ← Your BBS password
-    'notify_to': 'K1AJD',       # ← Who to notify
+    'notify_to': 'YOURCALL',       # ← Who to notify
 }
 ```
 
@@ -357,12 +357,12 @@ And `PARTNERS` (must match `partners.json`):
 
 ```python
 PARTNERS = {
-    'N4VAD':  {'connect_call': 'N4VAD-7',  'attach_port': 3},
-    'N3MEL':  {'connect_call': 'N3MEL-2',  'attach_port': 3},
+    'PARTNER3':  {'connect_call': 'PARTNER3-7',  'attach_port': 3},
+    'PARTNER1':  {'connect_call': 'PARTNER1-2',  'attach_port': 3},
 }
 ```
 
-> **Important:** Keys in `PARTNERS` must exactly match the block name in `linmail.cfg` (e.g. `N4VAD`, not `N4VAD-7`).
+> **Important:** Keys in `PARTNERS` must exactly match the block name in `linmail.cfg` (e.g. `PARTNER3`, not `PARTNER3-7`).
 
 ### Test
 
@@ -373,10 +373,10 @@ Open Command Prompt as Administrator:
 python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --status
 
 :: Manual pause for testing
-python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --pause N4VAD
+python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --pause PARTNER3
 
 :: Manual resume
-python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --resume N4VAD
+python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --resume PARTNER3
 ```
 
 ### Schedule with Task Scheduler (every 5 minutes)
@@ -408,7 +408,7 @@ CONFIG = {
     'backup_dir':    r'C:\UniServerZ\www\bpq\data\backups',
     'bbs_host':      'localhost',
     'bbs_port':      8010,
-    'bbs_user':      'K1AJD',
+    'bbs_user':      'YOURCALL',
     'bbs_pass':      'mypassword',
     'bpq_stop_cmd':  'net stop BPQ32',
     'bpq_start_cmd': 'net start BPQ32',
@@ -614,7 +614,7 @@ http://localhost/bpq/health-check.php
 python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --status
 
 :: Manual watchdog resume
-python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --resume N4VAD
+python C:\UniServerZ\www\bpq\scripts\connect-watchdog.py --resume PARTNER3
 
 :: Check storm monitor status
 python C:\UniServerZ\www\bpq\scripts\storm-monitor.py --status
@@ -625,4 +625,4 @@ python C:\UniServerZ\www\bpq\scripts\prop-scheduler.py
 
 ---
 
-*BPQ Dashboard v1.5.3 — K1AJD | TPRFN Network | [https://www.tprfn.net](https://www.tprfn.net)*
+*BPQ Dashboard v1.5.3 — YOURCALL | BPQ Network | [https://www.bpqdash.net](https://www.bpqdash.net)*

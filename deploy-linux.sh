@@ -40,7 +40,7 @@ BPQ_TELNET_PORT="8010"
 BPQ_SYSOP_USER=""
 BPQ_SYSOP_PASS=""
 VARA_LOG_DIR="/var/log/vara"
-VARA_CALLSIGN_URL="https://tprfn.k1ajd.net/callsign.txt"
+VARA_CALLSIGN_URL="https://your-domain.com/callsign.txt"
 VARA_CALLSIGN_FILE=""
 
 # ============================================================================
@@ -215,7 +215,7 @@ create_vara_update_script() {
     cat > "$INSTALL_DIR/scripts/update-vara-callsigns.sh" << 'VARASCRIPT'
 #!/bin/bash
 #
-# Update VARA callsign list from TPRFN
+# Update VARA callsign list from BPQDash
 #
 # Usage: ./update-vara-callsigns.sh
 #
@@ -223,7 +223,7 @@ create_vara_update_script() {
 #   0 6 * * * /path/to/update-vara-callsigns.sh
 #
 
-VARA_URL="https://tprfn.k1ajd.net/callsign.txt"
+VARA_URL="https://your-domain.com/callsign.txt"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VARA_FILE="$SCRIPT_DIR/../data/callsign.vara"
 BACKUP_FILE="$VARA_FILE.bak"

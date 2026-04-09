@@ -1,14 +1,14 @@
 #!/bin/bash
 # ============================================================================
-# BPQ Dashboard + TPRFN Network Monitor — Set Permissions & Install Nginx Config
+# BPQ Dashboard + BPQ Network Monitor — Set Permissions & Install Nginx Config
 # Run as root: sudo bash set-permissions.sh
 # ============================================================================
 
-DASH_DIR="/var/www/tprfn"
+DASH_DIR="/var/www/bpqdash"
 WEB_USER="www-data"
 WEB_GROUP="www-data"
-NGINX_CONF="/etc/nginx/sites-available/tprfn.conf"
-NGINX_ENABLED="/etc/nginx/sites-enabled/tprfn.conf"
+NGINX_CONF="/etc/nginx/sites-available/bpqdash.conf"
+NGINX_ENABLED="/etc/nginx/sites-enabled/bpqdash.conf"
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -29,7 +29,7 @@ echo "Directory: $DASH_DIR"
 echo "================================================================"
 
 # ── Step 1: Nginx security config ────────────────────────────────────────────
-if [ -f "$DASH_DIR/nginx-tprfn.conf" ]; then
+if [ -f "$DASH_DIR/nginx-bpqdash.conf" ]; then
     echo ""
     echo "[1/8] Nginx security configuration"
     if [ -f "$NGINX_CONF" ]; then
@@ -39,12 +39,12 @@ if [ -f "$DASH_DIR/nginx-tprfn.conf" ]; then
         else
             echo "  Backing up current config to ${NGINX_CONF}.bak"
             cp "$NGINX_CONF" "${NGINX_CONF}.bak"
-            cp "$DASH_DIR/nginx-tprfn.conf" "$NGINX_CONF"
+            cp "$DASH_DIR/nginx-bpqdash.conf" "$NGINX_CONF"
             echo "  ✓ Security config installed"
             echo "  ✓ Backup saved to ${NGINX_CONF}.bak"
         fi
     else
-        cp "$DASH_DIR/nginx-tprfn.conf" "$NGINX_CONF"
+        cp "$DASH_DIR/nginx-bpqdash.conf" "$NGINX_CONF"
         echo "  ✓ Nginx config installed to $NGINX_CONF"
     fi
 
@@ -69,7 +69,7 @@ if [ -f "$DASH_DIR/nginx-tprfn.conf" ]; then
     fi
 else
     echo ""
-    echo "[1/8] Nginx config — nginx-tprfn.conf not found in $DASH_DIR, skipping"
+    echo "[1/8] Nginx config — nginx-bpqdash.conf not found in $DASH_DIR, skipping"
 fi
 
 # ── Step 2: Base ownership ───────────────────────────────────────────────────
@@ -88,7 +88,7 @@ find "$DASH_DIR" -type d -exec chmod 755 {} \;
 # ── Step 5: Restrict config files with credentials (640) ─────────────────────
 echo "[5/8] Restricting config files (640 — no world read)..."
 CONFIG_COUNT=0
-for f in config.php bbs-config.php nws-config.php tprfn-config.php api/config.php includes/bootstrap.php; do
+for f in config.php bbs-config.php nws-config.php bpqdash-config.php api/config.php includes/bootstrap.php; do
     if [ -f "$f" ]; then
         chmod 640 "$f"
         CONFIG_COUNT=$((CONFIG_COUNT + 1))
@@ -128,7 +128,7 @@ echo "[8/8] Verifying critical file protections..."
 PASS=0
 FAIL=0
 
-for f in config.php bbs-config.php tprfn-config.php; do
+for f in config.php bbs-config.php bpqdash-config.php; do
     if [ -f "$f" ]; then
         perms=$(stat -c "%a" "$f" 2>/dev/null)
         if [ "$perms" = "640" ]; then
@@ -143,7 +143,7 @@ done
 
 # Check nginx is blocking config files (if curl available)
 if command -v curl &>/dev/null && [ -f "$NGINX_CONF" ]; then
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "https://tprfn.k1ajd.net/config.php" 2>/dev/null)
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 "https://your-domain.com/config.php" 2>/dev/null)
     if [ "$HTTP_CODE" = "403" ]; then
         echo "  ✓ Nginx blocks config.php — HTTP $HTTP_CODE"
         PASS=$((PASS + 1))
@@ -163,5 +163,5 @@ echo ""
 echo "Verify with:"
 echo "  ls -la $DASH_DIR"
 echo "  ls -la $DASH_DIR/config.php"
-echo "  curl -s -o /dev/null -w '%{http_code}' https://tprfn.k1ajd.net/config.php"
-echo "  curl -s -o /dev/null -w '%{http_code}' https://tprfn.k1ajd.net/includes/"
+echo "  curl -s -o /dev/null -w '%{http_code}' https://your-domain.com/config.php"
+echo "  curl -s -o /dev/null -w '%{http_code}' https://your-domain.com/includes/"

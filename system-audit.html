@@ -100,7 +100,7 @@
 
 <header>
   <h1>🔍 BPQ Dashboard <span>//</span> System Audit</h1>
-  <div class="meta">K1AJD · ARSSYSTEM · Live health check<br>Security · Resources · Services · Database · Logs</div>
+  <div class="meta">YOURCALL · BPQSERVER · Live health check<br>Security · Resources · Services · Database · Logs</div>
 </header>
 
 <div id="auth-gate" class="auth-gate" style="display:none;">
@@ -183,7 +183,7 @@ function loadData(pw) {
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('main-content').innerHTML =
           '<div class="error-msg">⚠ Audit failed: ' + err.message +
-          '<br><small>Ensure system-audit-api.php is deployed to /var/www/tprfn/</small></div>';
+          '<br><small>Ensure system-audit-api.php is deployed to /var/www/bpqdash/</small></div>';
       }
     });
 }
@@ -216,7 +216,7 @@ function render(data) {
       <div class="score-count crit"><div class="n">${s.crit||0}</div><div class="l">Critical</div></div>
     </div>
     <div class="sysinfo">
-      Host: ${data.hostname||'ARSSYSTEM'}<br>
+      Host: ${data.hostname||'BPQSERVER'}<br>
       Kernel: ${data.kernel||'—'}<br>
       ${data.uptime||'—'}
     </div>

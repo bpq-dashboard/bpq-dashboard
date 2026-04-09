@@ -1,7 +1,7 @@
 <?php
 /**
  * bpq-aprs.php — APRS dashboard API — reads from daemon cache
- * Daemon: /var/www/tprfn/scripts/bpq-aprs-daemon.py
+ * Daemon: /var/www/bpqdash/scripts/bpq-aprs-daemon.py
  */
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store');
@@ -86,7 +86,7 @@ if ($action === 'sendmsg') {
     // Format: SRCCALL>APRS,TCPIP*::DEST     :message text{seq}
     $dest    = str_pad($to, 9);
     $seqStr  = str_pad($seq, 3, '0', STR_PAD_LEFT);
-    $packet  = "K1AJD-1>APRS,TCPIP*::{$dest}:{$text}{{$seqStr}
+    $packet  = "YOURCALL-1>APRS,TCPIP*::{$dest}:{$text}{{$seqStr}
 ";
 
     // Send via APRS-IS
@@ -97,7 +97,7 @@ if ($action === 'sendmsg') {
     }
     stream_set_timeout($sock, 10);
     fgets($sock, 512); // banner
-    fwrite($sock, "user K1AJD-1 pass 15769 vers BPQ-Dashboard 1.0
+    fwrite($sock, "user YOURCALL-1 pass 15769 vers BPQ-Dashboard 1.0
 ");
     fgets($sock, 512); // login resp
     fwrite($sock, $packet);

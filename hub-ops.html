@@ -386,8 +386,8 @@ body {
     <div class="nav-brand">
       <span class="status-dot-nav"></span>
       <div>
-        <div class="nav-callsign" id="navCallsign">K1AJD-1</div>
-        <div class="nav-sub">TPRFN Hub · Hub Operations</div>
+        <div class="nav-callsign" id="navCallsign">YOURCALL-1</div>
+        <div class="nav-sub">BPQDash Hub · Hub Operations</div>
       </div>
     </div>
     <div class="nav-links">
@@ -774,15 +774,15 @@ body {
 //  CONFIGURATION — mirrors existing BPQ Dashboard config pattern
 // ═══════════════════════════════════════════════════════════════════
 const CFG = {
-  varaFile:    'k1ajd.vara',          // VARA log file in ./logs/
+  varaFile:    'yourcall.vara',          // VARA log file in ./logs/
   logsDir:     './logs/',             // Log directory
-  callsign:    'K1AJD',               // Hub callsign (used for BBS log filename)
+  callsign:    'YOURCALL',               // Hub callsign (used for BBS log filename)
   timezone:    'America/New_York',    // Local timezone
   refreshMs:   60000,                 // Auto-refresh interval
   bbsDaysLoad: 30,                    // Max days of BBS logs to load
   msgThreshold: 446,                  // Min bytes to count as message session
   nwsZone:     'GAZ087',              // NWS zone for alerts
-  partners:    ['WP4OH-11','N3MEL-2','NP4JN-11','K7EK','KK4DIV-1','N9SEO-1','N4SFL-1'],
+  partners:    ['WP4OH-11','PARTNER1-2','NP4JN-11','PARTNER5','PARTNER2-1','PARTNER6-1','PARTNER7-1'],
   solarProxy:  './solar-proxy.php',  // solar-proxy.php path
 };
 
@@ -993,7 +993,7 @@ function showNoDataWarning() {
   document.getElementById('noDataDetail').innerHTML =
     'Expected VARA log: <code style="color:var(--purple);">' + CFG.logsDir + CFG.varaFile + '</code><br>' +
     'Expected BBS log: <code style="color:var(--purple);">' + CFG.logsDir + 'log_' + yy + mm + dd + '_BBS.txt</code><br><br>' +
-    'Use the <code>fetch-vara-tprfn</code> script to populate the VARA log.';
+    'Use the <code>fetch-vara-bpqdash</code> script to populate the VARA log.';
   div.classList.remove('hidden');
 }
 
@@ -1607,7 +1607,7 @@ function updateConnectionTable() {
       ? `<span class="band-tag" style="background:${getBandColor(c.band)}">${c.band}</span>`
       : '<span style="color:var(--text4);font-size:11px;">–</span>';
 
-    // Find partner (which TPRFN hub station this connected to/from)
+    // Find partner (which BPQDash hub station this connected to/from)
     const partner = CFG.partners.find(p => p.startsWith(c.baseCall)) || '–';
 
     return `<tr>

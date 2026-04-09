@@ -1,6 +1,6 @@
 [Unit]
 Description=NWS Weather Alert Monitor for BPQ BBS
-Documentation=https://github.com/k1ajd/bpq-dashboard
+Documentation=https://github.com/yourcall/bpq-dashboard
 After=network-online.target
 Wants=network-online.target
 

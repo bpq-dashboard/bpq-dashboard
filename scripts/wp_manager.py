@@ -19,7 +19,7 @@ WORKFLOW (automated — for cron):
     Use --dry-run first to preview changes before scheduling.
 
 CRON EXAMPLE (run daily at 03:00 UTC):
-  0 3 * * * cd /home/tony/linbpq && python3 /var/www/tprfn/scripts/wp_manager.py --auto-clean >> /var/log/wp-auto-clean.log 2>&1
+  0 3 * * * cd /home/tony/linbpq && python3 /var/www/bpqdash/scripts/wp_manager.py --auto-clean >> /var/log/wp-auto-clean.log 2>&1
 
 FILES CREATED:
   wp_review.txt     — editable review list (you mark KEEP/REMOVE)
@@ -28,7 +28,7 @@ FILES CREATED:
   wp_baseline.txt   — snapshot of last clean state for --diff comparison
   wp_manager.log    — audit log of all actions taken
 
-Author: K1AJD
+Author: YOURCALL
 """
 
 import re

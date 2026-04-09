@@ -1,6 +1,6 @@
 <?php
 /**
- * TPRFN Network Map - Data API
+ * BPQ Network Map - Data API
  * Version: 1.1.0 — MySQL dual-write integration
  *
  * Provides parsed syslog data and hub configuration for the network map.
@@ -11,8 +11,8 @@
  * Endpoints:
  *   ?action=overview                        - Hub-to-hub network overview (JSON)
  *   ?action=hubs                            - Hub configuration (JSON)
- *   ?action=hub&id=K1AJD-7                  - Connections for a specific hub (JSON)
- *   ?action=hub_info&id=K1AJD-7             - Station info (frequencies, services) (JSON)
+ *   ?action=hub&id=YOURCALL-7                  - Connections for a specific hub (JSON)
+ *   ?action=hub_info&id=YOURCALL-7             - Station info (frequencies, services) (JSON)
  *   ?action=station_detail&hub=X&station=Y  - Detailed session data (JSON)
  *   ?action=all_stations                    - All polling stations across all hubs (JSON)
  *   ?action=network_history&days=N          - N-day merged overview (unlimited with MySQL)
@@ -22,15 +22,15 @@
 
 // Configuration
 $SYSLOG_PATH = '/var/log/remotelogs/syslog';
-$HUBS_CONFIG = __DIR__ . '/tprfn-hubs.php';
-$HUB_INFO_CONFIG = __DIR__ . '/tprfn-hub-info.php';
+$HUBS_CONFIG = __DIR__ . '/bpqdash-hubs.php';
+$HUB_INFO_CONFIG = __DIR__ . '/bpqdash-hub-info.php';
 $CACHE_DIR = __DIR__ . '/cache';
 $CACHE_TTL = 120; // seconds — reparse syslog at most every 2 minutes
 
 // ── MySQL integration (optional — degrades gracefully if DB unavailable) ────
 $DB_ENABLED = false;
-if (file_exists(__DIR__ . '/tprfn-db.php')) {
-    require_once __DIR__ . '/tprfn-db.php';
+if (file_exists(__DIR__ . '/bpqdash-db.php')) {
+    require_once __DIR__ . '/bpqdash-db.php';
     $DB_ENABLED = tprfn_db_available();
 }
 
@@ -385,7 +385,7 @@ function tprfn_db_write_sessions(array $parsed, string $todayDate, array $hubIds
             }
         }
     } catch (Throwable $e) {
-        error_log('TPRFN DB write error: ' . $e->getMessage());
+        error_log('BPQDash DB write error: ' . $e->getMessage());
     }
 }
 
@@ -630,7 +630,7 @@ function getHubsFull($configFile) {
         if (is_array($phpHubs)) $hubs = $phpHubs;
     }
     // Merge admin-added hubs from JSON
-    $jsonFile = dirname($configFile) . '/tprfn-hubs.json';
+    $jsonFile = dirname($configFile) . '/bpqdash-hubs.json';
     if (file_exists($jsonFile)) {
         $jsonHubs = json_decode(file_get_contents($jsonFile), true);
         if (is_array($jsonHubs)) $hubs = array_merge($hubs, $jsonHubs);
@@ -721,7 +721,7 @@ function requireSyslog($path) {
         http_response_code(500);
         header('Content-Type: application/json');
         echo json_encode(['error' => 'Log data currently unavailable. Contact the server administrator.']);
-        error_log("TPRFN: Syslog not available at $path");
+        error_log("BPQDash: Syslog not available at $path");
         exit;
     }
 }
@@ -1054,7 +1054,7 @@ switch ($action) {
                     }
                 }
             } catch (Throwable $e) {
-                error_log('TPRFN network_history DB error: ' . $e->getMessage());
+                error_log('BPQDash network_history DB error: ' . $e->getMessage());
             }
         }
 
@@ -1260,7 +1260,7 @@ switch ($action) {
                 // Re-sort dailyData by date
                 usort($dailyData, fn($a, $b) => strcmp($a['date'], $b['date']));
             } catch (Throwable $e) {
-                error_log('TPRFN hub_history DB error: ' . $e->getMessage());
+                error_log('BPQDash hub_history DB error: ' . $e->getMessage());
             }
         }
 
@@ -1340,7 +1340,7 @@ switch ($action) {
         header('Content-Type: text/plain');
         if (!file_exists($SYSLOG_PATH) || !is_readable($SYSLOG_PATH)) {
             http_response_code(500);
-            error_log("TPRFN: Syslog not available at $SYSLOG_PATH");
+            error_log("BPQDash: Syslog not available at $SYSLOG_PATH");
             die("Error: Log data currently unavailable.");
         }
         readfile($SYSLOG_PATH);

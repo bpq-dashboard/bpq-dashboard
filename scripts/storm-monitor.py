@@ -12,12 +12,12 @@ Usage:
     python3 storm-monitor.py --restore    # Force restore optimized schedules
 
 Cron (every hour):
-    0 * * * * /usr/bin/python3 /var/www/tprfn/scripts/storm-monitor.py >> /var/www/tprfn/logs/storm-monitor.log 2>&1
+    0 * * * * /usr/bin/python3 /var/www/bpqdash/scripts/storm-monitor.py >> /var/www/bpqdash/logs/storm-monitor.log 2>&1
 
 Works alongside prop-scheduler.py — this handles fast reactions,
 prop-scheduler handles slow optimization every 48 hours.
 
-Author: K1AJD BPQ Dashboard Project
+Author: YOURCALL BPQ Dashboard Project
 Version: 1.0.0
 """
 
@@ -49,15 +49,15 @@ CONFIG = {
     ),
     'state_file': (
         'C:\\UniServerZ\\www\\bpq\\cache\\storm-state.json'
-        if IS_WINDOWS else '/var/www/tprfn/cache/storm-state.json'
+        if IS_WINDOWS else '/var/www/bpqdash/cache/storm-state.json'
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\storm-monitor.log'
-        if IS_WINDOWS else '/var/www/tprfn/logs/storm-monitor.log'
+        if IS_WINDOWS else '/var/www/bpqdash/logs/storm-monitor.log'
     ),
     'backup_dir': (
         'C:\\UniServerZ\\www\\bpq\\scripts\\prop-backups'
-        if IS_WINDOWS else '/var/www/tprfn/scripts/prop-backups'
+        if IS_WINDOWS else '/var/www/bpqdash/scripts/prop-backups'
     ),
 
     # BPQ control — platform-specific
@@ -72,10 +72,10 @@ CONFIG = {
     'notify_via_bbs': True,
     'bbs_host': 'localhost',
     'bbs_port': 8010,
-    'bbs_user': 'K1AJD',
-    'bbs_pass': 'dawgs1958',
+    'bbs_user': 'YOURCALL',
+    'bbs_pass': 'YOURPASSWORD',
     'bbs_alias': 'bbs',
-    'bbs_notify_to': 'K1AJD',
+    'bbs_notify_to': 'YOURCALL',
 
     # Storm thresholds
     'kp_storm_threshold': 5,    # Kp >= 5 = storm mode (G1 minor storm)
@@ -95,13 +95,13 @@ CONFIG = {
     #   Kp 7-8 (G3): partners >= 300 mi suspended entirely
     #   Kp 8+  (G4): all partners suspended except < 200 mi
     'storm_partners': {
-        'KD4WLE': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'KD4WLE-3', 'port': 3, 'distance_mi':  87, 'suspend_kp': None},
-        'KK4DIV': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'KK4DIV-1', 'port': 3, 'distance_mi': 309, 'suspend_kp': 7.0},
-        'K7EK':   {'freq': '3.596000', 'mode': '',       'call': 'K7EK',     'port': 3, 'distance_mi': 374, 'suspend_kp': 7.0},
-        'N4VAD':  {'freq': '3.585000', 'mode': '',       'call': 'N4VAD-7',  'port': 3, 'distance_mi': 498, 'suspend_kp': 6.0},
-        'N4SFL':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'N4SFL-1',  'port': 3, 'distance_mi': 518, 'suspend_kp': 6.0},
-        'N3MEL':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'N3MEL-2',  'port': 3, 'distance_mi': 571, 'suspend_kp': 6.0},
-        'N9SEO':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'N9SEO-1',  'port': 3, 'distance_mi': 620, 'suspend_kp': 6.0},
+        'PARTNER4': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER4-3', 'port': 3, 'distance_mi':  87, 'suspend_kp': None},
+        'PARTNER2': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER2-1', 'port': 3, 'distance_mi': 309, 'suspend_kp': 7.0},
+        'PARTNER5':   {'freq': '3.596000', 'mode': '',       'call': 'PARTNER5',     'port': 3, 'distance_mi': 374, 'suspend_kp': 7.0},
+        'PARTNER3':  {'freq': '3.585000', 'mode': '',       'call': 'PARTNER3-7',  'port': 3, 'distance_mi': 498, 'suspend_kp': 6.0},
+        'PARTNER7':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER7-1',  'port': 3, 'distance_mi': 518, 'suspend_kp': 6.0},
+        'PARTNER1':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER1-2',  'port': 3, 'distance_mi': 571, 'suspend_kp': 6.0},
+        'PARTNER6':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER6-1',  'port': 3, 'distance_mi': 620, 'suspend_kp': 6.0},
     },
 
     # Suspend all HF partners beyond this distance during extreme storms (G4+, Kp >= 8)

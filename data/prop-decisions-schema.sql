@@ -1,7 +1,7 @@
 -- ============================================================
---  TPRFN prop_decisions table
+--  BPQDash prop_decisions table
 --  Tracks every prop-scheduler.py decision run with full context
---  Run: mysql -u root tprfn < prop-decisions-schema.sql
+--  Run: mysql -u root bpqdash < prop-decisions-schema.sql
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS prop_decisions (
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS prop_decisions (
     solar_source    VARCHAR(64)         NULL     COMMENT 'Source of solar data (hamqsl/noaa/fallback)',
 
     -- Partner
-    partner         VARCHAR(12)         NOT NULL COMMENT 'Partner callsign e.g. N3MEL',
+    partner         VARCHAR(12)         NOT NULL COMMENT 'Partner callsign e.g. PARTNER1',
     location        VARCHAR(64)         NULL     COMMENT 'Partner location description',
     distance_mi     SMALLINT UNSIGNED   NULL     COMMENT 'Distance in miles',
 
@@ -43,5 +43,5 @@ CREATE TABLE IF NOT EXISTS prop_decisions (
 SELECT 'prop_decisions table created OK' AS status;
 SELECT COUNT(*) AS columns
 FROM information_schema.COLUMNS
-WHERE TABLE_SCHEMA = 'tprfn'
+WHERE TABLE_SCHEMA = 'bpqdash'
   AND TABLE_NAME   = 'prop_decisions';

@@ -43,7 +43,7 @@ echo -e "${BOLD}${CYN}"
 cat << 'BANNER'
   ╔══════════════════════════════════════════════════════╗
   ║      BPQ Dashboard v1.5.5 — Guided Installer        ║
-  ║      K1AJD — TPRFN Network — Hephzibah GA           ║
+  ║         Amateur Radio Packet Network                 ║
   ╚══════════════════════════════════════════════════════╝
 BANNER
 echo -e "${NC}"
@@ -62,21 +62,23 @@ echo -e "\n${BOLD}We need a few details to configure BPQ Dashboard.${NC}"
 echo -e "Press ENTER to accept the default shown in [brackets].\n"
 
 # Callsign
-ask "Your station callsign (e.g. K1AJD):"
+ask "Your station callsign (e.g. YOURCALL):"
 read -r INPUT_CALL
-INPUT_CALL="${INPUT_CALL:-K1AJD}"
+INPUT_CALL="${INPUT_CALL:-YOURCALL}"
 INPUT_CALL="${INPUT_CALL^^}"   # uppercase
 ok "Callsign: $INPUT_CALL"
 
 # Node callsign
-ask "Your BPQ node callsign with SSID (e.g. K1AJD-4) [${INPUT_CALL}-4]:"
+ask "Your BPQ node callsign with SSID (e.g. YOURCALL-4) [${INPUT_CALL}-4]:"
 read -r INPUT_NODE
 INPUT_NODE="${INPUT_NODE:-${INPUT_CALL}-4}"
 INPUT_NODE="${INPUT_NODE^^}"
 ok "Node: $INPUT_NODE"
 
 # BPQ telnet password
-ask "Your BPQ telnet password (set in bpq32.cfg USER= line):"
+echo -e "  ${BLU}Hint: Open bpq32.cfg and find the USER= line.${NC}"
+echo -e "  ${BLU}Example: USER=YOURCALL,YOURPASSWORD,YOURCALL → password is YOURPASSWORD${NC}"
+ask "Your BPQ telnet password (from bpq32.cfg USER= line):"
 read -r -s INPUT_BPQ_PASS
 echo ""
 INPUT_BPQ_PASS="${INPUT_BPQ_PASS:-changeme}"
@@ -84,15 +86,18 @@ ok "BPQ password: (set)"
 
 # Domain / hostname
 HOSTNAME_AUTO=$(hostname -f 2>/dev/null || hostname)
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+echo -e "  ${BLU}Your server IP address is: ${WHT}${SERVER_IP}${NC}"
+echo -e "  ${BLU}If you don't have a domain name, just press ENTER to use the IP.${NC}"
 ask "Your server hostname or domain name [$HOSTNAME_AUTO]:"
 read -r INPUT_HOST
 INPUT_HOST="${INPUT_HOST:-$HOSTNAME_AUTO}"
 ok "Hostname: $INPUT_HOST"
 
 # Web root — detect or ask
-ask "Web root directory [/var/www/tprfn]:"
+ask "Web root directory [/var/www/html/bpq]:"
 read -r INPUT_WEBROOT
-WEB_ROOT="${INPUT_WEBROOT:-/var/www/tprfn}"
+WEB_ROOT="${INPUT_WEBROOT:-/var/www/html/bpq}"
 ok "Web root: $WEB_ROOT"
 
 # MySQL root password
@@ -103,15 +108,18 @@ INPUT_DB_ROOT_PASS="${INPUT_DB_ROOT_PASS:-BpqDashboard1!}"
 ok "Database root password: (set)"
 
 # DB for dashboard
-INPUT_DB_NAME="tprfn"
-INPUT_DB_USER="tprfn_user"
+INPUT_DB_NAME="bpqdash"
+INPUT_DB_USER="bpqdash_user"
 ask "Choose a database password for BPQ Dashboard [auto-generated]:"
 read -r -s INPUT_DB_PASS
 echo ""
-INPUT_DB_PASS="${INPUT_DB_PASS:-$(openssl rand -base64 16 2>/dev/null || echo 'BpqDb2025!')}"
+INPUT_DB_PASS="${INPUT_DB_PASS:-$(cat /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 16 2>/dev/null || echo 'BpqDb2025!')}"
 ok "Dashboard DB password: (set)"
 
 # LinBPQ directory
+echo -e "  ${BLU}This is where bpq32.cfg lives. Common paths:${NC}"
+echo -e "  ${BLU}  /home/linbpq    /home/pi/linbpq    /home/tony/linbpq${NC}"
+echo -e "  ${BLU}  Not sure? Run: find /home -name bpq32.cfg 2>/dev/null${NC}"
 ask "Path to your LinBPQ directory [/home/linbpq]:"
 read -r INPUT_LINBPQ
 LINBPQ_DIR="${INPUT_LINBPQ:-/home/linbpq}"
@@ -123,7 +131,9 @@ read -r INPUT_APRS_CALL
 INPUT_APRS_CALL="${INPUT_APRS_CALL:-${INPUT_CALL}-1}"
 INPUT_APRS_CALL="${INPUT_APRS_CALL^^}"
 
-ask "Your APRS-IS passcode (see https://apps.magicbug.co.uk/passcode/):"
+echo -e "  ${BLU}Get your free passcode at: https://apps.magicbug.co.uk/passcode/${NC}"
+echo -e "  ${BLU}Enter your callsign (no SSID) — it gives you a number e.g. 15769${NC}"
+ask "Your APRS-IS passcode (number from magicbug.co.uk):"
 read -r INPUT_APRS_PASS
 INPUT_APRS_PASS="${INPUT_APRS_PASS:-0}"
 ok "APRS: $INPUT_APRS_CALL / passcode set"
@@ -166,7 +176,6 @@ PACKAGES=(
     php8.3-mysql
     php8.3-curl
     php8.3-mbstring
-    php8.3-json
     php8.3-xml
     php8.3-zip
     mariadb-server
@@ -372,9 +381,9 @@ return [
         'callsign'  => '${INPUT_CALL}',
         'node'      => '${INPUT_NODE}',
         'email'     => '${INPUT_EMAIL}',
-        'lat'       => 33.4259,
-        'lon'       => -82.0099,
-        'locator'   => 'EM83XG',
+        'lat'       => 0.0,
+        'lon'       => 0.0,
+        'locator'   => '',
     ],
     'bbs' => [
         'host'      => '127.0.0.1',
@@ -395,7 +404,7 @@ return [
         'pass'      => '${INPUT_APRS_PASS}',
         'host'      => 'rotate.aprs2.net',
         'port'      => 14580,
-        'filter'    => 'r/33.4259/-82.0100/300',
+        'filter'    => 'r/0.0000/-0.0000/300',
     ],
     'paths' => [
         'linbpq'    => '${LINBPQ_DIR}',

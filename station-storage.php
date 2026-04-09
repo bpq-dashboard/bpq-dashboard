@@ -34,7 +34,7 @@ $MAX_STORAGE_SIZE = 2 * 1024 * 1024; // 2MB limit (locations are small)
 $MAX_LOCATIONS = 500;  // Sanity limit on station count
 
 // Default forwarding partners (used if no server file exists)
-$DEFAULT_PARTNERS = ['WP4OH-11', 'N3MEL-2', 'NP4JN-11', 'K7EK', 'KK4DIV-1', 'N9SEO-1', 'N4SFL-1'];
+$DEFAULT_PARTNERS = ['WP4OH-11', 'PARTNER1-2', 'NP4JN-11', 'PARTNER5', 'PARTNER2-1', 'PARTNER6-1', 'PARTNER7-1'];
 
 // ===========================
 // HELPER FUNCTIONS
