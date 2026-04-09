@@ -125,6 +125,18 @@ read -r INPUT_LINBPQ
 LINBPQ_DIR="${INPUT_LINBPQ:-/home/linbpq}"
 ok "LinBPQ dir: $LINBPQ_DIR"
 
+# Station coordinates (for APRS map centering and filter)
+echo -e "  ${BLU}Find your coordinates: right-click on maps.google.com${NC}"
+ask "Your station latitude  (e.g. 33.4259) [0.0000]:"
+read -r INPUT_LAT
+INPUT_LAT="${INPUT_LAT:-0.0000}"
+ok "Latitude: $INPUT_LAT"
+
+ask "Your station longitude (e.g. -82.0099 — West is negative) [0.0000]:"
+read -r INPUT_LON
+INPUT_LON="${INPUT_LON:-0.0000}"
+ok "Longitude: $INPUT_LON"
+
 # APRS credentials
 ask "Your APRS-IS callsign (usually YOURCALL-1) [${INPUT_CALL}-1]:"
 read -r INPUT_APRS_CALL
@@ -325,6 +337,13 @@ for f in "$SCRIPT_DIR"/*.html; do
     chmod 644 "$WEB_ROOT/$(basename "$f")"
     ok "HTML: $(basename "$f")"
 done
+
+# Patch APRS map with user's coordinates
+if [[ -f "$WEB_ROOT/bpq-aprs.html" ]]; then
+    sed -i "s|const HOME_LAT = 0.0000;.*|const HOME_LAT = ${INPUT_LAT};|" "$WEB_ROOT/bpq-aprs.html"
+    sed -i "s|const HOME_LON = 0.0000;.*|const HOME_LON = ${INPUT_LON};|" "$WEB_ROOT/bpq-aprs.html"
+    ok "APRS map centred on ${INPUT_LAT}, ${INPUT_LON}"
+fi
 
 # Copy all PHP files (except config.php — handled separately)
 say "Copying PHP API files..."
@@ -607,6 +626,20 @@ SVCEOF
     err "$name daemon failed to start — check: sudo journalctl -u $name -n 30"
     return 1
 }
+
+# Patch daemon scripts with user's settings
+say "Patching daemon scripts with your settings..."
+if [[ -f "$SCRIPTS_DIR/bpq-chat-daemon.py" ]]; then
+    sed -i "s|BPQ_USER   = 'YOURCALL'.*|BPQ_USER   = '${INPUT_CALL}'|" "$SCRIPTS_DIR/bpq-chat-daemon.py"
+    sed -i "s|BPQ_PASS   = 'YOURPASSWORD'.*|BPQ_PASS   = '${INPUT_BPQ_PASS}'|" "$SCRIPTS_DIR/bpq-chat-daemon.py"
+    ok "bpq-chat-daemon.py patched with callsign and password"
+fi
+if [[ -f "$SCRIPTS_DIR/bpq-aprs-daemon.py" ]]; then
+    sed -i "s|APRS_CALL.*=.*'YOURCALL-1'|APRS_CALL    = '${INPUT_APRS_CALL}'|" "$SCRIPTS_DIR/bpq-aprs-daemon.py"
+    sed -i "s|APRS_PASS.*=.*'0'|APRS_PASS    = '${INPUT_APRS_PASS}'|" "$SCRIPTS_DIR/bpq-aprs-daemon.py"
+    sed -i "s|r/0.0000/0.0000/300|r/${INPUT_LAT}/${INPUT_LON}/300|" "$SCRIPTS_DIR/bpq-aprs-daemon.py"
+    ok "bpq-aprs-daemon.py patched with callsign, passcode and location"
+fi
 
 # bpq-chat daemon
 if [[ -f "$SCRIPTS_DIR/bpq-chat-daemon.py" ]]; then

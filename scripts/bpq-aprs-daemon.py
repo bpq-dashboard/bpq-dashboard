@@ -21,7 +21,7 @@ APRS_HOST    = 'rotate.aprs2.net'
 APRS_PORT    = 14580
 APRS_CALL    = 'YOURCALL-1'
 APRS_PASS    = '15769'
-APRS_FILTER  = 'r/0.0000/-0.0000/300'
+APRS_FILTER  = 'r/0.0000/0.0000/300'   # Updated by install.sh from config.php
 APRS_VERSION = 'BPQ-Dashboard 1.0'   # Must be: name SPACE version
 
 CACHE_DIR    = '/var/www/bpqdash/cache/aprs'

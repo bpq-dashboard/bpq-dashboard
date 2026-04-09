@@ -14,8 +14,8 @@ from pathlib import Path
 # ── Config ────────────────────────────────────────────────────────
 BPQ_HOST   = 'localhost'
 BPQ_PORT   = 8010
-BPQ_USER   = 'YOURCALL'
-BPQ_PASS   = 'YOURPASSWORD'
+BPQ_USER   = 'YOURCALL'    # Set by install.sh from your callsign
+BPQ_PASS   = 'YOURPASSWORD' # Set by install.sh from your BPQ password
 
 STATE_DIR  = '/var/www/bpqdash/cache/chat-sessions'
 MSG_FILE   = STATE_DIR + '/chat-messages.json'
