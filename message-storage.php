@@ -1,7 +1,7 @@
 <?php
 /**
  * BPQ Dashboard Message Storage API
- * Version: 1.3.0
+ * Version: 1.5.5
  * 
  * Stores saved messages and folders as JSON files on the server.
  * This replaces browser localStorage for persistent, cross-device storage.

@@ -1,7 +1,7 @@
 <?php
 /**
  * firewall-api.php — Firewall status API for BPQSERVER
- * Version: 1.0.0
+ * Version: 1.5.5
  *
  * Returns iptables rules parsed into structured JSON.
  * Requires www-data to have sudo access to iptables -L -n --line-numbers

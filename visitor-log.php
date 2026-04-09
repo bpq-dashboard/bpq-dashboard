@@ -1,5 +1,6 @@
 <?php
 /**
+ * Version: 1.5.5
  * BPQDash Visitor Log
  *
  * Logs HTTPS visits to index.php and bpq-rf-connections.html.

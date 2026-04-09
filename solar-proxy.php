@@ -1,7 +1,7 @@
 <?php
 /**
  * Solar Data Proxy
- * Version: 1.3.0
+ * Version: 1.5.5
  * 
  * Proxies HamQSL solar XML data to avoid CORS issues
  */

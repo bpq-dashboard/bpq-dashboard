@@ -1,5 +1,6 @@
 <?php
 /**
+ * Version: 1.5.5
  * Callsign Location Lookup — Optimized
  * 
  * Looks up amateur radio callsign locations using QRZ.com (primary) and callook.info (fallback)

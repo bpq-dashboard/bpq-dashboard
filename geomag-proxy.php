@@ -1,5 +1,6 @@
 <?php
 /**
+ * Version: 1.5.5
  * geomag-proxy.php — NOAA Geomagnetic Data Proxy
  * Part of BPQ Dashboard Suite
  *

@@ -1,7 +1,7 @@
 <?php
 /**
  * NWS Alert BBS Poster
- * Version: 1.3.0
+ * Version: 1.5.5
  * 
  * This script receives NWS alert data via POST and sends it to the BPQ BBS
  * via telnet connection.

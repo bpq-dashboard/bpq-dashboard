@@ -1,7 +1,7 @@
 <?php
 /**
  * BPQ Dashboard Station Storage API
- * Version: 1.4.0
+ * Version: 1.5.5
  * 
  * Stores managed station locations and forwarding partners as JSON files
  * on the server. This replaces browser localStorage for persistent,

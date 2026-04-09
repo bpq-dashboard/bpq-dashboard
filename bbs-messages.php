@@ -1,7 +1,7 @@
 <?php
 /**
  * BPQ BBS Message API
- * Version: 1.3.1
+ * Version: 1.5.5
  * 
  * Connects to BPQ BBS via telnet and provides message management
  */

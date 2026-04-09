@@ -445,7 +445,7 @@ $totalChecks = count($checks);
 
     <div class="timestamp">
         Generated <?= gmdate('Y-m-d H:i:s') ?> UTC | PHP <?= $phpVer ?> | <?= PHP_OS_FAMILY ?>
-        | BPQ Dashboard v1.4.0
+        | BPQ Dashboard v1.5.5
     </div>
 </div>
 </body>

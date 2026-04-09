@@ -1,7 +1,7 @@
 <?php
 /**
  * system-audit-api.php — System health audit API for BPQSERVER
- * Version: 1.0.0
+ * Version: 1.5.5
  *
  * Runs system checks across 6 categories and returns structured JSON
  * with findings and recommendations.

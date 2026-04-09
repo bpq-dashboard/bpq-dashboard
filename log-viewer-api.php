@@ -1,7 +1,7 @@
 <?php
 /**
  * log-viewer-api.php — Log file reader API for BPQSERVER
- * Version: 1.0.0
+ * Version: 1.5.5
  */
 
 header('Content-Type: application/json');

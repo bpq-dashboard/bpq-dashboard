@@ -1,5 +1,6 @@
 <?php
 /**
+ * Version: 1.5.5
  * bpq-chat.php — BPQ Dashboard Chat Backend
  * Sequence-based message deduplication, no cookie headers.
  */

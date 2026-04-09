@@ -1,7 +1,7 @@
 <?php
 /**
  * bpqdash-db.php — Shared database connection helper
- * Version: 1.0.0
+ * Version: 1.5.5
  *
  * Include this file in any BPQDash PHP script that needs database access.
  * Usage:

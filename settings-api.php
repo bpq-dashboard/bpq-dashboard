@@ -1,7 +1,7 @@
 <?php
 /**
  * BPQ Dashboard Settings API
- * Version: 1.0.0
+ * Version: 1.5.5
  *
  * Read/write settings.json with BBS password authentication for writes.
  *

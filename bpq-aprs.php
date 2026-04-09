@@ -1,5 +1,6 @@
 <?php
 /**
+ * Version: 1.5.5
  * bpq-aprs.php — APRS dashboard API — reads from daemon cache
  * Daemon: /var/www/bpqdash/scripts/bpq-aprs-daemon.py
  */
