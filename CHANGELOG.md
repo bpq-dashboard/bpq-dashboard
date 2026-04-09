@@ -612,7 +612,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 - **Settings.json integration in `scripts/storm-monitor.py`** — Same pattern as prop-scheduler. Overrides CONFIG (BBS credentials, paths, storm thresholds) and rebuilds `storm_partners` from settings partners that have an 80m band entry. Backward-compatible.
 
-## [1.4.2] - 2026-03-01
+## [1.5.5] - 2026-03-01
 
 ### Added
 
@@ -687,7 +687,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - `bpq-traffic.html`: connections bar, messages doughnut, bytes bar, traffic type pie (4 charts)
   - `bpq-email-monitor.html`: hourly activity bar (1 chart)
 
-- **Version numbers** updated to v1.4.2 across all pages and documentation
+- **Version numbers** updated to v1.5.5 across all pages and documentation
 
 ### Fixed
 
@@ -723,7 +723,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 - Batch DOM rendering: eliminates hundreds of individual DOM operations per log refresh
 - 69 fewer console.log calls per page load/refresh cycle
 
-## [1.4.2] - 2026-02-07
+## [1.5.5] - 2026-02-07
 
 ### Added
 
@@ -770,14 +770,14 @@ All notable changes to BPQ Dashboard will be documented in this file.
 - Navigation labels updated: "Email" → "Messages" across all pages
 - NWS dashboard reduced from 2316 lines to 871 lines (62% smaller)
 - Error detection expanded to include Timeout and Failed patterns
-- Version numbers updated to v1.4.2 on all pages
+- Version numbers updated to v1.5.5 on all pages
 
 ### Fixed
 
 - Dynamic year display replaces hardcoded "26" in footer timestamps
 - NWS dashboard mobile layout shows alerts before sidebar controls
 
-## [1.4.0] - 2026-02-01
+## [1.5.5] - 2026-02-01
 
 ### Added
 
@@ -971,7 +971,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - Archives now include station location data (`station-locations.json` or `data/stations/`) when present
   - Monthly manifest shows days-in-month, days-with-logs, and month name
   - Monthly retention cleanup added to both scripts (configurable, default 12 months)
-  - Version bumped to 1.4.0
+  - Version bumped to 1.5.5
 
 - **RF Connections - Geomagnetic Conditions**
   - K-index chart: 24 hours → 3 days of 3-hour interval bars
@@ -1023,7 +1023,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - Now includes MHeard Stations (4-port tabbed display) and Known Stations Routing Table
   - Comprehensive node operations view: live logs, MHeard, routing, and station activity
 
-- **All Pages** - Version badge updated to v1.4.0
+- **All Pages** - Version badge updated to v1.5.5
 - All PHP files now use centralized bootstrap for security
 - Configuration migrated from multiple files to single `config.php`
 

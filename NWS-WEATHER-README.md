@@ -12,7 +12,7 @@ This package provides scripts to automatically fetch National Weather Service (N
 - Tracks processed alerts to avoid duplicates
 - Configurable by state, region, and alert type
 
-## v1.4.2 Dashboard Redesign
+## v1.5.5 Dashboard Redesign
 
 The NWS Dashboard has been completely rebuilt with the BPQ Dashboard light theme:
 

@@ -1,6 +1,6 @@
 # BPQ Dashboard Installation & Configuration Guide
 
-**Version:** 1.4.2  
+**Version:** 1.5.5  
 **Last Updated:** February 2026
 
 ---
@@ -51,7 +51,7 @@ BPQ Dashboard is a web-based monitoring suite for BPQ packet radio nodes. It pro
 | **Weather Alerts** | NWS alerts with BBS posting | NWS API |
 | **RF Power Monitor** | 4-channel RF power monitoring | DataLog files |
 
-### What's New in v1.4.0
+### What's New in v1.5.5
 
 - **Unified Configuration** - Single `config.php` replaces multiple config files
 - **Security Modes** - `local` (full features) and `public` (read-only) modes
@@ -341,7 +341,7 @@ Should show JSON with your configuration.
 
 ### Main Configuration File (`config.php`)
 
-The v1.4.0 unified configuration replaces the old `bbs-config.php` and `nws-config.php` files.
+The v1.5.5 unified configuration replaces the old `bbs-config.php` and `nws-config.php` files.
 
 ```php
 <?php
@@ -431,7 +431,7 @@ $config['bbs_pass'] = 'mypassword';
 
 ## Security Modes
 
-v1.4.0 introduces two security modes:
+v1.5.5 introduces two security modes:
 
 ### Local Mode (Default)
 
@@ -550,7 +550,7 @@ All pages include live UTC and Local digital clocks in the navigation bar.
 
 ## Data Archival
 
-v1.4.0 includes automated archival scripts for backing up logs and traffic data.
+v1.5.5 includes automated archival scripts for backing up logs and traffic data.
 
 ### Linux
 
