@@ -790,7 +790,13 @@
         </select>
         <div class="tb-sep"></div>
         <button class="tb-btn" id="multiSelectBtn" onclick="toggleMultiSelect()"><span class="icon">☑</span> Select</button>
-        <button class="tb-btn" onclick="openRulesModal()"><span class="icon">⚙</span> Rules</button>
+        <button class="tb-btn" onclick="openRulesModal()" id="rulesBtn" style="position:relative">
+            <span class="icon">⚙</span> Rules
+            <span id="rulesBadge" style="display:none;position:absolute;top:-6px;right:-6px;
+                background:var(--tb-accent);color:#fff;border-radius:50%;
+                width:17px;height:17px;font-size:10px;font-weight:700;
+                line-height:17px;text-align:center"></span>
+        </button>
         <div class="tb-sep"></div>
         <div id="searchBar">
             <span style="color:var(--tb-muted);font-size:13px">🔍</span>
@@ -844,6 +850,7 @@
                     <input type="checkbox" class="cb-all" id="cbAll" onclick="toggleSelectAll()" title="Select all">
                     <span id="bulkBarCount">0 selected</span>
                     <button class="tb-btn success" onclick="bulkSaveSelected()"><span class="icon">⬇</span> Save Selected</button>
+                    <button class="tb-btn" onclick="bulkMoveToFolder()" id="bulkMoveBtn"><span class="icon">📁</span> Move to Folder</button>
                     <button class="tb-btn danger"  onclick="bulkDeleteSelected()"><span class="icon">🗑</span> Delete Selected</button>
                     <button class="tb-btn" onclick="bulkMarkRead()" id="bulkMarkReadBtn" style="display:none"><span class="icon">✓</span> Mark Read</button>
                     <button class="tb-btn" style="margin-left:auto" onclick="exitMultiSelect()">✕ Cancel</button>
@@ -897,7 +904,13 @@
     <button class="mob-tb-btn" id="mobSaveBtn"  onclick="saveSelected()"   style="display:none"><span class="icon">⬇</span>Save</button>
     <button class="mob-tb-btn" id="mobDeleteBtn" onclick="deleteSelected()" style="display:none"><span class="icon">🗑</span>Delete</button>
     <button class="mob-tb-btn" onclick="openBulletinModal()"><span class="icon">📢</span>Bulletins</button>
-    <button class="mob-tb-btn" onclick="openRulesModal()"><span class="icon">⚙</span>Rules</button>
+    <button class="mob-tb-btn" onclick="openRulesModal()" style="position:relative">
+        <span class="icon">⚙</span>Rules
+        <span id="mobRulesBadge" style="display:none;position:absolute;top:-4px;right:-4px;
+            background:var(--tb-accent);color:#fff;border-radius:50%;
+            width:15px;height:15px;font-size:9px;font-weight:700;
+            line-height:15px;text-align:center"></span>
+    </button>
     <button class="mob-tb-btn" onclick="openAddressBook()"><span class="icon">👤</span>Contacts</button>
     <div style="flex:1"></div>
     <div id="mobStatusChip" style="font-size:10px;color:var(--tb-muted);padding:0 6px">Ready</div>
@@ -912,6 +925,7 @@
             <input type="checkbox" id="mobCbAll" style="width:14px;height:14px;accent-color:var(--tb-accent)" onclick="toggleSelectAll()">
             <span id="mobBulkCount" style="font-size:12px;font-weight:600;color:var(--tb-accent);flex:1">0 selected</span>
             <button class="mob-tb-btn success" onclick="bulkSaveSelected()" style="flex-direction:row;gap:4px"><span>⬇</span>Save</button>
+            <button class="mob-tb-btn" onclick="bulkMoveToFolder()" style="flex-direction:row;gap:4px"><span>📁</span>Move</button>
             <button class="mob-tb-btn" onclick="bulkMarkRead()" id="mobBulkMarkReadBtn" style="display:none;flex-direction:row;gap:4px"><span>✓</span>Read</button>
             <button class="mob-tb-btn" style="color:var(--tb-red);flex-direction:row;gap:4px" onclick="bulkDeleteSelected()"><span>🗑</span>Del</button>
             <button class="mob-tb-btn" onclick="exitMultiSelect()" style="flex-direction:row;gap:4px"><span>✕</span></button>
@@ -1139,6 +1153,7 @@ const CONFIG = {
 //  STATE
 // ═══════════════════════════════════════════════════════════════
 let messages      = [];
+let filedNumbers  = new Set(); // BBS message numbers filed to folders — filtered from inbox
 let savedMessages = [];
 let folders       = ['Saved'];
 let addressBook   = [];
@@ -1230,6 +1245,9 @@ function unlockInterface() {
     document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('app').classList.add('visible');
     loadData();
+    // Auto-connect to BBS and load inbox on page load
+    switchFolder('bbs');
+    setTimeout(() => fetchMessages(), 300);
     // Init mobile layout after load
     if (isMobile()) {
         setTimeout(() => { mobRenderList(); mobRenderFolders(); }, 100);
@@ -1273,6 +1291,12 @@ async function initAuth() {
 function loadData() {
     try { savedMessages  = JSON.parse(localStorage.getItem('bbs_saved_messages') || '[]'); } catch { savedMessages = []; }
     try { folders        = JSON.parse(localStorage.getItem('bbs_folders') || '["Saved"]'); } catch { folders = ['Saved']; }
+    // Rebuild filedNumbers from saved messages AND localStorage
+    filedNumbers = new Set(savedMessages.map(m => m.number).filter(Boolean));
+    try {
+        const stored = JSON.parse(localStorage.getItem('bbs_filed_numbers') || '[]');
+        stored.forEach(n => filedNumbers.add(n));
+    } catch {}
     try { addressBook    = JSON.parse(localStorage.getItem('bbs_contacts') || '[]'); } catch { addressBook = []; }
     try { savedBulletins = JSON.parse(localStorage.getItem('bbs_bulletins') || '[]'); } catch { savedBulletins = []; }
     loadRules();
@@ -1459,7 +1483,9 @@ async function fetchMessages() {
         const d = await r.json();
         hideLoading();
         if (d.success) {
-            messages = (d.messages || []).sort((a,b) => b.number - a.number);
+            // Filter out messages already filed to folders
+            const allMsgs = (d.messages || []).sort((a,b) => b.number - a.number);
+            messages = allMsgs.filter(m => !filedNumbers.has(m.number));
             setStatus('ready', `${messages.length} msgs`);
             const mobChip = document.getElementById('mobStatusChip');
             if (mobChip) mobChip.textContent = `${messages.length} msgs`;
@@ -1824,35 +1850,54 @@ function renderSaveFolderList() {
 function closeSaveModal() { document.getElementById('saveModal').classList.add('hidden'); }
 async function executeSave(folder) {
     // Bulk save mode
-    if (window._bulkSaveMode) {
+    // Handle both bulk save and bulk move modes
+    const isMoveMode = !!window._bulkMoveMode;
+    if (window._bulkSaveMode || isMoveMode) {
         window._bulkSaveMode = false;
+        window._bulkMoveMode = false;
         document.getElementById('deleteAfterSave').parentElement.style.display = '';
         closeSaveModal();
         const nums = [...selectedMsgs];
-        showLoading(`Saving ${nums.length} messages…`);
+        const fromInbox = currentFolder === 'bbs';
+        showLoading(`${isMoveMode ? 'Moving' : 'Saving'} ${nums.length} messages…`);
+
         for (const num of nums) {
-            const msg = messages.find(m => m.number === num);
+            const msg = fromInbox
+                ? messages.find(m => m.number === num)
+                : savedMessages.find(m => m.number === num && (m.folder||'Saved') === currentFolder);
             if (!msg) continue;
-            if (savedMessages.some(s => s.number === num)) continue;
             try {
-                const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${num}`);
-                const d = await r.json();
-                const msgToSave = { ...msg, body: d.success?(d.body||''):'', folder, savedAt: new Date().toISOString() };
+                let body = msg.body || '';
+                if (!body && fromInbox) {
+                    const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${num}`);
+                    const d = await r.json();
+                    body = d.success ? (d.body||'') : '';
+                }
+                // If moving from a saved folder, remove original first
+                if (isMoveMode && !fromInbox) {
+                    savedMessages = savedMessages.filter(
+                        m => !(m.number === num && (m.folder||'Saved') === currentFolder)
+                    );
+                }
+                const msgToSave = { ...msg, body, folder,
+                    savedAt: new Date().toISOString(), _read: false };
                 savedMessages.unshift(msgToSave);
             } catch {}
         }
         persist('bbs_saved_messages', savedMessages);
 
-        // Remove saved messages from inbox
-        const savedNums = new Set(nums);
+        // Remove from inbox and track as filed
+        const movedNums = new Set(nums);
+        nums.forEach(n => { if (n) filedNumbers.add(n); });
+        persistFiledNumbers();
         const before = messages.length;
-        messages = messages.filter(m => !savedNums.has(m.number));
-        persist('bbs_messages_cache', messages);
+        messages = messages.filter(m => !movedNums.has(m.number));
 
         hideLoading();
         recomputeUnread();
         const removed = before - messages.length;
-        showToast(`📬 ${nums.length} messages saved to "${folder}", ${removed} removed from inbox`);
+        const verb = isMoveMode ? 'moved' : 'saved';
+        showToast(`📁 ${nums.length} messages ${verb} to "${folder}"${removed?' — '+removed+' removed from inbox':''}`);
         exitMultiSelect();
         selectedMsg = null;
         clearPreview();
@@ -1883,7 +1928,8 @@ async function executeSave(folder) {
     const savedIdx = messages.findIndex(m => m.number === (selectedMsg.number));
     if (savedIdx >= 0) {
         messages.splice(savedIdx, 1);
-        persist('bbs_messages_cache', messages);
+        if (selectedMsg.number) filedNumbers.add(selectedMsg.number);
+        persistFiledNumbers();
     }
 
     selectedMsg = null;
@@ -1950,6 +1996,11 @@ async function executeDelete() {
     deleteTarget = null;
 }
 async function executeDeleteFromBBS() {
+    // Remove from filed tracking so it won't be hidden if re-received
+    if (deleteTarget && deleteTarget.number) {
+        filedNumbers.delete(deleteTarget.number);
+        persistFiledNumbers();
+    }
     const target = deleteTarget || selectedMsg;
     if (!target) return;
     showLoading('Deleting…');
@@ -2290,6 +2341,15 @@ function getCurrentList() {
     if (currentFolder === 'saved') return savedMessages;
     return savedMessages.filter(m => (m.folder||'Saved') === currentFolder);
 }
+function bulkMoveToFolder() {
+    if (!selectedMsgs.size) return;
+    // Reuse the save modal — set a move flag
+    window._bulkMoveMode = true;
+    window._bulkSaveMode = false;
+    renderSaveFolderList();
+    document.getElementById('saveModal').classList.remove('hidden');
+}
+
 async function bulkMarkRead() {
     if (!selectedMsgs.size) return;
     if (currentFolder === 'bbs') return; // only for saved folders
@@ -2469,6 +2529,7 @@ function buildBody() {
 function loadRules() {
     try { rules = JSON.parse(localStorage.getItem('bbs_rules') || '[]'); } catch { rules = []; }
     try { unreadFolders = JSON.parse(localStorage.getItem('bbs_unread') || '{}'); } catch { unreadFolders = {}; }
+    setTimeout(updateRulesBadge, 50);
     // Will recompute from message _read flags once messages are loaded
 
     // Flush pending reads on page unload / navigation
@@ -2499,6 +2560,7 @@ function loadRules() {
 
 function saveRules() {
     localStorage.setItem('bbs_rules', JSON.stringify(rules));
+    updateRulesBadge();
     // Persist to server storage too if enabled
     if (storageMode === 'server' && serverStorageAvailable) {
         fetch(CONFIG.storageUrl, {
@@ -2577,14 +2639,16 @@ async function applyRules(silent = false) {
     }
 
     if (matched > 0) {
-        // Remove matched messages from inbox
+        // Remove matched messages from inbox and track as filed
+        toRemove.forEach(n => { if (n) filedNumbers.add(n); });
+        persistFiledNumbers();
         messages = messages.filter(m => !toRemove.has(m.number));
         persist('bbs_saved_messages', savedMessages);
-        saveUnread();
+        recomputeUnread();
         updateSidebarFolders();
         updateCounts();
         if (currentFolder === 'bbs') renderList();
-        if (!silent) showToast(`Rules applied — ${matched} message${matched>1?'s':''} filed`);
+        if (!silent) showToast(`⚙ ${matched} message${matched>1?'s':''} filed by rules`);
     }
 
     return matched;
@@ -2621,6 +2685,7 @@ function closeRulesModal() {
 }
 
 function renderRulesList() {
+    updateRulesBadge();
     const container = document.getElementById('rulesList');
     const empty     = document.getElementById('rulesEmpty');
     if (rules.length === 0) {
@@ -2749,6 +2814,30 @@ async function flushPendingReads() {
         pendingReads = [...batch, ...pendingReads];
         console.warn('markReadBulk failed:', e);
     }
+}
+
+// Persist filedNumbers to localStorage so inbox stays clean after reload
+function persistFiledNumbers() {
+    try {
+        localStorage.setItem('bbs_filed_numbers',
+            JSON.stringify([...filedNumbers]));
+    } catch(e) { console.warn('Could not persist filed numbers:', e); }
+}
+
+// Update the Rules button badge with count of enabled rules
+function updateRulesBadge() {
+    const count = rules.filter(r => r.enabled).length;
+    const badge    = document.getElementById('rulesBadge');
+    const mobBadge = document.getElementById('mobRulesBadge');
+    [badge, mobBadge].forEach(b => {
+        if (!b) return;
+        if (count > 0) {
+            b.textContent = count;
+            b.style.display = '';
+        } else {
+            b.style.display = 'none';
+        }
+    });
 }
 
 // Recompute unread counts from actual _read flags on savedMessages

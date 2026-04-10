@@ -1,7 +1,7 @@
 <?php
 /**
  * BPQ Dashboard Settings API
- * Version: 1.5.5
+ * Version: 1.0.0
  *
  * Read/write settings.json with BBS password authentication for writes.
  *
@@ -231,8 +231,8 @@ function actionDetect() {
     } else {
         // Try common Linux linmail.cfg locations
         $linmailCandidates = [
-            '/home/tony/linbpq/linmail.cfg',
             '/home/' . get_current_user() . '/linbpq/linmail.cfg',
+            '/home/linbpq/linmail.cfg',
             '/opt/bpq/linmail.cfg',
             '/var/lib/bpq/linmail.cfg',
         ];
