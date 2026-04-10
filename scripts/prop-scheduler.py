@@ -12,9 +12,9 @@ Usage:
     python3 prop-scheduler.py --apply --force    # Apply even if no changes
 
 Cron (every 48 hours):
-    0 6 */2 * * /usr/bin/python3 /var/www/bpqdash/scripts/prop-scheduler.py --apply
+    0 6 */2 * * /usr/bin/python3 /var/www/tprfn/scripts/prop-scheduler.py --apply
 
-Author: YOURCALL BPQ Dashboard Project
+Author: K1AJD BPQ Dashboard Project
 Version: 1.0.1
 """
 
@@ -50,27 +50,27 @@ CONFIG = {
     ),
     'bbs_log_dir': (
         'C:\\UniServerZ\\www\\bpq\\logs'
-        if IS_WINDOWS else '/var/www/bpqdash/logs'
+        if IS_WINDOWS else '/var/www/tprfn/logs'
     ),
     'vara_log': (
-        'C:\\UniServerZ\\www\\bpq\\logs\\yourcall.vara'
-        if IS_WINDOWS else '/var/www/bpqdash/logs/yourcall.vara'
+        'C:\\UniServerZ\\www\\bpq\\logs\\k1ajd.vara'
+        if IS_WINDOWS else '/var/www/tprfn/logs/k1ajd.vara'
     ),
     'backup_dir': (
         'C:\\UniServerZ\\www\\bpq\\scripts\\prop-backups'
-        if IS_WINDOWS else '/var/www/bpqdash/scripts/prop-backups'
+        if IS_WINDOWS else '/var/www/tprfn/scripts/prop-backups'
     ),
     'state_file': (
         'C:\\UniServerZ\\www\\bpq\\cache\\prop-state.json'
-        if IS_WINDOWS else '/var/www/bpqdash/cache/prop-state.json'
+        if IS_WINDOWS else '/var/www/tprfn/cache/prop-state.json'
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\prop-scheduler.log'
-        if IS_WINDOWS else '/var/www/bpqdash/logs/prop-scheduler.log'
+        if IS_WINDOWS else '/var/www/tprfn/logs/prop-scheduler.log'
     ),
 
     # Home station
-    'home_call': 'YOURCALL',
+    'home_call': 'K1AJD',
     'home_lat': 33.47,
     'home_lon': -82.01,
     'home_grid': 'EM83al',
@@ -79,10 +79,10 @@ CONFIG = {
     'notify_via_bbs': True,
     'bbs_host': 'localhost',
     'bbs_port': 8010,
-    'bbs_user': 'YOURCALL',
-    'bbs_pass': 'YOURPASSWORD',
+    'bbs_user': 'K1AJD',
+    'bbs_pass': 'dawgs1958',
     'bbs_alias': 'bbs',
-    'bbs_notify_to': 'YOURCALL',
+    'bbs_notify_to': 'K1AJD',
 
     # BPQ control — platform-specific
     'bpq_stop_cmd': (
@@ -94,8 +94,12 @@ CONFIG = {
     # e.g., 'sudo systemctl restart bpq32' or 'killall -HUP linbpq'
 
     # Propagation data URLs
+    # Database credentials (matches tprfn-db.php)
+    'db_user': 'tprfn_app',
+    'db_pass': 'TprfnDb2026!',
+    'db_name': 'tprfn',
     'noaa_sfi_url': 'https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json',
-    'noaa_kp_url': 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',
+    'noaa_kp_url': 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',  # Returns objects: {time_tag, Kp, a_running}
     'noaa_forecast_url': 'https://services.swpc.noaa.gov/text/3-day-forecast.txt',
 
     # Tuning parameters
@@ -114,11 +118,11 @@ CONFIG = {
 # BPQ connect command template, and the SSID/alias for connection.
 
 PARTNERS = {
-    'PARTNER1': {
+    'N3MEL': {
         'name': 'Glenn',
         'location': 'Downingtown, PA',
         'lat': 40.01, 'lon': -75.71,
-        'connect_call': 'PARTNER1-2',
+        'connect_call': 'N3MEL-2',
         'attach_port': 3,
         'bands': {
             # Per hub fact sheet: 80m NT (nighttime), 40m DT Scan, 20m DT Scan
@@ -126,40 +130,40 @@ PARTNERS = {
             '40m': {'freq': '7.103200',  'mode': 'PKT-U'},   # DT Scan — daytime primary
             '20m': {'freq': '14.106500', 'mode': 'PKT-U'},   # DT Scan — daytime secondary (added 2026-03-19)
         },
-        'fallback_script': 'TIMES 0000-1059|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C PARTNER1-2|ELSE|C 2 MELBBS|TIMES 1100-2059|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER1-2|ELSE|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C PARTNER1-2|ELSE|C 2 MELBBS|TIMES 2100-2359|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C PARTNER1-2|ELSE|C 2 MELBBS',
+        'fallback_script': 'TIMES 0000-1059|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C N3MEL-2|ELSE|C 2 MELBBS|TIMES 1100-2059|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C N3MEL-2|ELSE|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C N3MEL-2|ELSE|C 2 MELBBS|TIMES 2100-2359|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C N3MEL-2|ELSE|C 2 MELBBS',
         # last_resort_else: after all RF attempts fail, try C 2 MELBBS via packet
         'last_resort_else': 'C 2 MELBBS',
     },
-    'PARTNER3': {
+    'N4VAD': {
         'name': 'Greg',
         'location': 'Guyton, GA',
         'lat': 32.33, 'lon': -81.39,
-        'connect_call': 'PARTNER3-7',
+        'connect_call': 'N4VAD-7',
         'attach_port': 3,
         'bands': {
             '80m': {'freq': '3.585000', 'mode': ''},
             '40m': {'freq': '7.115000', 'mode': ''},
         },
-        'fallback_script': 'TIMES 0000-1059|ATTACH 3|RADIO 3.585000|C PARTNER3-7|TIMES 1100-2259|ATTACH 3|RADIO 7.115000|C PARTNER3-7|TIMES 2300-2359|ATTACH 3|RADIO 3.585000|C PARTNER3-7',
+        'fallback_script': 'TIMES 0000-1059|ATTACH 3|RADIO 3.585000|C N4VAD-7|TIMES 1100-2259|ATTACH 3|RADIO 7.115000|C N4VAD-7|TIMES 2300-2359|ATTACH 3|RADIO 3.585000|C N4VAD-7',
     },
-    'PARTNER4': {
+    'KD4WLE': {
         'name': 'Sean',
         'location': 'S. Florida',
         'lat': 26.15, 'lon': -80.15,
-        'connect_call': 'PARTNER4-3',
+        'connect_call': 'KD4WLE-3',
         'attach_port': 3,
         'bands': {
             '80m': {'freq': '3.596000', 'mode': 'PKT-U'},
             '40m': {'freq': '7.103200', 'mode': 'PKT-U'},
             '20m': {'freq': '14.106500', 'mode': 'PKT-U'},
         },
-        'fallback_script': 'TIMES 0000-1259|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C PARTNER4-3|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER4-3|TIMES 1300-2359|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER4-3|ELSE|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C PARTNER4-3',
+        'fallback_script': 'TIMES 0000-1259|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C KD4WLE-3|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C KD4WLE-3|TIMES 1300-2359|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C KD4WLE-3|ELSE|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C KD4WLE-3',
     },
-    'PARTNER7': {
+    'N4SFL': {
         'name': 'Jay',
         'location': 'Delray, FL',
         'lat': 26.46, 'lon': -80.07,
-        'connect_call': 'PARTNER7-1',
+        'connect_call': 'N4SFL-1',
         'attach_port': 3,
         'bands': {
             # Per hub fact sheet: 20m=14.1065, 40m=7.1032, 80m=3.596, 30m=10.147
@@ -168,54 +172,54 @@ PARTNERS = {
             '30m': {'freq': '10.147000', 'mode': 'PKT-U'},
             '20m': {'freq': '14.106500', 'mode': 'PKT-U'},
         },
-        'fallback_script': 'TIMES 0000-1259|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C PARTNER7-1|ELSE|ATTACH 3|PAUSE|RADIO 7.103200 PKT-U|C PARTNER7-1|TIMES 1300-2359|ATTACH 3|RADIO 14.106500 PKT-U|C PARTNER7-1|ELSE|ATTACH 3|PAUSE|RADIO 10.147000 PKT-U|C PARTNER7-1|ELSE|ATTACH 3|PAUSE|RADIO 14.106500 PKT-U|C PARTNER7-1',
+        'fallback_script': 'TIMES 0000-1259|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C N4SFL-1|ELSE|ATTACH 3|PAUSE|RADIO 7.103200 PKT-U|C N4SFL-1|TIMES 1300-2359|ATTACH 3|RADIO 14.106500 PKT-U|C N4SFL-1|ELSE|ATTACH 3|PAUSE|RADIO 10.147000 PKT-U|C N4SFL-1|ELSE|ATTACH 3|PAUSE|RADIO 14.106500 PKT-U|C N4SFL-1',
     },
-    'PARTNER5': {
+    'K7EK': {
         'name': 'Gary',
         'location': 'Radcliff, KY',
         'lat': 37.84, 'lon': -85.95,
-        'connect_call': 'PARTNER5',
+        'connect_call': 'K7EK',
         'attach_port': 3,
         'bands': {
-            '80m': {'freq': '3.596000', 'mode': ''},       # PARTNER5 preferred (*3.596)
-            '40m': {'freq': '7.103200', 'mode': 'PKT-U'},  # PARTNER5 preferred (*7.1032)
-            '30m': {'freq': '10.143000', 'mode': 'PKT-U'}, # PARTNER5 preferred (*10.1430)
+            '80m': {'freq': '3.596000', 'mode': ''},       # K7EK preferred (*3.596)
+            '40m': {'freq': '7.103200', 'mode': 'PKT-U'},  # K7EK preferred (*7.1032)
+            '30m': {'freq': '10.143000', 'mode': 'PKT-U'}, # K7EK preferred (*10.1430)
         },
-        # PARTNER5 scans multiple freqs per band on a fixed published schedule:
+        # K7EK scans multiple freqs per band on a fixed published schedule:
         # 80m 0000-1259z: 3.585, 3.586, 3.587, *3.596, 3.597 MHz (USB dial)
         # 40m 1300-1859z: 7.1009, 7.1015, 7.1025, *7.1032 MHz (USB dial)
         # 30m 1900-2359z: 10.1400, 10.1415, *10.1430, 10.147 MHz (USB dial)
         # VARA HF: 500, 2300, 2750 Hz BW — PACTOR 1/2/3/4 also supported
-        # VARA retries MUST be 15-20 due to scanning dwell time (per Gary PARTNER5)
+        # VARA retries MUST be 15-20 due to scanning dwell time (per Gary K7EK)
         # Mirrors WC9P frequencies. VHF packet 145.01 @ 1200 baud.
-        'fixed_schedule': True,  # Don't override PARTNER5's published time windows
-        'fallback_script': 'TIMES 0000-1259|ATTACH 3|RADIO 3.596000|PAUSE|C PARTNER5|TIMES 1300-1859|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER5|TIMES 1900-2359|ATTACH 3|RADIO 10.143000 PKT-U|PAUSE|C PARTNER5',
+        'fixed_schedule': True,  # Don't override K7EK's published time windows
+        'fallback_script': 'TIMES 0000-1259|ATTACH 3|RADIO 3.596000|PAUSE|C K7EK|TIMES 1300-1859|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C K7EK|TIMES 1900-2359|ATTACH 3|RADIO 10.143000 PKT-U|PAUSE|C K7EK',
     },
-    'PARTNER6': {
+    'N9SEO': {
         'name': 'Kayne',
         'location': 'Mountain Home, AR',
         'lat': 36.34, 'lon': -92.38,
-        'connect_call': 'PARTNER6-1',
+        'connect_call': 'N9SEO-1',
         'attach_port': 3,
         'bands': {
             '80m': {'freq': '3.596000', 'mode': 'PKT-U'},
             '40m': {'freq': '7.103200', 'mode': 'PKT-U'},
             '20m': {'freq': '14.106500', 'mode': 'PKT-U'},
         },
-        'fallback_script': 'TIMES 0000-0159|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C PARTNER6-1|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER6-1|TIMES 1300-2359|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C PARTNER6-1',
+        'fallback_script': 'TIMES 0000-0159|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C N9SEO-1|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C N9SEO-1|TIMES 1300-2359|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C N9SEO-1',
     },
-    'PARTNER2': {
+    'KK4DIV': {
         'name': 'Bob',
         'location': 'Lynn Haven, FL',
         'lat': 30.24, 'lon': -85.65,
-        'connect_call': 'PARTNER2-1',
+        'connect_call': 'KK4DIV-1',
         'attach_port': 3,
         'bands': {
             '80m': {'freq': '3.596000', 'mode': 'PKT-U'},
             '40m': {'freq': '7.103200', 'mode': 'PKT-U'},
             '20m': {'freq': '14.106500', 'mode': 'PKT-U'},
         },
-        'fallback_script': 'TIMES 0000-0659|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C PARTNER2-1|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER2-1|TIMES 0700-1959|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER2-1|ELSE|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C PARTNER2-1|TIMES 2000-2359|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C PARTNER2-1|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C PARTNER2-1|ELSE|C 2 LHBBS',
+        'fallback_script': 'TIMES 0000-0659|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C KK4DIV-1|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C KK4DIV-1|TIMES 0700-1959|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C KK4DIV-1|ELSE|ATTACH 3|RADIO 14.106500 PKT-U|PAUSE|C KK4DIV-1|TIMES 2000-2359|ATTACH 3|RADIO 3.596000 PKT-U|PAUSE|C KK4DIV-1|ELSE|ATTACH 3|RADIO 7.103200 PKT-U|PAUSE|C KK4DIV-1|ELSE|C 2 LHBBS',
         # last_resort_else: after all RF attempts fail, try C 2 LHBBS via packet
         'last_resort_else': 'C 2 LHBBS',
     },
@@ -352,7 +356,7 @@ def apply_settings_json():
             CONFIG['log_file']   = os.path.join(p['log_dir'], 'prop-scheduler.log')
             CONFIG['vara_log']   = os.path.join(
                 p['log_dir'],
-                (CONFIG.get('home_call', 'yourcall') + '.vara').lower()
+                (CONFIG.get('home_call', 'k1ajd') + '.vara').lower()
             )
 
     # --- Prop scheduler weights / options ---
@@ -402,8 +406,8 @@ NVIS_BASELINE = {
     # daylight hours. 40m is the daytime workhorse. 20m is viable midday
     # for partners >400mi (skip distance favourable).
     #
-    # 20m note: viable for PARTNER4(518mi), PARTNER7(498mi), PARTNER1(571mi),
-    # PARTNER6(620mi), PARTNER2(309mi marginal). NOT viable for PARTNER3(87mi)
+    # 20m note: viable for KD4WLE(518mi), N4SFL(498mi), N3MEL(571mi),
+    # N9SEO(620mi), KK4DIV(309mi marginal). NOT viable for N4VAD(87mi)
     # — too close, skip zone. The distance/SFI adjustments in
     # calculate_band_scores() further tune these scores per partner.
 
@@ -544,15 +548,22 @@ def fetch_solar_conditions():
             log.warning("Could not parse SFI value")
 
     # Planetary K-index (most recent)
+    # NOAA changed format: old = array-of-arrays with header row
+    #   [["time_tag","Kp",...], ["2026-01-01 00:00:00","2.33",...]]
+    # New = array-of-objects
+    #   [{"time_tag":"2026-04-09T00:00:00","Kp":2.33,"a_running":9}]
     kp_data = fetch_json(CONFIG['noaa_kp_url'])
-    if kp_data and len(kp_data) > 1:
-        # First row is header, last row is most recent
+    if kp_data and len(kp_data) > 0:
         try:
             latest_kp = kp_data[-1]
-            conditions['kp'] = float(latest_kp[1])  # Kp value
+            # Detect format: new API returns objects, old returned arrays
+            if isinstance(latest_kp, dict):
+                conditions['kp'] = float(latest_kp.get('Kp', latest_kp.get('kp', 2)))
+            elif isinstance(latest_kp, list) and len(latest_kp) > 1:
+                conditions['kp'] = float(latest_kp[1])
             log.info(f"Kp index: {conditions['kp']}")
-        except (ValueError, TypeError, IndexError):
-            log.warning("Could not parse Kp value")
+        except (ValueError, TypeError, KeyError, IndexError):
+            log.warning("Could not parse Kp value — using default")
 
     return conditions
 
@@ -585,7 +596,7 @@ def parse_bbs_logs(partner_call, days=14):
     """Query MariaDB sessions table for connection statistics per band.
 
     Replaces the original BBS log file parser which was written for a
-    different log format. BPQSERVER BPQ logs do not include RADIO frequency
+    different log format. ARSSYSTEM BPQ logs do not include RADIO frequency
     commands or byte counts in the Disconnected line — all that data is
     captured in MariaDB via tprfn_insert_session(). This function queries
     the sessions table directly for accurate historical band statistics.
@@ -605,12 +616,12 @@ def parse_bbs_logs(partner_call, days=14):
                     band_freq_map[band] = freq
 
     # Build station pattern — match both bare callsign and SSID variants
-    # e.g. PARTNER1 matches PARTNER1-2, PARTNER1-7, PARTNER1 etc.
+    # e.g. N3MEL matches N3MEL-2, N3MEL-7, N3MEL etc.
     base_call = partner_call.split('-')[0].upper()
 
     cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime('%Y-%m-%d')
 
-    # Query sessions table — match on hub=YOURCALL-7 and station starts with partner base call
+    # Query sessions table — match on hub=K1AJD-7 and station starts with partner base call
     sql = f"""
 SELECT
     station,
@@ -629,9 +640,14 @@ GROUP BY station;
 """
 
     try:
+        # Use tprfn_app user (read credentials from tprfn-db.php or config)
+        db_user = CONFIG.get('db_user', 'tprfn_app')
+        db_pass = CONFIG.get('db_pass', 'TprfnDb2026!')
+        db_name = CONFIG.get('db_name', 'tprfn')
+        cmd = ['mysql', f'-u{db_user}', f'-p{db_pass}', db_name,
+               '--batch', '--skip-column-names', '-e', sql]
         result = subprocess.run(
-            ['mysql', '-u', 'root', 'bpqdash', '--batch', '--skip-column-names', '-e', sql],
-            capture_output=True, text=True, timeout=10
+            cmd, capture_output=True, text=True, timeout=10
         )
         if result.returncode != 0:
             log.warning(f"  DB query failed for {partner_call}: {result.stderr.strip()}")

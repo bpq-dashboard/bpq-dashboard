@@ -12,12 +12,12 @@ Usage:
     python3 storm-monitor.py --restore    # Force restore optimized schedules
 
 Cron (every hour):
-    0 * * * * /usr/bin/python3 /var/www/bpqdash/scripts/storm-monitor.py >> /var/www/bpqdash/logs/storm-monitor.log 2>&1
+    0 * * * * /usr/bin/python3 /var/www/tprfn/scripts/storm-monitor.py >> /var/www/tprfn/logs/storm-monitor.log 2>&1
 
 Works alongside prop-scheduler.py — this handles fast reactions,
 prop-scheduler handles slow optimization every 48 hours.
 
-Author: YOURCALL BPQ Dashboard Project
+Author: K1AJD BPQ Dashboard Project
 Version: 1.0.0
 """
 
@@ -49,15 +49,15 @@ CONFIG = {
     ),
     'state_file': (
         'C:\\UniServerZ\\www\\bpq\\cache\\storm-state.json'
-        if IS_WINDOWS else '/var/www/bpqdash/cache/storm-state.json'
+        if IS_WINDOWS else '/var/www/tprfn/cache/storm-state.json'
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\storm-monitor.log'
-        if IS_WINDOWS else '/var/www/bpqdash/logs/storm-monitor.log'
+        if IS_WINDOWS else '/var/www/tprfn/logs/storm-monitor.log'
     ),
     'backup_dir': (
         'C:\\UniServerZ\\www\\bpq\\scripts\\prop-backups'
-        if IS_WINDOWS else '/var/www/bpqdash/scripts/prop-backups'
+        if IS_WINDOWS else '/var/www/tprfn/scripts/prop-backups'
     ),
 
     # BPQ control — platform-specific
@@ -72,10 +72,10 @@ CONFIG = {
     'notify_via_bbs': True,
     'bbs_host': 'localhost',
     'bbs_port': 8010,
-    'bbs_user': 'YOURCALL',
-    'bbs_pass': 'YOURPASSWORD',
+    'bbs_user': 'K1AJD',
+    'bbs_pass': 'dawgs1958',
     'bbs_alias': 'bbs',
-    'bbs_notify_to': 'YOURCALL',
+    'bbs_notify_to': 'K1AJD',
 
     # Storm thresholds
     'kp_storm_threshold': 5,    # Kp >= 5 = storm mode (G1 minor storm)
@@ -95,13 +95,13 @@ CONFIG = {
     #   Kp 7-8 (G3): partners >= 300 mi suspended entirely
     #   Kp 8+  (G4): all partners suspended except < 200 mi
     'storm_partners': {
-        'PARTNER4': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER4-3', 'port': 3, 'distance_mi':  87, 'suspend_kp': None},
-        'PARTNER2': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER2-1', 'port': 3, 'distance_mi': 309, 'suspend_kp': 7.0},
-        'PARTNER5':   {'freq': '3.596000', 'mode': '',       'call': 'PARTNER5',     'port': 3, 'distance_mi': 374, 'suspend_kp': 7.0},
-        'PARTNER3':  {'freq': '3.585000', 'mode': '',       'call': 'PARTNER3-7',  'port': 3, 'distance_mi': 498, 'suspend_kp': 6.0},
-        'PARTNER7':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER7-1',  'port': 3, 'distance_mi': 518, 'suspend_kp': 6.0},
-        'PARTNER1':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER1-2',  'port': 3, 'distance_mi': 571, 'suspend_kp': 6.0},
-        'PARTNER6':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'PARTNER6-1',  'port': 3, 'distance_mi': 620, 'suspend_kp': 6.0},
+        'KD4WLE': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'KD4WLE-3', 'port': 3, 'distance_mi':  87, 'suspend_kp': None},
+        'KK4DIV': {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'KK4DIV-1', 'port': 3, 'distance_mi': 309, 'suspend_kp': 7.0},
+        'K7EK':   {'freq': '3.596000', 'mode': '',       'call': 'K7EK',     'port': 3, 'distance_mi': 374, 'suspend_kp': 7.0},
+        'N4VAD':  {'freq': '3.585000', 'mode': '',       'call': 'N4VAD-7',  'port': 3, 'distance_mi': 498, 'suspend_kp': 6.0},
+        'N4SFL':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'N4SFL-1',  'port': 3, 'distance_mi': 518, 'suspend_kp': 6.0},
+        'N3MEL':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'N3MEL-2',  'port': 3, 'distance_mi': 571, 'suspend_kp': 6.0},
+        'N9SEO':  {'freq': '3.596000', 'mode': 'PKT-U', 'call': 'N9SEO-1',  'port': 3, 'distance_mi': 620, 'suspend_kp': 6.0},
     },
 
     # Suspend all HF partners beyond this distance during extreme storms (G4+, Kp >= 8)
@@ -283,16 +283,27 @@ def save_state(state):
 # ============================================================================
 
 def fetch_kp():
-    """Fetch current Kp index from NOAA."""
+    """Fetch current Kp index from NOAA.
+    Handles both old array format and new object format:
+      Old: [['time_tag','Kp',...], ['2026-01-01 00:00:00','2.33',...]]
+      New: [{'time_tag':'2026-04-09T00:00:00','Kp':2.33,'a_running':9}]
+    """
     try:
         req = Request(CONFIG['noaa_kp_url'], headers={'User-Agent': 'BPQ-StormMonitor/1.0'})
         with urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
-        if data and len(data) > 1:
-            # First row is header, last row is most recent
-            kp = float(data[-1][1])
+        if data and len(data) > 0:
+            latest = data[-1]
+            # New format: object with Kp key
+            if isinstance(latest, dict):
+                kp = float(latest.get('Kp', latest.get('kp', 0)))
+            # Old format: array [timestamp, kp_value, ...]
+            elif isinstance(latest, list) and len(latest) > 1:
+                kp = float(latest[1])
+            else:
+                return None
             return kp
-    except (URLError, json.JSONDecodeError, ValueError, IndexError) as e:
+    except (URLError, json.JSONDecodeError, ValueError, IndexError, KeyError) as e:
         log.warning(f"Failed to fetch Kp: {e}")
     return None
 
