@@ -1,7 +1,7 @@
 <?php
 /**
  * BPQ Dashboard Message Storage API
- * Version: 1.5.5
+ * Version: 1.3.0
  * 
  * Stores saved messages and folders as JSON files on the server.
  * This replaces browser localStorage for persistent, cross-device storage.
@@ -219,6 +219,15 @@ function getMessages($folder = null) {
     
     $messages = readJsonFile($MESSAGES_FILE, []);
     
+    // Back-compat: messages saved before read-tracking had no _read field.
+    // Treat them as already read so they don't flood the unread count.
+    foreach ($messages as &$m) {
+        if (!array_key_exists('_read', $m)) {
+            $m['_read'] = true;
+        }
+    }
+    unset($m);
+
     if ($folder !== null) {
         $folder = sanitizeFolderName($folder);
         $messages = array_filter($messages, fn($m) => ($m['folder'] ?? 'Inbox') === $folder);
@@ -259,20 +268,26 @@ function saveMessage($message, $folder = 'Saved') {
         writeJsonFile($FOLDERS_FILE, $folders);
     }
     
-    // Prepare message for storage
+    // Prepare message for storage — preserve read state and rule flags
     $storedMessage = [
-        'id' => $message['id'] ?? generateMessageId(),
-        'number' => $message['number'] ?? null,
-        'date' => $message['date'] ?? date('d-M'),
-        'type' => $message['type'] ?? 'P',
-        'size' => $message['size'] ?? 0,
-        'from' => sanitize($message['from'] ?? 'Unknown'),
-        'to' => sanitize($message['to'] ?? ''),
-        'subject' => sanitize($message['subject'] ?? 'No Subject'),
-        'body' => $message['body'] ?? '',
-        'folder' => $folder,
-        'savedAt' => date('c'),
+        'id'          => $message['id'] ?? generateMessageId(),
+        'number'      => $message['number'] ?? null,
+        'date'        => $message['date'] ?? date('d-M'),
+        'type'        => $message['type'] ?? 'P',
+        'size'        => $message['size'] ?? 0,
+        'from'        => sanitize($message['from'] ?? 'Unknown'),
+        'to'          => sanitize($message['to'] ?? ''),
+        'subject'     => sanitize($message['subject'] ?? 'No Subject'),
+        'body'        => $message['body'] ?? '',
+        'folder'      => $folder,
+        'savedAt'     => $message['savedAt'] ?? date('c'),
+        '_read'       => $message['_read'] ?? false,
+        '_ruleMatched'=> $message['_ruleMatched'] ?? null,
     ];
+    // Remove null _ruleMatched to keep JSON clean
+    if ($storedMessage['_ruleMatched'] === null) {
+        unset($storedMessage['_ruleMatched']);
+    }
     
     $messages = readJsonFile($MESSAGES_FILE, []);
     
@@ -701,6 +716,75 @@ if ($method === 'POST') {
             echo json_encode(importData($input));
             break;
             
+        case 'markRead':
+            // Mark a single message as read — match by id (preferred) or number+folder
+            $id2     = $input['id'] ?? null;
+            $num     = $input['number'] ?? null;
+            $folder2 = sanitizeFolderName($input['folder'] ?? 'Saved');
+            ensureStorageDir();
+            $msgs  = readJsonFile($MESSAGES_FILE, []);
+            $found = false;
+            foreach ($msgs as &$m) {
+                $matchId  = $id2  && isset($m['id'])     && $m['id'] === $id2;
+                $matchNum = $num  && isset($m['number'])  && $m['number'] == $num
+                            && ($m['folder'] ?? 'Saved') === $folder2;
+                if ($matchId || $matchNum) {
+                    $m['_read'] = true;
+                    unset($m['_ruleMatched']);
+                    $found = true;
+                    break;
+                }
+            }
+            unset($m);
+            if ($found) {
+                writeJsonFile($MESSAGES_FILE, array_values($msgs));
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Message not found']);
+            }
+            exit;
+
+        case 'markReadBulk':
+            // Mark multiple messages as read in one write — sent on page unload/interval
+            $reads = $input['reads'] ?? [];
+            if (!is_array($reads) || empty($reads)) {
+                echo json_encode(['success' => true, 'updated' => 0]);
+                exit;
+            }
+            ensureStorageDir();
+            $msgs    = readJsonFile($MESSAGES_FILE, []);
+            $updated = 0;
+            // Build two lookups: by id and by number:folder
+            $byId  = [];
+            $byNum = [];
+            foreach ($msgs as $i => $m) {
+                if (!empty($m['id']))     $byId[$m['id']] = $i;
+                if (!empty($m['number'])) {
+                    $key = $m['number'] . ':' . ($m['folder'] ?? 'Saved');
+                    $byNum[$key] = $i;
+                }
+            }
+            foreach ($reads as $r) {
+                $idx = null;
+                // Prefer id lookup
+                if (!empty($r['id']) && isset($byId[$r['id']])) {
+                    $idx = $byId[$r['id']];
+                } elseif (!empty($r['number'])) {
+                    $key = $r['number'] . ':' . sanitizeFolderName($r['folder'] ?? 'Saved');
+                    if (isset($byNum[$key])) $idx = $byNum[$key];
+                }
+                if ($idx !== null && empty($msgs[$idx]['_read'])) {
+                    $msgs[$idx]['_read'] = true;
+                    unset($msgs[$idx]['_ruleMatched']);
+                    $updated++;
+                }
+            }
+            if ($updated > 0) {
+                writeJsonFile($MESSAGES_FILE, array_values($msgs));
+            }
+            echo json_encode(['success' => true, 'updated' => $updated]);
+            exit;
+
         case 'saveRules':
                 global $RULES_FILE;
                 ensureStorageDir();

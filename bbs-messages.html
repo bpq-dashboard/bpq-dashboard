@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BPQ Dashboard v1.5.5 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>BPQ BBS — YOURCALL</title>
+    <title>BPQ BBS — K1AJD</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -810,7 +809,7 @@
         <!-- Sidebar -->
         <div id="sidebar">
             <div class="sidebar-section">
-                <div class="sidebar-heading">YOURCALL BBS</div>
+                <div class="sidebar-heading">K1AJD BBS</div>
                 <div class="folder-item active" id="folderBBS"   onclick="switchFolder('bbs')">
                     <span class="folder-icon">📥</span> Inbox
                     <span class="folder-count zero" id="cntBBS">0</span>
@@ -846,6 +845,7 @@
                     <span id="bulkBarCount">0 selected</span>
                     <button class="tb-btn success" onclick="bulkSaveSelected()"><span class="icon">⬇</span> Save Selected</button>
                     <button class="tb-btn danger"  onclick="bulkDeleteSelected()"><span class="icon">🗑</span> Delete Selected</button>
+                    <button class="tb-btn" onclick="bulkMarkRead()" id="bulkMarkReadBtn" style="display:none"><span class="icon">✓</span> Mark Read</button>
                     <button class="tb-btn" style="margin-left:auto" onclick="exitMultiSelect()">✕ Cancel</button>
                 </div>
                 <div id="listHeader">
@@ -912,6 +912,7 @@
             <input type="checkbox" id="mobCbAll" style="width:14px;height:14px;accent-color:var(--tb-accent)" onclick="toggleSelectAll()">
             <span id="mobBulkCount" style="font-size:12px;font-weight:600;color:var(--tb-accent);flex:1">0 selected</span>
             <button class="mob-tb-btn success" onclick="bulkSaveSelected()" style="flex-direction:row;gap:4px"><span>⬇</span>Save</button>
+            <button class="mob-tb-btn" onclick="bulkMarkRead()" id="mobBulkMarkReadBtn" style="display:none;flex-direction:row;gap:4px"><span>✓</span>Read</button>
             <button class="mob-tb-btn" style="color:var(--tb-red);flex-direction:row;gap:4px" onclick="bulkDeleteSelected()"><span>🗑</span>Del</button>
             <button class="mob-tb-btn" onclick="exitMultiSelect()" style="flex-direction:row;gap:4px"><span>✕</span></button>
         </div>
@@ -1046,7 +1047,7 @@
                 <span class="tag-chip" onclick="addBulletinTag('SITREP')">SITREP</span>
                 <span class="tag-chip" onclick="addBulletinTag('NTS')">NTS</span>
                 <span class="tag-chip" onclick="addBulletinTag('ARES')">ARES</span>
-                <span class="tag-chip" onclick="addBulletinTag('BPQDash')">BPQDash</span>
+                <span class="tag-chip" onclick="addBulletinTag('TPRFN')">TPRFN</span>
                 <span class="tag-chip" onclick="addBulletinTag('NEWS')">NEWS</span>
             </div>
             <div class="form-row" style="margin-bottom:10px">
@@ -1148,6 +1149,7 @@ let selectedMsgs    = new Set(); // set of message numbers
 let rules           = [];        // message filing rules
 let signature       = { text: '', enabled: false }; // user signature
 let unreadFolders   = {};        // folderName → unread count
+let pendingReads    = [];            // [{number, folder}] — queued markRead syncs
 let sortField  = 'date';         // current sort field
 let sortAsc    = false;          // sort direction (false = newest first)
 let searchQuery = '';            // current search query
@@ -1361,6 +1363,8 @@ async function loadSavedFromServer() {
             }
             saveUnread();
         }
+        // Recompute unread from actual message _read flags
+        recomputeUnread();
         updateSidebarFolders();
         updateCounts();
         if (currentFolder !== 'bbs') renderList();
@@ -1623,6 +1627,7 @@ function renderList() {
 
     body.innerHTML = list.map((msg, i) => {
         const isSaved     = currentFolder === 'bbs' && savedMessages.some(s => s.number === msg.number);
+        const isUnread    = currentFolder !== 'bbs' && !msg._read;
         const isRuleMatch = !!msg._ruleMatched && !msg._read;
         const ruleTag     = msg._ruleMatched
             ? `<span class="rule-tag" title="Rule: ${escapeHtml(msg._ruleMatched || '')}">⚙ ${escapeHtml(msg._ruleMatched || '')}</span>`
@@ -1632,7 +1637,7 @@ function renderList() {
         const typeClass = `type-${(msg.type||msg.status||'B').charAt(0).toUpperCase()}`;
         const typeLbl   = (msg.type||msg.status||'B').charAt(0).toUpperCase();
         const savedIcon = isSaved ? '<span style="color:var(--tb-green);font-size:9px;margin-left:3px" title="Saved">●</span>' : '';
-        return `<div class="msg-row ${isSelected?'selected':''} ${isSaved?'saved-msg':''} ${isRuleMatch?'rule-matched':''} ${isChecked?'ms-checked':''}"
+        return `<div class="msg-row ${isSelected?'selected':''} ${isSaved?'saved-msg':''} ${isRuleMatch?'rule-matched':''} ${isUnread?'unread':''} ${isChecked?'ms-checked':''}"
                      onclick="multiSelectMode ? toggleRowCheck(${msg.number}, event) : selectMsg(${i})"
                      data-index="${i}" data-num="${msg.number}">
             <div class="msg-cell" style="display:flex;align-items:center;justify-content:center">
@@ -1679,16 +1684,27 @@ function selectMsg(index) {
 
     selectedMsg = { ...msg, _src: src, _index: index };
 
-    // Clear rule-matched highlight and mark as read when message is opened
-    if (src === 'saved' && msg._ruleMatched) {
+    // Mark message as read when opened in any saved folder
+    if (src === 'saved' && !msg._read) {
         const realIdx = savedMessages.findIndex(
             m => m.number === msg.number && (m.folder||'Saved') === (msg.folder||'Saved')
         );
         if (realIdx >= 0) {
+            // Clear rule highlight and mark read
             delete savedMessages[realIdx]._ruleMatched;
-            // Mark as read
             savedMessages[realIdx]._read = true;
             persist('bbs_saved_messages', savedMessages);
+            // Queue read sync to server
+            if (storageMode === 'server' && serverStorageAvailable) {
+                const readEntry = {
+                    id:     savedMessages[realIdx].id || null,
+                    number: savedMessages[realIdx].number,
+                    folder: savedMessages[realIdx].folder || 'Saved'
+                };
+                pendingReads.push(readEntry);
+                // Flush immediately — don't wait for unload
+                flushPendingReads();
+            }
         }
         delete selectedMsg._ruleMatched;
         selectedMsg._read = true;
@@ -1701,9 +1717,19 @@ function selectMsg(index) {
             saveUnread();
         }
 
-        // Re-render list and sidebar to remove green highlight and update badge
-        updateSidebarFolders();
-        if (isMobile()) mobRenderFolders();
+        // Recompute unread from actual message state (more reliable than counter)
+        recomputeUnread();
+        setTimeout(() => renderList(), 50);
+    } else if (src === 'saved' && msg._ruleMatched) {
+        // Already read but still has rule highlight — clear it
+        const realIdx = savedMessages.findIndex(
+            m => m.number === msg.number && (m.folder||'Saved') === (msg.folder||'Saved')
+        );
+        if (realIdx >= 0) {
+            delete savedMessages[realIdx]._ruleMatched;
+            persist('bbs_saved_messages', savedMessages);
+        }
+        delete selectedMsg._ruleMatched;
         setTimeout(() => renderList(), 50);
     }
 
@@ -1824,8 +1850,7 @@ async function executeSave(folder) {
         persist('bbs_messages_cache', messages);
 
         hideLoading();
-        unreadFolders[folder] = (unreadFolders[folder] || 0) + nums.length;
-        localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
+        recomputeUnread();
         const removed = before - messages.length;
         showToast(`📬 ${nums.length} messages saved to "${folder}", ${removed} removed from inbox`);
         exitMultiSelect();
@@ -1836,7 +1861,8 @@ async function executeSave(folder) {
         return;
     }
     if (!selectedMsg) return;
-    const msgToSave = { ...selectedMsg, body: selectedMsg._body||'', folder, savedAt: new Date().toISOString() };
+    const msgToSave = { ...selectedMsg, body: selectedMsg._body||'', folder,
+        savedAt: new Date().toISOString(), _read: false };
     delete msgToSave._src; delete msgToSave._index; delete msgToSave._body;
 
     if (storageMode==='server' && serverStorageAvailable) {
@@ -1850,10 +1876,6 @@ async function executeSave(folder) {
         savedMessages.unshift(msgToSave);
         persist('bbs_saved_messages', savedMessages);
     }
-
-    // Mark folder as having new mail
-    unreadFolders[folder] = (unreadFolders[folder] || 0) + 1;
-    localStorage.setItem('bbs_unread', JSON.stringify(unreadFolders));
 
     closeSaveModal();
 
@@ -2210,6 +2232,12 @@ function toggleMultiSelect() {
     // Only available in BBS inbox or saved/folder views
     multiSelectMode = true;
     selectedMsgs.clear();
+    // Show Mark Read only in saved folders
+    const inSavedFolder = currentFolder !== 'bbs';
+    const mrBtn    = document.getElementById('bulkMarkReadBtn');
+    const mrBtnMob = document.getElementById('mobBulkMarkReadBtn');
+    if (mrBtn)    mrBtn.style.display    = inSavedFolder ? '' : 'none';
+    if (mrBtnMob) mrBtnMob.style.display = inSavedFolder ? '' : 'none';
     document.getElementById('listBody').classList.add('multi-mode');
     document.getElementById('bulkBar').classList.add('visible');
     document.getElementById('multiSelectBtn').style.color = 'var(--tb-accent)';
@@ -2262,7 +2290,50 @@ function getCurrentList() {
     if (currentFolder === 'saved') return savedMessages;
     return savedMessages.filter(m => (m.folder||'Saved') === currentFolder);
 }
-async function bulkSaveSelected() {
+async function bulkMarkRead() {
+    if (!selectedMsgs.size) return;
+    if (currentFolder === 'bbs') return; // only for saved folders
+
+    const nums = [...selectedMsgs];
+    let updated = 0;
+
+    nums.forEach(num => {
+        const idx = savedMessages.findIndex(
+            m => m.number === num && (m.folder || 'Saved') === currentFolder
+        );
+        if (idx >= 0 && !savedMessages[idx]._read) {
+            delete savedMessages[idx]._ruleMatched;
+            savedMessages[idx]._read = true;
+            updated++;
+
+            // Sync each to server
+            if (storageMode === 'server' && serverStorageAvailable) {
+                const entry = {
+                    action: 'markRead',
+                    id:     savedMessages[idx]?.id || null,
+                    number: num,
+                    folder: currentFolder
+                };
+                pendingReads.push({ id: entry.id, number: num, folder: currentFolder });
+                flushPendingReads();
+            }
+        }
+    });
+
+    if (updated > 0) {
+        persist('bbs_saved_messages', savedMessages);
+        await flushPendingReads();
+        recomputeUnread();
+        showToast(`✓ ${updated} message${updated > 1 ? 's' : ''} marked as read`);
+    } else {
+        showToast('All selected messages already read');
+    }
+
+    exitMultiSelect();
+    renderList();
+}
+
+function bulkSaveSelected() {
     if (selectedMsgs.size === 0) { showToast('No messages selected', true); return; }
     if (currentFolder !== 'bbs') { showToast('Can only save from BBS inbox', true); return; }
     // Show folder picker — reuse single save modal
@@ -2398,6 +2469,20 @@ function buildBody() {
 function loadRules() {
     try { rules = JSON.parse(localStorage.getItem('bbs_rules') || '[]'); } catch { rules = []; }
     try { unreadFolders = JSON.parse(localStorage.getItem('bbs_unread') || '{}'); } catch { unreadFolders = {}; }
+    // Will recompute from message _read flags once messages are loaded
+
+    // Flush pending reads on page unload / navigation
+    window.addEventListener('beforeunload', () => {
+        if (pendingReads.length && storageMode === 'server' && serverStorageAvailable) {
+            // Use sendBeacon for reliable delivery on page unload
+            const data = JSON.stringify({ action: 'markReadBulk', reads: pendingReads });
+            navigator.sendBeacon(CONFIG.storageUrl, new Blob([data], {type:'application/json'}));
+            pendingReads = [];
+        }
+    });
+
+    // Also flush every 10 seconds in case of slow reading
+    setInterval(() => { if (pendingReads.length) flushPendingReads(); }, 10000);
     // Also pull rules from server if server mode active
     if (storageMode === 'server' && serverStorageAvailable) {
         fetch(CONFIG.storageUrl + '?action=rules')
@@ -2486,8 +2571,6 @@ async function applyRules(silent = false) {
             toRemove.add(msg.number);
 
             // Mark folder as having unread
-            unreadFolders[rule.folder] = (unreadFolders[rule.folder] || 0) + 1;
-
             matched++;
             break; // First matching rule wins — don't double-file
         }
@@ -2644,6 +2727,44 @@ function markFolderRead(folderName) {
         updateSidebarFolders();
         if (isMobile()) mobRenderFolders();
     }
+}
+
+// Flush all pending read syncs to server in one batch call
+async function flushPendingReads() {
+    if (!pendingReads.length) return;
+    if (storageMode !== 'server' || !serverStorageAvailable) {
+        pendingReads = [];
+        return;
+    }
+    const batch = [...pendingReads];
+    pendingReads = [];
+    try {
+        await fetch(CONFIG.storageUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'markReadBulk', reads: batch })
+        });
+    } catch(e) {
+        // Re-queue on failure
+        pendingReads = [...batch, ...pendingReads];
+        console.warn('markReadBulk failed:', e);
+    }
+}
+
+// Recompute unread counts from actual _read flags on savedMessages
+// More reliable than maintaining a manual counter
+function recomputeUnread() {
+    const computed = {};
+    savedMessages.forEach(m => {
+        if (!m._read) {
+            const f = m.folder || 'Saved';
+            computed[f] = (computed[f] || 0) + 1;
+        }
+    });
+    unreadFolders = computed;
+    saveUnread();
+    updateSidebarFolders();
+    if (typeof isMobile === 'function' && isMobile()) mobRenderFolders();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2947,7 +3068,7 @@ initAuth();
                 style="width:100%;min-height:120px;background:var(--tb-bg);border:1px solid var(--tb-border);
                        border-radius:var(--radius);color:var(--tb-text);padding:10px;
                        font-family:var(--font-mono);font-size:12px;resize:vertical;outline:none;line-height:1.6"
-                placeholder="73 de YOURCALL&#10;Tony — Augusta, GA&#10;BPQ Dashboard"></textarea>
+                placeholder="73 de K1AJD&#10;Tony — Augusta, GA&#10;BPQ Dashboard"></textarea>
             <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
                 <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer">
                     <input type="checkbox" id="sigEnabledGlobal" style="width:14px;height:14px;accent-color:var(--tb-accent)">
