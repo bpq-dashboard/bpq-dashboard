@@ -31,7 +31,7 @@ $config = [
 // ===========================
 
 define('AUTH_FILE', __DIR__ . '/data/.bbs_auth');
-define('AUTH_SALT', 'bpq_bbs_server_salt_2025_k1ajd');
+define('AUTH_SALT', 'bpq_bbs_server_salt_2025_bpqdash');
 
 function getStoredPasswordHash() {
     if (!file_exists(AUTH_FILE)) {

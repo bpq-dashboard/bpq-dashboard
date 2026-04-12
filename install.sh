@@ -1,11 +1,11 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════
-#  BPQ Dashboard v1.5.5 — Guided Installation Script
+#  BPQ Dashboard v1.5.6 — Guided Installation Script
 #  For Debian / Ubuntu / Raspberry Pi OS
 #
 #  HOW TO RUN:
-#    1. Copy the BPQ-Dashboard-v1.5.5.zip to your Linux machine
-#    2. Unzip it:   unzip BPQ-Dashboard-v1.5.5.zip
+#    1. Copy the BPQ-Dashboard-v1.5.6.zip to your Linux machine
+#    2. Unzip it:   unzip BPQ-Dashboard-v1.5.6.zip
 #    3. Enter dir:  cd BPQ-Dashboard-v1.5.2
 #    4. Run:        sudo bash install.sh
 # ═══════════════════════════════════════════════════════════════════
@@ -42,7 +42,7 @@ clear
 echo -e "${BOLD}${CYN}"
 cat << 'BANNER'
   ╔══════════════════════════════════════════════════════╗
-  ║      BPQ Dashboard v1.5.5 — Guided Installer        ║
+  ║      BPQ Dashboard v1.5.6 — Guided Installer        ║
   ║         Amateur Radio Packet Network                 ║
   ╚══════════════════════════════════════════════════════╝
 BANNER
@@ -212,15 +212,19 @@ for pkg in "${PACKAGES[@]}"; do
         if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$pkg" >> "$LOG" 2>&1; then
             ok "Installed: $pkg"
         else
-            # Try php8.2 fallback
+            # Try PHP version fallbacks 8.2 → 8.1 → 8.4
             if [[ "$pkg" == php8.3* ]]; then
-                FALLBACK="${pkg/8.3/8.2}"
-                say "Trying fallback: $FALLBACK..."
-                if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$FALLBACK" >> "$LOG" 2>&1; then
-                    ok "Installed fallback: $FALLBACK"
-                else
-                    warn "Could not install $pkg or fallback — continuing"
-                fi
+                INSTALLED=0
+                for PHPFB in 8.2 8.1 8.4; do
+                    FALLBACK="${pkg/8.3/$PHPFB}"
+                    say "Trying fallback: $FALLBACK..."
+                    if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$FALLBACK" >> "$LOG" 2>&1; then
+                        ok "Installed fallback: $FALLBACK"
+                        INSTALLED=1
+                        break
+                    fi
+                done
+                [[ $INSTALLED -eq 0 ]] && warn "Could not install $pkg or any fallback — continuing"
             else
                 warn "Could not install $pkg — may cause issues"
             fi
@@ -260,24 +264,25 @@ hdr "STEP 5 — CONFIGURE MARIADB"
 
 say "Securing MariaDB and creating dashboard database..."
 
-# Set root password and secure installation
-mysql -u root 2>/dev/null << MYSQL_SETUP
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${INPUT_DB_ROOT_PASS}';
-DELETE FROM mysql.user WHERE User='';
-DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost','127.0.0.1','::1');
-DROP DATABASE IF EXISTS test;
-DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-CREATE DATABASE IF NOT EXISTS \`${INPUT_DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${INPUT_DB_USER}'@'localhost' IDENTIFIED BY '${INPUT_DB_PASS}';
-GRANT ALL PRIVILEGES ON \`${INPUT_DB_NAME}\`.* TO '${INPUT_DB_USER}'@'localhost';
-FLUSH PRIVILEGES;
-MYSQL_SETUP
+# Use individual -e commands — avoids heredoc auth issues on Raspberry Pi / Debian
+# sudo mysql uses unix socket auth and works without a root password
+DB_OK=1
+sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('${INPUT_DB_ROOT_PASS}');" >> "$LOG" 2>&1 || true
+sudo mysql -e "DELETE FROM mysql.user WHERE User='';" >> "$LOG" 2>&1 || true
+sudo mysql -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost','127.0.0.1','::1');" >> "$LOG" 2>&1 || true
+sudo mysql -e "DROP DATABASE IF EXISTS test;" >> "$LOG" 2>&1 || true
+sudo mysql -e "DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test\_%%';" >> "$LOG" 2>&1 || true
+sudo mysql -e "CREATE DATABASE IF NOT EXISTS \`${INPUT_DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >> "$LOG" 2>&1 || DB_OK=0
+sudo mysql -e "CREATE USER IF NOT EXISTS '${INPUT_DB_USER}'@'localhost' IDENTIFIED BY '${INPUT_DB_PASS}';" >> "$LOG" 2>&1 || DB_OK=0
+sudo mysql -e "GRANT ALL PRIVILEGES ON \`${INPUT_DB_NAME}\`.* TO '${INPUT_DB_USER}'@'localhost';" >> "$LOG" 2>&1 || DB_OK=0
+sudo mysql -e "FLUSH PRIVILEGES;" >> "$LOG" 2>&1 || true
 
-if [[ $? -eq 0 ]]; then
+if [[ $DB_OK -eq 1 ]]; then
     ok "MariaDB secured and database '$INPUT_DB_NAME' created"
     ok "Database user '$INPUT_DB_USER' created"
 else
     warn "MariaDB setup may have had issues — check $LOG"
+    warn "If DB errors persist run: sudo mysql and enter commands manually"
 fi
 
 # Import schema if present
@@ -464,20 +469,95 @@ for pair in \
 done
 
 # ═══════════════════════════════════════════════════════════════════
-hdr "STEP 10 — CONFIGURE NGINX"
+hdr "STEP 10 — CONFIGURE WEB SERVER"
 # ═══════════════════════════════════════════════════════════════════
 
-# Remove default nginx site if it exists
-[[ -f /etc/nginx/sites-enabled/default ]] && \
-    rm /etc/nginx/sites-enabled/default && \
-    ok "Removed nginx default site"
-
-# Write nginx config
-NGINX_CONF="/etc/nginx/sites-available/bpq-dashboard.conf"
-NGINX_ENABLED="/etc/nginx/sites-enabled/bpq-dashboard.conf"
 PHP_SOCK="/run/php/php${PHP_VER}-fpm.sock"
 
-say "Writing nginx configuration..."
+# Detect which web server is running
+WEB_SERVER=""
+if systemctl is-active --quiet apache2 2>/dev/null; then
+    WEB_SERVER="apache2"
+    ok "Detected Apache2 web server"
+elif systemctl is-active --quiet nginx 2>/dev/null; then
+    WEB_SERVER="nginx"
+    ok "Detected Nginx web server"
+elif dpkg -l nginx 2>/dev/null | grep -q "^ii"; then
+    WEB_SERVER="nginx"
+    ok "Nginx installed — using nginx"
+else
+    WEB_SERVER="nginx"
+    warn "No web server detected — defaulting to nginx"
+fi
+
+if [[ "$WEB_SERVER" == "apache2" ]]; then
+    say "Configuring Apache2..."
+
+    # Enable required modules
+    a2enmod proxy_fcgi setenvif >> "$LOG" 2>&1 && ok "Apache2 modules enabled"
+    a2enconf "php${PHP_VER}-fpm" >> "$LOG" 2>&1 && ok "PHP-FPM config enabled"
+
+    # Write Apache2 vhost config
+    APACHE_CONF="/etc/apache2/sites-available/bpq-dashboard.conf"
+    cat > "$APACHE_CONF" << APACHECONF
+<VirtualHost *:80>
+    ServerName ${INPUT_HOST}
+    DocumentRoot ${WEB_ROOT}
+
+    <Directory ${WEB_ROOT}>
+        Options -Indexes -FollowSymLinks
+        AllowOverride None
+        Require all granted
+        DirectoryIndex index.html index.php
+    </Directory>
+
+    <FilesMatch "\.php\$">
+        SetHandler "proxy:unix:${PHP_SOCK}|fcgi://localhost"
+    </FilesMatch>
+
+    # Block sensitive directories
+    <DirectoryMatch "^${WEB_ROOT}/(cache|data|scripts|includes)">
+        Require all denied
+    </DirectoryMatch>
+
+    # Allow logs directory
+    <Directory ${WEB_ROOT}/logs>
+        Options -Indexes
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/bpq-error.log
+    CustomLog \${APACHE_LOG_DIR}/bpq-access.log combined
+</VirtualHost>
+APACHECONF
+
+    # Disable default site, enable bpq-dashboard
+    a2dissite 000-default >> "$LOG" 2>&1 || true
+    a2ensite bpq-dashboard >> "$LOG" 2>&1
+
+    # Test and reload
+    if apache2ctl configtest >> "$LOG" 2>&1; then
+        systemctl reload apache2 >> "$LOG" 2>&1
+        ok "Apache2 configured and reloaded"
+        ok "Site available at: http://$INPUT_HOST/"
+    else
+        err "Apache2 config test FAILED — check: sudo apache2ctl configtest"
+    fi
+
+else
+    # ── NGINX (default) ────────────────────────────────────────────
+    say "Configuring Nginx..."
+
+    # Remove default nginx site if it exists
+    [[ -f /etc/nginx/sites-enabled/default ]] && \
+        rm /etc/nginx/sites-enabled/default && \
+        ok "Removed nginx default site"
+
+    # Write nginx config
+    NGINX_CONF="/etc/nginx/sites-available/bpq-dashboard.conf"
+    NGINX_ENABLED="/etc/nginx/sites-enabled/bpq-dashboard.conf"
+
+    say "Writing nginx configuration..." 
 cat > "$NGINX_CONF" << NGINXCONF
 # BPQ Dashboard — nginx configuration
 # Generated by install.sh on $(date)
@@ -568,17 +648,19 @@ server {
 }
 NGINXCONF
 
-# Enable site
-ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
+    # Enable site
+    ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
 
-# Test nginx config
-if nginx -t >> "$LOG" 2>&1; then
-    systemctl reload nginx
-    ok "Nginx configured and reloaded"
-    ok "Site available at: http://$INPUT_HOST/"
-else
-    err "Nginx config test FAILED — check: sudo nginx -t"
-fi
+    # Test nginx config
+    if nginx -t >> "$LOG" 2>&1; then
+        systemctl reload nginx
+        ok "Nginx configured and reloaded"
+        ok "Site available at: http://$INPUT_HOST/"
+    else
+        err "Nginx config test FAILED — check: sudo nginx -t"
+    fi
+
+fi # end web server configuration
 
 # ═══════════════════════════════════════════════════════════════════
 hdr "STEP 11 — INSTALL SYSTEMD DAEMON SERVICES"
@@ -637,13 +719,50 @@ fi
 if [[ -f "$SCRIPTS_DIR/bpq-aprs-daemon.py" ]]; then
     sed -i "s|APRS_CALL.*=.*'YOURCALL-1'|APRS_CALL    = '${INPUT_APRS_CALL}'|" "$SCRIPTS_DIR/bpq-aprs-daemon.py"
     sed -i "s|APRS_PASS.*=.*'0'|APRS_PASS    = '${INPUT_APRS_PASS}'|" "$SCRIPTS_DIR/bpq-aprs-daemon.py"
-    sed -i "s|r/0.0000/0.0000/300|r/${INPUT_LAT}/${INPUT_LON}/300|" "$SCRIPTS_DIR/bpq-aprs-daemon.py"
+    # Use Python to patch APRS filter — avoids sed regex issues with decimal points in coordinates
+    python3 -c "
+import re, sys
+f = open('$SCRIPTS_DIR/bpq-aprs-daemon.py', 'r')
+c = f.read()
+f.close()
+c = re.sub(r'r/0\.0000/0\.0000/300', 'r/${INPUT_LAT}/${INPUT_LON}/300', c)
+f = open('$SCRIPTS_DIR/bpq-aprs-daemon.py', 'w')
+f.write(c)
+f.close()
+" && ok "APRS filter patched: r/${INPUT_LAT}/${INPUT_LON}/300" || warn "APRS filter patch failed — edit bpq-aprs-daemon.py manually" 
     ok "bpq-aprs-daemon.py patched with callsign, passcode and location"
+fi
+
+# ── Optional: Configure LinBPQ logdir switch ──────────────────────
+say "Checking for LinBPQ log redirect..."
+if [[ -f "/etc/systemd/system/linbpq.service" ]]; then
+    LINBPQ_SVC=$(cat /etc/systemd/system/linbpq.service)
+    if echo "$LINBPQ_SVC" | grep -q "logdir"; then
+        ok "LinBPQ logdir already configured"
+    else
+        echo ""
+        echo -e "${BOLD}LinBPQ service found. Redirect its logs to the dashboard logs folder?${NC}"
+        echo "  This allows the dashboard log viewer to show BPQ BBS activity logs."
+        read -r -p "  Configure LinBPQ logdir? [Y/n]: " LOGDIR_CHOICE
+        LOGDIR_CHOICE="${LOGDIR_CHOICE:-Y}"
+        if [[ "$LOGDIR_CHOICE" =~ ^[Yy] ]]; then
+            # Add logdir to ExecStart line
+            sed -i "s|ExecStart=\(.*linbpq\)\(.*\)$|ExecStart= logdir=${WEB_ROOT}/logs|"                 /etc/systemd/system/linbpq.service
+            chmod 777 "${WEB_ROOT}/logs"
+            systemctl daemon-reload >> "$LOG" 2>&1
+            ok "LinBPQ logdir set to ${WEB_ROOT}/logs"
+            warn "Restart LinBPQ for changes to take effect: sudo systemctl restart linbpq"
+        fi
+    fi
+elif command -v linbpq &>/dev/null || find /home -name linbpq -type f 2>/dev/null | head -1 | grep -q linbpq; then
+    echo ""
+    say "LinBPQ found but no systemd service detected."
+    say "To redirect logs manually, start LinBPQ with: logdir=${WEB_ROOT}/logs"
 fi
 
 # bpq-chat daemon
 if [[ -f "$SCRIPTS_DIR/bpq-chat-daemon.py" ]]; then
-    install_daemon "bpq-chat" "$SCRIPTS_DIR/bpq-chat-daemon.py" "$WEB_USER"
+    install_daemon "bpq-chat" "$SCRIPTS_DIR/bpq-chat-daemon.py" "$WEB_USER" 
 else
     warn "bpq-chat-daemon.py not found — chat daemon not installed"
 fi

@@ -224,9 +224,9 @@ if (strpos($nginxTest, 'successful') !== false) {
 }
 
 // nginx error log recent errors (excluding duplicate session errors which are now fixed)
-$nginxErrors = sh('tail -100 /var/log/nginx/error.log 2>/dev/null | grep -v "tprfn_insert_session" | grep "\[error\]\|\[crit\]" | wc -l');
+$nginxErrors = sh('tail -100 /var/log/nginx/error.log 2>/dev/null | grep -v "bpq_insert_session" | grep "\[error\]\|\[crit\]" | wc -l');
 if ((int)$nginxErrors > 10) {
-    $sample = sh('tail -100 /var/log/nginx/error.log 2>/dev/null | grep -v "tprfn_insert_session" | grep "\[error\]\|\[crit\]" | tail -3');
+    $sample = sh('tail -100 /var/log/nginx/error.log 2>/dev/null | grep -v "bpq_insert_session" | grep "\[error\]\|\[crit\]" | tail -3');
     $findings[] = finding('nginx-errors','nginx','warn',"$nginxErrors recent nginx errors",
         "Sample: $sample",
         'Review nginx error log: sudo tail -50 /var/log/nginx/error.log');
@@ -371,14 +371,14 @@ if ($bpq === 'active') {
 }
 
 // PAT Winlink
-$pat = sh('systemctl is-active pat@arsk1ajd 2>/dev/null');
+$pat = sh('systemctl is-active pat@YOURCALL 2>/dev/null');
 if ($pat === 'active') {
     $findings[] = finding('pat','application','ok','PAT Winlink is running',
-        'PAT Winlink client (arsk1ajd) is active on port 8080.');
+        'PAT Winlink client (YOURCALL) is active on port 8080.');
 } else {
     $findings[] = finding('pat','application','warn','PAT Winlink is not running',
         'PAT Winlink is not active.',
-        'sudo systemctl start pat@arsk1ajd');
+        'sudo systemctl start pat@YOURCALL');
 }
 
 // VARA validator

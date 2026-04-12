@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>BPQ BBS — K1AJD</title>
+    <title>BPQ BBS Messages</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -759,7 +759,8 @@
         <a href="bpq-system-logs.html"     class="nav-link">System</a>
         <a href="bpq-connect-log.html"     class="nav-link">Connects</a>
         <a href="bpq-email-monitor.html"   class="nav-link">Messages</a>
-        <a href="bbs-messages.html"        class="nav-link active">BBS</a>
+        <a href="bpq-aprs.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">APRS</a>
+                    <a href="bbs-messages.html"        class="nav-link active">BBS</a>
         <a href="nws-dashboard.html"       class="nav-link">Weather</a>
         <a href="bpq-chat.html"           class="nav-link">Chat</a>
         <div class="nav-spacer"></div>
@@ -815,7 +816,7 @@
         <!-- Sidebar -->
         <div id="sidebar">
             <div class="sidebar-section">
-                <div class="sidebar-heading">K1AJD BBS</div>
+                <div class="sidebar-heading">BPQ BBS</div>
                 <div class="folder-item active" id="folderBBS"   onclick="switchFolder('bbs')">
                     <span class="folder-icon">📥</span> Inbox
                     <span class="folder-count zero" id="cntBBS">0</span>
@@ -1178,7 +1179,7 @@ let serverStorageAvailable = false;
 //  AUTH  (identical logic to original — server hash verify)
 // ═══════════════════════════════════════════════════════════════
 async function hashPassword(pw) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw + 'bpq_bbs_server_salt_2025_k1ajd'));
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw + 'bpq_bbs_server_salt_2025_bpqdash'));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 async function checkServerAuth() {
@@ -3157,7 +3158,7 @@ initAuth();
                 style="width:100%;min-height:120px;background:var(--tb-bg);border:1px solid var(--tb-border);
                        border-radius:var(--radius);color:var(--tb-text);padding:10px;
                        font-family:var(--font-mono);font-size:12px;resize:vertical;outline:none;line-height:1.6"
-                placeholder="73 de K1AJD&#10;Tony — Augusta, GA&#10;BPQ Dashboard"></textarea>
+                placeholder="73 de YOURCALL&#10;Your Name — Your City, ST&#10;BPQ Dashboard"></textarea>
             <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
                 <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer">
                     <input type="checkbox" id="sigEnabledGlobal" style="width:14px;height:14px;accent-color:var(--tb-accent)">

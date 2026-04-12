@@ -428,13 +428,16 @@
 <header>
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance Reference</h1>
   <div class="meta">
-    K1AJD · ARSSYSTEM · Ubuntu / nginx 1.28 / PHP 8.3<br>
-    Web root: /var/www/tprfn · v1.5.4 · March 2026
+    YOURCALL · BPQSERVER · Your OS / nginx / PHP<br>
+    Web root: /var/www/html/bpq · v1.5.4 · March 2026
   </div>
 </header>
 
 <!-- ── Tool Links ── -->
 <div style="display:flex;gap:10px;margin-bottom:28px;flex-wrap:wrap;">
+  <a href="bpq-aprs.html" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:10px 18px;text-decoration:none;color:var(--text);font-size:.85rem;font-weight:500;transition:border-color .2s" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--border2)'">
+    <span style="font-size:1.1rem">📡</span><span>APRS Map</span>
+  </a>
   <a href="firewall-status.html" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:10px 18px;text-decoration:none;color:var(--text);font-family:var(--mono);font-size:0.8rem;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border2)'">
     <span style="font-size:1.1rem;">🛡️</span>
     <span><strong style="color:var(--green)">Firewall Status</strong><br><span style="color:var(--muted);font-size:0.7rem;">iptables rules · port access · fail2ban</span></span>
@@ -460,7 +463,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span></code>
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/html/bpq/scripts/prop-scheduler.py</span></code>
         <div class="cmd-label">Dry run — show what would change without touching linmail.cfg</div>
       </div>
       <div class="cmd-tag blue">dry run</div>
@@ -468,7 +471,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span> <span class="flag">--apply</span></code>
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/html/bpq/scripts/prop-scheduler.py</span> <span class="flag">--apply</span></code>
         <div class="cmd-label">Apply new schedules if propagation model detects meaningful change</div>
       </div>
       <div class="cmd-tag green">apply</div>
@@ -476,7 +479,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span> <span class="flag">--apply --force</span></code>
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/html/bpq/scripts/prop-scheduler.py</span> <span class="flag">--apply --force</span></code>
         <div class="cmd-label">Force apply even if no change is detected — use after manual edits or to reset</div>
       </div>
       <div class="cmd-tag amber">force</div>
@@ -484,15 +487,15 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/prop-scheduler.py</span> <span class="flag">--apply --partner</span> <span class="kw">N4VAD</span></code>
-        <div class="cmd-label">Apply to a single partner only — replace N4VAD with any partner callsign</div>
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/html/bpq/scripts/prop-scheduler.py</span> <span class="flag">--apply --partner</span> <span class="kw">PARTNER</span></code>
+        <div class="cmd-label">Apply to a single partner only — replace PARTNER with any partner callsign</div>
       </div>
       <div class="cmd-tag blue">single</div>
     </div>
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>tail -50 <span class="path">/var/www/tprfn/logs/prop-scheduler.log</span></code>
+        <code>tail -50 <span class="path">/var/www/html/bpq/logs/prop-scheduler.log</span></code>
         <div class="cmd-label">View last 50 lines of prop scheduler log</div>
       </div>
       <div class="cmd-tag blue">log</div>
@@ -508,7 +511,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>python3 <span class="path">/var/www/tprfn/scripts/storm-monitor.py</span> <span class="flag">--status</span></code>
+        <code>python3 <span class="path">/var/www/html/bpq/scripts/storm-monitor.py</span> <span class="flag">--status</span></code>
         <div class="cmd-label">Show current Kp, storm state, and saved ConnectScripts</div>
       </div>
       <div class="cmd-tag blue">status</div>
@@ -516,7 +519,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/tprfn/scripts/storm-monitor.py</span> <span class="flag">--restore</span></code>
+        <code><span class="sudo">sudo</span> python3 <span class="path">/var/www/html/bpq/scripts/storm-monitor.py</span> <span class="flag">--restore</span></code>
         <div class="cmd-label">Force restore optimized schedules — use if storm cleared but auto-restore didn't fire</div>
       </div>
       <div class="cmd-tag amber">restore</div>
@@ -524,7 +527,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>tail -50 <span class="path">/var/www/tprfn/logs/storm-monitor.log</span></code>
+        <code>tail -50 <span class="path">/var/www/html/bpq/logs/storm-monitor.log</span></code>
         <div class="cmd-label">View last 50 lines of storm monitor log</div>
       </div>
       <div class="cmd-tag blue">log</div>
@@ -556,7 +559,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>ls -lt <span class="path">/var/www/tprfn/scripts/prop-backups/</span> <span class="dim">| head -10</span></code>
+        <code>ls -lt <span class="path">/var/www/html/bpq/scripts/prop-backups/</span> <span class="dim">| head -10</span></code>
         <div class="cmd-label">List most recent linmail.cfg backups (newest first)</div>
       </div>
       <div class="cmd-tag blue">backups</div>
@@ -565,8 +568,8 @@
     <div class="cmd">
       <div class="cmd-inner">
         <code><span class="sudo">sudo</span> systemctl stop bpq <span class="dim">&amp;&amp;</span> \
-  cp <span class="path">/var/www/tprfn/scripts/prop-backups/</span><span class="kw">linmail_YYYYMMDD_HHMMSS.cfg.bak</span> \
-     <span class="path">/home/tony/linbpq/linmail.cfg</span> <span class="dim">&amp;&amp;</span> \
+  cp <span class="path">/var/www/html/bpq/scripts/prop-backups/</span><span class="kw">linmail_YYYYMMDD_HHMMSS.cfg.bak</span> \
+     <span class="path">/home/SYSOP/linbpq/linmail.cfg</span> <span class="dim">&amp;&amp;</span> \
   <span class="sudo">sudo</span> systemctl start bpq</code>
         <div class="cmd-label">Restore a specific backup — replace filename with actual backup name from listing above</div>
       </div>
@@ -583,7 +586,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>rm -f <span class="path">/var/www/tprfn/cache/prop-state.json</span></code>
+        <code>rm -f <span class="path">/var/www/html/bpq/cache/prop-state.json</span></code>
         <div class="cmd-label">Clear prop scheduler state — forces full recalculation on next run</div>
       </div>
       <div class="cmd-tag amber">cache</div>
@@ -591,7 +594,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>rm -f <span class="path">/var/www/tprfn/cache/storm-state.json</span></code>
+        <code>rm -f <span class="path">/var/www/html/bpq/cache/storm-state.json</span></code>
         <div class="cmd-label">Clear storm monitor state — resets calm counter and saved ConnectScripts</div>
       </div>
       <div class="cmd-tag amber">cache</div>
@@ -599,7 +602,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>rm -f <span class="path">/var/www/tprfn/cache/*.json</span></code>
+        <code>rm -f <span class="path">/var/www/html/bpq/cache/*.json</span></code>
         <div class="cmd-label">Clear all dashboard cache files — dashboard rebuilds on next page load</div>
       </div>
       <div class="cmd-tag red">flush all</div>
@@ -607,7 +610,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>ls -lh <span class="path">/var/www/tprfn/cache/</span></code>
+        <code>ls -lh <span class="path">/var/www/html/bpq/cache/</span></code>
         <div class="cmd-label">List cache files and sizes</div>
       </div>
       <div class="cmd-tag blue">inspect</div>
@@ -672,14 +675,14 @@
     <div class="cmd">
       <div class="cmd-inner">
         <code><span class="sudo">sudo</span> grep <span class="flag">limiting requests</span> <span class="path">/var/log/nginx/error.log</span> | tail -10</code>
-        <div class="cmd-label">Check for rate limit errors — if dashboard log cards show 503, the tprfn_logs zone (100r/s) may need increasing</div>
+        <div class="cmd-label">Check for rate limit errors — if dashboard log cards show 503, the bpq_logs zone (100r/s) may need increasing</div>
       </div>
       <div class="cmd-tag amber">rate limit</div>
     </div>
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> chown www-data:www-data <span class="path">/var/www/tprfn/logs/CMSAccess_*.log</span></code>
+        <code><span class="sudo">sudo</span> chown www-data:www-data <span class="path">/var/www/html/bpq/logs/CMSAccess_*.log</span></code>
         <div class="cmd-label">Fix CMSAccess log ownership — run if RMS Services card shows zero. LinBPQ writes these as root; nginx needs www-data ownership to serve them.</div>
       </div>
       <div class="cmd-tag red">fix perms</div>
@@ -695,7 +698,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>du -sh <span class="path">/var/www/tprfn/logs/</span>*</code>
+        <code>du -sh <span class="path">/var/www/html/bpq/logs/</span>*</code>
         <div class="cmd-label">Check size of all log files — VARA logs can grow large</div>
       </div>
       <div class="cmd-tag blue">disk</div>
@@ -703,7 +706,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>df -h <span class="path">/var/www/tprfn</span></code>
+        <code>df -h <span class="path">/var/www/html/bpq</span></code>
         <div class="cmd-label">Check disk space on the web partition</div>
       </div>
       <div class="cmd-tag blue">disk</div>
@@ -711,7 +714,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>ls -lh <span class="path">/var/www/tprfn/logs/</span></code>
+        <code>ls -lh <span class="path">/var/www/html/bpq/logs/</span></code>
         <div class="cmd-label">List all log files with sizes and dates</div>
       </div>
       <div class="cmd-tag blue">inspect</div>
@@ -719,7 +722,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>ls -lh <span class="path">/var/www/tprfn/data/stations/</span></code>
+        <code>ls -lh <span class="path">/var/www/html/bpq/data/stations/</span></code>
         <div class="cmd-label">Check saved station locations and forwarding partner files</div>
       </div>
       <div class="cmd-tag blue">inspect</div>
@@ -735,7 +738,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> bash <span class="path">/var/www/tprfn/set-permissions.sh</span></code>
+        <code><span class="sudo">sudo</span> bash <span class="path">/var/www/html/bpq/set-permissions.sh</span></code>
         <div class="cmd-label">Run the included permissions script — use after uploading new files</div>
       </div>
       <div class="cmd-tag green">fix perms</div>
@@ -743,8 +746,8 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code><span class="sudo">sudo</span> chown -R www-data:www-data <span class="path">/var/www/tprfn/data/</span>
-<span class="sudo">sudo</span> chmod -R 750 <span class="path">/var/www/tprfn/data/</span></code>
+        <code><span class="sudo">sudo</span> chown -R www-data:www-data <span class="path">/var/www/html/bpq/data/</span>
+<span class="sudo">sudo</span> chmod -R 750 <span class="path">/var/www/html/bpq/data/</span></code>
         <div class="cmd-label">Fix permissions on data/ directory — run if settings or station storage fails to write</div>
       </div>
       <div class="cmd-tag amber">fix perms</div>
@@ -757,20 +760,20 @@
 <div class="section">
   <div class="section-title amber">Key Paths</div>
   <div class="paths">
-    <div class="paths-row"><div class="paths-key">Web root</div><div class="paths-val">/var/www/tprfn/</div></div>
-    <div class="paths-row"><div class="paths-key">BPQ config</div><div class="paths-val">/home/tony/linbpq/linmail.cfg</div></div>
-    <div class="paths-row"><div class="paths-key">Log directory</div><div class="paths-val">/var/www/tprfn/logs/</div></div>
-    <div class="paths-row"><div class="paths-key">Cache directory</div><div class="paths-val">/var/www/tprfn/cache/</div></div>
-    <div class="paths-row"><div class="paths-key">linmail.cfg backups</div><div class="paths-val">/var/www/tprfn/scripts/prop-backups/</div></div>
-    <div class="paths-row"><div class="paths-key">Settings JSON</div><div class="paths-val">/var/www/tprfn/data/settings.json</div></div>
-    <div class="paths-row"><div class="paths-key">Station storage</div><div class="paths-val">/var/www/tprfn/data/stations/</div></div>
-    <div class="paths-row"><div class="paths-key">Prop scheduler log</div><div class="paths-val">/var/www/tprfn/logs/prop-scheduler.log</div></div>
-    <div class="paths-row"><div class="paths-key">Storm monitor log</div><div class="paths-val">/var/www/tprfn/logs/storm-monitor.log</div></div>
-    <div class="paths-row"><div class="paths-key">Prop state</div><div class="paths-val">/var/www/tprfn/cache/prop-state.json</div></div>
-    <div class="paths-row"><div class="paths-key">Storm state</div><div class="paths-val">/var/www/tprfn/cache/storm-state.json</div></div>
-    <div class="paths-row"><div class="paths-key">Nginx config (live)</div><div class="paths-val">/etc/nginx/sites-enabled/tprfn.conf  (edit this — not sites-available)</div></div>
-    <div class="paths-row"><div class="paths-key">Prop scheduler</div><div class="paths-val">/var/www/tprfn/scripts/prop-scheduler.py</div></div>
-    <div class="paths-row"><div class="paths-key">Storm monitor</div><div class="paths-val">/var/www/tprfn/scripts/storm-monitor.py</div></div>
+    <div class="paths-row"><div class="paths-key">Web root</div><div class="paths-val">/var/www/html/bpq/</div></div>
+    <div class="paths-row"><div class="paths-key">BPQ config</div><div class="paths-val">/home/SYSOP/linbpq/linmail.cfg</div></div>
+    <div class="paths-row"><div class="paths-key">Log directory</div><div class="paths-val">/var/www/html/bpq/logs/</div></div>
+    <div class="paths-row"><div class="paths-key">Cache directory</div><div class="paths-val">/var/www/html/bpq/cache/</div></div>
+    <div class="paths-row"><div class="paths-key">linmail.cfg backups</div><div class="paths-val">/var/www/html/bpq/scripts/prop-backups/</div></div>
+    <div class="paths-row"><div class="paths-key">Settings JSON</div><div class="paths-val">/var/www/html/bpq/data/settings.json</div></div>
+    <div class="paths-row"><div class="paths-key">Station storage</div><div class="paths-val">/var/www/html/bpq/data/stations/</div></div>
+    <div class="paths-row"><div class="paths-key">Prop scheduler log</div><div class="paths-val">/var/www/html/bpq/logs/prop-scheduler.log</div></div>
+    <div class="paths-row"><div class="paths-key">Storm monitor log</div><div class="paths-val">/var/www/html/bpq/logs/storm-monitor.log</div></div>
+    <div class="paths-row"><div class="paths-key">Prop state</div><div class="paths-val">/var/www/html/bpq/cache/prop-state.json</div></div>
+    <div class="paths-row"><div class="paths-key">Storm state</div><div class="paths-val">/var/www/html/bpq/cache/storm-state.json</div></div>
+    <div class="paths-row"><div class="paths-key">Nginx config (live)</div><div class="paths-val">/etc/nginx/sites-enabled/bpq-dashboard.conf  (edit this — not sites-available)</div></div>
+    <div class="paths-row"><div class="paths-key">Prop scheduler</div><div class="paths-val">/var/www/html/bpq/scripts/prop-scheduler.py</div></div>
+    <div class="paths-row"><div class="paths-key">Storm monitor</div><div class="paths-val">/var/www/html/bpq/scripts/storm-monitor.py</div></div>
   </div>
 </div>
 
@@ -855,7 +858,7 @@
   </div>
 
   <div class="paths" style="margin-top:12px;">
-    <div class="paths-row"><div class="paths-key">WP.cfg</div><div class="paths-val">/home/tony/linbpq/WP.cfg</div></div>
+    <div class="paths-row"><div class="paths-key">WP.cfg</div><div class="paths-val">/home/SYSOP/linbpq/WP.cfg</div></div>
     <div class="paths-row"><div class="paths-key">Review file</div><div class="paths-val">wp_review.txt (same dir as script)</div></div>
     <div class="paths-row"><div class="paths-key">Whitelist</div><div class="paths-val">wp_whitelist.txt</div></div>
     <div class="paths-row"><div class="paths-key">Blacklist</div><div class="paths-val">wp_blacklist.txt</div></div>
@@ -994,7 +997,7 @@
 <div class="section" id="partners-editor">
   <div class="section-title purple">Forwarding Partners Editor</div>
   <p style="font-size:0.8rem;color:var(--muted);margin-bottom:14px;font-family:var(--mono);">
-    Edits <span style="color:var(--cyan)">/var/www/tprfn/data/partners.json</span> — read by both
+    Edits <span style="color:var(--cyan)">/var/www/html/bpq/data/partners.json</span> — read by both
     <strong>prop-scheduler.py</strong> and <strong>storm-monitor.py</strong> at startup.
     A timestamped backup is created automatically on every save.
   </p>
@@ -1317,24 +1320,24 @@ document.querySelectorAll('.cmd').forEach(function(cmd) {
   <div class="section-title blue">BBS Messages &mdash; Server Storage</div>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
-      <code>sudo -u www-data php -r "$_SERVER['REQUEST_METHOD']='GET'; $_SERVER['PHP_SELF']='/message-storage.php'; $_GET['action']='stats'; chdir('/var/www/tprfn'); include '/var/www/tprfn/message-storage.php';"</code>
+      <code>sudo -u www-data php -r "$_SERVER['REQUEST_METHOD']='GET'; $_SERVER['PHP_SELF']='/message-storage.php'; $_GET['action']='stats'; chdir('/var/www/html/bpq'); include '/var/www/html/bpq/message-storage.php';"</code>
       <div class="cmd-label">Test server storage endpoint &mdash; should return success:true with stats. Run if BBS page shows "Server Storage unavailable".</div>
     </div><div class="cmd-tag blue">test</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>sudo mkdir -p /var/www/tprfn/data/messages &amp;&amp; sudo chown -R www-data:www-data /var/www/tprfn/data/messages &amp;&amp; sudo chmod 775 /var/www/tprfn/data/messages</code>
+      <code>sudo mkdir -p /var/www/html/bpq/data/messages &amp;&amp; sudo chown -R www-data:www-data /var/www/html/bpq/data/messages &amp;&amp; sudo chmod 775 /var/www/html/bpq/data/messages</code>
       <div class="cmd-label">Create and fix permissions on server storage directory.</div>
     </div><div class="cmd-tag amber">fix perms</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>cat /var/www/tprfn/data/messages/rules.json</code>
+      <code>cat /var/www/html/bpq/data/messages/rules.json</code>
       <div class="cmd-label">View saved filing rules &mdash; if rules disappear after reload check this file exists and is not empty.</div>
     </div><div class="cmd-tag green">inspect</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>python3 -c "import json; d=json.load(open('/var/www/tprfn/data/messages/messages.json')); print(len(d), 'messages,', sum(1 for m in d if not m.get('_read',True)), 'unread')"</code>
+      <code>python3 -c "import json; d=json.load(open('/var/www/html/bpq/data/messages/messages.json')); print(len(d), 'messages,', sum(1 for m in d if not m.get('_read',True)), 'unread')"</code>
       <div class="cmd-label">Quick message stats &mdash; total saved messages and unread count from server storage.</div>
     </div><div class="cmd-tag blue">stats</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>sudo -u www-data php /var/www/tprfn/migrate-read-state.php</code>
-      <div class="cmd-label">One-time migration &mdash; marks all existing messages as _read=true. Run once after upgrading to v1.5.5 to prevent old messages flooding unread counts. Delete script after running.</div>
+      <code>sudo -u www-data php /var/www/html/bpq/migrate-read-state.php</code>
+      <div class="cmd-label">One-time migration &mdash; marks all existing messages as _read=true. Run once after upgrading to v1.5.6 to prevent old messages flooding unread counts. Delete script after running.</div>
     </div><div class="cmd-tag amber">migrate once</div></div>
   </div>
 </div>
@@ -1344,15 +1347,15 @@ document.querySelectorAll('.cmd').forEach(function(cmd) {
   <div class="section-title purple">Geomagnetic Data Proxy</div>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
-      <code>sudo -u www-data php -r "$_SERVER['REQUEST_METHOD']='GET'; $_SERVER['PHP_SELF']='/geomag-proxy.php'; $_GET['data']='kindex'; chdir('/var/www/tprfn'); include '/var/www/tprfn/geomag-proxy.php';" | head -c 200</code>
+      <code>sudo -u www-data php -r "$_SERVER['REQUEST_METHOD']='GET'; $_SERVER['PHP_SELF']='/geomag-proxy.php'; $_GET['data']='kindex'; chdir('/var/www/html/bpq'); include '/var/www/html/bpq/geomag-proxy.php';" | head -c 200</code>
       <div class="cmd-label">Test geomagnetic proxy &mdash; should return NOAA Kp JSON objects. If bpq-rf-connections Geomagnetic card shows "Error loading data" run this to diagnose.</div>
     </div><div class="cmd-tag blue">test</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>ls -la /var/www/tprfn/cache/geomag/</code>
+      <code>ls -la /var/www/html/bpq/cache/geomag/</code>
       <div class="cmd-label">Check geomagnetic cache files &mdash; kindex.json and dgd.txt cached 15 minutes. Delete to force fresh NOAA fetch.</div>
     </div><div class="cmd-tag green">inspect</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>sudo rm -f /var/www/tprfn/cache/geomag/*.json /var/www/tprfn/cache/geomag/*.txt &amp;&amp; echo "Cache cleared"</code>
+      <code>sudo rm -f /var/www/html/bpq/cache/geomag/*.json /var/www/html/bpq/cache/geomag/*.txt &amp;&amp; echo "Cache cleared"</code>
       <div class="cmd-label">Clear geomagnetic cache &mdash; forces fresh fetch from NOAA on next page load.</div>
     </div><div class="cmd-tag amber">clear cache</div></div>
   </div>
@@ -1363,12 +1366,12 @@ document.querySelectorAll('.cmd').forEach(function(cmd) {
   <div class="section-title green">RF Power Monitor &mdash; WaveNode DataLog</div>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
-      <code>ls -lt /var/www/tprfn/logs/DataLog*.txt | head -5</code>
+      <code>ls -lt /var/www/html/bpq/logs/DataLog*.txt | head -5</code>
       <div class="cmd-label">List most recent WaveNode DataLog files &mdash; newest should be recent. If old, check WaveNode is running on Windows and sync is working.</div>
     </div><div class="cmd-tag green">inspect</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>sudo -u www-data php -r "$_SERVER['REQUEST_METHOD']='GET'; $_SERVER['PHP_SELF']='/api/data.php'; $_GET['source']='datalog'; $_GET['days']='7'; $_GET['debug']='1'; chdir('/var/www/tprfn'); include '/var/www/tprfn/api/data.php';" 2>&amp;1 | python3 -m json.tool | head -20</code>
-      <div class="cmd-label">Test RF power data API &mdash; shows DataLog files found and samples loaded. If zero files check paths.datalog in config.php points to /var/www/tprfn/logs/</div>
+      <code>sudo -u www-data php -r "$_SERVER['REQUEST_METHOD']='GET'; $_SERVER['PHP_SELF']='/api/data.php'; $_GET['source']='datalog'; $_GET['days']='7'; $_GET['debug']='1'; chdir('/var/www/html/bpq'); include '/var/www/html/bpq/api/data.php';" 2>&amp;1 | python3 -m json.tool | head -20</code>
+      <div class="cmd-label">Test RF power data API &mdash; shows DataLog files found and samples loaded. If zero files check paths.datalog in config.php points to /var/www/html/bpq/logs/</div>
     </div><div class="cmd-tag blue">test</div></div>
   </div>
 </div>
@@ -1378,12 +1381,12 @@ document.querySelectorAll('.cmd').forEach(function(cmd) {
   <div class="section-title amber">NOAA API &mdash; Format Change (2026)</div>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
-      <code>tail -5 /var/www/tprfn/logs/prop-scheduler.log</code>
-      <div class="cmd-label">Check prop-scheduler Kp parsing &mdash; NOAA changed format from array-of-arrays to array-of-objects in early 2026. v1.5.5 handles both. If KeyError:1 appears, update prop-scheduler.py from archive.</div>
+      <code>tail -5 /var/www/html/bpq/logs/prop-scheduler.log</code>
+      <div class="cmd-label">Check prop-scheduler Kp parsing &mdash; NOAA changed format from array-of-arrays to array-of-objects in early 2026. v1.5.6 handles both. If KeyError:1 appears, update prop-scheduler.py from archive.</div>
     </div><div class="cmd-tag amber">check</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>tail -5 /var/www/tprfn/logs/storm-monitor.log</code>
-      <div class="cmd-label">Check storm-monitor Kp parsing &mdash; same NOAA format fix applied in v1.5.5. KeyError:1 = old script, update from archive.</div>
+      <code>tail -5 /var/www/html/bpq/logs/storm-monitor.log</code>
+      <div class="cmd-label">Check storm-monitor Kp parsing &mdash; same NOAA format fix applied in v1.5.6. KeyError:1 = old script, update from archive.</div>
     </div><div class="cmd-tag amber">check</div></div>
   </div>
 </div>
@@ -1394,11 +1397,11 @@ document.querySelectorAll('.cmd').forEach(function(cmd) {
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code>sudo crontab -l | grep wp_manager</code>
-      <div class="cmd-label">Verify wp_manager cron is active &mdash; line must NOT be commented out (#). Blacklisted entries reappearing = cron not running. This was a known issue on ARSSYSTEM.</div>
+      <div class="cmd-label">Verify wp_manager cron is active &mdash; line must NOT be commented out (#). Blacklisted entries reappearing = cron not running. This was a known issue on BPQSERVER.</div>
     </div><div class="cmd-tag blue">verify</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>0 3 * * * cd /home/tony/linbpq &amp;&amp; python3 /var/www/tprfn/scripts/wp_manager.py --auto-clean &gt;&gt; /var/log/wp-auto-clean.log 2&gt;&amp;1</code>
-      <div class="cmd-label">Correct crontab entry &mdash; runs at 3am daily. Add with: sudo crontab -e. DEFAULT_WP_PATH in script already set to /home/tony/linbpq/WP.cfg so --wp flag not needed.</div>
+      <code>0 3 * * * cd /home/SYSOP/linbpq &amp;&amp; python3 /var/www/html/bpq/scripts/wp_manager.py --auto-clean &gt;&gt; /var/log/wp-auto-clean.log 2&gt;&amp;1</code>
+      <div class="cmd-label">Correct crontab entry &mdash; runs at 3am daily. Add with: sudo crontab -e. DEFAULT_WP_PATH in script already set to /home/SYSOP/linbpq/WP.cfg so --wp flag not needed.</div>
     </div><div class="cmd-tag green">crontab entry</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>tail -20 /var/log/wp-auto-clean.log</code>

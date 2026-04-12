@@ -226,7 +226,7 @@ All pages show live UTC and Local clocks in the nav bar.
 
 ## Security Modes
 
-v1.5.5 includes two security modes:
+v1.5.6 includes two security modes:
 
 ### Local Mode (Default)
 - Full features enabled
@@ -249,7 +249,7 @@ See [PUBLIC-DEPLOYMENT.md](PUBLIC-DEPLOYMENT.md) for internet deployment guide.
 ## Upgrading from v1.2.x
 
 1. Backup existing installation
-2. Extract v1.5.5 files
+2. Extract v1.5.6 files
 3. Create `config.php` from example
 4. Migrate settings from old `bbs-config.php` to new format
 5. Delete old `bbs-config.php` and `nws-config.php`

@@ -687,7 +687,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - `bpq-traffic.html`: connections bar, messages doughnut, bytes bar, traffic type pie (4 charts)
   - `bpq-email-monitor.html`: hourly activity bar (1 chart)
 
-- **Version numbers** updated to v1.5.5 across all pages and documentation
+- **Version numbers** updated to v1.5.6 across all pages and documentation
 
 ### Fixed
 
@@ -770,7 +770,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
 - Navigation labels updated: "Email" → "Messages" across all pages
 - NWS dashboard reduced from 2316 lines to 871 lines (62% smaller)
 - Error detection expanded to include Timeout and Failed patterns
-- Version numbers updated to v1.5.5 on all pages
+- Version numbers updated to v1.5.6 on all pages
 
 ### Fixed
 
@@ -1023,7 +1023,7 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - Now includes MHeard Stations (4-port tabbed display) and Known Stations Routing Table
   - Comprehensive node operations view: live logs, MHeard, routing, and station activity
 
-- **All Pages** - Version badge updated to v1.5.5
+- **All Pages** - Version badge updated to v1.5.6
 - All PHP files now use centralized bootstrap for security
 - Configuration migrated from multiple files to single `config.php`
 
@@ -1163,3 +1163,41 @@ All notable changes to BPQ Dashboard will be documented in this file.
   - Read-only analysis mode, safe to run at any time
   - Produces wp_scan_report.txt with full suspect breakdown
   - Callsign validation covering all ITU prefix allocations
+
+## v1.5.6 — 2026-04-12
+
+### Fixed — Deployment
+- `install.sh`: MariaDB setup now uses `sudo mysql -e` commands instead of
+  heredoc — fixes authentication failures on Raspberry Pi / Debian systems
+- `install.sh`: Web server auto-detection — configures nginx or Apache2
+  whichever is already running; generates correct vhost config for each
+- `install.sh`: APRS filter coordinate patching now uses Python regex
+  instead of sed — fixes longitude corruption (e.g. -84.0698 → -84.06.98)
+- `install.sh`: Optional LinBPQ logdir switch configuration — redirects
+  BPQ BBS activity logs to dashboard logs folder for log viewer access
+- `includes/bootstrap.php`: Added to deploy archive (was missing — caused
+  6 PHP files to fail with "Failed to open required" error)
+- `bpq-chat-daemon.py`: Fixed hardcoded /var/www/tprfn/ cache path
+- `bpq-aprs-daemon.py`: Fixed hardcoded /var/www/tprfn/ cache path
+- `install-check.php`: Removed ARSSYSTEM-specific file checks; fixed
+  chkOk() → chkPass() (10 occurrences); added real deploy file checks
+- `log-viewer-api.php`: All log paths now derived from config.php
+  dynamically; auto-detects nginx vs Apache2 for web server error log
+- `settings-modal.js`: Generic placeholder paths for deploy
+- `settings-api.php`: Uses get_current_user() for linmail.cfg detection
+
+### Added — BBS Messages
+- Read state persistence via pendingReads queue + sendBeacon on page unload
+- markRead / markReadBulk PHP endpoints using message id as primary key
+- Auto-connect to BBS inbox on page load
+- Rules badge showing enabled rule count on toolbar button
+- Move to Folder in multi-select toolbar (desktop + mobile)
+- Mark All Read in multi-select toolbar
+- Filed messages never reappear in inbox after page reload (filedNumbers)
+- recomputeUnread() derives badge counts from actual _read flags
+
+### Added — Security
+- nginx: return 444 blocks for phpunit/eval-stdin RCE scanner paths
+- nginx: blocks for .env, .git, xmlrpc.php, wp-login.php probes
+- bpq-maintenance.html: 5 new sections for server storage, geomag proxy,
+  RF power monitor, NOAA format change, WP manager crontab verification

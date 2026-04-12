@@ -19,7 +19,7 @@ WORKFLOW (automated — for cron):
     Use --dry-run first to preview changes before scheduling.
 
 CRON EXAMPLE (run daily at 03:00 UTC):
-  0 3 * * * cd /home/tony/linbpq && python3 /var/www/bpqdash/scripts/wp_manager.py --auto-clean >> /var/log/wp-auto-clean.log 2>&1
+  0 3 * * * cd /home/SYSOP/linbpq && python3 /var/www/html/bpq/scripts/wp_manager.py --auto-clean >> /var/log/wp-auto-clean.log 2>&1
 
 FILES CREATED:
   wp_review.txt     — editable review list (you mark KEEP/REMOVE)
@@ -44,7 +44,7 @@ from collections import defaultdict
 # CONFIG — edit these for your system
 # ─────────────────────────────────────────────────────────────
 
-DEFAULT_WP_PATH      = "/home/tony/linbpq/WP.cfg"
+DEFAULT_WP_PATH      = "/home/SYSOP/linbpq/WP.cfg"
 REVIEW_FILE          = "wp_review.txt"
 WHITELIST_FILE       = "wp_whitelist.txt"
 BLACKLIST_FILE       = "wp_blacklist.txt"

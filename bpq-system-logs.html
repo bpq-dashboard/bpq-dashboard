@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPQ BBS System Logs v1.5.5</title>
+    <title>BPQ BBS System Logs v1.5.4</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Preconnect for faster CDN loading -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -392,6 +392,7 @@
                     <a href="bpq-system-logs.html" class="px-2 sm:px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium text-xs sm:text-sm">System</a>
                     <a href="bpq-connect-log.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Connects</a>
                 <a href="bpq-email-monitor.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Messages</a>
+                    <a href="bpq-aprs.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">APRS</a>
                     <a href="bbs-messages.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">BBS</a>
                     <a href="nws-dashboard.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Weather</a>
                     <a href="bpq-chat.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Chat</a>
@@ -408,7 +409,7 @@
                     <div class="text-center flex-1">
                         <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                             <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">System Logs</h1>
-                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.5</span>
+                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.4</span>
                         </div>
                         <p class="text-gray-600 text-sm sm:text-lg">Real-time event monitoring</p>
                         <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -2745,7 +2746,7 @@
             doc.setTextColor(150);
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
-            doc.text(`BPQ Dashboard v1.5.5 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            doc.text(`BPQ Dashboard v1.5.4 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
             
             // Generate filename
             const dateStr = new Date().toISOString().slice(0, 10);
@@ -3649,11 +3650,11 @@
         // ===================================
         
         // Sample log data (first 100 lines from recent logs)
-        const sampleLogs = `251227 00:01:43 |PARTNER2    Connecting to BBS PARTNER2
-251227 00:01:43 <PARTNER2    *** CONNECTED 
-251227 00:01:43 ?PARTNER2    Script MSGTYPES B5000 P5000 T5000
-251227 00:01:43 ?PARTNER2    Nothing to do - quitting
-251227 00:01:43 |PARTNER2    PARTNER2 Disconnected
+        const sampleLogs = `251227 00:01:43 |W1AW    Connecting to BBS W1AW
+251227 00:01:43 <W1AW    *** CONNECTED 
+251227 00:01:43 ?W1AW    Script MSGTYPES B5000 P5000 T5000
+251227 00:01:43 ?W1AW    Nothing to do - quitting
+251227 00:01:43 |W1AW    W1AW Disconnected
 251227 00:03:45 |KA3VSP    Connecting to BBS KA3VSP
 251227 00:03:45 <KA3VSP    *** CONNECTED 
 251227 00:03:45 ?KA3VSP    Script MSGTYPES B5000 P5000 T5000
@@ -3671,12 +3672,12 @@
 251227 00:23:42 |VE3CGR-1  Incoming Connect from VE3CGR
 251227 00:23:52 ?VE3CGR-1  Msg 7978 Routing Trace To KEPS Via AMSAT
 251227 00:24:15 |VE3CGR-1  VE3CGR Disconnected
-251227 01:15:23 |PARTNER2    Connecting to BBS PARTNER2
-251227 01:15:23 <PARTNER2    *** CONNECTED 
-251227 01:15:23 |PARTNER2    PARTNER2 Disconnected
-251227 02:30:45 |PARTNER7     Incoming Connect from PARTNER7
-251227 02:30:45 <PARTNER7     *** CONNECTED 
-251227 02:30:52 |PARTNER7     PARTNER7 Disconnected
+251227 01:15:23 |W1AW    Connecting to BBS W1AW
+251227 01:15:23 <W1AW    *** CONNECTED 
+251227 01:15:23 |W1AW    W1AW Disconnected
+251227 02:30:45 |N4SFL     Incoming Connect from N4SFL
+251227 02:30:45 <N4SFL     *** CONNECTED 
+251227 02:30:52 |N4SFL     N4SFL Disconnected
 251227 03:45:12 |KE0GB     Connecting to BBS KE0GB
 251227 03:45:12 <KE0GB     *** CONNECTED 
 251227 03:45:12 |KE0GB     KE0GB Disconnected

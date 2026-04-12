@@ -1,20 +1,21 @@
 <?php
 /**
- * log-viewer-api.php — Log file reader API for BPQSERVER
- * Version: 1.5.5
+ * log-viewer-api.php — Log file reader API
+ * Version: 1.1.0 — paths read from config.php, generic deploy
  */
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
-// Auth
-$configFile = __DIR__ . '/bpqdash-config.php';
-if (file_exists($configFile)) {
-    $cfg = include $configFile;
-    $bbsPassword = $cfg['bbs_password'] ?? $cfg['password'] ?? null;
-} else {
-    $bbsPassword = null;
-}
+// Load config.php for paths and auth
+$cfg        = file_exists(__DIR__ . '/config.php') ? include __DIR__ . '/config.php' : [];
+$WEB_ROOT   = $cfg['paths']['web_root']  ?? __DIR__;
+$LOG_DIR    = $cfg['paths']['logs']      ?? $WEB_ROOT . '/logs';
+$SCRIPTS    = $cfg['paths']['scripts']   ?? $WEB_ROOT . '/scripts';
+$CALL       = strtolower($cfg['station']['callsign'] ?? 'bpq');
+
+// Auth — use BBS password from config
+$bbsPassword     = $cfg['bbs']['pass'] ?? null;
 $providedPassword = $_GET['password'] ?? $_SERVER['HTTP_X_BBS_PASSWORD'] ?? null;
 if ($bbsPassword && $providedPassword !== $bbsPassword) {
     http_response_code(401);
@@ -22,24 +23,34 @@ if ($bbsPassword && $providedPassword !== $bbsPassword) {
     exit;
 }
 
-// Log catalogue
+// Detect web server for error log path
+$webserverLog = '/var/log/nginx/error.log';
+if (!file_exists($webserverLog)) {
+    $webserverLog = '/var/log/apache2/bpq-error.log';
+}
+if (!file_exists($webserverLog)) {
+    $webserverLog = '/var/log/apache2/error.log';
+}
+
+// Log catalogue — all paths derived from config.php
 $LOGS = [
-    'prop-scheduler'   => ['path' => '/var/www/bpqdash/logs/prop-scheduler.log',   'label' => 'Prop Scheduler',    'group' => 'BPQ Dashboard', 'color' => 'blue',   'desc' => 'Propagation-based forwarding schedule updates'],
-    'connect-watchdog' => ['path' => '/var/www/bpqdash/logs/connect-watchdog.log', 'label' => 'Connect Watchdog',  'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Failed connect detection and pause/restore'],
-    'wp-auto-clean'    => ['path' => '/var/log/wp-auto-clean.log',               'label' => 'WP Auto Clean',     'group' => 'BPQ Dashboard', 'color' => 'green',  'desc' => 'Winlink White Pages automatic cleanup'],
-    'watchdog-state'   => ['path' => '/var/www/bpqdash/cache/watchdog-state.json', 'label' => 'Watchdog State',    'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Current connect-watchdog pause state (JSON)'],
-    'vara-validator'   => ['path' => '/var/log/vara-validator.log',              'label' => 'VARA Validator',    'group' => 'VARA',          'color' => 'purple', 'desc' => 'VARA callsign validator proxy log'],
-    'vara-sessions'    => ['path' => '/var/www/bpqdash/logs/yourcall.vara',          'label' => 'VARA Sessions',     'group' => 'VARA',          'color' => 'purple', 'desc' => 'Raw VARA HF session data'],
-    'bbs-today'        => ['path' => null, 'dir' => '/var/www/bpqdash/logs',       'label' => 'BBS Log (Today)',   'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => "Today's BPQ BBS activity log", 'dynamic' => 'today'],
-    'bbs-archive'      => ['path' => null, 'dir' => '/var/www/bpqdash/logs',       'label' => 'BBS Log (Archive)', 'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => 'Historical BPQ BBS logs — select a date', 'dynamic' => 'archive'],
-    'nws-monitor'      => ['path' => '/var/log/nws-monitor.log',                 'label' => 'NWS Monitor',       'group' => 'System',        'color' => 'red',    'desc' => 'NWS weather alert monitor'],
-    'nginx-error'      => ['path' => '/var/log/nginx/error.log',                 'label' => 'NGINX Errors',      'group' => 'System',        'color' => 'red',    'desc' => 'nginx web server error log'],
-    'auth'             => ['path' => '/var/log/auth.log',                        'label' => 'Auth Log',          'group' => 'System',        'color' => 'amber',  'desc' => 'SSH and system authentication events'],
+    'prop-scheduler'   => ['path' => $LOG_DIR . '/prop-scheduler.log',        'label' => 'Prop Scheduler',    'group' => 'BPQ Dashboard', 'color' => 'blue',   'desc' => 'Propagation-based forwarding schedule updates'],
+    'connect-watchdog' => ['path' => $LOG_DIR . '/connect-watchdog.log',       'label' => 'Connect Watchdog',  'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Failed connect detection and pause/restore'],
+    'wp-auto-clean'    => ['path' => '/var/log/wp-auto-clean.log',             'label' => 'WP Auto Clean',     'group' => 'BPQ Dashboard', 'color' => 'green',  'desc' => 'Winlink White Pages automatic cleanup'],
+    'watchdog-state'   => ['path' => $WEB_ROOT . '/cache/watchdog-state.json', 'label' => 'Watchdog State',    'group' => 'BPQ Dashboard', 'color' => 'amber',  'desc' => 'Current connect-watchdog pause state (JSON)'],
+    'vara-validator'   => ['path' => '/var/log/vara-validator.log',            'label' => 'VARA Validator',    'group' => 'VARA',          'color' => 'purple', 'desc' => 'VARA callsign validator proxy log'],
+    'vara-sessions'    => ['path' => $LOG_DIR . '/' . $CALL . '.vara',         'label' => 'VARA Sessions',     'group' => 'VARA',          'color' => 'purple', 'desc' => 'Raw VARA HF session data'],
+    'bbs-today'        => ['path' => null, 'dir' => $LOG_DIR,                  'label' => 'BBS Log (Today)',   'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => "Today's BPQ BBS activity log", 'dynamic' => 'today'],
+    'bbs-archive'      => ['path' => null, 'dir' => $LOG_DIR,                  'label' => 'BBS Log (Archive)', 'group' => 'BPQ Node',      'color' => 'cyan',   'desc' => 'Historical BPQ BBS logs — select a date', 'dynamic' => 'archive'],
+    'nws-monitor'      => ['path' => '/var/log/nws-monitor.log',               'label' => 'NWS Monitor',       'group' => 'System',        'color' => 'red',    'desc' => 'NWS weather alert monitor'],
+    'webserver-error'  => ['path' => $webserverLog,                            'label' => 'Web Server Errors', 'group' => 'System',        'color' => 'red',    'desc' => 'nginx or Apache2 web server error log'],
+    'auth'             => ['path' => '/var/log/auth.log',                       'label' => 'Auth Log',          'group' => 'System',        'color' => 'amber',  'desc' => 'SSH and system authentication events'],
 ];
 
 function get_today_bbs_path(): string {
+    global $LOG_DIR;
     $now = new DateTime('now', new DateTimeZone('UTC'));
-    return sprintf('/var/www/bpqdash/logs/log_%s_BBS.txt', $now->format('ymd'));
+    return sprintf('%s/log_%s_BBS.txt', $LOG_DIR, $now->format('ymd'));
 }
 
 function list_bbs_dates(string $dir): array {
@@ -100,8 +111,9 @@ function search_log(string $path, string $q): array {
 }
 
 function resolve_path(array $meta, string $date = ''): ?string {
+    global $LOG_DIR;
     if (($meta['dynamic'] ?? '') === 'today')   return get_today_bbs_path();
-    if (($meta['dynamic'] ?? '') === 'archive') return $date ? "/var/www/bpqdash/logs/log_{$date}_BBS.txt" : null;
+    if (($meta['dynamic'] ?? '') === 'archive') return $date ? "{$LOG_DIR}/log_{$date}_BBS.txt" : null;
     return $meta['path'] ?? null;
 }
 
@@ -155,7 +167,8 @@ if ($action === 'search') {
 }
 
 if ($action === 'dates') {
-    echo json_encode(['dates' => list_bbs_dates('/var/www/bpqdash/logs')], JSON_PRETTY_PRINT);
+    global $LOG_DIR;
+    echo json_encode(['dates' => list_bbs_dates($LOG_DIR)], JSON_PRETTY_PRINT);
     exit;
 }
 

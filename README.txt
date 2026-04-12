@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════
-  BPQ Dashboard v1.5.5
+  BPQ Dashboard v1.5.6
   YOURCALL — BPQ Network — Your City, GA
   https://www.bpqdash.net     sysop@example.com
 ═══════════════════════════════════════════════════════════════════
@@ -65,11 +65,11 @@ INSTALLATION — STEP BY STEP
 
   STEP 1 — Copy zip to your Linux server
     Windows: Use WinSCP or FileZilla to copy
-      BPQ-Dashboard-v1.5.5-deploy.zip
+      BPQ-Dashboard-v1.5.6-deploy.zip
       to your home folder on the server
 
     Linux/Mac terminal:
-      scp BPQ-Dashboard-v1.5.5-deploy.zip user@server-ip:~/
+      scp BPQ-Dashboard-v1.5.6-deploy.zip user@server-ip:~/
 
   STEP 2 — Log in to your server
     ssh your-username@your-server-ip
@@ -78,7 +78,7 @@ INSTALLATION — STEP BY STEP
     sudo apt install unzip
 
   STEP 4 — Unzip the archive
-    unzip BPQ-Dashboard-v1.5.5-deploy.zip
+    unzip BPQ-Dashboard-v1.5.6-deploy.zip
 
   STEP 5 — Enter the folder
     cd BPQ-Dashboard-deploy

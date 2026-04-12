@@ -1,4 +1,4 @@
-# BPQ Dashboard v1.5.5 — Troubleshooting Guide
+# BPQ Dashboard v1.5.6 — Troubleshooting Guide
 
 ---
 
@@ -133,13 +133,13 @@ sudo systemctl start mariadb
 
 **Test connection:**
 ```bash
-mysql -u tprfn_user -p bpqdash -e "SELECT 1"
+mysql -u bpqdash_user -p bpqdash -e "SELECT 1"
 ```
 
 **Reset database password:**
 ```bash
 sudo mysql
-ALTER USER 'tprfn_user'@'localhost' IDENTIFIED BY 'your-new-password';
+ALTER USER 'bpqdash_user'@'localhost' IDENTIFIED BY 'your-new-password';
 FLUSH PRIVILEGES;
 exit
 ```

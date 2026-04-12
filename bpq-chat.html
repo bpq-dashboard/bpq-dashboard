@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BPQ Dashboard v1.5.5 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>BPQ Chat — YOURCALL</title>
+    <title>BPQ Chat</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -247,7 +246,8 @@
     <a href="bpq-system-logs.html"    class="nav-link">System</a>
     <a href="bpq-connect-log.html"    class="nav-link">Connects</a>
     <a href="bpq-email-monitor.html"  class="nav-link">Messages</a>
-    <a href="bbs-messages.html"       class="nav-link">BBS</a>
+    <a href="bpq-aprs.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">APRS</a>
+                    <a href="bbs-messages.html"       class="nav-link">BBS</a>
     <a href="nws-dashboard.html"      class="nav-link">Weather</a>
     <a href="bpq-chat.html"           class="nav-link active">Chat</a>
     <div class="nav-spacer"></div>
@@ -425,11 +425,11 @@
 <div id="authModal" class="modal-backdrop">
     <div class="modal-box" style="width:400px">
         <div class="modal-header">
-            <span class="modal-title">📡 BPQ Chat — YOURCALL Node</span>
+            <span class="modal-title">📡 BPQ Chat — Node</span>
         </div>
         <div class="modal-body">
             <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">
-                Welcome to the <strong style="color:var(--accent)">YOURCALL BPQ Chat</strong> gateway.<br>
+                Welcome to the <strong style="color:var(--accent)">BPQ Chat</strong> gateway.<br>
                 Authorized amateur radio operators may connect using their BPQ node credentials.<br>
                 Guests may view chat traffic in read-only mode.
             </p>
@@ -464,7 +464,7 @@
         </div>
         <div class="modal-body">
             <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">
-                To request a BPQ account on the YOURCALL node, email the sysop with your callsign and intended use.
+                To request a BPQ account, email the sysop with your callsign and intended use.
             </p>
             <div class="form-row">
                 <label class="form-label">Your Callsign</label>
@@ -477,7 +477,7 @@
             </div>
             <div class="form-row">
                 <label class="form-label">Brief note (optional)</label>
-                <input type="text" class="form-input" id="reqNote" placeholder="BPQDash member, VARA HF operator...">
+                <input type="text" class="form-input" id="reqNote" placeholder="TPRFN member, VARA HF operator...">
             </div>
         </div>
         <div class="modal-footer">

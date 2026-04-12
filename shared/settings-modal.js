@@ -241,7 +241,7 @@
         <div class="stn-section">
             <div class="stn-section-title">🏠 Home Station</div>
             <div class="stn-grid2">
-                ${field('Callsign',   'stn_callsign', s.callsign ?? '',  'text',   'e.g. K1AJD')}
+                ${field('Callsign',   'stn_callsign', s.callsign ?? '',  'text',   'e.g. W1AW')}
                 ${field('Grid Square','stn_grid',     s.grid     ?? '',  'text',   '6-char, e.g. EM83al')}
                 ${field('Latitude',   'stn_lat',      s.lat      ?? 0,   'number', '33.47')}
                 ${field('Longitude',  'stn_lon',      s.lon      ?? 0,   'number', '-82.01')}

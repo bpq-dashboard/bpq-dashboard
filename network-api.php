@@ -673,7 +673,7 @@ function getMonthlyTotals($cacheDir, $currentDailyTx, $currentDailyRx, $currentD
         // Skip today's snapshot if one exists (we use live data for today)
         if (($snap['date'] ?? '') === $todayDate) continue;
         
-        // Use stored totals if available (v1.5.5+ snapshots)
+        // Use stored totals if available (v1.5.6+ snapshots)
         if (isset($snap['estMessages'])) {
             $monthlyMsgs += $snap['estMessages'];
             $monthlyTx += $snap['totalBytesTx'] ?? 0;

@@ -23,7 +23,7 @@ return [
         'host' => 'localhost',
         'name' => 'bpqdash',
         'user' => 'bpqdash_user',
-        'pass' => 'TprfnDb2026!',
+        'pass' => 'YOURDBPASSWORD',
     ],
     'security_mode' => 'local',
     'features'      => ['bbs_read'=>true,'bbs_write'=>true,'nws_post'=>true],
@@ -31,7 +31,7 @@ return [
     'cors'          => ['allow_all'=>true],
     'logging'       => ['enabled'=>false],
     'paths'         => [
-        'logs'    => '/home/tony/linbpq/',
+        'logs'    => '/home/SYSOP/linbpq/',
         'scripts' => '/var/www/html/bpq/scripts/',
     ],
 ];

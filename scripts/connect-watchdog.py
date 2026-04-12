@@ -40,7 +40,7 @@ IS_WINDOWS = platform.system() == 'Windows'
 CONFIG = {
     'linmail_cfg': (
         os.path.join(os.environ.get('APPDATA', 'C:\\'), 'BPQ32', 'linmail.cfg')
-        if IS_WINDOWS else '/home/tony/linbpq/linmail.cfg'
+        if IS_WINDOWS else '/home/SYSOP/linbpq/linmail.cfg'
     ),
     'bbs_log_dir': (
         'C:\\UniServerZ\\www\\bpq\\logs'

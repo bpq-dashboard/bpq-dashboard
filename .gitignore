@@ -1,0 +1,6 @@
+SESSION-JOURNAL.txt
+*.log
+*.bak
+config.php
+data/
+cache/

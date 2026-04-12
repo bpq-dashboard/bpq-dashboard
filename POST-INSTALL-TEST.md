@@ -1,4 +1,4 @@
-# BPQ Dashboard v1.5.5 — Post-Installation Testing Guide
+# BPQ Dashboard v1.5.6 — Post-Installation Testing Guide
 
 Work through these tests after running install.sh.
 Each test tells you what to look for and what to do if it fails.
@@ -151,7 +151,7 @@ sudo nano /var/www/html/bpq/config.php
 
 ```bash
 sudo systemctl status mariadb
-mysql -u tprfn_user -p bpqdash -e "SHOW TABLES;"
+mysql -u bpqdash_user -p bpqdash -e "SHOW TABLES;"
 ```
 
 ✓ Pass: Lists tables including sessions, hubs, prop_decisions

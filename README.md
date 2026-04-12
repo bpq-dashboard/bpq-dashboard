@@ -1,8 +1,8 @@
-# BPQ Dashboard v1.5.5
+# BPQ Dashboard v1.5.6
 
 A comprehensive, modern monitoring dashboard suite for BPQ packet radio nodes featuring real-time RF connection analysis, system monitoring, traffic statistics, message monitoring, BBS message management, and NWS weather alerts.
 
-## What's New in v1.5.5
+## What's New in v1.5.6
 
 ### Best Paths Visualization (RF Connections)
 - **Quality-Scored Links** — station-to-home paths on Station Map scored by S/N (40%), VARA throughput (35%), and reliability (25%)
@@ -62,7 +62,7 @@ A comprehensive, modern monitoring dashboard suite for BPQ packet radio nodes fe
 
 See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 
-## What's New in v1.5.5
+## What's New in v1.5.6
 
 ### System Logs Enhancements
 - **Callsign Search & PDF Reports** - Search logs by callsign with PDF report generation featuring color-coded entries, summary statistics, and multi-page support
@@ -87,7 +87,7 @@ See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 - Mode toggle saves preference to localStorage
 - Intelligent warnings for missing logs or no activity
 
-## What's New in v1.5.5
+## What's New in v1.5.6
 
 ### Major Features
 - **VARA Channel Quality Analysis** - Dedicated panel mapping observed VARA bitrates to modem modulation tiers (BFSK→32QAM), with quality distribution bars, 7-day S/N and speed trends, QSB/multipath detection, and S/N-bitrate mismatch warnings
@@ -192,7 +192,7 @@ See [INSTALL.md](INSTALL.md) for detailed instructions.
 
 ## Features
 
-### Unified Configuration (v1.5.5)
+### Unified Configuration (v1.5.6)
 
 Single `config.php` file for all settings:
 
@@ -383,7 +383,7 @@ See [INSTALL.md](INSTALL.md) for more troubleshooting tips.
 ## Upgrading from v1.3.x
 
 1. **Backup your existing installation**
-2. **Extract v1.5.5 files** to your dashboard directory
+2. **Extract v1.5.6 files** to your dashboard directory
 3. **Keep your existing `config.php`** — no config changes required
 4. **Create `data/stations/` directory** with web server write permissions
 5. **Note:** MHeard Stations and Known Stations Routing Table have moved from RF Connections to System Logs
@@ -393,7 +393,7 @@ See [INSTALL.md](INSTALL.md) for more troubleshooting tips.
 ## Upgrading from v1.2.x
 
 1. **Backup your existing installation**
-2. **Extract v1.5.5 files** to your dashboard directory
+2. **Extract v1.5.6 files** to your dashboard directory
 3. **Create new config.php** from `config.php.example`
 4. **Migrate settings** from old `bbs-config.php`:
    ```php

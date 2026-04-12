@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- BPQ Dashboard v1.5.5 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RF Power Monitor Dashboard</title>
@@ -36,7 +35,14 @@
                 <div id="navClocks" class="flex items-center gap-2 font-mono text-xs sm:text-sm">
                     <span id="navUtcClock" class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold tracking-wider" title="UTC / Zulu">--:--:-- Z</span>
                     <span id="navLocalClock" class="px-2 sm:px-3 py-1 sm:py-1.5 rounded bg-gray-700 text-gray-300 font-semibold tracking-wider" title="Local time">--:--:-- L</span>
-                </div>
+                
+        <div class="flex gap-1 sm:gap-2 flex-wrap">
+            <a href="bpq-rf-connections.html" class="px-2 py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 text-xs font-medium">RF</a>
+            <a href="bpq-aprs.html" class="px-2 py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 text-xs font-medium">APRS</a>
+            <a href="bbs-messages.html" class="px-2 py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 text-xs font-medium">BBS</a>
+            <a href="bpq-chat.html" class="px-2 py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 text-xs font-medium">Chat</a>
+            <a href="nws-dashboard.html" class="px-2 py-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 text-xs font-medium">Weather</a>
+        </div></div>
                 <div id="statusIndicator" class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full">
                     <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                     <span id="statusText" class="text-sm text-gray-300">Loading...</span>
@@ -366,7 +372,7 @@
             document.getElementById('statusText').textContent = refreshOnly ? 'Refreshing...' : 'Loading data...';
             
             const now = new Date();
-            const daysToFetch = refreshOnly ? 2 : 31;
+            const daysToFetch = refreshOnly ? 2 : 180;
             
             try {
                 const r = await fetch(`api/data.php?source=datalog&days=${daysToFetch}&t=${Date.now()}`);

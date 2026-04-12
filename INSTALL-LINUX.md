@@ -49,8 +49,8 @@ This guide walks you through installing BPQ Dashboard on a Linux computer (Raspb
 | LinBPQ telnet port | LinBPQ config → TELNET section | `8010` |
 | BBS sysop username | LinBPQ config | `YOURCALL` |
 | BBS password | LinBPQ config | `mypassword` |
-| LinBPQ log directory | Where LinBPQ writes `log_*_BBS.txt` | `/home/tony/linbpq/` |
-| LinBPQ config file | Path to `linmail.cfg` | `/home/tony/linbpq/linmail.cfg` |
+| LinBPQ log directory | Where LinBPQ writes `log_*_BBS.txt` | `/home/SYSOP/linbpq/` |
+| LinBPQ config file | Path to `linmail.cfg` | `/home/SYSOP/linbpq/linmail.cfg` |
 
 ---
 
@@ -220,17 +220,17 @@ ls /opt/linbpq/*.txt 2>/dev/null
 cd /var/www/html/bpq/logs/
 
 # BBS logs (required for all dashboards)
-sudo ln -sf /home/tony/linbpq/log_*_BBS.txt .
+sudo ln -sf /home/SYSOP/linbpq/log_*_BBS.txt .
 
 # TCP logs (required for Email Monitor in SMTP/POP mode)
-sudo ln -sf /home/tony/linbpq/log_*_TCP.txt .
+sudo ln -sf /home/SYSOP/linbpq/log_*_TCP.txt .
 
 # VARA session log (required for RF Connections frequency data)
 # The filename matches your callsign — adjust accordingly
-sudo ln -sf /home/tony/linbpq/yourcall.vara .
+sudo ln -sf /home/SYSOP/linbpq/yourcall.vara .
 
 # CMS Access log (required for Winlink/WL2K session display)
-sudo ln -sf /home/tony/linbpq/CMSAccess_*.log .
+sudo ln -sf /home/SYSOP/linbpq/CMSAccess_*.log .
 ```
 
 > **Alternative — cron-based copy:** If symbolic links don't work (e.g. logs are on a different machine), use the included `sync-bpq-logs.sh` script on a cron schedule instead.
@@ -391,7 +391,7 @@ Edit the `CONFIG` block at the top of `connect-watchdog.py`:
 
 ```python
 CONFIG = {
-    'linmail_cfg':   '/home/tony/linbpq/linmail.cfg',  # ← Path to your linmail.cfg
+    'linmail_cfg':   '/home/SYSOP/linbpq/linmail.cfg',  # ← Path to your linmail.cfg
     'bbs_log_dir':  '/var/www/html/bpq/logs',          # ← Dashboard logs directory
     'state_file':   '/var/www/html/bpq/cache/watchdog-state.json',
     'log_file':     '/var/www/html/bpq/logs/connect-watchdog.log',
@@ -494,7 +494,7 @@ Edit `CONFIG` at the top of `prop-scheduler.py`:
 
 ```python
 CONFIG = {
-    'linmail_cfg':   '/home/tony/linbpq/linmail.cfg',
+    'linmail_cfg':   '/home/SYSOP/linbpq/linmail.cfg',
     'backup_dir':    '/var/www/html/bpq/data/backups',
     'bbs_host':      'localhost',
     'bbs_port':      8010,
