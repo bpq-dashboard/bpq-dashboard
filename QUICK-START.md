@@ -1,6 +1,6 @@
 # BPQ Dashboard Quick Start Guide
 
-**Version 1.5.5** - Get your BPQ Dashboard running in 5 minutes!
+**Version 1.5.6** - Get your BPQ Dashboard running in 5 minutes!
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@
 
 ### Step 2: Deploy Dashboard
 
-1. Extract `BPQ-Dashboard-v1_4_1.zip`
+1. Extract `BPQ-Dashboard-v1.5.6-deploy.zip`
 2. Copy `BPQ-Dashboard` folder to `C:\UniServerZ\www\bpq\`
 3. Create directories:
    ```batch
@@ -109,7 +109,7 @@ sudo systemctl start apache2
 
 ```bash
 # Extract and copy files
-unzip BPQ-Dashboard-v1_4_1.zip
+unzip BPQ-Dashboard-v1.5.6-deploy.zip
 sudo mkdir -p /var/www/html/bpq
 sudo cp -r BPQ-Dashboard/* /var/www/html/bpq/
 

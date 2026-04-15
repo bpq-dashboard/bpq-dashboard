@@ -1,0 +1,17 @@
+[Unit]
+Description=BPQ VARA HF Terminal Daemon
+After=network.target linbpq.service
+Wants=linbpq.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/python3 /var/www/tprfn/scripts/bpq-vara-daemon.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

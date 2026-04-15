@@ -1,10 +1,22 @@
 # BPQ Dashboard — Linux Installation Guide
 
-**Version 1.5.3** | **Last Updated:** March 2026
+**Version 1.5.6** | **Last Updated:** April 2026
 
 This guide walks you through installing BPQ Dashboard on a Linux computer (Raspberry Pi, Ubuntu, Debian, etc.) step by step. No prior experience with web servers is required.
 
 > 📌 **Windows user?** See **[INSTALL-WINDOWS.md](INSTALL-WINDOWS.md)** instead.
+
+---
+
+## New in v1.5.6
+
+- **BPQ Telnet Client** (`bpq-telnet.html`) — browser-based terminal with live NetROM node sidebar
+- **VARA HF Terminal** (`bpq-vara.html`) — HF keyboard-to-keyboard terminal via BPQ ATT command
+- **NetROM Nodes API** (`bpq-nodes-api.php`) — live route table fetched from BPQ every 30 seconds
+- **Frequency QSY** — VARA terminal commands flrig to QSY on frequency selection
+- **Allowlist management** — sysop-controlled list of authorised VARA HF stations
+
+These features are installed automatically by `install.sh`. See [README.md](README.md) for full usage documentation.
 
 ---
 
@@ -96,8 +108,8 @@ The included script automates the entire installation:
 
 ```bash
 # Extract the dashboard zip (adjust filename for your version)
-unzip BPQ-Dashboard-v1.5.3.zip
-cd BPQ-Dashboard-v1.5.2
+unzip BPQ-Dashboard-v1.5.6.zip
+cd BPQ-Dashboard-v1.5.6
 
 # Make the deployment script executable
 chmod +x deploy-linux.sh
@@ -121,7 +133,7 @@ sudo mkdir -p /var/www/html/bpq
 sudo chown $USER:$USER /var/www/html/bpq
 
 # Copy all dashboard files
-cp -r BPQ-Dashboard-v1.5.2/* /var/www/html/bpq/
+cp -r BPQ-Dashboard-v1.5.6/* /var/www/html/bpq/
 
 # Create required directories
 sudo mkdir -p /var/www/html/bpq/{logs,cache,data/stations,data/messages,wx}
@@ -819,4 +831,4 @@ sudo systemctl restart apache2
 
 ---
 
-*BPQ Dashboard v1.5.3 — YOURCALL | BPQ Network | [https://www.bpqdash.net](https://www.bpqdash.net)*
+*BPQ Dashboard v1.5.6 — YOURCALL | BPQ Network | [https://www.bpqdash.net](https://www.bpqdash.net)*

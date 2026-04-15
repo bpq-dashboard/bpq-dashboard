@@ -156,6 +156,48 @@ read -r INPUT_EMAIL
 INPUT_EMAIL="${INPUT_EMAIL:-${INPUT_CALL,,}@example.com}"
 ok "Sysop email: $INPUT_EMAIL"
 
+# VARA HF terminal
+echo ""
+echo -e "  ${BLU}The BPQ Telnet Client and VARA HF Terminal are included in this release.${NC}"
+echo -e "  ${BLU}The Telnet Client works immediately with no extra software.${NC}"
+echo -e "  ${BLU}The VARA HF Terminal requires VARA HF modem software already running.${NC}"
+read -r -p "  Do you have VARA HF software running on this or a network machine? [y/N]: " HAS_VARA
+HAS_VARA="${HAS_VARA:-N}"
+if [[ "$HAS_VARA" =~ ^[Yy] ]]; then
+    echo -e "  ${BLU}Is VARA HF running on THIS machine (localhost)?${NC}"
+    read -r -p "  VARA HF host IP [127.0.0.1]: " INPUT_VARA_HOST
+    INPUT_VARA_HOST="${INPUT_VARA_HOST:-127.0.0.1}"
+    echo -e "  ${BLU}VARA HF command port — check VARA Settings → TCP Ports. Default is 8300,${NC}"
+    echo -e "  ${BLU}but some installs use different ports (e.g. 9025).${NC}"
+    read -r -p "  VARA HF command port [8300]: " INPUT_VARA_PORT
+    INPUT_VARA_PORT="${INPUT_VARA_PORT:-8300}"
+    # BPQ port number for VARA HF — ask which BPQ port drives VARA
+    echo -e "  ${BLU}Which BPQ port number is your VARA HF port? (check bpq32.cfg PORTNUM= in the VARA section)${NC}"
+    read -r -p "  BPQ VARA HF port number [3]: " INPUT_BPQ_VARA_PORT
+    INPUT_BPQ_VARA_PORT="${INPUT_BPQ_VARA_PORT:-3}"
+    # flrig for frequency control
+    read -r -p "  Do you use flrig for rig control? [y/N]: " HAS_FLRIG
+    HAS_FLRIG="${HAS_FLRIG:-N}"
+    if [[ "$HAS_FLRIG" =~ ^[Yy] ]]; then
+        read -r -p "  flrig host IP [127.0.0.1]: " INPUT_FLRIG_HOST
+        INPUT_FLRIG_HOST="${INPUT_FLRIG_HOST:-127.0.0.1}"
+        read -r -p "  flrig XML-RPC port [12345]: " INPUT_FLRIG_PORT
+        INPUT_FLRIG_PORT="${INPUT_FLRIG_PORT:-12345}"
+    else
+        INPUT_FLRIG_HOST="127.0.0.1"
+        INPUT_FLRIG_PORT="12345"
+    fi
+    ok "VARA HF: ${INPUT_VARA_HOST}:${INPUT_VARA_PORT} — BPQ port ${INPUT_BPQ_VARA_PORT}"
+    ok "flrig: ${INPUT_FLRIG_HOST}:${INPUT_FLRIG_PORT}"
+else
+    INPUT_VARA_HOST="127.0.0.1"
+    INPUT_VARA_PORT="8300"
+    INPUT_BPQ_VARA_PORT="3"
+    INPUT_FLRIG_HOST="127.0.0.1"
+    INPUT_FLRIG_PORT="12345"
+    say "VARA HF terminal will be installed but requires VARA HF software to function"
+fi
+
 echo -e "\n${GRN}${BOLD}Configuration collected. Starting installation...${NC}\n"
 sleep 2
 
@@ -164,6 +206,8 @@ SCRIPTS_DIR="$WEB_ROOT/scripts"
 CACHE_DIR="$WEB_ROOT/cache"
 DATA_DIR="$WEB_ROOT/data"
 IMG_DIR="$WEB_ROOT/img"
+VARA_CACHE_DIR="$WEB_ROOT/cache/vara-sessions"
+TELNET_CACHE_DIR="$WEB_ROOT/cache/telnet-sessions"
 WEB_USER="www-data"
 
 # ═══════════════════════════════════════════════════════════════════
@@ -299,6 +343,26 @@ if [[ -f "$SCRIPT_DIR/data/prop-decisions-schema.sql" ]]; then
         ok "prop_decisions schema imported" || warn "prop_decisions schema had warnings"
 fi
 
+# Create vara_allowed_stations table for VARA HF terminal allowlist
+say "Creating VARA HF allowlist table..."
+sudo mysql "${INPUT_DB_NAME}" -e "
+CREATE TABLE IF NOT EXISTS vara_allowed_stations (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    callsign   VARCHAR(10) NOT NULL,
+    name       VARCHAR(60) DEFAULT '',
+    notes      VARCHAR(255) DEFAULT '',
+    added_by   VARCHAR(10) DEFAULT '${INPUT_CALL}',
+    added_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+    active     TINYINT(1) DEFAULT 1,
+    UNIQUE KEY uq_callsign (callsign)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+" >> "$LOG" 2>&1 && ok "vara_allowed_stations table created" || warn "vara_allowed_stations table creation had warnings — run manually if needed"
+
+# Grant bpqdash_user access to the vara table (needs explicit grant since GRANT ALL was on *.*)
+sudo mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE ON \`${INPUT_DB_NAME}\`.vara_allowed_stations TO '${INPUT_DB_USER}'@'localhost';" >> "$LOG" 2>&1 || true
+sudo mysql -e "FLUSH PRIVILEGES;" >> "$LOG" 2>&1 || true
+ok "VARA table permissions granted to ${INPUT_DB_USER}"
+
 # ═══════════════════════════════════════════════════════════════════
 hdr "STEP 6 — CREATE WEB ROOT & DIRECTORIES"
 # ═══════════════════════════════════════════════════════════════════
@@ -310,6 +374,8 @@ DIRS=(
     "$CACHE_DIR/aprs"
     "$CACHE_DIR/chat-sessions"
     "$CACHE_DIR/network"
+    "$VARA_CACHE_DIR"
+    "$TELNET_CACHE_DIR"
     "$DATA_DIR"
     "$DATA_DIR/backups"
     "$IMG_DIR"
@@ -625,6 +691,53 @@ server {
         fastcgi_pass unix:${PHP_SOCK};
     }
 
+    # ── VARA HF terminal API ───────────────────────────────────────
+    location = /vara-api.php {
+        limit_req zone=bpq_api burst=10 nodelay;
+        fastcgi_read_timeout 15s;
+        fastcgi_send_timeout 15s;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:${PHP_SOCK};
+    }
+
+    # ── NetROM nodes API ───────────────────────────────────────────
+    location = /bpq-nodes-api.php {
+        limit_req zone=bpq_api burst=5 nodelay;
+        fastcgi_read_timeout 30s;
+        fastcgi_send_timeout 30s;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:${PHP_SOCK};
+    }
+
+    # ── VARA HF terminal page ──────────────────────────────────────
+    location = /bpq-vara.html {
+        try_files \$uri =404;
+    }
+
+    # ── BPQ Telnet WebSocket proxy ─────────────────────────────────
+    location ^~ /ws/telnet {
+        proxy_pass         http://127.0.0.1:8765;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # ── VARA HF Terminal WebSocket proxy ───────────────────────────
+    location ^~ /ws/vara {
+        proxy_pass         http://127.0.0.1:8767;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+    }
+
     # ── General PHP ────────────────────────────────────────────────
     location ~ \\.php\$ {
         limit_req zone=bpq_api burst=20 nodelay;
@@ -733,6 +846,39 @@ f.close()
     ok "bpq-aprs-daemon.py patched with callsign, passcode and location"
 fi
 
+# Patch bpq-telnet-daemon.py
+if [[ -f "$SCRIPTS_DIR/bpq-telnet-daemon.py" ]]; then
+    sed -i "s|BPQ_USER    = 'YOURCALL'|BPQ_USER    = '${INPUT_CALL}'|" "$SCRIPTS_DIR/bpq-telnet-daemon.py"
+    sed -i "s|BPQ_PASS    = 'YOURPASSWORD'|BPQ_PASS    = '${INPUT_BPQ_PASS}'|" "$SCRIPTS_DIR/bpq-telnet-daemon.py"
+    ok "bpq-telnet-daemon.py patched with callsign and password"
+fi
+
+# Patch bpq-vara-daemon.py
+if [[ -f "$SCRIPTS_DIR/bpq-vara-daemon.py" ]]; then
+    sed -i "s|BPQ_USER    = 'YOURCALL'|BPQ_USER    = '${INPUT_CALL}'|" "$SCRIPTS_DIR/bpq-vara-daemon.py"
+    sed -i "s|BPQ_PASS    = 'YOURPASSWORD'|BPQ_PASS    = '${INPUT_BPQ_PASS}'|" "$SCRIPTS_DIR/bpq-vara-daemon.py"
+    sed -i "s|BPQ_VARA_PORT = 3|BPQ_VARA_PORT = ${INPUT_BPQ_VARA_PORT}|" "$SCRIPTS_DIR/bpq-vara-daemon.py"
+    ok "bpq-vara-daemon.py patched with callsign, password and VARA port"
+fi
+
+# Patch vara-api.php
+if [[ -f "$WEB_ROOT/vara-api.php" ]]; then
+    sed -i "s|'YOURPASSWORD';        // overridden from config.php bbs.pass|'${INPUT_BPQ_PASS}';        // overridden from config.php bbs.pass|" "$WEB_ROOT/vara-api.php"
+    sed -i "s|'sysop@example.com';  // set to your email address|'${INPUT_EMAIL}';  // set to your email address|" "$WEB_ROOT/vara-api.php"
+    sed -i "s|'127.0.0.1';          // flrig host — localhost or remote IP|'${INPUT_FLRIG_HOST}';          // flrig host|" "$WEB_ROOT/vara-api.php"
+    sed -i "s|\$FLRIG_PORT  = 12345;|\$FLRIG_PORT  = ${INPUT_FLRIG_PORT};|" "$WEB_ROOT/vara-api.php"
+    sed -i "s|'YOURCALL'|'${INPUT_CALL}'|g" "$WEB_ROOT/vara-api.php"
+    ok "vara-api.php patched with callsign, email and flrig settings"
+fi
+
+# Patch bpq-nodes-api.php
+if [[ -f "$WEB_ROOT/bpq-nodes-api.php" ]]; then
+    sed -i "s|\$BPQ_USER  = 'YOURCALL';|\$BPQ_USER  = '${INPUT_CALL}';|" "$WEB_ROOT/bpq-nodes-api.php"
+    sed -i "s|\$BPQ_PASS  = 'YOURPASSWORD';|\$BPQ_PASS  = '${INPUT_BPQ_PASS}';|" "$WEB_ROOT/bpq-nodes-api.php"
+    sed -i "s|\$NODE_CALL = 'YOURCALL-4';|\$NODE_CALL = '${INPUT_NODE}';|" "$WEB_ROOT/bpq-nodes-api.php"
+    ok "bpq-nodes-api.php patched with callsign and password"
+fi
+
 # ── Optional: Configure LinBPQ logdir switch ──────────────────────
 say "Checking for LinBPQ log redirect..."
 if [[ -f "/etc/systemd/system/linbpq.service" ]]; then
@@ -798,6 +944,20 @@ VARASVC
     systemctl daemon-reload >> "$LOG" 2>&1
     systemctl enable vara-validator >> "$LOG" 2>&1
     ok "vara-validator service installed (start when VARA HF is configured)"
+fi
+
+# bpq-telnet daemon (WebSocket→BPQ telnet proxy)
+if [[ -f "$SCRIPTS_DIR/bpq-telnet-daemon.py" ]]; then
+    install_daemon "bpq-telnet" "$SCRIPTS_DIR/bpq-telnet-daemon.py" "$WEB_USER"
+else
+    warn "bpq-telnet-daemon.py not found — Telnet terminal daemon not installed"
+fi
+
+# bpq-vara daemon (WebSocket→BPQ VARA HF proxy)
+if [[ -f "$SCRIPTS_DIR/bpq-vara-daemon.py" ]]; then
+    install_daemon "bpq-vara" "$SCRIPTS_DIR/bpq-vara-daemon.py" "$WEB_USER"
+else
+    warn "bpq-vara-daemon.py not found — VARA HF terminal daemon not installed"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
@@ -947,12 +1107,16 @@ echo -e "  Dashboard URL : ${BLU}http://$INPUT_HOST/${NC}"
 echo -e "  Check tool    : ${BLU}http://$INPUT_HOST/install-check.php?pass=bpqcheck${NC}"
 echo ""
 echo -e "${BOLD}NEXT STEPS:${NC}"
-echo -e "  ${YLW}1.${NC} Verify LinBPQ is running and accessible on port 8010"
-echo -e "  ${YLW}2.${NC} Review config:  ${BLU}sudo nano $WEB_ROOT/config.php${NC}"
-echo -e "  ${YLW}3.${NC} Check daemons:  ${BLU}sudo systemctl status bpq-chat bpq-aprs${NC}"
-echo -e "  ${YLW}4.${NC} View logs:      ${BLU}sudo journalctl -u bpq-chat -u bpq-aprs -f${NC}"
-echo -e "  ${YLW}5.${NC} Run SSL setup:  ${BLU}sudo certbot --nginx -d $INPUT_HOST${NC}"
-echo -e "  ${YLW}6.${NC} Remove checker: ${BLU}sudo rm $WEB_ROOT/install-check.php${NC}"
+echo -e "  ${YLW}1.${NC}  Verify LinBPQ is running and accessible on port 8010"
+echo -e "  ${YLW}2.${NC}  Open dashboard:  ${BLU}http://${INPUT_HOST}/${NC}"
+echo -e "  ${YLW}3.${NC}  Review config:   ${BLU}sudo nano $WEB_ROOT/config.php${NC}"
+echo -e "  ${YLW}4.${NC}  Check daemons:   ${BLU}sudo systemctl status bpq-chat bpq-aprs bpq-telnet bpq-vara${NC}"
+echo -e "  ${YLW}5.${NC}  View logs:       ${BLU}sudo journalctl -u bpq-telnet -u bpq-vara -f${NC}"
+echo -e "  ${YLW}6.${NC}  BPQ Telnet:      ${BLU}http://${INPUT_HOST}/bpq-telnet.html${NC}"
+echo -e "  ${YLW}7.${NC}  VARA HF Terminal:${BLU}http://${INPUT_HOST}/bpq-vara.html${NC}  (password: your BPQ password)"
+echo -e "  ${YLW}8.${NC}  NetROM Nodes:    Auto-populated in bpq-telnet.html sidebar"
+echo -e "  ${YLW}9.${NC}  Run SSL setup:   ${BLU}sudo certbot --nginx -d $INPUT_HOST${NC}"
+echo -e "  ${YLW}10.${NC} Remove checker:  ${BLU}sudo rm $WEB_ROOT/install-check.php${NC}"
 echo ""
 echo -e "  Log saved to: $LOG"
 echo ""
