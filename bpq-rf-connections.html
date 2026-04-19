@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPQ RF Connections v1.5.6</title>
+    <title>BPQ RF Connections v1.5.4</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Preconnect to CDNs for faster loading -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -197,13 +197,10 @@
                     <a href="bpq-traffic.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Traffic</a>
                     <a href="bpq-system-logs.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">System</a>
                     <a href="bpq-connect-log.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Connects</a>
-                    <a href="bpq-email-monitor.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Messages</a>
+                <a href="bpq-email-monitor.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Messages</a>
                     <a href="bbs-messages.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">BBS</a>
-                    <a href="bpq-aprs.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">APRS</a>
-                    <a href="bpq-chat.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Chat</a>
                     <a href="nws-dashboard.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Weather</a>
-                    <a href="bpq-telnet.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Telnet</a>
-                    <a href="bpq-vara.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">VARA HF</a>
+                    <a href="bpq-chat.html" class="px-2 sm:px-4 py-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 font-medium text-xs sm:text-sm">Chat</a>
                 </div>
             </div>
         </div>
@@ -303,7 +300,7 @@
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">RF Connections</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.6</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.4</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">VARA HF Analytics with Frequency Tracking</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -370,7 +367,7 @@
                             <button onclick="showManagePartnersModal()" class="px-2 py-1 bg-gray-400 hover:bg-gray-500 text-white text-xs font-semibold rounded transition-colors">Manage</button>
                         </div>
                     </div>
-                    <div id="bpqHubList" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+                    <div id="tprfnHubList" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
                         <div class="text-gray-400 text-center py-2">Loading...</div>
                     </div>
                 </div>
@@ -914,12 +911,12 @@
     </div>
     <script>
         // Configuration
-        const VARA_LOG_FILE = 'yourcall.vara';
+        const VARA_LOG_FILE = 'k1ajd.vara';
         const BBS_LOG_BASE_URL = './logs/';
         const VARA_LOG_BASE_URL = './logs/';
         const CMS_LOG_BASE_URL = './logs/';
         const BBS_DAYS_TO_LOAD = 30; // Load 30 days of BBS logs for time range filtering
-        const HOME_STATION = { callsign: 'YOURCALL', lat: 0.0000, lon: 0.0000, grid: 'AA00aa', city: 'Your City' }; // Augusta, GA area
+        const HOME_STATION = { callsign: 'YOURCALL', lat: 0, lon: 0, grid: 'XX00aa' }; // Set to your callsign and grid square
         
         // Message detection threshold (total bytes TX+RX) — aligned with TPRFN Network Map
         // CMS ground truth: real messages always have TX+RX >= 446 bytes
@@ -940,7 +937,7 @@
         
         // TPRFN Hub stations that this station connects to regularly
         // Default stations (used to initialize localStorage if empty)
-        const DEFAULT_TPRFN_HUB_STATIONS = [];
+        const DEFAULT_TPRFN_HUB_STATIONS = ['WP4OH-11', 'N3MEL-2', 'NP4JN-11', 'K7EK', 'KK4DIV-1', 'N9SEO-1', 'N4SFL-1'];
         
         // localStorage key for forwarding partners
         const FORWARDING_PARTNERS_KEY = 'bpq_forwarding_partners';
@@ -1229,7 +1226,7 @@
             return '00-06Z';
         }
         
-        const BANDS = { '160m': { min: 1.8, max: 2.0, color: '#7c3aed' }, '80m': { min: 3.5, max: 4.0, color: '#ef4444' }, '40m': { min: 7.0, max: 7.3, color: '#f59e0b' }, '30m': { min: 10.1, max: 10.15, color: '#10b981' }, '20m': { min: 14.0, max: 14.35, color: '#3b82f6' }, '17m': { min: 18.068, max: 18.168, color: '#8b5cf6' }, '15m': { min: 21.0, max: 21.45, color: '#ec4899' }, '12m': { min: 24.89, max: 24.99, color: '#14b8a6' }, '10m': { min: 28.0, max: 29.7, color: '#f97316' }, 'WL2K': { min: 0, max: 0, color: '#06b6d4' } };
+        const BANDS = { 'VARA HF': { min: -1, max: -1, color: '#e8a020' }, '160m': { min: 1.8, max: 2.0, color: '#7c3aed' }, '80m': { min: 3.5, max: 4.0, color: '#ef4444' }, '40m': { min: 7.0, max: 7.3, color: '#f59e0b' }, '30m': { min: 10.1, max: 10.15, color: '#10b981' }, '20m': { min: 14.0, max: 14.35, color: '#3b82f6' }, '17m': { min: 18.068, max: 18.168, color: '#8b5cf6' }, '15m': { min: 21.0, max: 21.45, color: '#ec4899' }, '12m': { min: 24.89, max: 24.99, color: '#14b8a6' }, '10m': { min: 28.0, max: 29.7, color: '#f97316' }, 'WL2K': { min: 0, max: 0, color: '#06b6d4' } };
         const freqToBand = (f) => { for (const [b, r] of Object.entries(BANDS)) if (f >= r.min && f <= r.max) return b; return 'Unknown'; };
         const getBandColor = (b) => BANDS[b]?.color || '#6b7280';
 
@@ -2329,7 +2326,7 @@
                             if (match) {
                                 const [, h, m, s, call] = match;
                                 const baseCall = call.replace(/-\d+$/, '');
-                                // Skip our own node connecting to CMS outbound
+                                // Skip own hub connecting to CMS outbound — set to your hub callsign
                                 if (baseCall === 'YOURCALL') return;
                                 const key = result.dateKey + ':' + h + ':' + m + ':' + baseCall;
                                 cmsCallsigns[key] = true;
@@ -2382,8 +2379,8 @@
                         '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br><br>' +
                         '<span class="text-gray-500 font-semibold">Where does this file come from?</span><br>' +
                         'If you are part of the TPRFN network, your VARA log is available at:<br>' +
-                        '<span class="font-mono text-purple-600">https://your-domain/YOURCALL.vara</span><br><br>' +
-                        'Use the included <span class="font-mono font-semibold">fetch-vara-bpq</span> script to download and<br>' +
+                        '<span class="font-mono text-purple-600">https://yourdomain.example/YOURCALL.vara</span><br><br>' +
+                        'Use the included <span class="font-mono font-semibold">fetch-vara-tprfn</span> script to download and<br>' +
                         'append new entries every 15 minutes. See INSTALL documentation for setup.<br><br>' +
                         '<span class="text-gray-500 font-semibold">Not part of TPRFN?</span> The dashboard will still show BBS forwarding data<br>' +
                         'if <span class="font-mono font-semibold text-purple-600">log_' + yy + mm + dd + '_BBS.txt</span> files are available.' +
@@ -2437,7 +2434,7 @@
                     radioCount++;
                 }
                 
-                // Match incoming connects with frequency: "260107 00:10:49 |W1AW-1 Incoming Connect from W1AW on Port 3 Freq 7104700 Mode VARA"
+                // Match incoming connects with frequency: "260107 00:10:49 |KK4DIV-1 Incoming Connect from KK4DIV on Port 3 Freq 7104700 Mode VARA"
                 // Helper to convert Mon DD to YYMMDD key
                 function monDDtoYYMMDD(mon, day) {
                     const MONTHS = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06','Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'};
@@ -2494,7 +2491,7 @@
                 }
                 
                 // Match "Error - Port in use (Session Attached)" failures
-                // Format: "260114 06:06:48 <K7EK      AGNODE:YOURCALL-4} Error - Port in use (Session Attached"
+                // Format: "260114 06:06:48 <K7EK      AGNODE:K1AJD-4} Error - Port in use (Session Attached"
                 const portInUseMatch = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+<([A-Z0-9-]+)\s+.*Error\s*-\s*Port\s+in\s+use/i);
                 if (portInUseMatch) {
                     const [, date, h, m, s, call] = portInUseMatch;
@@ -2511,8 +2508,8 @@
                 }
                 
                 // Match "} Failure with" patterns (VARA or AGNODE connection failures)
-                // Format: "260114 00:12:35 <LU4ECL    AGNODE:YOURCALL-4} Failure with LU4ECL-4"
-                // Format: "260114 20:34:45 <N4SFL     VARA} Failure with YOURCALL-7 N4SFL-D-7"
+                // Format: "260114 00:12:35 <LU4ECL    AGNODE:K1AJD-4} Failure with LU4ECL-4"
+                // Format: "260114 20:34:45 <N4SFL     VARA} Failure with K1AJD-7 N4SFL-D-7"
                 const varaFailureMatch = line.match(/(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+<([A-Z0-9-]+)\s+.*}\s*Failure\s+with/i);
                 if (varaFailureMatch) {
                     const [, date, h, m, s, call] = varaFailureMatch;
@@ -2814,7 +2811,7 @@
 
             varaLogs.forEach(line => {
                 // Handle both VARA log date formats:
-                //   New format: "Mar 25 17:44:39 H-YOURCALL-7 VARAHF ..."  (Mon DD HH:MM:SS)
+                //   New format: "Mar 25 17:44:39 H-K1AJD-7 VARAHF ..."  (Mon DD HH:MM:SS)
                 //   Old format: "251226 00:06:02 <NP4JN ..."              (YYMMDD HH:MM:SS)
                 let mon, day, h, m, s, dateStr, ts;
 
@@ -2874,7 +2871,8 @@
                     const [, call, attempt, maxAttempts] = connecting;
                     if (attempt === '1') { 
                         // First attempt - start tracking
-                        curr = { type: 'outgoing', callsign: call, startTime: ts, dateStr, h, m, s, freqMHz: findFrequency(call, h, m, s, 'outgoing', dateStr) }; 
+                        const _freq = findFrequency(call, h, m, s, 'outgoing', dateStr);
+                        curr = { type: 'outgoing', callsign: call, startTime: ts, dateStr, h, m, s, freqMHz: _freq, isVaraTerminal: !_freq }; 
                         lastConnectAttempt = { callsign: call, attempt: 1, maxAttempts: parseInt(maxAttempts) };
                     } else {
                         // Update attempt count
@@ -2886,7 +2884,7 @@
                 const connTo = line.match(/Connected to ([A-Z0-9-]+)\s+VARA HF/i);
                 if (connTo) { 
                     const freq = findFrequency(connTo[1], h, m, s, 'outgoing', dateStr); 
-                    curr = { type: 'outgoing', callsign: connTo[1], startTime: ts, dateStr, h, m, s, status: 'connected', freqMHz: freq || curr?.freqMHz }; 
+                    curr = { type: 'outgoing', callsign: connTo[1], startTime: ts, dateStr, h, m, s, status: 'connected', freqMHz: freq || curr?.freqMHz, isVaraTerminal: !freq }; 
                     lastConnectAttempt = null;  // Clear - connection succeeded
                     return; 
                 }
@@ -2941,6 +2939,9 @@
                     const totalBytes = parseInt(tx) + parseInt(rx), isSuccess = totalBytes > 0 || curr.snr !== undefined;
                     const maxBps = Math.max(parseInt(txBps), parseInt(rxBps));
                     let band = curr.freqMHz ? freqToBand(curr.freqMHz) : 'Unknown';
+                    // VARA HF Terminal connections go through ATT 3 without a RADIO command
+                    // so frequency lookup returns null — mark them as VARA HF instead of Unknown
+                    if (band === 'Unknown' && curr.isVaraTerminal) band = 'VARA HF';
                     let inferredFreqMHz = null;  // For WL2K connections
                     
                     // For Unknown band incoming connections, check BBS log to determine type
@@ -4616,7 +4617,7 @@
         }
         
         function updateTPRFNHubStations() {
-            const container = document.getElementById('bpqHubList');
+            const container = document.getElementById('tprfnHubList');
             const partners = getForwardingPartners();
             
             if (partners.length === 0) {
@@ -5894,7 +5895,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.6 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.4 | HF Efficiency Report
                 </p>
             `;
             

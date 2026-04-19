@@ -10,7 +10,7 @@ HF sessions via the VARA modem.
 BPQ session sequence:
   Login → NODE → ATT 3 → [VARA HF session] → D → BYE
 
-Run as: python3 /var/www/html/bpq/scripts/bpq-vara-daemon.py
+Run as: python3 /var/www/tprfn/scripts/bpq-vara-daemon.py
 Service: bpq-vara.service
 """
 
@@ -26,7 +26,7 @@ from pathlib import Path
 
 # ── Configuration ──────────────────────────────────────────────────
 import os as _os
-_candidates = ['/var/www/html/bpq', '/var/www/bpq', '/var/www/tprfn']
+_candidates = ['/var/www/tprfn', '/var/www/html/bpq', '/var/www/bpq']
 WEB_ROOT = next((p for p in _candidates if _os.path.isdir(p)), '/var/www/html/bpq')
 
 STATE_DIR   = WEB_ROOT + '/cache/vara-sessions'
@@ -38,7 +38,7 @@ WS_PORT     = 8767
 BPQ_HOST    = '127.0.0.1'
 BPQ_PORT    = 8010
 BPQ_USER    = 'YOURCALL'
-BPQ_PASS    = 'YOURPASSWORD'
+BPQ_PASS    = 'yourpassword'
 BPQ_VARA_PORT = 3            # BPQ port number for VARA HF
 
 MAX_SESSIONS = 3
@@ -67,6 +67,12 @@ VARA_PATTERNS = [
     (re.compile(r'LINK\s+ESTABLISHED',     re.I),         'link_up',      lambda m: {}),
     (re.compile(r'LINK\s+DISCONNECTED',    re.I),         'link_down',    lambda m: {}),
     (re.compile(r'BUSY\s+CHANNEL',         re.I),         'busy',         lambda m: {}),
+    (re.compile(r'Failure\s+with\s+(\S+)', re.I),        'failure',      lambda m: {'remote': m.group(1).upper()}),
+    (re.compile(r'CANCELPENDING',           re.I),         'cancelled',    lambda m: {}),
+    (re.compile(r'TIMEOUT',                 re.I),         'timeout',      lambda m: {}),
+    (re.compile(r'^PENDING\s+(\S+)',        re.I|re.M),    'pending',      lambda m: {'remote': m.group(1).upper()}),
+    (re.compile(r'BUFFER\s+(\d+)',          re.I),         'buffer',       lambda m: {'bytes': int(m.group(1))}),
+    (re.compile(r'IAMALIVE',               re.I),         'keepalive',    lambda m: {}),
     (re.compile(r'S/N\s*([-\d]+)\s*dB',   re.I),         'snr',          lambda m: {'snr': int(m.group(1))}),
     (re.compile(r'BW(\d+)',                re.I),         'bandwidth',    lambda m: {'bw': f'BW{m.group(1)}'}),
     (re.compile(r'ATTACHED\s+TO\s+PORT',   re.I),         'attached',     lambda m: {}),
@@ -227,7 +233,7 @@ class VARASession:
             except asyncio.TimeoutError:
                 pass
             log.info(f"Session {self.session_id}: at node prompt")
-            await asyncio.sleep(0.5)  # let BPQ settle at node prompt
+            await asyncio.sleep(1.0)  # let BPQ fully settle at node prompt
 
             # Step 5 — attach to VARA HF port
             self.writer.write(f'ATT {BPQ_VARA_PORT}\r\n'.encode())
@@ -244,6 +250,7 @@ class VARASession:
                 log.warning(f"Session {self.session_id}: ATT failed. Got: {repr(clean[-60:])}")
                 return False
 
+            await asyncio.sleep(0.5)  # let VARA port fully initialise
             self.vara_attached = True
             log.info(f"Session {self.session_id}: attached to VARA HF port {BPQ_VARA_PORT}")
             await self.send_event('attached', {'port': BPQ_VARA_PORT})
@@ -321,7 +328,7 @@ class VARASession:
                 # D releases VARA port, BYE closes telnet
                 self.writer.write(b'D\r\nBYE\r\n')
                 await self.writer.drain()
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.8)  # let BPQ fully release VARA port
         except Exception:
             pass
         try:
@@ -437,19 +444,17 @@ async def main():
 
     log.info(f"BPQ VARA Daemon starting on {WS_HOST}:{WS_PORT}")
     write_heartbeat()
-
-    ws_ver = tuple(int(x) for x in websockets.__version__.split('.')[:2])
     log.info(f"websockets version: {websockets.__version__}")
 
-    if ws_ver >= (11, 0):
-        async with websockets.serve(handle_websocket, WS_HOST, WS_PORT,
-                                    ping_interval=30, ping_timeout=10):
-            log.info(f"VARA daemon ready — ws://{WS_HOST}:{WS_PORT}")
-            await asyncio.gather(asyncio.Future(), heartbeat_loop())
-    else:
-        async with websockets.serve(handle_websocket, WS_HOST, WS_PORT):
-            log.info(f"VARA daemon ready — ws://{WS_HOST}:{WS_PORT}")
-            await asyncio.gather(asyncio.Future(), heartbeat_loop())
+    async with websockets.serve(
+        handle_websocket,
+        WS_HOST,
+        WS_PORT,
+        ping_interval=None,
+        ping_timeout=None,
+    ):
+        log.info(f"VARA daemon ready — ws://{WS_HOST}:{WS_PORT}")
+        await asyncio.gather(asyncio.Future(), heartbeat_loop())
 
 
 if __name__ == '__main__':

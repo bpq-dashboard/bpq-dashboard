@@ -1059,7 +1059,7 @@ function parseWhoOutput(raw) {
 
     lines.forEach(line => {
         line = line.trim();
-        // Match: "YOURCALL at AGCHAT Tony, Augusta, GA [General] Idle for 578 seconds"
+        // Match: "YOURCALL at AGCHAT YOUR_NAME, YOUR_CITY, STATE [General] Idle for 578 seconds"
         const m = line.match(/^([A-Z0-9\-\/]+)\s+at\s+(\S+)\s+(.+?)\s+\[(.+?)\]\s+Idle for (\d+)/i);
         if (!m) return;
         const call  = m[1].toUpperCase();

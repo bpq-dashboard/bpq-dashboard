@@ -3,1089 +3,464 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VARA HF Terminal — BPQ Dashboard</title>
+<title>VARA HF Terminal</title>
 <style>
-/* ── Design: Dark operator console — amber/green on near-black ── */
 :root {
-    --bg:        #0a0c0f;
-    --surface:   #111418;
-    --surface2:  #181c22;
-    --border:    #252a32;
-    --text:      #d4dbe8;
-    --muted:     #5a6578;
-    --amber:     #e8a020;
-    --amber-dim: #7a4f08;
-    --green:     #22c55e;
-    --red:       #ef4444;
-    --blue:      #3b82f6;
-    --cyan:      #22d3ee;
-    --term-bg:   #070910;
-    --term-fg:   #c8d4e8;
-    --term-amber:#e8a020;
-    --term-green:#22c55e;
-    --term-red:  #ef4444;
-    --font-mono: 'Courier New', 'Lucida Console', monospace;
-    --font-ui:   'Segoe UI', system-ui, sans-serif;
+    --bg:#080a0d;--surface:#0f1318;--surface2:#161b22;
+    --border:#1e242e;--border2:#2a3340;
+    --text:#c8d4e0;--muted:#4a5568;
+    --amber:#e8a020;--amber-dim:#6b4510;--amber-bg:#1a1005;
+    --green:#22c55e;--red:#ef4444;--blue:#3b82f6;--cyan:#22d3ee;
+    --term-bg:#050709;--term-fg:#b8c8d8;
+    --mono:'Courier New','Lucida Console',monospace;
+    --ui:'Segoe UI',system-ui,sans-serif;
+    --r:6px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
 
-/* ═══════════════════════════════════════════════════════
-   LOGIN OVERLAY — blocks entire page until authenticated
-   ═══════════════════════════════════════════════════════ */
-#loginOverlay {
-    position:fixed;inset:0;
-    background:#0a0c0f;
-    display:flex;align-items:center;justify-content:center;
-    z-index:9999;
-    font-family:var(--font-ui);
-}
-#loginOverlay.hidden { display:none; }
+/* LOGIN */
+#loginOverlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:var(--ui)}
+#loginOverlay.hidden{display:none}
+.login-box{width:360px;background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:36px 30px;box-shadow:0 32px 80px rgba(0,0,0,.9)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo .icon{font-size:36px;display:block;margin-bottom:10px}
+.login-logo h1{font-size:16px;font-weight:700;color:var(--amber);letter-spacing:.5px;text-transform:uppercase}
+.login-logo p{font-size:11px;color:var(--muted);margin-top:5px}
+.lf{margin-bottom:14px}
+.lf label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.lf input{width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:9px 11px;border-radius:var(--r);font-size:13px;font-family:var(--mono);outline:none;transition:border-color .15s}
+.lf input:focus{border-color:var(--amber)}
+.login-btn{width:100%;background:var(--amber);color:#000;border:none;padding:10px;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s;margin-top:6px}
+.login-btn:hover{opacity:.85}
+.login-err{color:var(--red);font-size:11px;text-align:center;margin-top:10px;min-height:16px}
+.login-sub{text-align:center;margin-top:18px;font-size:11px;color:var(--muted)}
+.login-sub a{color:var(--amber);cursor:pointer;text-decoration:none}
+#reqPanel{display:none;margin-top:16px}
+#reqPanel.show{display:block}
+.req-sep{border:none;border-top:1px solid var(--border);margin:14px 0}
+.req-note{font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+.req-btn{width:100%;background:var(--surface2);color:var(--amber);border:1px solid var(--amber-dim);padding:8px;border-radius:var(--r);font-size:12px;cursor:pointer}
+.req-ok{color:var(--green);font-size:11px;text-align:center;margin-top:8px;display:none}
 
-.login-box {
-    width:380px;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:12px;
-    padding:36px 32px;
-    box-shadow:0 24px 80px rgba(0,0,0,.8);
-}
-.login-logo {
-    text-align:center;
-    margin-bottom:28px;
-}
-.login-logo .icon { font-size:40px;display:block;margin-bottom:8px; }
-.login-logo h1 {
-    font-size:18px;font-weight:700;
-    color:var(--amber);letter-spacing:.5px;
-}
-.login-logo p { font-size:12px;color:var(--muted);margin-top:4px; }
-.login-field { margin-bottom:16px; }
-.login-field label {
-    display:block;font-size:11px;color:var(--muted);
-    text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;
-}
-.login-field input {
-    width:100%;background:var(--bg);border:1px solid var(--border);
-    color:var(--text);padding:10px 12px;border-radius:6px;
-    font-size:14px;font-family:var(--font-mono);outline:none;
-}
-.login-field input:focus { border-color:var(--amber); }
-.login-btn {
-    width:100%;background:var(--amber);color:#000;
-    border:none;padding:11px;border-radius:6px;
-    font-size:14px;font-weight:700;cursor:pointer;
-    letter-spacing:.3px;transition:opacity .15s;
-    margin-top:4px;
-}
-.login-btn:hover { opacity:.88; }
-.login-error {
-    color:var(--red);font-size:12px;text-align:center;
-    margin-top:12px;min-height:18px;
-}
-.login-request-link {
-    text-align:center;margin-top:20px;
-    font-size:11px;color:var(--muted);
-}
-.login-request-link a {
-    color:var(--amber);cursor:pointer;text-decoration:none;
-}
-.login-request-link a:hover { text-decoration:underline; }
+/* APP */
+#app{display:none;height:100vh;flex-direction:column;background:var(--bg);color:var(--text);font-family:var(--ui);font-size:13px}
+#app.show{display:flex}
 
-/* Request access panel */
-#requestPanel { display:none;margin-top:20px; }
-#requestPanel.visible { display:block; }
-.request-sep {
-    border:none;border-top:1px solid var(--border);margin:16px 0;
-}
-.request-note {
-    font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;
-}
-.request-btn {
-    width:100%;background:var(--surface2);color:var(--amber);
-    border:1px solid var(--amber-dim);padding:9px;border-radius:6px;
-    font-size:13px;cursor:pointer;transition:background .15s;
-}
-.request-btn:hover { background:var(--amber-dim); }
-.request-sent {
-    color:var(--green);font-size:12px;text-align:center;
-    margin-top:8px;display:none;
-}
+/* TOPBAR */
+#topbar{display:flex;align-items:center;gap:10px;padding:7px 14px;background:var(--surface);border-bottom:2px solid var(--amber-dim);flex-shrink:0}
+#topbar h1{font-size:13px;font-weight:700;color:var(--amber);letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
+.tb-sep{width:1px;height:18px;background:var(--border2);flex-shrink:0}
+.sbadge{display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.4px;border:1px solid var(--border2);transition:all .3s;white-space:nowrap}
+.sbadge.idle{border-color:var(--muted);color:var(--muted)}
+.sbadge.connecting{border-color:var(--amber);color:var(--amber);animation:pulse 1s infinite}
+.sbadge.attached{border-color:var(--blue);color:var(--blue)}
+.sbadge.session{border-color:var(--green);color:var(--green)}
+.sbadge.busy{border-color:var(--red);color:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.sdot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.chip{font-size:10px;font-family:var(--mono);color:var(--muted);padding:2px 7px;border:1px solid var(--border2);border-radius:4px;white-space:nowrap}
+.chip.on{color:var(--cyan);border-color:var(--cyan)}
+#timer{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.tb-space{flex:1}
+.tb-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:3px 9px;border-radius:var(--r);font-size:11px;cursor:pointer;transition:background .15s;white-space:nowrap}
+.tb-btn:hover{background:var(--border2)}
+.tb-btn.danger{color:var(--red);border-color:var(--red)}
+.tb-btn.danger:hover{background:rgba(239,68,68,.12)}
 
-/* ═══════════════════════════════════════════════════════
-   MAIN APP (hidden until authenticated)
-   ═══════════════════════════════════════════════════════ */
-#app {
-    display:none;height:100vh;
-    flex-direction:column;overflow:hidden;
-    background:var(--bg);color:var(--text);
-    font-family:var(--font-ui);font-size:13px;
-}
-#app.visible { display:flex; }
+/* CONNECT BAR */
+#connectBar{padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+#presetRow{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.preset-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.preset-btn{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);padding:3px 9px;border-radius:var(--r);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all .15s;white-space:nowrap}
+.preset-btn:hover{border-color:var(--amber);color:var(--amber)}
+.preset-btn.active{background:var(--amber-bg);border-color:var(--amber);color:var(--amber);font-weight:700}
+#inputRow{display:flex;gap:8px;align-items:flex-end}
+.fi{display:flex;flex-direction:column;gap:4px}
+.fi label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.fi input{background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:6px 9px;border-radius:var(--r);font-size:13px;font-family:var(--mono);outline:none;transition:border-color .15s}
+.fi input:focus{border-color:var(--amber)}
+#freqInput{width:130px}
+#callInput{width:120px;text-transform:uppercase;letter-spacing:.5px}
+#freqHint{font-size:9px;color:var(--muted);margin-top:2px;height:12px}
+#freqHint.ok{color:var(--green)}
+#freqHint.err{color:var(--red)}
+.fi-space{flex:1}
+#connectBtn{background:var(--amber);color:#000;border:none;padding:7px 20px;border-radius:var(--r);font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s;align-self:flex-end;white-space:nowrap}
+#connectBtn:hover{opacity:.85}
+#connectBtn:disabled{opacity:.35;cursor:not-allowed}
+#disconnectBtn{background:transparent;color:var(--red);border:1px solid var(--red);padding:7px 16px;border-radius:var(--r);font-size:12px;cursor:pointer;display:none;transition:background .15s;align-self:flex-end;white-space:nowrap}
+#disconnectBtn:hover{background:rgba(239,68,68,.1)}
 
-/* ── Top bar ──────────────────────────────────────────── */
-#topbar {
-    display:flex;align-items:center;gap:10px;
-    padding:8px 16px;
-    background:var(--surface);
-    border-bottom:2px solid var(--amber-dim);
-    flex-shrink:0;
-}
-#topbar h1 {
-    font-size:14px;font-weight:700;color:var(--amber);
-    letter-spacing:.3px;
-}
-.tb-sep { width:1px;height:20px;background:var(--border);flex-shrink:0; }
+/* TERMINAL */
+#termWrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#idleMsg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted)}
+.idle-icon{font-size:44px;opacity:.3}
+.idle-text{font-size:12px;text-align:center;line-height:1.7;color:var(--muted)}
+.idle-text strong{color:var(--amber)}
+#terminal{flex:1;overflow-y:auto;padding:10px 14px;font-family:var(--mono);font-size:12px;line-height:1.65;color:var(--term-fg);word-wrap:break-word;white-space:pre-wrap;display:none;background:var(--term-bg)}
+#terminal::-webkit-scrollbar{width:4px}
+#terminal::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sys{color:var(--muted);font-style:italic}
+.ok{color:var(--green)}
+.warn{color:var(--amber)}
+.err{color:var(--red)}
 
-/* Status badge */
-.status-badge {
-    display:flex;align-items:center;gap:6px;
-    padding:3px 10px;border-radius:20px;
-    font-size:11px;font-weight:600;letter-spacing:.3px;
-    border:1px solid var(--border);
-    transition:all .3s;
-}
-.status-badge.idle    { border-color:var(--muted);color:var(--muted); }
-.status-badge.connecting { border-color:var(--amber);color:var(--amber);animation:pulse 1s infinite; }
-.status-badge.attached   { border-color:var(--blue);color:var(--blue); }
-.status-badge.session    { border-color:var(--green);color:var(--green); }
-.status-badge.busy       { border-color:var(--red);color:var(--red); }
-@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
-.status-dot { width:7px;height:7px;border-radius:50%;background:currentColor; }
-
-/* SNR / BW chips */
-.info-chip {
-    font-size:11px;font-family:var(--font-mono);
-    color:var(--muted);padding:2px 8px;
-    border:1px solid var(--border);border-radius:4px;
-}
-.info-chip.active { color:var(--cyan);border-color:var(--cyan); }
-
-#sessionTimer { font-size:11px;color:var(--muted);font-family:var(--font-mono); }
-.tb-spacer { flex:1; }
-
-.tb-btn {
-    background:var(--surface2);border:1px solid var(--border);
-    color:var(--text);padding:4px 10px;border-radius:6px;
-    font-size:12px;cursor:pointer;transition:background .15s;
-}
-.tb-btn:hover { background:var(--border); }
-.tb-btn.danger  { color:var(--red);border-color:var(--red); }
-.tb-btn.danger:hover  { background:rgba(239,68,68,.15); }
-.tb-btn.primary { background:var(--amber);color:#000;border-color:var(--amber);font-weight:600; }
-.tb-btn.primary:hover { opacity:.85; }
-.tb-btn:disabled { opacity:.4;cursor:not-allowed; }
-
-/* ── Main layout ──────────────────────────────────────── */
-#main { display:flex;flex:1;overflow:hidden; }
-
-/* ── Sidebar ──────────────────────────────────────────── */
-#sidebar {
-    width:220px;flex-shrink:0;
-    background:var(--surface);
-    border-right:1px solid var(--border);
-    display:flex;flex-direction:column;overflow:hidden;
-}
-.s-section {
-    padding:8px 12px 6px;
-    font-size:9px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.8px;
-    color:var(--amber-dim);
-    border-bottom:1px solid var(--border);
-    flex-shrink:0;
-}
-
-/* Connect form */
-#connectForm {
-    padding:10px 12px;
-    border-bottom:1px solid var(--border);
-    flex-shrink:0;
-}
-.f-label {
-    font-size:10px;color:var(--muted);
-    text-transform:uppercase;letter-spacing:.4px;
-    margin-bottom:4px;display:block;
-}
-.f-input {
-    background:var(--bg);border:1px solid var(--border);
-    color:var(--text);padding:5px 8px;border-radius:5px;
-    font-size:13px;font-family:var(--font-mono);width:100%;
-    text-transform:uppercase;letter-spacing:.5px;
-    outline:none;
-}
-.f-input:focus { border-color:var(--amber); }
-#connectBtn {
-    width:100%;margin-top:8px;
-    background:var(--amber);color:#000;border:none;
-    padding:7px;border-radius:5px;font-size:13px;font-weight:700;
-    cursor:pointer;letter-spacing:.3px;transition:opacity .15s;
-}
-#connectBtn:hover { opacity:.85; }
-#connectBtn:disabled { opacity:.4;cursor:not-allowed; }
-#disconnectBtn {
-    width:100%;margin-top:6px;
-    background:transparent;color:var(--red);
-    border:1px solid var(--red);
-    padding:6px;border-radius:5px;font-size:12px;
-    cursor:pointer;display:none;transition:background .15s;
-}
-#disconnectBtn:hover { background:rgba(239,68,68,.12); }
-
-/* BW selector */
-#bwSelector {
-    display:flex;gap:4px;margin-top:8px;
-}
-.bw-btn {
-    flex:1;background:var(--surface2);border:1px solid var(--border);
-    color:var(--muted);padding:4px 0;border-radius:4px;
-    font-size:10px;font-family:var(--font-mono);cursor:pointer;
-    transition:all .15s;text-align:center;
-}
-.bw-btn:hover { border-color:var(--amber);color:var(--amber); }
-.bw-btn.active { background:var(--amber-dim);border-color:var(--amber);color:var(--amber); }
-
-/* Frequency section */
-#freqSection {
-    border-bottom:1px solid var(--border);
-    flex-shrink:0;
-}
-.freq-preset {
-    display:flex;align-items:center;gap:6px;
-    padding:6px 12px;cursor:pointer;
-    border-bottom:1px solid rgba(255,255,255,.03);
-    transition:background .15s;
-}
-.freq-preset:hover { background:var(--surface2); }
-.freq-preset.active { background:rgba(232,160,32,.08); }
-.freq-band {
-    font-size:9px;font-weight:700;color:var(--amber-dim);
-    text-transform:uppercase;width:28px;flex-shrink:0;
-}
-.freq-mhz {
-    font-size:12px;font-family:var(--font-mono);color:var(--text);
-    flex:1;
-}
-.freq-qsy { font-size:9px;color:var(--muted); }
-
-/* Custom frequency input */
-#freqCustom {
-    padding:8px 12px;
-    border-bottom:1px solid var(--border);
-    flex-shrink:0;
-}
-.freq-custom-row {
-    display:flex;gap:6px;align-items:center;margin-top:4px;
-}
-.freq-custom-input {
-    flex:1;background:var(--bg);border:1px solid var(--border);
-    color:var(--text);padding:5px 8px;border-radius:5px;
-    font-size:12px;font-family:var(--font-mono);outline:none;
-}
-.freq-custom-input:focus { border-color:var(--amber); }
-.freq-custom-btn {
-    background:var(--surface2);border:1px solid var(--border);
-    color:var(--amber);padding:5px 10px;border-radius:5px;
-    font-size:11px;cursor:pointer;white-space:nowrap;
-    transition:background .15s;
-}
-.freq-custom-btn:hover { background:var(--amber-dim); }
-#freqValidMsg {
-    font-size:10px;margin-top:4px;min-height:14px;
-}
-#freqValidMsg.ok  { color:var(--green); }
-#freqValidMsg.err { color:var(--red); }
-
-/* Current freq display */
-#currentFreq {
-    padding:6px 12px;font-size:11px;
-    color:var(--muted);font-family:var(--font-mono);
-    border-bottom:1px solid var(--border);flex-shrink:0;
-}
-#currentFreq span { color:var(--amber); }
-
-/* Allowlist section */
-#allowlistSection {
-    flex:1;overflow-y:auto;display:flex;flex-direction:column;
-}
-.al-row {
-    display:flex;align-items:center;gap:6px;
-    padding:5px 12px;border-bottom:1px solid rgba(255,255,255,.03);
-    font-size:11px;cursor:pointer;transition:background .1s;
-}
-.al-row:hover { background:var(--surface2); }
-.al-call {
-    font-family:var(--font-mono);color:var(--text);flex:1;
-    font-size:12px;letter-spacing:.3px;
-}
-.al-call.inactive { color:var(--muted);text-decoration:line-through; }
-.al-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
-.al-dot.on  { background:var(--green); }
-.al-dot.off { background:var(--muted); }
-
-/* Allowlist toolbar */
-#alToolbar {
-    padding:8px 12px;
-    border-top:1px solid var(--border);
-    flex-shrink:0;
-}
-.al-add-row { display:flex;gap:4px;margin-bottom:4px; }
-.al-input {
-    flex:1;background:var(--bg);border:1px solid var(--border);
-    color:var(--text);padding:4px 6px;border-radius:4px;
-    font-size:12px;font-family:var(--font-mono);
-    text-transform:uppercase;outline:none;
-}
-.al-input:focus { border-color:var(--amber); }
-.al-add-btn {
-    background:var(--amber);color:#000;border:none;
-    padding:4px 10px;border-radius:4px;font-size:11px;
-    font-weight:700;cursor:pointer;
-}
-
-/* ── Terminal area ────────────────────────────────────── */
-#termArea {
-    flex:1;display:flex;flex-direction:column;
-    background:var(--term-bg);overflow:hidden;
-}
-#connectPrompt {
-    flex:1;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;
-    gap:12px;color:var(--muted);
-}
-.prompt-icon { font-size:52px;opacity:.4; }
-.prompt-text { font-size:13px;text-align:center;line-height:1.6; }
-.prompt-text strong { color:var(--amber); }
-
-#terminal {
-    flex:1;overflow-y:auto;
-    padding:12px 16px;
-    font-family:var(--font-mono);font-size:13px;line-height:1.6;
-    color:var(--term-fg);word-wrap:break-word;white-space:pre-wrap;
-    display:none;
-}
-#terminal::-webkit-scrollbar { width:5px; }
-#terminal::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
-
-/* VARA status message styles */
-.sys-line  { color:var(--muted);font-style:italic; }
-.vara-ok   { color:var(--green);font-weight:bold; }
-.vara-warn { color:var(--amber); }
-.vara-err  { color:var(--red); }
-
-/* Input bar */
-#inputBar {
-    display:flex;gap:8px;padding:8px 12px;
-    background:var(--surface);
-    border-top:1px solid var(--border);
-    flex-shrink:0;align-items:center;
-}
-#inputPrompt { color:var(--amber);font-family:var(--font-mono);font-size:13px;flex-shrink:0; }
-#termInput {
-    flex:1;background:var(--term-bg);border:1px solid var(--border);
-    color:var(--term-fg);padding:6px 10px;border-radius:5px;
-    font-family:var(--font-mono);font-size:13px;outline:none;
-}
-#termInput:focus { border-color:var(--amber); }
-#sendBtn {
-    background:var(--amber);color:#000;border:none;
-    padding:6px 14px;border-radius:5px;font-size:13px;
-    font-weight:700;cursor:pointer;
-}
-#sendBtn:hover { opacity:.85; }
-#sendBtn:disabled { opacity:.4;cursor:not-allowed; }
+/* INPUT BAR */
+#inputBar{display:flex;gap:8px;padding:7px 12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;align-items:center}
+#prompt{color:var(--amber);font-family:var(--mono);font-size:12px;flex-shrink:0}
+#termInput{flex:1;background:var(--term-bg);border:1px solid var(--border2);color:var(--term-fg);padding:5px 9px;border-radius:var(--r);font-family:var(--mono);font-size:12px;outline:none}
+#termInput:focus{border-color:var(--amber)}
+#sendBtn{background:var(--amber);color:#000;border:none;padding:5px 12px;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer}
+#sendBtn:disabled{opacity:.35;cursor:not-allowed}
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════
-     LOGIN OVERLAY
-     ═══════════════════════════════════════════════════ -->
 <div id="loginOverlay">
   <div class="login-box">
     <div class="login-logo">
       <span class="icon">📡</span>
       <h1>VARA HF Terminal</h1>
-      <p>Authorized Sysop Access Only</p>
+      <p>YOUR NODE · Authorized Access Only</p>
     </div>
-
-    <div class="login-field">
+    <div class="lf">
       <label>Sysop Password</label>
       <input type="password" id="loginPass" placeholder="Enter password" autocomplete="current-password">
     </div>
     <button class="login-btn" onclick="doLogin()">🔐 Authenticate</button>
-    <div class="login-error" id="loginError"></div>
-
-    <div class="login-request-link">
-      Not authorized? <a onclick="toggleRequest()">Request access from sysop</a>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-sub">
+      Not authorized? <a onclick="toggleReq()">Request access from sysop</a>
     </div>
-
-    <div id="requestPanel">
-      <hr class="request-sep">
-      <p class="request-note">
-        Fill in your details and an email will be sent to the sysop
-        at <strong>your sysop email</strong> requesting access to the
-        VARA HF terminal.
-      </p>
-      <div class="login-field">
-        <label>Your Callsign</label>
-        <input type="text" id="reqCall" placeholder="K1ABC" style="text-transform:uppercase">
-      </div>
-      <div class="login-field">
-        <label>Your Name</label>
-        <input type="text" id="reqName" placeholder="First Last">
-      </div>
-      <div class="login-field">
-        <label>Message (optional)</label>
-        <input type="text" id="reqMsg" placeholder="Why you need access...">
-      </div>
-      <button class="request-btn" onclick="sendRequest()">📧 Send Access Request</button>
-      <div class="request-sent" id="reqSent">✓ Request sent to your sysop email</div>
+    <div id="reqPanel">
+      <hr class="req-sep">
+      <p class="req-note">Fill in your details and an email will be sent to the sysop at <strong>sysop@example.com</strong>.</p>
+      <div class="lf"><label>Your Callsign</label><input type="text" id="reqCall" placeholder="K1ABC" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="lf"><label>Your Name</label><input type="text" id="reqName" placeholder="First Last"></div>
+      <div class="lf"><label>Message (optional)</label><input type="text" id="reqMsg" placeholder="Reason for access..."></div>
+      <button class="req-btn" onclick="sendReq()">📧 Send Access Request</button>
+      <div class="req-ok" id="reqOk">✓ Request sent to sysop@example.com</div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════
-     MAIN APP
-     ═══════════════════════════════════════════════════ -->
 <div id="app">
-
-  <!-- Top bar -->
   <div id="topbar">
-    <h1>📡 VARA HF Terminal</h1>
+    <h1>📡 VARA HF</h1>
     <div class="tb-sep"></div>
-
-    <div class="status-badge idle" id="statusBadge">
-      <div class="status-dot"></div>
-      <span id="statusLabel">IDLE</span>
-    </div>
-
-    <div class="info-chip" id="chipRemote" style="display:none"></div>
-    <div class="info-chip" id="chipBw">BW500</div>
-    <div class="info-chip" id="chipSnr" style="display:none">SNR --</div>
-
-    <div class="tb-spacer"></div>
-
-    <span id="sessionTimer"></span>
-    <button class="tb-btn" onclick="clearTerminal()">🗑 Clear</button>
-    <button class="tb-btn" onclick="copySession()">📋 Copy</button>
-    <button class="tb-btn danger" onclick="doLogout()">🔒 Logout</button>
+    <div class="sbadge idle" id="sbadge"><div class="sdot"></div><span id="slabel">IDLE</span></div>
+    <div class="chip" id="chipRemote" style="display:none"></div>
+    <div class="chip" id="chipBw">BW500</div>
+    <div class="chip" id="chipSnr" style="display:none">SNR --</div>
+    <div class="chip" id="chipFreq" style="display:none"></div>
+    <div class="tb-space"></div>
+    <span id="timer"></span>
+    <button class="tb-btn" onclick="clearTerm()">Clear</button>
+    <button class="tb-btn" onclick="copyTerm()">Copy</button>
+    <button class="tb-btn danger" onclick="doLogout()">Logout</button>
   </div>
 
-  <!-- Main -->
-  <div id="main">
-
-    <!-- Sidebar -->
-    <div id="sidebar">
-
-      <!-- Connect form -->
-      <div class="s-section">Connect</div>
-      <div id="connectForm">
-        <label class="f-label">Remote Callsign</label>
-        <input class="f-input" id="remoteCall" placeholder="N3MEL" maxlength="9"
-               oninput="this.value=this.value.toUpperCase()">
-
-        <div id="bwSelector">
-          <div class="bw-btn active" onclick="setBW('BW500')">BW500</div>
-          <div class="bw-btn" onclick="setBW('BW2300')">BW2300</div>
-          <div class="bw-btn" onclick="setBW('BW2750')">BW2750</div>
-        </div>
-
-        <button id="connectBtn" onclick="doConnect()">⚡ Connect</button>
-        <button id="disconnectBtn" onclick="doDisconnect()">⏹ Disconnect</button>
+  <div id="connectBar">
+    <div id="presetRow">
+      <span class="preset-label">Quick:</span>
+      <button class="preset-btn" onclick="qsyPreset(3.596,this)">80m 3.596</button>  <!-- Edit presets to match your scan frequencies -->
+      <button class="preset-btn" onclick="qsyPreset(7.1032,this)">40m 7.103</button>
+      <button class="preset-btn" onclick="qsyPreset(10.1482,this)">30m 10.148</button>
+      <button class="preset-btn" onclick="qsyPreset(14.103,this)">20m 14.103</button>
+      <button class="preset-btn" onclick="qsyPreset(14.1065,this)">20m 14.106</button>
+    </div>
+    <div id="inputRow">
+      <div class="fi">
+        <label>Frequency (MHz)</label>
+        <input type="number" id="freqInput" step="0.001" min="1.8" max="29.7" placeholder="14.103" oninput="onFreqInput()">
+        <div id="freqHint"></div>
       </div>
-
-      <!-- Frequency presets -->
-      <div id="freqSection">
-        <div class="s-section">Frequency</div>
-        <div id="currentFreq">Current: <span id="currentFreqVal">--</span> MHz</div>
-
-        <!-- Presets from bpq32.cfg -->
-        <div class="freq-preset" onclick="qsy(3.596)">
-          <span class="freq-band">80m</span>
-          <span class="freq-mhz">3.596.000</span>
-          <span class="freq-qsy">USB</span>
-        </div>
-        <div class="freq-preset" onclick="qsy(7.1032)">
-          <span class="freq-band">40m</span>
-          <span class="freq-mhz">7.103.200</span>
-          <span class="freq-qsy">USB</span>
-        </div>
-        <div class="freq-preset" onclick="qsy(10.1482)">
-          <span class="freq-band">30m</span>
-          <span class="freq-mhz">10.148.200</span>
-          <span class="freq-qsy">USB</span>
-        </div>
-        <div class="freq-preset" onclick="qsy(14.103)">
-          <span class="freq-band">20m</span>
-          <span class="freq-mhz">14.103.000</span>
-          <span class="freq-qsy">USB</span>
-        </div>
-        <div class="freq-preset" onclick="qsy(14.1065)">
-          <span class="freq-band">20m</span>
-          <span class="freq-mhz">14.106.500</span>
-          <span class="freq-qsy">USB</span>
-        </div>
+      <div class="fi">
+        <label>Remote Callsign</label>
+        <input type="text" id="callInput" placeholder="N3MEL" maxlength="9" oninput="this.value=this.value.toUpperCase()">
       </div>
-
-      <!-- Custom frequency input -->
-      <div id="freqCustom">
-        <label class="f-label">Custom Frequency (MHz)</label>
-        <div class="freq-custom-row">
-          <input class="freq-custom-input" id="customFreqInput"
-                 type="number" step="0.001" min="1.8" max="29.7"
-                 placeholder="14.103" oninput="validateCustomFreq()">
-          <button class="freq-custom-btn" onclick="qsyCustom()">QSY</button>
-        </div>
-        <div id="freqValidMsg"></div>
+      <div class="fi">
+        <label>Bandwidth</label>
+        <select id="bwSelect" onchange="currentBW=this.value" style="background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:6px 9px;border-radius:var(--r);font-size:13px;font-family:var(--mono);outline:none;">
+          <option value="BW500" selected>BW500</option>
+          <option value="BW2300">BW2300</option>
+          <option value="BW2750">BW2750</option>
+        </select>
       </div>
+      <div class="fi-space"></div>
+      <button id="connectBtn" onclick="doConnect()">⚡ Connect</button>
+      <button id="disconnectBtn" onclick="doDisconnect()">⏹ Disconnect</button>
+    </div>
+  </div>
 
-      <!-- Allowed stations -->
-      <div class="s-section" style="display:flex;justify-content:space-between;align-items:center">
-        <span>Allowed Stations</span>
-        <span style="cursor:pointer;color:var(--amber);font-size:11px" onclick="loadAllowlist()">↻</span>
-      </div>
-      <div id="allowlistSection">
-        <div id="allowlistRows" style="flex:1;overflow-y:auto"></div>
-        <div id="alToolbar">
-          <div class="al-add-row">
-            <input class="al-input" id="alNewCall" placeholder="K1ABC"
-                   maxlength="9" oninput="this.value=this.value.toUpperCase()">
-            <button class="al-add-btn" onclick="addStation()">+ Add</button>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- end sidebar -->
-
-    <!-- Terminal -->
-    <div id="termArea">
-      <div id="connectPrompt">
-        <div class="prompt-icon">📻</div>
-        <div class="prompt-text">
-          Select a frequency, enter a remote callsign,<br>
-          then click <strong>Connect</strong> to open the VARA HF session.<br>
-          <span style="font-size:11px;color:var(--muted);margin-top:6px;display:block">
-            BPQ Port 3 · VARA HF · BW500
-          </span>
-        </div>
-      </div>
-      <div id="terminal"></div>
-      <div id="inputBar">
-        <span id="inputPrompt">▶</span>
-        <input id="termInput" placeholder="Type and press Enter…"
-               autocomplete="off" autocorrect="off" autocapitalize="off"
-               spellcheck="false" disabled
-               onkeydown="handleKey(event)">
-        <button id="sendBtn" onclick="sendCmd()" disabled>Send ↵</button>
+  <div id="termWrap">
+    <div id="idleMsg">
+      <div class="idle-icon">📻</div>
+      <div class="idle-text">
+        Select a frequency, enter a remote callsign,<br>
+        then click <strong>Connect</strong>.<br>
+        <span style="font-size:10px;margin-top:4px;display:block">BPQ Port 3 · VARA HF · Auto-adapts rate to conditions</span>
       </div>
     </div>
+    <div id="terminal"></div>
+  </div>
 
-  </div><!-- end main -->
-</div><!-- end app -->
+  <div id="inputBar">
+    <span id="prompt">▶</span>
+    <input id="termInput" placeholder="Type and press Enter…" autocomplete="off" autocorrect="off" spellcheck="false" disabled onkeydown="onKey(event)">
+    <button id="sendBtn" onclick="sendCmd()" disabled>Send ↵</button>
+    <button class="tb-btn" onclick="sendQuick('D')" id="btnD" disabled title="Disconnect VARA link">D</button>
+    <button class="tb-btn danger" onclick="doDisconnect()" id="btnDis" disabled title="Release BPQ port and end session">End Session</button>
+  </div>
+</div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════════════
-let ws          = null;
-let wsConnected = false;
-let varaState   = 'idle';   // idle | connecting | attached | session | busy
-let sessionStart= null;
-let cmdHistory  = [];
-let histIdx     = -1;
-let currentBW   = 'BW500';
-let activePreset= null;
+const API    = 'vara-api.php';
+const WS_URL = (location.protocol==='https:' ? 'wss://' : 'ws://')
+    + location.hostname
+    + (location.port ? ':'+location.port : '')
+    + '/ws/vara';
 
-const API = 'vara-api.php';
-const WS_URL = location.protocol === 'https:'
-    ? `wss://${location.hostname}/ws/vara`
-    : `ws://${location.hostname}:8767`;
+const BANDS = [
+    [1.8,2.0,'160m'],[3.525,4.0,'80m'],[5.3305,5.4035,'60m'],
+    [7.025,7.3,'40m'],[10.1,10.15,'30m'],[14.025,14.35,'20m'],
+    [18.068,18.168,'17m'],[21.025,21.45,'15m'],[24.89,24.99,'12m'],[28.0,29.7,'10m']
+];
 
-// ═══════════════════════════════════════════════════════════════
-// LOGIN / AUTH
-// ═══════════════════════════════════════════════════════════════
-async function checkAuth() {
-    try {
-        const r = await fetch(API, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({action:'check_auth'})
-        });
-        const d = await r.json();
-        if (d.authenticated) showApp();
-    } catch(e) { /* stay on login */ }
+let ws=null,wsConn=false,varaState='idle',sessionStart=null;
+let cmdHistory=[],histIdx=-1,currentBW='BW500',freqRestored=false;
+
+// AUTH
+async function checkAuth(){
+    try{const r=await fetch(API+'?action=check_auth',{credentials:'same-origin'});const d=await r.json();if(d.authenticated)showApp();}catch(e){}
 }
-
-async function doLogin() {
-    const pass = document.getElementById('loginPass').value;
-    const err  = document.getElementById('loginError');
-    err.textContent = '';
-    if (!pass) { err.textContent = 'Password required'; return; }
-    try {
-        const r = await fetch(API, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({action:'auth', password:pass})
-        });
-        const d = await r.json();
-        if (d.authenticated) {
-            showApp();
-        } else {
-            err.textContent = 'Invalid password';
-        }
-    } catch(e) {
-        err.textContent = 'Error: ' + e.message;
-    }
+async function doLogin(){
+    const pass=document.getElementById('loginPass').value;
+    const err=document.getElementById('loginErr');
+    err.textContent='';
+    if(!pass){err.textContent='Password required';return;}
+    try{
+        const r=await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'auth',password:pass})});
+        const d=await r.json();
+        if(d.authenticated)showApp();else err.textContent='Invalid password';
+    }catch(e){err.textContent='Error: '+e.message;}
 }
-
-function showApp() {
+function showApp(){
     document.getElementById('loginOverlay').classList.add('hidden');
-    document.getElementById('app').classList.add('visible');
-    loadAllowlist();
+    document.getElementById('app').classList.add('show');
     getCurrentFreq();
-    setInterval(updateTimer, 10000);
-    setInterval(getCurrentFreq, 30000);
+    setInterval(updateTimer,10000);
+    setInterval(getCurrentFreq,30000);
 }
-
-async function doLogout() {
-    await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action:'logout'})});
-    if (ws) ws.close();
-    location.reload();
+async function doLogout(){
+    await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});
+    if(ws)ws.close();location.reload();
 }
-
-function toggleRequest() {
-    const p = document.getElementById('requestPanel');
-    p.classList.toggle('visible');
+function toggleReq(){document.getElementById('reqPanel').classList.toggle('show');}
+async function sendReq(){
+    const cs=document.getElementById('reqCall').value.trim().toUpperCase();
+    const name=document.getElementById('reqName').value.trim();
+    const msg=document.getElementById('reqMsg').value.trim();
+    if(!cs){alert('Callsign required');return;}
+    await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'request',callsign:cs,name,message:msg})});
+    document.getElementById('reqOk').style.display='block';
 }
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
-async function sendRequest() {
-    const cs   = document.getElementById('reqCall').value.trim().toUpperCase();
-    const name = document.getElementById('reqName').value.trim();
-    const msg  = document.getElementById('reqMsg').value.trim();
-    if (!cs) { alert('Callsign required'); return; }
-    const r = await fetch(API, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action:'request', callsign:cs, name, message:msg})
-    });
-    document.getElementById('reqSent').style.display = 'block';
+// FREQUENCY
+function bandForMhz(mhz){for(const[lo,hi,n]of BANDS)if(mhz>=lo-0.001&&mhz<=hi+0.001)return n;return null;}
+function onFreqInput(){
+    const val=parseFloat(document.getElementById('freqInput').value);
+    const hint=document.getElementById('freqHint');
+    document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    if(!val){hint.textContent='';hint.className='';return;}
+    const band=bandForMhz(val);
+    hint.textContent=band?`✓ ${band} · data authorized`:'✗ Not in a Region 2 data band';
+    hint.className=band?'ok':'err';
 }
-
-document.getElementById('loginPass').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doLogin();
-});
-
-// ═══════════════════════════════════════════════════════════════
-// WEBSOCKET / VARA SESSION
-// ═══════════════════════════════════════════════════════════════
-function doConnect() {
-    const call = document.getElementById('remoteCall').value.trim().toUpperCase();
-    if (!call) { appendSys('Enter a remote callsign first', 'vara-warn'); return; }
-
-    if (ws) { ws.close(); ws = null; }
-
-    setStatus('connecting', 'CONNECTING');
-    showTerminal();
-    appendSys(`Connecting to BPQ → VARA HF Port 3…`, 'sys-line');
-
-    ws = new WebSocket(WS_URL);
-
-    ws.onopen = () => {
-        wsConnected = true;
-        ws.send(JSON.stringify({action:'connect'}));
-    };
-
-    ws.onmessage = (evt) => {
-        try {
-            const msg = JSON.parse(evt.data);
-            handleMsg(msg, call);
-        } catch(e) {
-            appendText(evt.data);
+function qsyPreset(mhz,btn){
+    document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('freqInput').value=mhz;
+    onFreqInput();
+    doQsy(mhz);
+}
+async function doQsy(mhz){
+    appendSys(`QSY → ${mhz.toFixed(4)} MHz…`,'sys');
+    try{
+        const r=await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set_freq',mhz})});
+        let d;
+        try{ d=await r.json(); }catch(e){ 
+            // Non-JSON response (e.g. timeout) — show warning but continue
+            appendSys(`QSY sent — radio QSYs within 7s (server slow to respond)`,'warn');
+            const c=document.getElementById('chipFreq');
+            c.textContent=mhz.toFixed(4)+' MHz';c.style.display='';
+            return;
         }
-    };
-
-    ws.onclose = () => {
-        wsConnected = false;
-        if (varaState !== 'idle') {
-            setStatus('idle', 'IDLE');
-            appendSys('WebSocket closed', 'sys-line');
-            setInputEnabled(false);
-        }
-        varaState = 'idle';
-    };
-
-    ws.onerror = () => {
-        appendSys('WebSocket error — is bpq-vara-daemon running?', 'vara-err');
-        appendSys('Check: sudo systemctl status bpq-vara', 'sys-line');
-        setStatus('idle', 'IDLE');
-    };
+        if(d.ok){
+            const c=document.getElementById('chipFreq');
+            c.textContent=mhz.toFixed(4)+' MHz';c.style.display='';c.classList.add('on');
+            appendSys(`✓ ${mhz.toFixed(4)} MHz set — radio QSYs within 7s`,'ok');
+        }else appendSys(`QSY failed: ${d.error}`,'err');
+    }catch(e){
+        // Network error — still update display optimistically
+        appendSys(`QSY sent — radio QSYs within 7s`,'warn');
+        const c=document.getElementById('chipFreq');
+        c.textContent=mhz.toFixed(4)+' MHz';c.style.display='';
+    }
+}
+async function getCurrentFreq(){
+    try{
+        const r=await fetch(API+'?action=get_freq',{credentials:'same-origin'});
+        const d=await r.json();
+        if(d.ok&&d.mhz){const c=document.getElementById('chipFreq');c.textContent=d.mhz.toFixed(4)+' MHz';c.style.display='';}
+    }catch(e){}
 }
 
-function handleMsg(msg, remoteCall) {
-    switch(msg.type) {
-        case 'connecting':
-            setStatus('connecting', 'LOGGING IN');
-            break;
+// WEBSOCKET
+function doConnect(){
+    const freqVal=parseFloat(document.getElementById('freqInput').value);
+    const call=document.getElementById('callInput').value.trim().toUpperCase();
+    if(!freqVal||!bandForMhz(freqVal)){appendSys('Select a valid ITU Region 2 frequency first','warn');showTerm();return;}
+    if(!call){appendSys('Enter a remote callsign','warn');showTerm();return;}
+    if(ws){ws.close();ws=null;}
+    setStatus('connecting','CONNECTING');showTerm();freqRestored=false;
+    appendSys(`Opening VARA HF session → ${call} on ${freqVal.toFixed(4)} MHz…`,'sys');
+    // Pick up selected BW at connect time
+    currentBW = document.getElementById('bwSelect').value;
+    ws=new WebSocket(WS_URL);
+    ws.onopen=()=>{wsConn=true;ws.send(JSON.stringify({action:'connect'}));};
+    ws.onmessage=evt=>{try{handleMsg(JSON.parse(evt.data),call,freqVal);}catch(e){appendText(evt.data);}};
+    ws.onclose=()=>{
+        wsConn=false;
+        if(varaState!=='idle'){setStatus('idle','IDLE');appendSys('WebSocket closed','sys');setInput(false);restoreFreq();}
+        varaState='idle';showDisBtn(false);
+    };
+    ws.onerror=()=>{appendSys('WebSocket error — check: sudo systemctl status bpq-vara','err');setStatus('idle','IDLE');};
+}
 
+function handleMsg(msg,call,freqMhz){
+    switch(msg.type){
+        case 'connecting':setStatus('connecting','LOGGING IN');break;
         case 'connected':
-            // BPQ logged in and VARA port attached — now send connect command
-            setStatus('attached', 'ATTACHED');
-            appendSys(`Attached to BPQ Port ${msg.vara_port} (VARA HF)`, 'vara-ok');
-            appendSys(`Setting bandwidth ${currentBW}…`, 'sys-line');
-            // Set bandwidth then connect
-            ws.send(JSON.stringify({action:'send', data: currentBW}));
-            setTimeout(() => {
-                appendSys(`Connecting to ${remoteCall}…`, 'sys-line');
-                ws.send(JSON.stringify({action:'send', data: `C ${remoteCall}`}));
-            }, 600);
-            setInputEnabled(true);
-            sessionStart = Date.now();
-            document.getElementById('disconnectBtn').style.display = 'block';
-            document.getElementById('connectBtn').style.display = 'none';
-            break;
-
-        case 'event':
-            handleVaraEvent(msg);
-            break;
-
-        case 'data':
-            appendText(msg.data);
-            break;
-
+            setStatus('attached','ATTACHED');
+            appendSys(`Attached to BPQ Port ${msg.vara_port} (VARA HF)`,'ok');
+            (async()=>{
+                if(freqMhz){
+                    try{await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set_freq',mhz:freqMhz})});}catch(e){}
+                }
+                ws.send(JSON.stringify({action:'send',data:currentBW}));
+                await new Promise(r=>setTimeout(r,1200)); // give VARA time to process BW command
+                appendSys(`Connecting to ${call}…`,'sys');
+                ws.send(JSON.stringify({action:'send',data:`C ${call}`}));
+            })();
+            setInput(true);sessionStart=Date.now();showDisBtn(true);break;
+        case 'event':handleVaraEvent(msg);break;
+        case 'data':appendText(msg.data);break;
         case 'disconnected':
-            setStatus('idle', 'IDLE');
-            appendSys('Session ended — VARA port released', 'sys-line');
-            setInputEnabled(false);
-            document.getElementById('disconnectBtn').style.display = 'none';
-            document.getElementById('connectBtn').style.display = 'block';
-            hideChips();
-            varaState = 'idle';
-            sessionStart = null;
-            break;
-
+            setStatus('idle','IDLE');appendSys('Session ended — VARA port released','sys');
+            setInput(false);showDisBtn(false);
+            document.getElementById('chipRemote').style.display='none';
+            document.getElementById('chipSnr').style.display='none';
+            varaState='idle';sessionStart=null;restoreFreq();break;
         case 'error':
-            appendSys(`Error: ${msg.message}`, 'vara-err');
-            setStatus('idle', 'IDLE');
-            setInputEnabled(false);
-            document.getElementById('disconnectBtn').style.display = 'none';
-            document.getElementById('connectBtn').style.display = 'block';
-            break;
+            appendSys(`Error: ${msg.message}`,'err');
+            setStatus('idle','IDLE');setInput(false);showDisBtn(false);restoreFreq();break;
     }
 }
 
-function handleVaraEvent(msg) {
-    switch(msg.event) {
-        case 'attached':
-            setStatus('attached', 'ATTACHED');
-            break;
+function handleVaraEvent(msg){
+    switch(msg.event){
         case 'connected':
-            varaState = 'session';
-            setStatus('session', `CONNECTED`);
-            const chip = document.getElementById('chipRemote');
-            chip.textContent = msg.remote || '';
-            chip.style.display = msg.remote ? '' : 'none';
-            chip.classList.add('active');
-            appendSys(`VARA link established with ${msg.remote}`, 'vara-ok');
-            break;
-        case 'disconnected':
-        case 'link_down':
-            varaState = 'attached';
-            setStatus('attached', 'ATTACHED');
-            document.getElementById('chipRemote').style.display = 'none';
-            document.getElementById('chipSnr').style.display = 'none';
-            appendSys('VARA link disconnected', 'vara-warn');
-            break;
-        case 'busy':
-            setStatus('busy', 'BUSY');
-            appendSys('Channel busy — waiting…', 'vara-warn');
-            break;
+            varaState='session';setStatus('session','CONNECTED');
+            const cr=document.getElementById('chipRemote');
+            cr.textContent=msg.remote||'';cr.style.display=msg.remote?'':'none';cr.classList.add('on');
+            appendSys(`VARA link established with ${msg.remote}`,'ok');break;
+        case 'disconnected':case 'link_down':
+            varaState='attached';setStatus('attached','ATTACHED');
+            document.getElementById('chipRemote').style.display='none';
+            document.getElementById('chipSnr').style.display='none';
+            appendSys('VARA link disconnected — type D to release port or click End Session','warn');break;
+        case 'busy':setStatus('busy','BUSY');appendSys('Channel busy — VARA waiting for clear channel','warn');break;
         case 'snr':
-            const snrChip = document.getElementById('chipSnr');
-            snrChip.textContent = `SNR ${msg.snr} dB`;
-            snrChip.style.display = '';
-            snrChip.classList.toggle('active', msg.snr >= 5);
-            break;
+            const cs=document.getElementById('chipSnr');
+            cs.textContent=`SNR ${msg.snr} dB`;cs.style.display='';
+            cs.classList.toggle('on',msg.snr>=5);break;
         case 'bandwidth':
-            currentBW = msg.bw;
-            document.getElementById('chipBw').textContent = msg.bw;
-            updateBwButtons(msg.bw);
+            currentBW=msg.bw;
+            document.getElementById('chipBw').textContent=msg.bw;
+            const sel=document.getElementById('bwSelect');
+            if([...sel.options].some(o=>o.value===msg.bw)) sel.value=msg.bw;
             break;
-        case 'port_in_use':
-            appendSys('VARA HF port is in use — try again shortly', 'vara-err');
+        case 'port_in_use':appendSys('VARA HF port is in use — try again shortly','err');break;
+        case 'pending':
+            setStatus('session','INCOMING');
+            appendSys(`Incoming connection request from ${msg.remote||'unknown'}…`,'ok');
+            break;
+        case 'failure':
+            setStatus('attached','ATTACHED');
+            appendSys(`Connect failed — ${msg.remote||'remote station'} did not respond`,'warn');
+            appendSys('Station may not be listening. Type C CALLSIGN to retry or End Session to quit.','sys');
+            break;
+        case 'cancelled':
+            setStatus('attached','ATTACHED');
+            appendSys('Connection attempt cancelled by VARA','warn');
+            break;
+        case 'timeout':
+            setStatus('attached','ATTACHED');
+            appendSys('Connection timed out — station did not respond','warn');
             break;
     }
 }
 
-function doDisconnect() {
-    if (ws) {
-        appendSys('Disconnecting (D)…', 'sys-line');
-        ws.send(JSON.stringify({action:'send', data:'D'}));
-        setTimeout(() => ws.send(JSON.stringify({action:'disconnect'})), 800);
-    }
+function doDisconnect(){
+    if(ws){appendSys('Disconnecting…','sys');ws.send(JSON.stringify({action:'send',data:'D'}));setTimeout(()=>ws&&ws.send(JSON.stringify({action:'disconnect'})),1500);}
+    restoreFreq();
 }
 
-function setBW(bw) {
-    currentBW = bw;
-    updateBwButtons(bw);
-    document.getElementById('chipBw').textContent = bw;
-    if (ws && wsConnected && varaState === 'attached') {
-        ws.send(JSON.stringify({action:'send', data:bw}));
-        appendSys(`Bandwidth set to ${bw}`, 'sys-line');
-    }
+// RESTORE
+function restoreFreq(){
+    if(freqRestored)return;freqRestored=true;
+    fetch(API+'?action=restore_freq',{credentials:'same-origin'})
+        .then(r=>r.json()).then(d=>{if(d.ok&&d.restored)appendSys('✓ RADIO 2 scan schedule restored','sys');}).catch(()=>{});
+    setTimeout(()=>{freqRestored=false;},5000);
 }
+window.addEventListener('beforeunload',()=>{if(varaState!=='idle')navigator.sendBeacon(API+'?action=restore_freq');});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&varaState!=='idle')navigator.sendBeacon(API+'?action=restore_freq');});
 
-function updateBwButtons(bw) {
-    document.querySelectorAll('.bw-btn').forEach(b => {
-        b.classList.toggle('active', b.textContent === bw);
-    });
-}
+// TERMINAL
+function showTerm(){document.getElementById('idleMsg').style.display='none';document.getElementById('terminal').style.display='block';}
+function appendText(text){const t=document.getElementById('terminal');const s=document.createElement('span');s.textContent=text;t.appendChild(s);t.scrollTop=t.scrollHeight;}
+function appendSys(text,cls){const t=document.getElementById('terminal');const s=document.createElement('span');s.className=cls||'sys';s.textContent=`[${new Date().toLocaleTimeString()}] ${text}\n`;t.appendChild(s);t.scrollTop=t.scrollHeight;}
+function clearTerm(){document.getElementById('terminal').innerHTML='';}
+function copyTerm(){navigator.clipboard.writeText(document.getElementById('terminal').innerText);}
 
-// ═══════════════════════════════════════════════════════════════
-// FREQUENCY / FLRIG
-// ═══════════════════════════════════════════════════════════════
-async function qsy(mhz) {
-    // Highlight active preset
-    document.querySelectorAll('.freq-preset').forEach(p => p.classList.remove('active'));
-    event.currentTarget.classList.add('active');
-
-    appendSys(`QSY → ${mhz.toFixed(4)} MHz USB`, 'sys-line');
-    try {
-        const r = await fetch(API, {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({action:'set_freq', mhz})
-        });
-        const d = await r.json();
-        if (d.ok) {
-            document.getElementById('currentFreqVal').textContent = mhz.toFixed(4);
-            appendSys(`✓ Rig QSY'd to ${mhz.toFixed(4)} MHz (${d.band?.band || ''})`, 'vara-ok');
-        } else {
-            appendSys(`QSY failed: ${d.error}`, 'vara-err');
-        }
-    } catch(e) {
-        appendSys(`QSY error: ${e.message}`, 'vara-err');
-    }
-}
-
-function validateCustomFreq() {
-    const val = parseFloat(document.getElementById('customFreqInput').value);
-    const msg = document.getElementById('freqValidMsg');
-    if (!val) { msg.textContent = ''; msg.className = ''; return; }
-    // Client-side band check (mirrors server validation)
-    const regions = [
-        [1.8,2.0],[3.525,4.0],[5.3305,5.4035],[7.025,7.3],
-        [10.1,10.15],[14.025,14.35],[18.068,18.168],
-        [21.025,21.45],[24.89,24.99],[28.0,29.7]
-    ];
-    const ok = regions.some(([lo,hi]) => val >= lo - 0.001 && val <= hi + 0.001);
-    msg.textContent = ok
-        ? `✓ Valid ITU Region 2 amateur frequency`
-        : `✗ Not in a Region 2 data-authorized band`;
-    msg.className = ok ? 'ok' : 'err';
-}
-
-async function qsyCustom() {
-    const val = parseFloat(document.getElementById('customFreqInput').value);
-    if (!val) return;
-    // Clear preset highlights
-    document.querySelectorAll('.freq-preset').forEach(p => p.classList.remove('active'));
-    await qsy(val);
-}
-
-async function getCurrentFreq() {
-    try {
-        const r = await fetch(API + '?action=get_freq');
-        const d = await r.json();
-        if (d.ok && d.mhz) {
-            document.getElementById('currentFreqVal').textContent = d.mhz.toFixed(4);
-        }
-    } catch(e) { /* flrig may not be reachable */ }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ALLOWLIST MANAGEMENT
-// ═══════════════════════════════════════════════════════════════
-async function loadAllowlist() {
-    try {
-        const r = await fetch(API + '?action=list');
-        const d = await r.json();
-        if (!d.ok) return;
-        renderAllowlist(d.stations);
-    } catch(e) { /* silently fail */ }
-}
-
-function renderAllowlist(stations) {
-    const container = document.getElementById('allowlistRows');
-    if (!stations || stations.length === 0) {
-        container.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted)">No stations added yet</div>';
-        return;
-    }
-    container.innerHTML = stations.map(s => `
-        <div class="al-row" title="${s.notes || s.name || ''}">
-            <div class="al-dot ${s.active == 1 ? 'on' : 'off'}"></div>
-            <span class="al-call ${s.active == 1 ? '' : 'inactive'}"
-                  onclick="document.getElementById('remoteCall').value='${s.callsign}'"
-                  title="Click to use as remote callsign">${s.callsign}</span>
-            <span style="font-size:10px;color:var(--muted);flex:1">${s.name || ''}</span>
-            <span style="font-size:10px;cursor:pointer;color:var(--muted)"
-                  onclick="toggleStation(${s.id})" title="Toggle">
-                  ${s.active == 1 ? '●' : '○'}</span>
-            <span style="font-size:10px;cursor:pointer;color:var(--red);margin-left:4px"
-                  onclick="deleteStation(${s.id},'${s.callsign}')" title="Remove">✕</span>
-        </div>
-    `).join('');
-}
-
-async function addStation() {
-    const cs = document.getElementById('alNewCall').value.trim().toUpperCase();
-    if (!cs) return;
-    const r = await fetch(API, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action:'add', callsign:cs})
-    });
-    const d = await r.json();
-    if (d.ok) {
-        document.getElementById('alNewCall').value = '';
-        loadAllowlist();
-    } else {
-        alert(d.error);
-    }
-}
-
-async function toggleStation(id) {
-    await fetch(API, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action:'toggle', id})
-    });
-    loadAllowlist();
-}
-
-async function deleteStation(id, cs) {
-    if (!confirm(`Remove ${cs} from the allowlist?`)) return;
-    await fetch(API, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({action:'delete', id})
-    });
-    loadAllowlist();
-}
-
-// ═══════════════════════════════════════════════════════════════
-// TERMINAL OUTPUT
-// ═══════════════════════════════════════════════════════════════
-function showTerminal() {
-    document.getElementById('connectPrompt').style.display = 'none';
-    document.getElementById('terminal').style.display = 'block';
-}
-
-function appendText(text) {
-    const term = document.getElementById('terminal');
-    const span = document.createElement('span');
-    span.innerHTML = ansiToHtml(escapeHtml(text));
-    term.appendChild(span);
-    term.scrollTop = term.scrollHeight;
-}
-
-function appendSys(text, cls = 'sys-line') {
-    const term = document.getElementById('terminal');
-    const span = document.createElement('span');
-    span.className = cls;
-    span.textContent = `[${new Date().toLocaleTimeString()}] ${text}\n`;
-    term.appendChild(span);
-    term.scrollTop = term.scrollHeight;
-}
-
-function escapeHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function ansiToHtml(text) {
-    return text
-        .replace(/\x1b\[([0-9;]*)m/g, (_, codes) => {
-            if (!codes || codes === '0') return '</span><span>';
-            return `</span><span class="ansi-${codes.replace(/;/g,'-')}">`;
-        })
-        .replace(/\x1b\[[^m]*m/g, '');
-}
-
-function clearTerminal() {
-    document.getElementById('terminal').innerHTML = '';
-}
-
-function copySession() {
-    navigator.clipboard.writeText(document.getElementById('terminal').innerText)
-        .then(() => {
-            const b = document.querySelector('.tb-btn:nth-child(6)');
-            if (b) { b.textContent = '✓ Copied'; setTimeout(() => b.textContent = '📋 Copy', 2000); }
-        });
-}
-
-function hideChips() {
-    document.getElementById('chipRemote').style.display = 'none';
-    document.getElementById('chipSnr').style.display = 'none';
-}
-
-// ═══════════════════════════════════════════════════════════════
 // INPUT
-// ═══════════════════════════════════════════════════════════════
-function handleKey(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault(); sendCmd();
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (histIdx < cmdHistory.length - 1) {
-            histIdx++;
-            document.getElementById('termInput').value = cmdHistory[cmdHistory.length - 1 - histIdx];
-        }
-    } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (histIdx > 0) {
-            histIdx--;
-            document.getElementById('termInput').value = cmdHistory[cmdHistory.length - 1 - histIdx];
-        } else {
-            histIdx = -1;
-            document.getElementById('termInput').value = '';
-        }
-    }
+function onKey(e){
+    if(e.key==='Enter'){e.preventDefault();sendCmd();}
+    else if(e.key==='ArrowUp'){e.preventDefault();if(histIdx<cmdHistory.length-1){histIdx++;document.getElementById('termInput').value=cmdHistory[cmdHistory.length-1-histIdx];}}
+    else if(e.key==='ArrowDown'){e.preventDefault();if(histIdx>0){histIdx--;document.getElementById('termInput').value=cmdHistory[cmdHistory.length-1-histIdx];}else{histIdx=-1;document.getElementById('termInput').value='';}}
 }
-
-function sendCmd() {
-    const input = document.getElementById('termInput');
-    const text  = input.value.trim();
-    if (!text || !ws || !wsConnected) return;
-    appendText(`> ${text}\n`);
-    ws.send(JSON.stringify({action:'send', data:text}));
-    if (text) {
-        cmdHistory.push(text);
-        if (cmdHistory.length > 100) cmdHistory.shift();
-    }
-    histIdx = -1;
-    input.value = '';
+function sendQuick(cmd){
+    if(!ws||!wsConn)return;
+    appendText('> '+cmd+'\n');
+    ws.send(JSON.stringify({action:'send',data:cmd}));
 }
-
-function setInputEnabled(on) {
-    document.getElementById('termInput').disabled = !on;
-    document.getElementById('sendBtn').disabled   = !on;
-    if (on) setTimeout(() => document.getElementById('termInput').focus(), 50);
+function sendCmd(){
+    const inp=document.getElementById('termInput');const text=inp.value.trim();
+    if(!text||!ws||!wsConn)return;
+    appendText(`> ${text}\n`);ws.send(JSON.stringify({action:'send',data:text}));
+    if(text){cmdHistory.push(text);if(cmdHistory.length>100)cmdHistory.shift();}
+    histIdx=-1;inp.value='';
 }
+function setInput(on){document.getElementById('termInput').disabled=!on;document.getElementById('sendBtn').disabled=!on;document.getElementById('btnD').disabled=!on;document.getElementById('btnDis').disabled=!on;if(on)setTimeout(()=>document.getElementById('termInput').focus(),50);}
 
-// ═══════════════════════════════════════════════════════════════
-// STATUS / UI
-// ═══════════════════════════════════════════════════════════════
-function setStatus(state, label) {
-    varaState = state;
-    const badge = document.getElementById('statusBadge');
-    badge.className = `status-badge ${state}`;
-    document.getElementById('statusLabel').textContent = label;
-}
+// UI
+function setStatus(state,label){varaState=state;document.getElementById('sbadge').className=`sbadge ${state}`;document.getElementById('slabel').textContent=label;}
+function showDisBtn(show){document.getElementById('disconnectBtn').style.display=show?'':'none';document.getElementById('connectBtn').style.display=show?'none':'';}
+function updateTimer(){if(!sessionStart){document.getElementById('timer').textContent='';return;}const s=Math.round((Date.now()-sessionStart)/1000);document.getElementById('timer').textContent=`${Math.floor(s/60)}m ${s%60}s`;}
 
-function updateTimer() {
-    if (!sessionStart) { document.getElementById('sessionTimer').textContent = ''; return; }
-    const secs = Math.round((Date.now() - sessionStart) / 1000);
-    const m = Math.floor(secs / 60), s = secs % 60;
-    document.getElementById('sessionTimer').textContent = `${m}m ${s}s`;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════════════
 checkAuth();
 </script>
 </body>

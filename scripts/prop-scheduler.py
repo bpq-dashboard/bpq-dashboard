@@ -378,7 +378,7 @@ NVIS_BASELINE = {
     # UTC hour: {band: base_score}
     #
     # CORRECTED 2026-03-19 based on D-layer absorption research.
-    # Augusta GA (33N) UTC offsets: EDT=UTC-4 (Mar-Nov), EST=UTC-5 (Nov-Mar)
+    # Set timezone UTC offset for your location (EDT=UTC-4, EST=UTC-5, CDT=UTC-5, etc)
     #
     # KEY FINDING: D-layer absorbs 80m from ~30min after local sunrise
     # until ~45min after local sunset. 80m should NOT be primary during

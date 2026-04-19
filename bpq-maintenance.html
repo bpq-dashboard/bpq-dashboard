@@ -946,7 +946,7 @@
 
     <div class="cmd">
       <div class="cmd-inner">
-        <code>nc -zv <span class="path">10.0.0.213</span> <span class="kw">9025</span></code>
+        <code>nc -zv <span class="path">VARA_HOST_IP</span> <span class="kw">9025</span></code>
         <div class="cmd-label">Test connectivity to VARA HF on Windows — must return <span class="kw">open</span>. Fails if VARA HF is not running or Windows Firewall is blocking.</div>
       </div>
       <div class="cmd-tag blue">test vara</div>
@@ -991,9 +991,9 @@
     <div class="paths-row"><div class="paths-key">Script</div><div class="paths-val">/usr/local/bin/vara-callsign-validator.py</div></div>
     <div class="paths-row"><div class="paths-key">Service file</div><div class="paths-val">/etc/systemd/system/vara-validator.service</div></div>
     <div class="paths-row"><div class="paths-key">Log file</div><div class="paths-val">/var/log/vara-validator.log</div></div>
-    <div class="paths-row"><div class="paths-key">VARA HF host</div><div class="paths-val">10.0.0.213  (cmd: 9025 · data: 9026)</div></div>
+    <div class="paths-row"><div class="paths-key">VARA HF host</div><div class="paths-val">YOUR_VARA_HOST  (cmd: 9025 · data: 9026)</div></div>
     <div class="paths-row"><div class="paths-key">Proxy listens on</div><div class="paths-val">127.0.0.1:9025 / 127.0.0.1:9026</div></div>
-    <div class="paths-row"><div class="paths-key">BPQ32 VARAHOST</div><div class="paths-val">127.0.0.1  (changed from 10.0.0.213)</div></div>
+    <div class="paths-row"><div class="paths-key">BPQ32 VARAHOST</div><div class="paths-val">127.0.0.1  (or your VARA host IP)</div></div>
     <div class="paths-row"><div class="paths-key">User manual</div><div class="paths-val">vara-validator-user-guide.docx</div></div>
   </div>
 </div>

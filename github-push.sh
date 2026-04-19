@@ -1,7 +1,7 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════════
 #  BPQ Dashboard — GitHub Release Push Script
-#  Run from ARSSYSTEM after testing is complete
+#  Run after testing is complete
 #
 #  What this does:
 #    1. Verifies the deploy archive exists and looks sane

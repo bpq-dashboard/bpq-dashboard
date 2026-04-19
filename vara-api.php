@@ -26,10 +26,14 @@ require_once __DIR__ . '/tprfn-db.php';
 
 // ── Config ────────────────────────────────────────────────────────
 $SYSOP_PASS  = 'YOURPASSWORD';        // overridden from config.php bbs.pass below
-$SYSOP_EMAIL = 'sysop@example.com';  // set to your email address
-$FLRIG_HOST  = '127.0.0.1';          // flrig host — localhost or remote IP
+$SYSOP_EMAIL = 'sysop@example.com'  // set to your email;
+$FLRIG_HOST  = '127.0.0.1'  // flrig host;
 $FLRIG_PORT  = 12345;
-$DAEMON_FILE = __DIR__ . '/cache/vara-sessions/vara-daemon.json';
+$DAEMON_FILE  = __DIR__ . '/cache/vara-sessions/vara-daemon.json';
+$BPQ32_CFG    = '/home/linbpq/bpq32.cfg'  // path to your bpq32.cfg;   // path to bpq32.cfg
+$BPQ32_BACKUP = __DIR__ . '/cache/vara-sessions/bpq32-radio-backup.txt';
+$RIGRECONFIG_USER = 'YOURCALL';
+$RIGRECONFIG_PASS = 'YOURPASSWORD'; // BPQ sysop password (same as bbs.pass in config.php)
 
 // Load actual pass from config if available
 if (!empty($CONFIG['bbs']['pass'])) $SYSOP_PASS = $CONFIG['bbs']['pass'];
@@ -133,12 +137,14 @@ function flrigGetFreq(): float|false {
     if (!$resp) return false;
     if (preg_match('/<double>([\d.]+)<\/double>/', $resp, $m)) return (float)$m[1];
     if (preg_match('/<string>([\d.]+)<\/string>/', $resp, $m)) return (float)$m[1];
+    // FTdx3000 returns plain <value>7103200</value> with no type wrapper
+    if (preg_match('/<value>(\d+)<\/value>/', $resp, $m)) return (float)$m[1];
     return false;
 }
 
 function flrigSetFreq(float $hz): bool {
-    // flrig uses Hz as integer
-    $resp = flrigCall('rig.set_vfo', [(string)(int)$hz]);
+    // flrig uses Hz as integer — correct method is rig.set_frequency
+    $resp = flrigCall('rig.set_frequency', [(string)(int)$hz]);
     return $resp !== false;
 }
 
@@ -146,6 +152,131 @@ function flrigSetMode(string $mode): bool {
     $resp = flrigCall('rig.set_mode', [$mode]);
     return $resp !== false;
 }
+
+/**
+ * Send FREQUENCY command directly to VARA HF command port.
+ * VARA accepts: FREQUENCY <hz_integer>
+ * This bypasses flrig and BPQ's radio scanner entirely.
+ */
+function varaSetFreq(string $vara_host, int $vara_port, int $hz): bool {
+    $sock = @fsockopen($vara_host, $vara_port, $errno, $errstr, 3);
+    if (!$sock) return false;
+    stream_set_timeout($sock, 3);
+    $cmd = "FREQUENCY " . $hz . "
+";
+    $ok = @fwrite($sock, $cmd);
+    // Read any response (VARA may echo back OK or nothing)
+    @fgets($sock, 128);
+    fclose($sock);
+    return $ok !== false;
+}
+
+// ── bpq32.cfg RADIO 2 rewrite ────────────────────────────────────
+/**
+ * Rewrite the RADIO 2 frequency scan list in bpq32.cfg to a single
+ * frequency, then send RIGRECONFIG to BPQ so the scanner picks it up
+ * without restarting LinBPQ.
+ *
+ * Original scan block is backed up to cache/vara-sessions/bpq32-radio-backup.txt
+ * Call restoreRadio2() on session disconnect to restore it.
+ */
+function rewriteRadio2(float $hz, string $cfgPath, string $backupPath): bool {
+    if (!file_exists($cfgPath)) return false;
+    $cfg = file_get_contents($cfgPath);
+
+    // Match RADIO 2 block from "RADIO 2" line to "*****" terminator (inclusive)
+    // Uses [\s\S] to match across multiple lines including time sections
+    if (!preg_match('/(^RADIO 2 ?
+[\s\S]*?\*{5})/m', $cfg, $m)) {
+        return false;
+    }
+    $originalBlock = $m[1];
+
+    // Back up original block if not already backed up
+    if (!file_exists($backupPath)) {
+        file_put_contents($backupPath, $originalBlock);
+    }
+
+    // Build new block with single frequency
+    $mhz = number_format($hz / 1000000, 6, '.', '');
+    $newBlock = "RADIO 2
+"
+              . " FLRIG {$FLRIG_HOST}:{$FLRIG_PORT} HAMLIB={$FLRIG_HOST}:4532
+"
+              . " 00:00
+"
+              . " 7,{$mhz},PKT-U
+"
+              . "*****";
+
+    $cfg = str_replace($originalBlock, $newBlock, $cfg);
+    file_put_contents($cfgPath, $cfg);
+    return true;
+}
+
+function restoreRadio2(string $cfgPath, string $backupPath): bool {
+    if (!file_exists($backupPath) || !file_exists($cfgPath)) return false;
+    $original = file_get_contents($backupPath);
+    $cfg      = file_get_contents($cfgPath);
+
+    // Find the current (modified) RADIO 2 block and replace with original
+    if (!preg_match('/(RADIO 2\s*
+(?:.*
+)*?\*{3,})/m', $cfg, $m)) {
+        return false;
+    }
+    $cfg = str_replace($m[1], $original, $cfg);
+    file_put_contents($cfgPath, $cfg);
+    unlink($backupPath);
+    return true;
+}
+
+/**
+ * Send RIGRECONFIG to BPQ via HTTP management interface (port 8008).
+ *
+ * Sequence confirmed working:
+ *   1. GET /Node/Terminal.html to get session token
+ *   2. POST PASSWORD to /TermInput?TOKEN — grants SYSOP status (Ok)
+ *   3. POST RIGRECONFIG immediately — responds "Rigcontrol Reconfig requested"
+ */
+function sendRigReconfig(string $user, string $pass, string $host = '127.0.0.1', int $port = 8008): bool {
+    $base = "http://{$host}:{$port}";
+    $auth = base64_encode("{$user}:{$pass}");
+    $hdr  = "Authorization: Basic {$auth}\r\nConnection: close\r\n";
+
+    // Step 1 — open terminal session, get token
+    $ctx = stream_context_create(['http' => ['method'=>'GET','header'=>$hdr,'timeout'=>5]]);
+    $html = @file_get_contents("{$base}/Node/Terminal.html", false, $ctx);
+    if (!$html) return false;
+    if (!preg_match('/TermClose\?(T[0-9A-Fa-f]+)/i', $html, $m)) return false;
+    $token = $m[1];
+
+    // Step 2 — PASSWORD grants SYSOP status
+    $ctx = stream_context_create(['http' => [
+        'method'  => 'POST',
+        'header'  => $hdr . "Content-Type: application/x-www-form-urlencoded\r\n",
+        'content' => 'input=PASSWORD',
+        'timeout' => 5,
+    ]]);
+    @file_get_contents("{$base}/TermInput?{$token}", false, $ctx);
+    usleep(300000); // 300ms — BPQ processes PASSWORD
+
+    // Step 3 — RIGRECONFIG while SYSOP session is still active
+    $ctx = stream_context_create(['http' => [
+        'method'  => 'POST',
+        'header'  => $hdr . "Content-Type: application/x-www-form-urlencoded\r\n",
+        'content' => 'input=RIGRECONFIG',
+        'timeout' => 5,
+    ]]);
+    @file_get_contents("{$base}/TermInput?{$token}", false, $ctx);
+    usleep(600000); // 600ms — BPQ processes RIGRECONFIG
+
+    // Step 4 — verify by reading output screen
+    $ctx = stream_context_create(['http' => ['method'=>'GET','header'=>$hdr,'timeout'=>5]]);
+    $out = @file_get_contents("{$base}/Node/OutputScreen.html?{$token}", false, $ctx);
+    return $out && str_contains($out, 'Rigcontrol');
+}
+
 
 // ── Request dispatch ──────────────────────────────────────────────
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
@@ -193,7 +324,7 @@ switch ($action) {
         try {
             tprfn_execute($pdo,
                 "INSERT INTO vara_allowed_stations (callsign, name, notes, added_by) VALUES (?,?,?,?)",
-                [$cs, $name, $note, 'YOURCALL']
+                [$cs, $name, $note, $CONFIG['node']['callsign'] ?? 'YOURCALL']
             );
         } catch (\PDOException $e) {
             if (str_contains($e->getMessage(), 'Duplicate')) fail("$cs is already in the allowlist");
@@ -232,7 +363,7 @@ switch ($action) {
                  . "To approve, add $cs to the allowlist in bpq-vara.html\n"
                  . "Sent from BPQ Dashboard VARA terminal on " . date('Y-m-d H:i:s') . " UTC";
         $sent = mail($SYSOP_EMAIL, $subject, $body,
-            "From: dashboard@" . $_SERVER['HTTP_HOST'] . "\r\nReply-To: {$cs}@invalid");
+            "From: dashboard@bpq.k1ajd.net\r\nReply-To: {$cs}@invalid");
         ok(['sent' => $sent, 'to' => $SYSOP_EMAIL]);
 
     // ── FREQUENCY — validate ──────────────────────────────────────
@@ -245,23 +376,28 @@ switch ($action) {
 
     // ── FREQUENCY — set via flrig ─────────────────────────────────
     case 'set_freq':
-        requireAuth();
+        // No auth required — page login overlay protects access
         $mhz = (float)($input['mhz'] ?? 0);
         if ($mhz <= 0) fail('Frequency (MHz) required');
-        // Validate against Region 2 data allocations
         $bandInfo = validateAmateurFreq($mhz);
         if (!$bandInfo) fail("$mhz MHz is not in an ITU Region 2 HF data-authorized band");
-        $hz = $mhz * 1000000;
-        // QSY flrig
-        $freqOk = flrigSetFreq($hz);
-        // Set USB mode (VARA HF uses USB dial)
-        $modeOk = flrigSetMode('USB');
-        if (!$freqOk) fail("Could not reach flrig at {$FLRIG_HOST}:{$FLRIG_PORT}");
-        ok(['mhz' => $mhz, 'hz' => $hz, 'band' => $bandInfo, 'mode_set' => $modeOk]);
+        $hz = (int)round($mhz * 1000000);
+        // Rewrite RADIO 2 scan list in bpq32.cfg to single selected frequency
+        // then send RIGRECONFIG so BPQ scanner moves radio without restart
+        $cfgOk  = rewriteRadio2((float)$hz, $BPQ32_CFG, $BPQ32_BACKUP);
+        $rigOk  = false;
+        if ($cfgOk) {
+            $rigOk = sendRigReconfig($RIGRECONFIG_USER, $RIGRECONFIG_PASS);
+        }
+
+
+        ok(['mhz' => $mhz, 'hz' => $hz, 'band' => $bandInfo,
+            'cfg_rewritten' => $cfgOk, 'rigreconfig_sent' => $rigOk,
+            'method' => 'rigreconfig']);
 
     // ── FREQUENCY — get current ───────────────────────────────────
     case 'get_freq':
-        requireAuth();
+        // No auth required — read only
         $hz = flrigGetFreq();
         if ($hz === false) fail("Could not reach flrig at {$FLRIG_HOST}:{$FLRIG_PORT}");
         $mhz = round($hz / 1000000, 6);
@@ -278,6 +414,58 @@ switch ($action) {
         $age  = time() - ($data['updated_ts'] ?? 0);
         $data['stale'] = $age > 60;
         ok($data);
+
+    // ── RIG INFO — full rig status for rig-status.html ──────────────
+    case 'get_rig_info':
+        // Only use confirmed-working flrig methods
+        $hz   = flrigGetFreq();
+        if ($hz === false) fail("Cannot reach flrig at {$FLRIG_HOST}:{$FLRIG_PORT}");
+        $modeRaw = flrigCall('rig.get_mode', []);
+        // Extract mode string from XML response
+        $mode = 'PKT-U';
+        if ($modeRaw && preg_match('/<string>([^<]+)<\/string>/', $modeRaw, $mm)) {
+            $mode = trim($mm[1]);
+        } elseif ($modeRaw && preg_match('/<value>([^<]+)<\/value>/', $modeRaw, $mm)) {
+            $mode = trim($mm[1]);
+        }
+        // S-meter (0-100 scale from flrig, represents signal strength)
+        $smeterRaw = flrigCall('rig.get_smeter', []);
+        $smeter = null;
+        if ($smeterRaw && preg_match('/<value>(\d+)<\/value>/', $smeterRaw, $mm)) {
+            $smeter = (int)$mm[1];
+        }
+        // Power meter (0 on RX, 0-100 on TX)
+        $pwrRaw = flrigCall('rig.get_pwrmeter', []);
+        $pwrmeter = null;
+        if ($pwrRaw && preg_match('/<value>(\d+)<\/value>/', $pwrRaw, $mm)) {
+            $pwrmeter = (int)$mm[1];
+        }
+        // SWR meter (0 on RX, value on TX)
+        $swrRaw = flrigCall('rig.get_swrmeter', []);
+        $swrmeter = null;
+        if ($swrRaw && preg_match('/<value>(\d+)<\/value>/', $swrRaw, $mm)) {
+            $swrmeter = (int)$mm[1];
+        }
+        $isTx = ($pwrmeter !== null && $pwrmeter > 0);
+        ok([
+            'hz'       => (int)$hz,
+            'mhz'      => round($hz / 1000000, 6),
+            'mode'     => $mode,
+            'smeter'   => $smeter,
+            'pwrmeter' => $pwrmeter,
+            'swrmeter' => $swrmeter,
+            'tx'       => $isTx,
+        ]);
+
+    // ── FREQUENCY RESTORE — called on session disconnect ─────────────
+    case 'restore_freq':
+        // Restore original RADIO 2 scan list and send RIGRECONFIG
+        $restored = restoreRadio2($BPQ32_CFG, $BPQ32_BACKUP);
+        $rigOk    = false;
+        if ($restored) {
+            $rigOk = sendRigReconfig($RIGRECONFIG_USER, $RIGRECONFIG_PASS);
+        }
+        ok(['restored' => $restored, 'rigreconfig_sent' => $rigOk]);
 
     default:
         fail('Unknown action', 404);

@@ -86,7 +86,7 @@ CONFIG = {
     'noaa_kp_url': 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',
 
     # Partners to switch to 80m during storms — with distance and suspend threshold.
-    # distance_mi: great-circle distance from home station (Augusta GA)
+    # distance_mi: great-circle distance from home station
     # suspend_kp:  Kp level at which to SUSPEND attempts entirely (not just 80m).
     #              None = never suspend (short-path stations always worth trying).
     # Tiering logic:
