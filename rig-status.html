@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rig Status</title>
+<style>
+:root {
+    --bg:#080a0d;--surface:#0f1318;--surface2:#161b22;
+    --border:#1e242e;--border2:#2a3340;
+    --text:#c8d4e0;--muted:#4a5568;
+    --amber:#e8a020;--amber-dim:#6b4510;--amber-bg:#1a1005;
+    --green:#22c55e;--red:#ef4444;--blue:#3b82f6;--cyan:#22d3ee;
+    --mono:'Courier New','Lucida Console',monospace;
+    --ui:'Segoe UI',system-ui,sans-serif;
+    --r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--ui)}
+
+#app{
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;min-height:100vh;padding:20px;gap:0;
+}
+
+/* Main frequency display */
+.freq-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:16px;padding:32px 48px;text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,.6);min-width:380px;
+}
+.rig-name{
+    font-size:11px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:1px;margin-bottom:20px;
+}
+.freq-display{
+    font-family:var(--mono);font-size:56px;font-weight:700;
+    color:var(--amber);letter-spacing:3px;line-height:1;
+    margin-bottom:6px;
+    text-shadow:0 0 30px rgba(232,160,32,.25);
+    min-height:64px;transition:color .3s;
+}
+.freq-unit{
+    font-size:13px;color:var(--muted);letter-spacing:2px;
+    text-transform:uppercase;margin-bottom:18px;
+}
+.freq-breakdown{
+    display:flex;gap:6px;justify-content:center;margin-bottom:18px;
+}
+.freq-seg{
+    background:var(--surface2);border:1px solid var(--border2);
+    border-radius:4px;padding:3px 10px;font-family:var(--mono);
+    font-size:11px;color:var(--muted);
+}
+.freq-seg span{color:var(--text);font-weight:700}
+
+.status-row{
+    display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
+    margin-bottom:16px;
+}
+.pill{
+    display:flex;align-items:center;gap:5px;
+    padding:4px 14px;border-radius:20px;
+    font-size:11px;font-weight:700;letter-spacing:.5px;
+    border:1px solid var(--border2);
+}
+.pill.mode{border-color:var(--cyan);color:var(--cyan)}
+.pill.band{border-color:var(--amber);color:var(--amber)}
+
+.update-row{
+    display:flex;align-items:center;gap:8px;
+    font-size:10px;color:var(--muted);justify-content:center;
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);transition:all .3s}
+.dot.stale{background:var(--muted)}
+.dot.error{background:var(--red)}
+
+/* Scanner */
+.scanner-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:12px;padding:20px 24px;min-width:380px;
+}
+.card-title{
+    font-size:10px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:1px;margin-bottom:14px;
+}
+.scanner-freqs{
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+}
+.sf{
+    background:var(--surface2);border:1px solid var(--border2);
+    border-radius:var(--r);padding:10px 14px;text-align:center;
+    transition:all .4s;min-width:80px;
+}
+.sf-mhz{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text)}
+.sf-band{font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+.sf.active{border-color:var(--amber);background:var(--amber-bg)}
+.sf.active .sf-mhz{color:var(--amber)}
+.sf.active .sf-band{color:var(--amber-dim)}
+
+/* Error */
+.err{color:var(--red);font-size:11px;margin-top:10px;display:none}
+
+/* Meters */
+.meter-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:12px;padding:20px 24px;min-width:380px;
+}
+.meter-label{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:8px;
+}
+.meter-name{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.meter-val{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)}
+.meter-bar-wrap{
+    height:18px;background:var(--surface2);border-radius:9px;
+    overflow:hidden;margin-bottom:14px;border:1px solid var(--border);
+    position:relative;
+}
+.meter-bar{
+    height:100%;border-radius:9px;width:0%;
+    transition:width .4s ease;
+}
+.meter-bar.smeter{
+    background:linear-gradient(90deg,#22c55e 0%,#22c55e 54%,#f59e0b 54%,#f59e0b 72%,#ef4444 72%);
+}
+.meter-bar.power{
+    background:linear-gradient(90deg,#3b82f6 0%,#22c55e 40%,#f59e0b 70%,#ef4444 90%);
+}
+.meter-ticks{
+    display:flex;justify-content:space-between;
+    font-size:9px;color:var(--muted);font-family:var(--mono);
+    margin-top:-10px;margin-bottom:12px;padding:0 2px;
+}
+.tx-badge{
+    display:inline-block;background:var(--red);color:#fff;
+    font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;
+    animation:pulse 0.7s infinite;margin-left:8px;
+    display:none;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Main layout: meters left, freq+scanner right -->
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%;max-width:900px">
+
+    <!-- LEFT COLUMN: S-Meter stacked above Power Meter -->
+    <div style="display:flex;flex-direction:column;gap:12px;flex-shrink:0">
+
+      <!-- S-Meter -->
+      <div class="meter-card" style="padding:14px 16px;min-width:0">
+        <div class="card-title" style="margin-bottom:6px">📶 S-Meter</div>
+        <canvas id="smeterGauge" width="260" height="150"></canvas>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--amber);margin-top:4px;text-align:center" id="smeterVal">–</div>
+      </div>
+
+      <!-- Power Meter -->
+      <div class="meter-card" style="padding:14px 16px;min-width:0">
+        <div class="card-title" style="margin-bottom:6px">
+          📡 TX Power
+          <span class="tx-badge" id="txBadge">TX</span>
+        </div>
+        <canvas id="pwrGauge" width="260" height="150"></canvas>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--amber);margin-top:4px;text-align:center" id="pwrVal">0 W</div>
+      </div>
+
+      <!-- SWR Meter — only shown when transmitting -->
+      <div class="meter-card" id="swrCard" style="padding:14px 16px;min-width:0;display:none">
+        <div class="card-title" style="margin-bottom:6px">⚡ SWR</div>
+        <canvas id="swrGauge" width="260" height="150"></canvas>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--amber);margin-top:4px;text-align:center" id="swrVal">1.0 : 1</div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: Frequency readout + scanner -->
+    <div style="display:flex;flex-direction:column;gap:12px;flex:1;min-width:280px">
+
+      <!-- Frequency card -->
+      <div class="freq-card" style="padding:24px 32px">
+        <div class="rig-name" id="rigName">📻 Loading...</div>
+        <div class="freq-display" id="freqDisplay">––– .–––</div>
+        <div class="freq-unit">MHz</div>
+        <div class="freq-breakdown">
+          <div class="freq-seg">Band <span id="segBand">–</span></div>
+          <div class="freq-seg">kHz offset <span id="segHz">–</span></div>
+        </div>
+        <div class="status-row">
+          <div class="pill mode" id="pillMode">–</div>
+          <div class="pill band" id="pillBand">–</div>
+        </div>
+        <div class="update-row">
+          <div class="dot" id="dot"></div>
+          <span id="updateTime">Connecting…</span>
+        </div>
+        <div class="err" id="err">⚠ flrig offline — start flrig on the Windows machine to enable rig status</div>
+      </div>
+
+      <!-- Scanner card -->
+      <div class="scanner-card">
+        <div class="card-title">📡 RADIO 2 Scan Frequencies</div>
+        <div class="scanner-freqs">
+          <div class="sf" data-freq="3.596000"><div class="sf-mhz">3.596</div><div class="sf-band">80m</div></div>
+          <div class="sf" data-freq="7.103200"><div class="sf-mhz">7.103</div><div class="sf-band">40m</div></div>
+          <div class="sf" data-freq="10.148200"><div class="sf-mhz">10.148</div><div class="sf-band">30m</div></div>
+          <div class="sf" data-freq="14.103000"><div class="sf-mhz">14.103</div><div class="sf-band">20m</div></div>
+          <div class="sf" data-freq="14.106500"><div class="sf-mhz">14.106</div><div class="sf-band">20m</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = 'vara-api.php';
+const BANDS = [
+    [1.8,2.0,'160m'],[3.525,4.0,'80m'],[5.3305,5.4035,'60m'],
+    [7.025,7.3,'40m'],[10.1,10.15,'30m'],[14.025,14.35,'20m'],
+    [18.068,18.168,'17m'],[21.025,21.45,'15m'],
+    [24.89,24.99,'12m'],[28.0,29.7,'10m']
+];
+
+function bandForMhz(mhz){
+    for(const [lo,hi,n] of BANDS) if(mhz>=lo-0.001&&mhz<=hi+0.001) return n;
+    return '?';
+}
+
+function highlightScanner(mhz){
+    document.querySelectorAll('.sf').forEach(el=>{
+        const f=parseFloat(el.dataset.freq);
+        el.classList.toggle('active', Math.abs(mhz-f)<0.0006);
+    });
+}
+
+function setDot(state){
+    document.getElementById('dot').className='dot'+(state==='ok'?'':' '+state);
+}
+
+async function poll(){
+    try{
+        // Use POST to avoid nginx 403 on GET
+        const r = await fetch(API, {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{
+                'Content-Type':'application/json',
+                'X-Requested-With':'XMLHttpRequest'
+            },
+            body: JSON.stringify({action:'get_rig_info'})
+        });
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        const d = await r.json();
+        if(!d.ok) throw new Error(d.error||'API error');
+
+        const mhz = d.mhz;
+        const band = bandForMhz(mhz);
+
+        // Format frequency: 14.103200 → "14.103 200"
+        const mhzStr = mhz.toFixed(6);           // "14.103200"
+        const [int,dec] = mhzStr.split('.');      // "14", "103200"
+        const khz = dec.slice(0,3);               // "103"
+        const hz  = dec.slice(3);                 // "200"
+
+        document.getElementById('freqDisplay').textContent = int+'.'+khz+' '+hz;
+        document.getElementById('segBand').textContent  = band;
+        document.getElementById('segHz').textContent    = parseInt(hz)+' Hz';
+        document.getElementById('pillMode').textContent = d.mode||'–';
+        document.getElementById('pillBand').textContent = band;
+        // Update rig name if returned by API
+        if (d.rig_model && d.rig_make) {
+            document.getElementById('rigName').textContent =
+                '📻 ' + d.rig_make + ' ' + d.rig_model;
+        } else if (d.rig_model) {
+            document.getElementById('rigName').textContent = '📻 ' + d.rig_model;
+        }
+
+        highlightScanner(mhz);
+
+        // Update analog gauges
+        if(typeof updateGauges === 'function'){
+            updateGauges(d.smeter, d.pwrmeter, d.swrmeter);
+        }
+
+        // PTT pill
+        document.getElementById('pillMode').textContent = d.mode||'–';
+        document.getElementById('pillBand').textContent = band;
+        // Update rig name if returned by API
+        if (d.rig_model && d.rig_make) {
+            document.getElementById('rigName').textContent =
+                '📻 ' + d.rig_make + ' ' + d.rig_model;
+        } else if (d.rig_model) {
+            document.getElementById('rigName').textContent = '📻 ' + d.rig_model;
+        }
+
+        document.getElementById('updateTime').textContent =
+            'Updated '+new Date().toLocaleTimeString();
+        document.getElementById('err').style.display='none';
+        setDot('ok');
+
+    }catch(e){
+        document.getElementById('updateTime').textContent='Poll failed — retrying…';
+        document.getElementById('err').style.display='block';
+        setDot('error');
+    }
+}
+
+poll();
+setInterval(poll, 3000);
+</script>
+
+<script>
+function drawMeter(canvasId, opts) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    const cx = W / 2, cy = H - 18;
+    const R = Math.min(W, H) * 0.80;
+    // Standard meter: pivot at bottom, needle sweeps upward (left=0, right=full)
+    // In canvas coords: Math.PI = 9 o'clock (left), 0 = 3 o'clock (right)
+    // Arc from PI to 0 going counter-clockwise draws the upper semicircle
+    const startAngle = Math.PI;
+    const endAngle   = 0;
+    const sweep      = Math.PI;   // positive = counter-clockwise in our formula
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Face
+    ctx.fillStyle = '#1c1f24';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 12, Math.PI, 0);
+    ctx.lineTo(cx + R + 12, cy + 20);
+    ctx.lineTo(cx - R - 12, cy + 20);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#252830';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 6, Math.PI, 0);
+    ctx.lineTo(cx + R + 6, cy + 14);
+    ctx.lineTo(cx - R - 6, cy + 14);
+    ctx.closePath();
+    ctx.fill();
+
+    // Coloured zones
+    opts.zones.forEach(z => {
+        ctx.strokeStyle = z.color;
+        ctx.lineWidth = 8;
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R - 10, startAngle + sweep * z.from, startAngle + sweep * z.to, false);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    });
+
+    // Ticks and labels
+    opts.ticks.forEach(t => {
+        const angle = startAngle + sweep * t.frac;
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+        const len = t.major ? 14 : 7;
+        ctx.strokeStyle = t.major ? '#aaa' : '#555';
+        ctx.lineWidth = t.major ? 1.5 : 0.8;
+        ctx.beginPath();
+        ctx.moveTo(cx + (R + 2) * cos, cy + (R + 2) * sin);
+        ctx.lineTo(cx + (R + 2 - len) * cos, cy + (R + 2 - len) * sin);
+        ctx.stroke();
+        if (t.label) {
+            const lr = R + 2 - len - 14;
+            ctx.fillStyle = '#bbb';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(t.label, cx + lr * cos, cy + lr * sin);
+        }
+    });
+
+    // Needle
+    const na = startAngle + sweep * Math.min(1, Math.max(0, opts.value));
+    ctx.strokeStyle = '#e8a020';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - 8 * Math.cos(na), cy - 8 * Math.sin(na));
+    ctx.lineTo(cx + (R - 8) * Math.cos(na), cy + (R - 8) * Math.sin(na));
+    ctx.stroke();
+
+    // Pivot
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(cx, cy, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e8a020';
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+}
+
+const S_TICKS = [
+    {frac:0,     major:true,  label:'1'},
+    {frac:0.067, major:false},
+    {frac:0.133, major:true,  label:'3'},
+    {frac:0.2,   major:false},
+    {frac:0.267, major:true,  label:'5'},
+    {frac:0.333, major:false},
+    {frac:0.4,   major:true,  label:'7'},
+    {frac:0.467, major:false},
+    {frac:0.54,  major:true,  label:'9'},
+    {frac:0.62,  major:true,  label:'+10'},
+    {frac:0.72,  major:true,  label:'+20'},
+    {frac:0.86,  major:true,  label:'+40'},
+    {frac:1.0,   major:true,  label:'+60'},
+];
+const S_ZONES = [
+    {from:0,    to:0.54, color:'#22c55e'},
+    {from:0.54, to:0.72, color:'#f59e0b'},
+    {from:0.72, to:1.0,  color:'#ef4444'},
+];
+const P_TICKS = [
+    {frac:0,   major:true,  label:'0'},
+    {frac:0.2, major:true,  label:'20'},
+    {frac:0.4, major:true,  label:'40'},
+    {frac:0.6, major:true,  label:'60'},
+    {frac:0.8, major:true,  label:'80'},
+    {frac:1.0, major:true,  label:'100W'},
+    {frac:0.1, major:false},
+    {frac:0.3, major:false},
+    {frac:0.5, major:false},
+    {frac:0.7, major:false},
+    {frac:0.9, major:false},
+];
+const P_ZONES = [
+    {from:0,   to:0.5, color:'#3b82f6'},
+    {from:0.5, to:0.8, color:'#22c55e'},
+    {from:0.8, to:1.0, color:'#ef4444'},
+];
+
+// SWR: 0-100 from flrig maps to 1.0:1 to ~3.0+:1
+// Good SWR <30 (1.5:1), caution 30-60 (2:1), danger >60 (3:1+)
+const SWR_TICKS = [
+    {frac:0,    major:true,  label:'1.0'},
+    {frac:0.15, major:true,  label:'1.5'},
+    {frac:0.3,  major:true,  label:'2.0'},
+    {frac:0.5,  major:false},
+    {frac:0.6,  major:true,  label:'3.0'},
+    {frac:0.75, major:false},
+    {frac:0.9,  major:true,  label:'5.0+'},
+    {frac:0.1,  major:false},
+    {frac:0.2,  major:false},
+    {frac:0.4,  major:false},
+];
+const SWR_ZONES = [
+    {from:0,    to:0.15, color:'#22c55e'},
+    {from:0.15, to:0.3,  color:'#f59e0b'},
+    {from:0.3,  to:1.0,  color:'#ef4444'},
+];
+
+let curSmeter = 0, curPwr = 0;
+
+function updateGauges(smeter, pwrmeter, swrmeter) {
+    if (smeter !== null && smeter !== undefined) {
+        curSmeter = smeter / 100;
+        drawMeter('smeterGauge', {value: curSmeter, ticks: S_TICKS, zones: S_ZONES});
+        let label;
+        if      (smeter <= 6)  label = 'S1';
+        else if (smeter <= 12) label = 'S2';
+        else if (smeter <= 18) label = 'S3';
+        else if (smeter <= 24) label = 'S4';
+        else if (smeter <= 30) label = 'S5';
+        else if (smeter <= 36) label = 'S6';
+        else if (smeter <= 42) label = 'S7';
+        else if (smeter <= 48) label = 'S8';
+        else if (smeter <= 54) label = 'S9';
+        else if (smeter <= 60) label = 'S9+10';
+        else if (smeter <= 72) label = 'S9+20';
+        else if (smeter <= 86) label = 'S9+30';
+        else                   label = 'S9+40';
+        document.getElementById('smeterVal').textContent = label + ' (' + smeter + ')';
+    }
+    const pwr = pwrmeter || 0;
+    curPwr = pwr / 100;
+    drawMeter('pwrGauge', {value: curPwr, ticks: P_TICKS, zones: P_ZONES});
+    document.getElementById('pwrVal').textContent = Math.round(pwr) + ' W';
+    document.getElementById('txBadge').style.display = pwr > 0 ? 'inline-block' : 'none';
+
+    // SWR — only show card when transmitting
+    const swrCard = document.getElementById('swrCard');
+    if (pwr > 0 && swrmeter !== null && swrmeter !== undefined) {
+        swrCard.style.display = '';
+        if (!document.getElementById('swrGauge')._drawn) {
+            drawMeter('swrGauge', {value: 0, ticks: SWR_TICKS, zones: SWR_ZONES});
+        }
+        const swrFrac = Math.min(1, swrmeter / 100);
+        drawMeter('swrGauge', {value: swrFrac, ticks: SWR_TICKS, zones: SWR_ZONES});
+        // Convert 0-100 to SWR ratio: 1.0 at 0, ~5.0+ at 100
+        const swrRatio = (1 + swrFrac * 4).toFixed(1);
+        document.getElementById('swrVal').textContent = swrRatio + ' : 1';
+        // Colour the label by zone
+        const swrEl = document.getElementById('swrVal');
+        if (swrFrac < 0.15)      swrEl.style.color = '#22c55e';
+        else if (swrFrac < 0.3)  swrEl.style.color = '#f59e0b';
+        else                     swrEl.style.color = '#ef4444';
+    } else {
+        swrCard.style.display = 'none';
+    }
+}
+
+// Draw initial empty meters on load
+window.addEventListener('load', () => {
+    drawMeter('smeterGauge', {value: 0, ticks: S_TICKS, zones: S_ZONES});
+    drawMeter('pwrGauge',    {value: 0, ticks: P_TICKS, zones: P_ZONES});
+});
+</script>
+</body>
+</html>

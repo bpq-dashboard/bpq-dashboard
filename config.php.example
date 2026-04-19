@@ -25,6 +25,28 @@ return [
         'user' => 'bpqdash_user',
         'pass' => 'YOURDBPASSWORD',
     ],
+    // ── Radio / flrig settings ───────────────────────────────────────────
+    // flrig must be running and connected to your radio for rig-status.html
+    // and VARA HF frequency control to work.
+    //
+    // model: leave blank for auto-detection from flrig (recommended)
+    //        or set to force a specific profile if auto-detect fails.
+    //        Supported: FTdx3000, FTdx10, FTdx101, FT-991, FT-710, FT-891,
+    //                   FT-450, FT-897, FT-857, IC-7300, IC-7610, IC-705,
+    //                   IC-7100, IC-7200, IC-7600, IC-7700, IC-7800, IC-9700,
+    //                   TS-590, TS-890, TS-2000, K3, KX3, K4
+    //
+    // digital_mode: override the mode switched to before VARA connects.
+    //               null = don't switch mode (safe default for FTdx3000).
+    //               Set to 'DATA-U', 'USB-D', 'USB', etc. to force a mode.
+    //               Leave blank to use the profile default.
+    'radio' => [
+        'model'        => '',           // blank = auto-detect from flrig
+        'flrig_host'   => '127.0.0.1', // IP of machine running flrig
+        'flrig_port'   => 12345,        // flrig XML-RPC port
+        'digital_mode' => null,         // null = use profile default
+    ],
+
     'security_mode' => 'local',
     'features'      => ['bbs_read'=>true,'bbs_write'=>true,'nws_post'=>true],
     'rate_limit'    => ['enabled'=>false],

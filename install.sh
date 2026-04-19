@@ -274,12 +274,27 @@ if yesno "Enable VARA HF Terminal?"; then
         INPUT_FLRIG_PORT="12345"
         INPUT_BPQ32_CFG="${LINBPQ_DIR}/bpq32.cfg"
     fi
+    echo ""
+    echo -e "  ${BLU}Radio model — used to select the correct digital mode for VARA HF.${NC}"
+    echo -e "  ${BLU}Leave blank to auto-detect from flrig (recommended).${NC}"
+    echo -e "  ${BLU}Supported: FTdx3000, FTdx10, FT-991, FT-710, FT-891, FT-450, FT-897,${NC}"
+    echo -e "  ${BLU}           IC-7300, IC-7610, IC-705, IC-7100, IC-7200, IC-7600, IC-7700,${NC}"
+    echo -e "  ${BLU}           IC-7800, IC-9700, TS-590, TS-890, TS-2000, K3, KX3, K4${NC}"
+    ask "Radio model (blank = auto-detect) []:"
+    read -r INPUT_RADIO_MODEL
+    INPUT_RADIO_MODEL="${INPUT_RADIO_MODEL:-}"
+    if [[ -n "$INPUT_RADIO_MODEL" ]]; then
+        ok "Radio model: $INPUT_RADIO_MODEL"
+    else
+        ok "Radio model: auto-detect from flrig"
+    fi
     ok "VARA HF: ${INPUT_VARA_HOST}:${INPUT_VARA_PORT} BPQ port ${INPUT_BPQ_VARA_PORT}"
 else
     HAS_VARA=N
     INPUT_VARA_HOST="127.0.0.1"; INPUT_VARA_PORT="8300"
     INPUT_BPQ_VARA_PORT="3";     INPUT_FLRIG_HOST="127.0.0.1"
     INPUT_FLRIG_PORT="12345";    INPUT_BPQ32_CFG="${LINBPQ_DIR}/bpq32.cfg"
+    INPUT_RADIO_MODEL=""
     say "VARA HF terminal will be installed but inactive until VARA HF is set up"
 fi
 
@@ -320,7 +335,8 @@ echo -e "  ${WHT}Web root:${NC}        $WEB_ROOT"
 echo -e "  ${WHT}Server:${NC}          http://$INPUT_HOST/"
 echo -e "  ${WHT}APRS:${NC}            $([[ $HAS_APRS == Y ]] && echo "$INPUT_APRS_CALL" || echo 'disabled')"
 echo -e "  ${WHT}VARA HF:${NC}         $([[ $HAS_VARA == Y ]] && echo "${INPUT_VARA_HOST}:${INPUT_VARA_PORT} BPQ port ${INPUT_BPQ_VARA_PORT}" || echo 'disabled')"
-echo -e "  ${WHT}flrig:${NC}           $([[ $HAS_FLRIG == Y ]] && echo "${INPUT_FLRIG_HOST}:${INPUT_FLRIG_PORT}" || echo 'disabled')"
+echo -e "  ${WHT}flrig:${NC}           $([[ $HAS_FLRIG == Y ]] && echo "${INPUT_FLRIG_HOST}:${INPUT_FLRIG_PORT}" || echo 'disabled')
+  ${WHT}Radio model:${NC}     ${INPUT_RADIO_MODEL:-auto-detect from flrig}"
 echo -e "  ${WHT}WaveNode:${NC}        $([[ $HAS_WAVENODE == Y ]] && echo "${INPUT_WN_USER}@${INPUT_WN_HOST}" || echo 'not configured')
   ${WHT}Database:${NC}        $([[ $HAS_DB == Y ]] && echo "MariaDB — $INPUT_DB_NAME (user: $INPUT_DB_USER)" || echo 'skipped (VARA allowlist disabled)')"
 echo ""
