@@ -1,6 +1,10 @@
-SESSION-JOURNAL.txt
-*.log
-*.bak
 config.php
+tprfn-db.php.local
 data/
 cache/
+logs/
+wavenode-logs/
+*.log
+*.bak
+SESSION-JOURNAL.txt
+/tmp/
