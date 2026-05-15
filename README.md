@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.7** — A web dashboard for amateur radio BPQ packet nodes.
+**Version 1.5.8** — A web dashboard for amateur radio BPQ packet nodes.
 
 A self-hosted, locally-run web interface for monitoring a BPQ32 / LinBPQ
 packet radio node. Shows live RF connections, BBS messages, station
@@ -90,7 +90,7 @@ A documented template is at `config.php.example`.
 
 ## Lineage
 
-This is `v1.5.7-generic`, derived from a private operator's `v1.5.6`
+This is `v1.5.8-generic`, derived from a private operator's `v1.5.6`
 build. The genericization pass removed all operator-specific
 identifiers, callsigns, IP addresses, passwords, and geographic
 coordinates. See `CHANGELOG.md` for what changed.

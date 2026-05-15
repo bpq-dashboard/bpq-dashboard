@@ -1283,12 +1283,10 @@ async function initAuth() {
 function loadData() {
     try { savedMessages  = JSON.parse(localStorage.getItem('bbs_saved_messages') || '[]'); } catch { savedMessages = []; }
     try { folders        = JSON.parse(localStorage.getItem('bbs_folders') || '["Saved"]'); } catch { folders = ['Saved']; }
-    // Rebuild filedNumbers from saved messages AND localStorage
-    filedNumbers = new Set(savedMessages.map(m => m.number).filter(Boolean));
-    try {
-        const stored = JSON.parse(localStorage.getItem('bbs_filed_numbers') || '[]');
-        stored.forEach(n => filedNumbers.add(n));
-    } catch {}
+    // Rebuild filedNumbers from saved messages AND localStorage, with
+    // auto-heal of any orphaned blacklist entries that no longer have a
+    // matching saved message. See healOrphanedFiledNumbers() comment.
+    rebuildFiledNumbersWithHeal();
     try { addressBook    = JSON.parse(localStorage.getItem('bbs_contacts') || '[]'); } catch { addressBook = []; }
     try { savedBulletins = JSON.parse(localStorage.getItem('bbs_bulletins') || '[]'); } catch { savedBulletins = []; }
     loadRules();
@@ -1296,6 +1294,36 @@ function loadData() {
     updateSidebarFolders();
     updateCounts();
     checkServerStorage();
+}
+
+// Rebuild the in-memory filedNumbers Set from the current savedMessages
+// array PLUS the persisted localStorage blacklist, while auto-healing any
+// orphans (entries in the blacklist that have no matching saved message).
+//
+// This must be safe to call multiple times in one session — specifically
+// it needs to run after loadSavedFromServer() replaces savedMessages, so
+// orphans introduced by that replacement get cleaned up. Without this
+// re-heal, the rule-filed-then-reload flow leaves messages permanently
+// invisible because filedNumbers retains the rule-set ID while the
+// server's savedMessages copy doesn't have it.
+function rebuildFiledNumbersWithHeal() {
+    const savedNumbers = new Set(savedMessages.map(m => m.number).filter(Boolean));
+    filedNumbers = new Set(savedNumbers);
+    try {
+        const stored = JSON.parse(localStorage.getItem('bbs_filed_numbers') || '[]');
+        const orphans = [];
+        stored.forEach(n => {
+            if (savedNumbers.has(n)) {
+                filedNumbers.add(n);
+            } else {
+                orphans.push(n);
+            }
+        });
+        if (orphans.length > 0) {
+            console.info(`bbs-messages: auto-healed ${orphans.length} orphaned filed-number(s):`, orphans);
+            persistFiledNumbers();
+        }
+    } catch {}
 }
 function persist(key, val) {
     try {
@@ -1381,6 +1409,12 @@ async function loadSavedFromServer() {
         }
         // Recompute unread from actual message _read flags
         recomputeUnread();
+        // Re-heal orphaned filed-numbers — savedMessages was just replaced
+        // by the server's version, which may not include rule-filed
+        // messages that were only ever in localStorage. Without this,
+        // those BBS message numbers stay in filedNumbers blacklist
+        // forever, hiding the BBS messages from the inbox.
+        rebuildFiledNumbersWithHeal();
         updateSidebarFolders();
         updateCounts();
         if (currentFolder !== 'bbs') renderList();
@@ -1496,21 +1530,50 @@ async function fetchMessages() {
         showToast(e.message, true);
     }
 }
-async function fetchMessageBody(num) {
-    showLoading(`Reading message #${num}…`);
+// Tracks the message number whose body fetch is currently the most
+// recent one. If a stale fetch returns after a newer click, we ignore
+// it so the preview pane stays consistent with what the user clicked
+// last.
+let _bodyFetchToken = 0;
+
+async function fetchMessageBody(num, onSuccess, opts = {}) {
+    const { quietLoading = false } = opts;
+    const myToken = ++_bodyFetchToken;
+    if (!quietLoading) showLoading(`Reading message #${num}…`);
     try {
         const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${num}`);
         const d = await r.json();
-        hideLoading();
+        if (!quietLoading) hideLoading();
         if (d.success) {
-            document.getElementById('previewBodyText').textContent = d.body || '(Empty message)';
-            if (selectedMsg) selectedMsg._body = d.body || '';
+            const body = d.body || '';
+            const isCurrent = (myToken === _bodyFetchToken);
+            if (isCurrent) {
+                // Only update the visible preview if this is still the
+                // user's most recent click. A stale response would
+                // otherwise overwrite the preview pane with old content.
+                document.getElementById('previewBodyText').textContent = body || '(Empty message)';
+                if (selectedMsg) selectedMsg._body = body;
+            } else {
+                console.debug(`fetchMessageBody: not updating preview for stale #${num} (token mismatch)`);
+            }
+            // Always run the caching callback — caller knows which
+            // message number it asked about and writes the body to the
+            // right entry in savedMessages. This is what populates the
+            // cache for lazy-load.
+            if (typeof onSuccess === 'function') onSuccess(body);
+            return body;
         } else {
-            document.getElementById('previewBodyText').textContent = 'Error: ' + (d.error||'Failed');
+            if (myToken === _bodyFetchToken) {
+                document.getElementById('previewBodyText').textContent = 'Error: ' + (d.error||'Failed');
+            }
+            return null;
         }
     } catch(e) {
-        hideLoading();
-        document.getElementById('previewBodyText').textContent = 'Error: ' + e.message;
+        if (!quietLoading) hideLoading();
+        if (myToken === _bodyFetchToken) {
+            document.getElementById('previewBodyText').textContent = 'Error: ' + e.message;
+        }
+        return null;
     }
 }
 
@@ -1764,6 +1827,24 @@ function selectMsg(index) {
     if (src === 'bbs') {
         document.getElementById('previewBodyText').textContent = 'Loading…';
         fetchMessageBody(msg.number);
+    } else if (!msg.body) {
+        // Saved message with no cached body — typically a rule-filed message
+        // whose body fetch failed during applyRules(). Fetch it now and
+        // cache the result back to savedMessages so we don't refetch.
+        // Use quietLoading so the full-screen overlay doesn't block the
+        // user from clicking another message while this one fetches.
+        document.getElementById('previewBodyText').textContent = 'Loading…';
+        fetchMessageBody(msg.number, (body) => {
+            const realIdx = savedMessages.findIndex(
+                m => m.number === msg.number &&
+                     (m.folder || 'Saved') === (msg.folder || 'Saved')
+            );
+            if (realIdx >= 0) {
+                savedMessages[realIdx].body = body;
+                persist('bbs_saved_messages', savedMessages);
+            }
+            selectedMsg._body = body;
+        }, { quietLoading: true });
     } else {
         document.getElementById('previewBodyText').textContent = msg.body || '(No content stored)';
         selectedMsg._body = msg.body || '';
@@ -2602,13 +2683,37 @@ async function applyRules(silent = false) {
         for (const rule of enabled) {
             if (!matchesRule(msg, rule)) continue;
 
-            // Fetch body if not cached
+            // Fetch body, retrying up to 3 times for new messages where
+            // the BBS may not have the read-handler ready yet, or for
+            // transient network blips. Failures here used to be silently
+            // swallowed, leaving the user with a rule-flagged message
+            // whose content was empty when opened. The lazy-load path
+            // in selectMsg() also recovers this, but retrying here means
+            // the body is usually cached on first display.
             let body = '';
-            try {
-                const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${msg.number}`);
-                const d = await r.json();
-                body = d.success ? (d.body || '') : '';
-            } catch {}
+            let fetchOk = false;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const r = await fetch(`${CONFIG.apiUrl}?action=read&msg=${msg.number}`);
+                    const d = await r.json();
+                    if (d.success) {
+                        body = d.body || '';
+                        fetchOk = true;
+                        break;
+                    }
+                } catch (e) {
+                    if (attempt === 3) {
+                        console.warn(`applyRules: body fetch failed for msg #${msg.number} after 3 attempts:`, e);
+                    }
+                }
+                // Backoff: 200ms, then 500ms
+                if (attempt < 3) {
+                    await new Promise(r => setTimeout(r, attempt === 1 ? 200 : 500));
+                }
+            }
+            if (!fetchOk) {
+                console.warn(`applyRules: body unavailable for msg #${msg.number} (rule "${rule.name}"); will lazy-load on open`);
+            }
 
             // Ensure target folder exists
             if (!folders.includes(rule.folder)) {
@@ -2636,6 +2741,35 @@ async function applyRules(silent = false) {
         persistFiledNumbers();
         messages = messages.filter(m => !toRemove.has(m.number));
         persist('bbs_saved_messages', savedMessages);
+
+        // If using server storage, also push newly-filed messages there.
+        // Without this, rule-filed messages live ONLY in localStorage and
+        // get silently discarded on the next page reload when
+        // loadSavedFromServer() replaces savedMessages with the server's
+        // (older) copy — leaving their numbers stuck in filedNumbers as
+        // orphans, which makes the underlying BBS messages invisible.
+        if (storageMode === 'server' && serverStorageAvailable) {
+            // Find the messages we just added (most recently unshifted)
+            const justFiled = savedMessages.filter(m => toRemove.has(m.number));
+            for (const m of justFiled) {
+                fetch(CONFIG.storageUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action:  'saveMessage',
+                        message: m,
+                        folder:  m.folder || 'Saved'
+                    })
+                }).then(r => r.json()).then(d => {
+                    if (!d || !d.success) {
+                        console.warn(`applyRules: server save failed for msg #${m.number}:`, d && d.error);
+                    }
+                }).catch(e => {
+                    console.warn(`applyRules: server save threw for msg #${m.number}:`, e);
+                });
+            }
+        }
+
         recomputeUnread();
         updateSidebarFolders();
         updateCounts();

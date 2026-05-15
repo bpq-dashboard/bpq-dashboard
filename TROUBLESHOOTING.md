@@ -1,4 +1,4 @@
-# BPQ Dashboard v1.5.7 — Troubleshooting Guide
+# BPQ Dashboard v1.5.8 — Troubleshooting Guide
 
 ---
 

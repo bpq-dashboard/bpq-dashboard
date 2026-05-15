@@ -1,5 +1,71 @@
 # Changelog
 
+## v1.5.8-generic — 2026-05-15
+
+Bug-fix release: BBS rules engine cascade. Four related issues in
+`bbs-messages.html` that surfaced when auto-filing rules were used
+against new BBS messages.
+
+### Fixed
+
+- **Rule-filed messages now load their body correctly.** Previously, if
+  the body fetch failed transiently (BBS not ready, network blip),
+  `applyRules` silently filed the message with an empty body. Fix:
+  retry the body fetch up to 3 times with backoff (200ms, 500ms),
+  log to `console.warn` on failure, and lazy-load the body on first
+  click as a fallback. The lazy-loaded body is cached back to
+  `savedMessages` so subsequent clicks are instant.
+- **Orphaned filed-number entries are now auto-healed on page load.**
+  When a saved message was deleted from a folder without using the
+  "delete from BBS" path, its entry remained in the `bbs_filed_numbers`
+  blacklist, permanently hiding the underlying BBS message from the
+  inbox. Fix: `loadData()` and `loadSavedFromServer()` now both call
+  `rebuildFiledNumbersWithHeal()`, which drops any blacklist entry
+  that doesn't have a matching saved message and persists the
+  cleaned list. Includes a `console.info` summary of healed entries
+  for visibility.
+- **Clicking a second message no longer gets blocked.** The lazy-load
+  path was calling `showLoading()`, which renders a full-screen
+  overlay (`position: fixed; inset: 0; z-index: 800`) that intercepted
+  all clicks until the BBS telnet round-trip completed. Fix: added
+  `{ quietLoading: true }` option to `fetchMessageBody`, used by the
+  lazy-load path; the inline "Loading…" text in the preview pane
+  remains as a visual cue. Direct inbox clicks still get the overlay.
+- **Rule-filed messages now persist to server storage.** Previously
+  `applyRules` only wrote to localStorage, so reloading the page in
+  server-storage mode wiped out rule-filed messages (because
+  `loadSavedFromServer` overwrote local `savedMessages` with the
+  server's copy that didn't have them). The blacklist persisted but
+  the saved copy didn't — creating permanent orphans. Fix:
+  `applyRules` now POSTs each rule-filed message to
+  `message-storage.php` via `{ action: 'saveMessage' }` when
+  `storageMode === 'server'`.
+- **Race-protection on body fetches.** Added a token counter so a
+  slow response from an earlier click doesn't overwrite the preview
+  pane after the user has clicked a different message. Stale
+  responses still cache their body to `savedMessages` (so the
+  earlier-clicked message displays instantly when revisited) but
+  don't touch the visible preview.
+- **Fixed PHP fatal error in `message-storage.php` when saving
+  rule-filed messages.** The `saveMessage()` handler called a
+  `sanitize()` function that was never defined, causing every POST
+  with `action=saveMessage` to fail with
+  `Call to undefined function sanitize()` in the nginx error log.
+  This bug was latent in earlier versions because `applyRules`
+  didn't write to server storage — once v1.5.8 wired up that path,
+  the missing function broke the round-trip. Fix: added a generic
+  `sanitize()` function that strips control characters, normalises
+  whitespace, and caps length at 500 chars.
+
+### Changed
+
+- `fetchMessageBody(num)` now has signature
+  `fetchMessageBody(num, onSuccess, opts = {})`. Backwards-compatible
+  — existing single-argument calls still work.
+- Heal logic moved from inline in `loadData()` to standalone
+  `rebuildFiledNumbersWithHeal()` so it's callable from multiple
+  code paths.
+
 ## v1.5.7-generic — 2026-05-15
 
 First public-redistributable release. Derived from a private operator's

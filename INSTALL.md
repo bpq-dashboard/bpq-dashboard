@@ -42,9 +42,23 @@ If you got this as a zip file, copy it to your Linux server and unzip
 it. If you got it via git clone, you already have it.
 
 ```bash
-unzip BPQ-Dashboard-v1.5.7.zip
-cd BPQ-Dashboard-v1.5.7
+unzip BPQ-Dashboard-v1.5.8.zip
+cd BPQ-Dashboard-v1.5.8
 ```
+
+If instead you want to extract the contents into an existing working
+directory (for example, a directory you've prepared for `git` to push
+the files publicly from), unzip into a temporary location and then move
+the files up:
+
+```bash
+unzip BPQ-Dashboard-v1.5.8.zip
+mv BPQ-Dashboard-v1.5.8/* .
+rmdir BPQ-Dashboard-v1.5.8
+```
+
+The archive contains no top-level dotfiles, so a simple `*` glob is
+enough. Don't bother with `.[!.]*` — it just produces an error.
 
 ### 2. Run the installer
 

@@ -49,11 +49,25 @@
         .btn-secondary { background: white; border: 2px solid #e5e7eb; color: #374151; transition: all 0.2s; }
         .btn-secondary:hover { border-color: #667eea; background: #f5f3ff; }
         
-        .log-entry { font-family: ui-monospace, monospace; font-size: 0.75rem; padding: 0.25rem 0; border-bottom: 1px solid #f3f4f6; }
-        .log-success { color: #059669; }
-        .log-error { color: #dc2626; }
-        .log-warning { color: #d97706; }
-        .log-info { color: #6b7280; }
+        /* Status log entries — !important on display/height/color defeats
+           Tailwind preflight resets that have, in the past (May 14 2026),
+           silently collapsed similar log-entry rules to height: 0 and
+           overridden inherited color. See SESSION-JOURNAL note on the
+           bpq-system-logs.html fix. */
+        .log-entry {
+            display: block !important;
+            min-height: 1.4em !important;
+            height: auto !important;
+            color: #374151 !important;
+            font-family: ui-monospace, monospace;
+            font-size: 0.75rem;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .log-success { color: #059669 !important; }
+        .log-error { color: #dc2626 !important; }
+        .log-warning { color: #d97706 !important; }
+        .log-info { color: #6b7280 !important; }
         
         .bbs-preview { font-family: ui-monospace, monospace; font-size: 0.75rem; background: #1e293b; color: #e2e8f0; border-radius: 8px; padding: 1rem; white-space: pre-wrap; line-height: 1.4; }
         
@@ -160,7 +174,7 @@
     [data-theme="dark"] th { color: #d1d5db !important; }
     [data-theme="dark"] tr:hover { background-color: rgba(55,65,81,0.5) !important; }
     /* Log viewer */
-    [data-theme="dark"] .log-entry { color: #d1d5db; }
+    [data-theme="dark"] .log-entry { color: #d1d5db !important; }
     [data-theme="dark"] .log-connect { color: #6ee7b7 !important; }
     [data-theme="dark"] .log-disconnect { color: #fca5a5 !important; }
     [data-theme="dark"] .log-message { color: #93c5fd !important; }
@@ -287,6 +301,15 @@
                             <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="AR">AK</button>
                             <button class="region-btn px-2 py-2 rounded-lg text-xs font-semibold text-gray-600" data-region="PR">PAC</button>
                         </div>
+                    </div>
+
+                    <!-- Norman OK convective quick-view -->
+                    <div class="glass-container p-4 rounded-xl">
+                        <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">🌪️ Norman OK Convective</h3>
+                        <p class="text-xs text-gray-500 mb-3">Tornado · Severe Tstm · Flash Flood — issued by NWS Norman (OUN WFO + SPC).</p>
+                        <button id="openNormanModalBtn" class="w-full px-3 py-2 rounded-lg text-sm font-semibold text-white" style="background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%); box-shadow: 0 2px 8px rgba(220,38,38,0.3);">
+                            View Norman Alerts <span id="normanCountBadge" class="ml-2 inline-block px-2 py-0.5 rounded-full bg-white bg-opacity-25 text-xs font-bold">0</span>
+                        </button>
                     </div>
 
                     <!-- Alert Types -->
@@ -427,6 +450,29 @@
             </div>
             <div class="mt-4 text-center">
                 <a href="#" onclick="resetPostAllPassword(); return false;" class="text-xs text-gray-400 hover:text-purple-600">Reset password</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Norman OK convective alerts modal -->
+    <div id="normanModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-container rounded-2xl max-w-4xl w-full flex flex-col" style="max-height: 90vh;">
+            <div class="p-5 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        🌪️ Norman OK Convective Alerts
+                        <span id="normanModalCount" class="text-sm font-normal text-gray-500">0 active</span>
+                    </h3>
+                    <p class="text-xs text-gray-500 mt-1">Tornado · Severe Thunderstorm · Flash Flood — Watches &amp; Warnings issued by NWS Norman (OUN WFO + SPC)</p>
+                </div>
+                <button id="closeNormanModalBtn" class="text-gray-400 hover:text-gray-700 text-2xl leading-none w-8 h-8 flex items-center justify-center" aria-label="Close">&times;</button>
+            </div>
+            <div id="normanAlertsList" class="p-5 overflow-y-auto custom-scrollbar space-y-2 flex-1">
+                <!-- populated by renderNormanAlerts() -->
+            </div>
+            <div class="px-5 py-3 border-t border-gray-200 text-xs text-gray-500 flex items-center justify-between">
+                <span id="normanModalUpdated">Not yet fetched.</span>
+                <span>Source: api.weather.gov/alerts/active</span>
             </div>
         </div>
     </div>
@@ -772,6 +818,138 @@
             });
         }
         
+        // ============================================================
+        // Norman OK convective quick-view
+        // ----------------------------------------------------------------
+        // Filters alerts to those issued by NWS Norman OK (both the OUN
+        // forecast office and the Storm Prediction Center, which are
+        // co-located and both carry "Norman OK" in senderName). Limited
+        // to the convective trio: Tornado, Severe Thunderstorm, and
+        // Flash Flood — Watches and Warnings.
+        // ============================================================
+        
+        const NORMAN_EVENT_TYPES = new Set([
+            'Tornado Warning', 'Tornado Watch',
+            'Severe Thunderstorm Warning', 'Severe Thunderstorm Watch',
+            'Flash Flood Warning', 'Flash Flood Watch'
+        ]);
+        
+        function alertIsNormanConvective(alert) {
+            const props = alert.properties || {};
+            const sender = props.senderName || '';
+            if (!sender.includes('Norman OK')) return false;
+            return NORMAN_EVENT_TYPES.has(props.event || '');
+        }
+        
+        function getNormanAlerts() {
+            return alerts.filter(alertIsNormanConvective);
+        }
+        
+        function updateNormanCountBadge() {
+            const badge = document.getElementById('normanCountBadge');
+            if (!badge) return;
+            const count = getNormanAlerts().length;
+            badge.textContent = count;
+            // Pulse badge when count > 0 to draw attention during active wx
+            badge.classList.toggle('animate-pulse', count > 0);
+        }
+        
+        function renderNormanAlerts() {
+            const list = document.getElementById('normanAlertsList');
+            const countEl = document.getElementById('normanModalCount');
+            const updatedEl = document.getElementById('normanModalUpdated');
+            if (!list) return;
+            
+            const normanAlerts = getNormanAlerts();
+            countEl.textContent = `${normanAlerts.length} active`;
+            updatedEl.textContent = lastFetchTime
+                ? `Last fetched: ${lastFetchTime.toLocaleTimeString('en-US', { hour12: false })}`
+                : 'Not yet fetched.';
+            
+            if (normanAlerts.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-12 text-gray-400">
+                        <div class="text-5xl mb-3">🌤️</div>
+                        <h4 class="font-semibold text-gray-500 text-lg">${alerts.length > 0 ? 'No Norman convective alerts active' : 'No alerts loaded yet'}</h4>
+                        <p class="text-sm mt-1">${alerts.length > 0 ? 'Norman WFO and SPC are quiet right now.' : 'Click "Fetch Alerts" on the main dashboard.'}</p>
+                    </div>`;
+                return;
+            }
+            
+            // Sort: Warnings before Watches, then by severity, then newest first
+            const eventPriority = ev => {
+                if (ev.includes('Tornado Warning')) return 0;
+                if (ev.includes('Severe Thunderstorm Warning')) return 1;
+                if (ev.includes('Flash Flood Warning')) return 2;
+                if (ev.includes('Tornado Watch')) return 3;
+                if (ev.includes('Severe Thunderstorm Watch')) return 4;
+                if (ev.includes('Flash Flood Watch')) return 5;
+                return 9;
+            };
+            const sorted = normanAlerts.slice().sort((a, b) => {
+                const pa = eventPriority(a.properties.event || '');
+                const pb = eventPriority(b.properties.event || '');
+                if (pa !== pb) return pa - pb;
+                // Newer effective time first within same priority
+                return new Date(b.properties.effective || 0) - new Date(a.properties.effective || 0);
+            });
+            
+            list.innerHTML = sorted.map(alert => {
+                const props = alert.properties;
+                const type = getAlertType(props.event || '');
+                const isSpc = (props.senderName || '').includes('Storm Prediction Center');
+                const senderTag = isSpc ? 'SPC' : 'OUN';
+                const senderColor = isSpc ? '#7c3aed' : '#dc2626';
+                const areas = truncateText(props.areaDesc || '', 200);
+                const effective = formatDateTime(props.effective);
+                const expires = formatDateTime(props.expires);
+                
+                return `
+                    <div class="alert-item alert-${type} p-3 rounded-lg">
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="badge badge-${type}">${props.event || 'Alert'}</span>
+                                <span class="badge" style="background:${senderColor}; color:white;">${senderTag}</span>
+                            </div>
+                            <span class="text-xs text-gray-400 whitespace-nowrap">${formatTime(props.effective)}</span>
+                        </div>
+                        <div class="text-sm font-semibold text-gray-800 mb-1">${props.headline || props.event}</div>
+                        <div class="text-xs text-gray-500 mb-1">📍 ${areas}</div>
+                        <div class="text-xs text-gray-400">⏱ Effective ${effective} → Expires ${expires}</div>
+                    </div>`;
+            }).join('');
+        }
+        
+        function openNormanModal() {
+            renderNormanAlerts();
+            const modal = document.getElementById('normanModal');
+            modal.classList.remove('hidden');
+            log('Opened Norman OK convective view', 'info');
+            document.addEventListener('keydown', normanModalEscHandler);
+        }
+        
+        function closeNormanModal() {
+            document.getElementById('normanModal').classList.add('hidden');
+            document.removeEventListener('keydown', normanModalEscHandler);
+        }
+        
+        function normanModalEscHandler(e) {
+            if (e.key === 'Escape') closeNormanModal();
+        }
+        
+        // Wire up trigger + close handlers once DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            const openBtn = document.getElementById('openNormanModalBtn');
+            const closeBtn = document.getElementById('closeNormanModalBtn');
+            const modal = document.getElementById('normanModal');
+            if (openBtn) openBtn.addEventListener('click', openNormanModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeNormanModal);
+            // Click-outside-to-close (clicks on the backdrop, not the inner card)
+            if (modal) modal.addEventListener('click', e => {
+                if (e.target === modal) closeNormanModal();
+            });
+        });
+        
         function selectAlert(idx) {
             const filtered = alerts.filter(a => alertMatchesTypes(a) && alertMatchesRegions(a));
             const severityOrder = { Extreme: 0, Severe: 1, Moderate: 2, Minor: 3, Unknown: 4 };
@@ -815,6 +993,15 @@
             document.getElementById('activeAlerts').textContent = alerts.length;
             document.getElementById('warningCount').textContent = warnings;
             document.getElementById('watchCount').textContent = watches;
+            
+            // Keep the Norman OK sidebar badge in sync with the latest fetch
+            updateNormanCountBadge();
+            
+            // If the Norman modal is currently open, re-render so it shows
+            // the freshest data without the user needing to close/reopen
+            if (!document.getElementById('normanModal').classList.contains('hidden')) {
+                renderNormanAlerts();
+            }
         }
         
         function generateBBSMessage(alert) {

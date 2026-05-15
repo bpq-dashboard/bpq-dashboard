@@ -115,6 +115,32 @@ function sanitizeFolderName($name) {
 }
 
 /**
+ * Sanitize generic message-field strings (from, to, subject).
+ *
+ * Used by saveMessage to clean strings before persisting. Strips
+ * control characters, normalises whitespace, truncates to a sane
+ * maximum length so a malformed BBS response cannot blow up storage.
+ *
+ * NOTE: Previously this function was referenced from saveMessage()
+ * but never defined, causing a PHP fatal error every time the client
+ * POSTed action=saveMessage. The error was masked because applyRules
+ * (in bbs-messages.html) only ever wrote to localStorage (not the
+ * server) until v1.5.8 wired up server-storage from applyRules.
+ */
+function sanitize($value) {
+    if (!is_string($value)) {
+        return '';
+    }
+    // Strip control characters except for whitespace
+    $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value);
+    // Collapse runs of whitespace
+    $value = preg_replace('/\s+/', ' ', $value);
+    $value = trim($value);
+    // Cap length so a junk header can't fill storage
+    return substr($value, 0, 500);
+}
+
+/**
  * Generate unique message ID
  */
 function generateMessageId() {
