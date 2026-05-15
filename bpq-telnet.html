@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telnet Client — YOURCALL BPQ</title>
+<style>
+:root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --surface2: #1c2128;
+    --border:   #30363d;
+    --text:     #e6edf3;
+    --muted:    #8b949e;
+    --accent:   #4a9eff;
+    --green:    #3fb950;
+    --red:      #f85149;
+    --amber:    #d29922;
+    --orange:   #e3783a;
+    --purple:   #bc8cff;
+    --term-bg:  #0a0e14;
+    --term-fg:  #cdd6f4;
+    --term-green: #a6e3a1;
+    --term-red:   #f38ba8;
+    --term-amber: #f9e2af;
+    --term-blue:  #89b4fa;
+    --term-cyan:  #89dceb;
+    --term-purple:#cba6f7;
+    --font-mono: 'Courier New', 'Lucida Console', monospace;
+    --font-ui:   system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Top bar ─────────────────────────────────────────── */
+#topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+#topbar h1 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+}
+#statusDot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background .3s;
+    flex-shrink: 0;
+}
+#statusDot.connected { background: var(--green); }
+#statusDot.connecting { background: var(--amber); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+#statusLabel {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 80px;
+}
+.tb-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.tb-btn:hover { background: var(--border); }
+.tb-btn.danger { color: var(--red); border-color: var(--red); }
+.tb-btn.danger:hover { background: rgba(248,81,73,.15); }
+.tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tb-btn.primary:hover { opacity: .85; }
+#sessionInfo {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+/* ── Main layout ─────────────────────────────────────── */
+#main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+#sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sidebar-section {
+    padding: 10px 12px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+}
+.quick-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    transition: background .15s;
+    font-size: 12px;
+}
+.quick-btn:hover { background: var(--surface2); }
+.quick-btn .qicon { font-size: 14px; width: 18px; text-align: center; }
+.quick-btn .qname { flex: 1; }
+.quick-btn .qport {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+/* Custom connect form */
+#customForm {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.form-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.form-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    width: 100%;
+}
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Command reference */
+.cmd-ref-section {
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.cmd-ref-toggle {
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+.cmd-ref-toggle:hover { color: var(--text); }
+.cmd-ref-body {
+    overflow-y: auto;
+    max-height: 300px;
+    display: none;
+}
+.cmd-ref-body.open { display: block; }
+.cmd-group {
+    padding: 4px 12px 2px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--accent);
+    margin-top: 4px;
+}
+.cmd-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 12px;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+    cursor: pointer;
+    transition: background .1s;
+}
+.cmd-row:hover { background: var(--surface2); }
+.cmd-code {
+    font-family: var(--font-mono);
+    color: var(--term-green);
+    font-size: 11px;
+    flex-shrink: 0;
+    min-width: 70px;
+}
+.cmd-desc {
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.3;
+}
+
+/* Session log */
+#sessionLog {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+}
+.log-entry {
+    padding: 5px 12px;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+    cursor: pointer;
+    transition: background .1s;
+}
+.log-entry:hover { background: var(--surface2); }
+.log-time { color: var(--muted); font-family: var(--font-mono); }
+.log-host { color: var(--accent); }
+
+/* ── Terminal area ───────────────────────────────────── */
+#termArea {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--term-bg);
+}
+
+/* Connect prompt shown when disconnected */
+#connectPrompt {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--muted);
+}
+#connectPrompt .big-icon { font-size: 48px; }
+#connectPrompt p { font-size: 13px; }
+
+/* Terminal output */
+#terminal {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--term-fg);
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+#terminal::-webkit-scrollbar { width: 6px; }
+#terminal::-webkit-scrollbar-track { background: transparent; }
+#terminal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ANSI colour classes */
+.ansi-0 { color: var(--term-fg); }
+.ansi-1 { font-weight: bold; }
+.ansi-31 { color: var(--term-red); }
+.ansi-32 { color: var(--term-green); }
+.ansi-33 { color: var(--term-amber); }
+.ansi-34 { color: var(--term-blue); }
+.ansi-35 { color: var(--term-purple); }
+.ansi-36 { color: var(--term-cyan); }
+.ansi-37 { color: #fff; }
+.ansi-sys { color: var(--muted); font-style: italic; }
+
+/* Input bar */
+#inputBar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    align-items: center;
+}
+#inputPrompt {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+#termInput {
+    flex: 1;
+    background: var(--term-bg);
+    border: 1px solid var(--border);
+    color: var(--term-fg);
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+}
+#termInput:focus { border-color: var(--accent); }
+#sendBtn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    cursor: pointer;
+}
+#sendBtn:hover { opacity: .85; }
+#sendBtn:disabled { opacity: .4; cursor: not-allowed; }
+</style>
+</head>
+<body data-nav-page="telnet">
+
+<!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
+     Sits ABOVE the page's own #topbar, which preserves the per-page
+     status (Disconnected/Connected, session info) and tool buttons. -->
+<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+
+<!-- Top Bar -->
+<div id="topbar">
+    <h1>⚡ BPQ Telnet Client</h1>
+    <div id="statusDot"></div>
+    <span id="statusLabel">Disconnected</span>
+    <button class="tb-btn" id="clearBtn" onclick="clearTerminal()">🗑 Clear</button>
+    <button class="tb-btn" id="copyBtn" onclick="copySession()">📋 Copy</button>
+    <button class="tb-btn danger" id="disconnectBtn" onclick="doDisconnect()" style="display:none">⏹ Disconnect</button>
+    <span id="sessionInfo"></span>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="sidebar-section">Local</div>
+
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ Node')">
+            <span class="qicon">📡</span>
+            <span class="qname">BPQ Node</span>
+            <span class="qport">:8010</span>
+        </div>
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ BBS', 'BBS')">
+            <span class="qicon">📬</span>
+            <span class="qname">BPQ BBS</span>
+            <span class="qport">:8010</span>
+        </div>
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ Chat', 'CHAT')">
+            <span class="qicon">💬</span>
+            <span class="qname">BPQ Chat</span>
+            <span class="qport">:8010</span>
+        </div>
+        <div class="quick-btn" onclick="quickConnect('server.winlink.org', 8772, 'WL2K CMS')">
+            <span class="qicon">✉</span>
+            <span class="qname">WL2K CMS</span>
+            <span class="qport">:8772</span>
+        </div>
+
+        <div class="sidebar-section" style="margin-top:4px">
+            NetROM Nodes
+            <span id="nodesRefreshBtn" onclick="loadNodes()" title="Refresh"
+                  style="float:right;cursor:pointer;font-size:11px;color:var(--accent)">↻</span>
+        </div>
+        <div id="nodesList" style="overflow-y:auto;max-height:260px">
+            <div style="padding:8px 12px;font-size:11px;color:var(--muted)">Loading…</div>
+        </div>
+
+        <div class="sidebar-section" style="margin-top:4px">Custom</div>
+        <div id="customForm">
+            <div class="form-label">Host</div>
+            <input class="form-input" id="customHost" value="127.0.0.1" placeholder="host or IP">
+            <div class="form-label">Port</div>
+            <input class="form-input" id="customPort" value="8010" placeholder="port" type="number">
+            <button class="tb-btn primary" onclick="customConnect()" style="margin-top:4px">⚡ Connect</button>
+        </div>
+
+        <div class="sidebar-section" style="margin-top:4px">Session Log</div>
+        <div id="sessionLog"></div>
+
+        <!-- BPQ Command Reference -->
+        <div class="cmd-ref-section">
+            <div class="cmd-ref-toggle" onclick="toggleCmdRef()" id="cmdRefToggle">
+                <span>BPQ Commands</span>
+                <span id="cmdRefArrow">▸</span>
+            </div>
+            <div class="cmd-ref-body" id="cmdRefBody">
+
+                <div class="cmd-group">Node</div>
+                <div class="cmd-row" onclick="pasteCmd('?')" title="Send command">
+                    <span class="cmd-code">?</span>
+                    <span class="cmd-desc">List commands</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('NODES')">
+                    <span class="cmd-code">NODES</span>
+                    <span class="cmd-desc">List known NetROM nodes</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('ROUTES')">
+                    <span class="cmd-code">ROUTES</span>
+                    <span class="cmd-desc">Show active routes + quality</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('LINKS')">
+                    <span class="cmd-code">LINKS</span>
+                    <span class="cmd-desc">Active AX.25 sessions</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('PORTS')">
+                    <span class="cmd-code">PORTS</span>
+                    <span class="cmd-desc">List radio ports</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('INFO')">
+                    <span class="cmd-code">INFO</span>
+                    <span class="cmd-desc">Node info / version</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('BBS')">
+                    <span class="cmd-code">BBS</span>
+                    <span class="cmd-desc">Connect to local BBS</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('CHAT')">
+                    <span class="cmd-code">CHAT</span>
+                    <span class="cmd-desc">Connect to chat server</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('BYE')">
+                    <span class="cmd-code">BYE</span>
+                    <span class="cmd-desc">Disconnect from node</span>
+                </div>
+
+                <div class="cmd-group">BBS</div>
+                <div class="cmd-row" onclick="pasteCmd('L')">
+                    <span class="cmd-code">L</span>
+                    <span class="cmd-desc">List new messages</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('LA')">
+                    <span class="cmd-code">LA</span>
+                    <span class="cmd-desc">List all messages</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('LM')">
+                    <span class="cmd-code">LM</span>
+                    <span class="cmd-desc">List messages to me</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('R ')">
+                    <span class="cmd-code">R #</span>
+                    <span class="cmd-desc">Read message #</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('S ')">
+                    <span class="cmd-code">S CALL</span>
+                    <span class="cmd-desc">Send message to callsign</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('SP ')">
+                    <span class="cmd-code">SP CALL</span>
+                    <span class="cmd-desc">Send private message</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('SB ')">
+                    <span class="cmd-code">SB TOPIC</span>
+                    <span class="cmd-desc">Send bulletin</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('K ')">
+                    <span class="cmd-code">K #</span>
+                    <span class="cmd-desc">Kill (delete) message #</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('F ')">
+                    <span class="cmd-code">F #</span>
+                    <span class="cmd-desc">Forward message #</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('NODE')">
+                    <span class="cmd-code">NODE</span>
+                    <span class="cmd-desc">Return to node prompt</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('B')">
+                    <span class="cmd-code">B</span>
+                    <span class="cmd-desc">Bye / disconnect BBS</span>
+                </div>
+
+                <div class="cmd-group">Connect</div>
+                <div class="cmd-row" onclick="pasteCmd('C ')">
+                    <span class="cmd-code">C CALL</span>
+                    <span class="cmd-desc">Connect to node/station</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('C ')">
+                    <span class="cmd-code">C ALIAS</span>
+                    <span class="cmd-desc">Connect via NetROM alias</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('MHEARD ')">
+                    <span class="cmd-code">MH #</span>
+                    <span class="cmd-desc">Stations heard on port #</span>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Terminal -->
+    <div id="termArea">
+        <div id="connectPrompt">
+            <div class="big-icon">📡</div>
+            <p>Select a target from the sidebar or enter a custom host to connect</p>
+        </div>
+        <div id="terminal" style="display:none"></div>
+
+        <!-- Input Bar -->
+        <div id="inputBar">
+            <span id="inputPrompt">&gt;</span>
+            <input id="termInput" placeholder="Type command and press Enter..."
+                   autocomplete="off" autocorrect="off" autocapitalize="off"
+                   spellcheck="false" disabled
+                   onkeydown="handleInputKey(event)">
+            <button id="sendBtn" onclick="sendCommand()" disabled>Send ↵</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let ws          = null;
+let connected   = false;
+let cmdHistory  = [];
+let histIdx     = -1;
+let sessionStart= null;
+let currentHost = '';
+let currentPort = 0;
+let pendingCmd  = '';  // command to send after connect (quick-connect auto-nav)
+let sessionLog  = JSON.parse(localStorage.getItem('bpq_telnet_log') || '[]');
+
+// ── WebSocket ──────────────────────────────────────────────────────
+// Use wss:// if served over HTTPS (routes through nginx proxy)
+// Use ws:// if served over HTTP (direct to daemon port)
+const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
+const WS_URL   = location.protocol === 'https:'
+    ? `wss://${location.hostname}/ws/telnet`
+    : `ws://${location.hostname}:8765`;
+
+function connect(host, port, label, autoCmd) {
+    if (ws) { ws.close(); ws = null; }
+
+    setStatus('connecting', `Connecting to ${host}:${port}…`);
+    currentHost = host;
+    currentPort = port;
+    pendingCmd  = autoCmd || '';
+
+    showTerminal();
+    appendSys(`Connecting to ${host}:${port}…`);
+
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+        ws.send(JSON.stringify({ action: 'connect', host, port }));
+    };
+
+    ws.onmessage = (evt) => {
+        try {
+            const msg = JSON.parse(evt.data);
+            handleMessage(msg, host, port, label);
+        } catch(e) {
+            appendText(evt.data);
+        }
+    };
+
+    ws.onclose = () => {
+        if (connected) {
+            setStatus('disconnected', 'Disconnected');
+            appendSys('Connection closed');
+            connected = false;
+            setInputEnabled(false);
+        }
+    };
+
+    ws.onerror = () => {
+        setStatus('disconnected', 'Connection error');
+        appendSys('WebSocket error — is the telnet daemon running?');
+        appendSys('Check: sudo systemctl status bpq-telnet');
+    };
+}
+
+function handleMessage(msg, host, port, label) {
+    switch(msg.type) {
+        case 'connected':
+            connected = true;
+            sessionStart = Date.now();
+            setStatus('connected', `${host}:${port}`);
+            appendSys(`Connected to ${host}:${port}`);
+            setInputEnabled(true);
+            addSessionLog(host, port, label);
+            document.getElementById('disconnectBtn').style.display = '';
+            if (pendingCmd) {
+                setTimeout(() => sendRaw(pendingCmd), 800);
+                pendingCmd = '';
+            }
+            break;
+
+        case 'data':
+            appendText(msg.data);
+            break;
+
+        case 'disconnected':
+            connected = false;
+            setStatus('disconnected', 'Disconnected');
+            appendSys('Disconnected from server');
+            setInputEnabled(false);
+            document.getElementById('disconnectBtn').style.display = 'none';
+            updateSessionInfo();
+            break;
+
+        case 'error':
+            appendSys(`Error: ${msg.message}`);
+            break;
+
+        case 'pong':
+            break;
+    }
+}
+
+function doDisconnect() {
+    if (ws) ws.send(JSON.stringify({ action: 'disconnect' }));
+    setTimeout(() => { if (ws) { ws.close(); ws = null; } }, 300);
+    connected = false;
+    setStatus('disconnected', 'Disconnected');
+    setInputEnabled(false);
+    document.getElementById('disconnectBtn').style.display = 'none';
+    updateSessionInfo();
+}
+
+// ── Quick connect ─────────────────────────────────────────────────
+function quickConnect(host, port, label, autoCmd) {
+    connect(host, port, label, autoCmd);
+}
+
+function customConnect() {
+    const host = document.getElementById('customHost').value.trim();
+    const port = parseInt(document.getElementById('customPort').value);
+    if (!host || !port) return;
+    connect(host, port, `${host}:${port}`);
+}
+
+// ── Input handling ────────────────────────────────────────────────
+function handleInputKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sendCommand();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (histIdx < cmdHistory.length - 1) {
+            histIdx++;
+            document.getElementById('termInput').value = cmdHistory[cmdHistory.length - 1 - histIdx];
+        }
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (histIdx > 0) {
+            histIdx--;
+            document.getElementById('termInput').value = cmdHistory[cmdHistory.length - 1 - histIdx];
+        } else {
+            histIdx = -1;
+            document.getElementById('termInput').value = '';
+        }
+    }
+}
+
+function sendCommand() {
+    const input = document.getElementById('termInput');
+    const text  = input.value;
+    if (!connected || !ws) return;
+    // Echo command locally
+    appendText(`> ${text}\n`);
+    sendRaw(text);
+    // History
+    if (text.trim()) {
+        cmdHistory.push(text);
+        if (cmdHistory.length > 100) cmdHistory.shift();
+    }
+    histIdx = -1;
+    input.value = '';
+}
+
+function sendRaw(text) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'send', data: text }));
+    }
+}
+
+// ── Terminal output ───────────────────────────────────────────────
+function appendText(text) {
+    const term = document.getElementById('terminal');
+    const span = document.createElement('span');
+    span.innerHTML = ansiToHtml(escapeHtml(text));
+    term.appendChild(span);
+    term.scrollTop = term.scrollHeight;
+}
+
+function appendSys(text) {
+    const term = document.getElementById('terminal');
+    const span = document.createElement('span');
+    span.className = 'ansi-sys';
+    span.textContent = `[${new Date().toLocaleTimeString()}] ${text}\n`;
+    term.appendChild(span);
+    term.scrollTop = term.scrollHeight;
+}
+
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function ansiToHtml(text) {
+    // Convert common ANSI escape sequences to HTML spans
+    return text.replace(/\x1b\[([0-9;]*)m/g, (match, codes) => {
+        if (!codes || codes === '0') return '</span><span class="ansi-0">';
+        const parts = codes.split(';');
+        const classes = parts.map(c => `ansi-${c}`).join(' ');
+        return `</span><span class="${classes}">`;
+    }).replace(/\x1b\[[^m]*m/g, ''); // strip remaining escape sequences
+}
+
+function clearTerminal() {
+    document.getElementById('terminal').innerHTML = '';
+}
+
+function copySession() {
+    const text = document.getElementById('terminal').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✓ Copied';
+        setTimeout(() => btn.textContent = '📋 Copy', 2000);
+    });
+}
+
+// ── UI helpers ────────────────────────────────────────────────────
+function setStatus(state, label) {
+    const dot = document.getElementById('statusDot');
+    dot.className = state;
+    document.getElementById('statusLabel').textContent = label;
+}
+
+function setInputEnabled(enabled) {
+    document.getElementById('termInput').disabled = !enabled;
+    document.getElementById('sendBtn').disabled   = !enabled;
+    if (enabled) {
+        setTimeout(() => document.getElementById('termInput').focus(), 50);
+    }
+}
+
+function showTerminal() {
+    document.getElementById('connectPrompt').style.display = 'none';
+    document.getElementById('terminal').style.display = '';
+}
+
+function updateSessionInfo() {
+    if (!sessionStart) return;
+    const secs = Math.round((Date.now() - sessionStart) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('sessionInfo').textContent =
+        `Session: ${m}m ${s}s`;
+}
+
+// ── Session log ───────────────────────────────────────────────────
+function addSessionLog(host, port, label) {
+    const entry = {
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+        host, port,
+        label: label || `${host}:${port}`
+    };
+    sessionLog.unshift(entry);
+    if (sessionLog.length > 20) sessionLog.pop();
+    localStorage.setItem('bpq_telnet_log', JSON.stringify(sessionLog));
+    renderSessionLog();
+}
+
+function renderSessionLog() {
+    const container = document.getElementById('sessionLog');
+    container.innerHTML = sessionLog.map(e => `
+        <div class="log-entry" onclick="quickConnect('${e.host}', ${e.port}, '${e.label}')">
+            <div class="log-time">${e.time}</div>
+            <div class="log-host">${e.label}</div>
+        </div>
+    `).join('');
+}
+
+// ── Session timer ─────────────────────────────────────────────────
+setInterval(updateSessionInfo, 10000);
+
+// ── Command reference ────────────────────────────────────────────
+function toggleCmdRef() {
+    const body  = document.getElementById('cmdRefBody');
+    const arrow = document.getElementById('cmdRefArrow');
+    const open  = body.classList.toggle('open');
+    arrow.textContent = open ? '▾' : '▸';
+}
+
+function pasteCmd(cmd) {
+    const input = document.getElementById('termInput');
+    input.value = cmd;
+    input.focus();
+    // Place cursor at end
+    input.setSelectionRange(cmd.length, cmd.length);
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+renderSessionLog();
+loadNodes();
+setInterval(loadNodes, 30000);  // refresh NetROM nodes every 30s
+
+// ── NetROM Nodes ──────────────────────────────────────────────────
+async function loadNodes() {
+    const container = document.getElementById('nodesList');
+    try {
+        const resp = await fetch('bpq-nodes-api.php');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        // Update header count with active route count
+        const activeCount = (data.nodes || []).filter(n => n.active).length;
+        const hdr = document.getElementById('nodesRefreshBtn').parentElement;
+        hdr.childNodes[0].textContent = `NetROM (${activeCount})`;
+        renderNodes(data.nodes);
+    } catch(e) {
+        container.innerHTML = `<div style="padding:8px 12px;font-size:11px;color:var(--red)">
+            ⚠ ${e.message}</div>`;
+    }
+}
+
+function renderNodes(nodes) {
+    const container = document.getElementById('nodesList');
+    if (!nodes || nodes.length === 0) {
+        container.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted)">No nodes found</div>';
+        return;
+    }
+
+    // Only show active direct neighbours — filter out inactive nodes
+    const active_nodes = nodes.filter(n => n.active);
+
+    if (active_nodes.length === 0) {
+        container.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted)">No active routes</div>';
+        return;
+    }
+
+    // Sort alphabetically by alias
+    active_nodes.sort((a, b) => {
+        const aLabel = a.alias || a.call;
+        const bLabel = b.alias || b.call;
+        return aLabel.localeCompare(bLabel);
+    });
+
+    container.innerHTML = active_nodes.map(n => {
+        const label = n.alias || n.call;
+        const sub   = n.alias ? n.call : '';
+        const qual  = n.qual
+            ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">${n.qual}</span>`
+            : '';
+        const cmd   = `<span style="display:block;font-size:9px;color:var(--accent);font-family:var(--font-mono)">C ${n.call}</span>`;
+        return `<div class="quick-btn" style="cursor:pointer" onclick="quickConnect('127.0.0.1', 8010, '${label}')">
+            <span class="qicon"><span style="color:var(--green);font-size:9px">●</span></span>
+            <span class="qname" style="flex:1;min-width:0">
+                <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
+                ${sub ? `<span style="display:block;font-size:9px;color:var(--muted);font-family:var(--font-mono)">${sub}</span>` : ''}
+                ${cmd}
+            </span>
+            ${qual}
+        </div>`;
+    }).join('');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# /etc/systemd/system/vara-logger.service
+# Systemd service for VARA HF log collection
+# Part of BPQ BBS Dashboard Suite v1.0.4
+#
+# Installation:
+#   1. Run setup.sh to configure paths automatically, OR
+#   2. Manually edit ExecStart path below
+#   3. Copy this file to /etc/systemd/system/vara-logger.service
+#   4. sudo systemctl daemon-reload
+#   5. sudo systemctl enable vara-logger
+#   6. sudo systemctl start vara-logger
+#
+# Commands:
+#   Start:   sudo systemctl start vara-logger
+#   Stop:    sudo systemctl stop vara-logger
+#   Status:  sudo systemctl status vara-logger
+#   Logs:    sudo journalctl -u vara-logger -f
+
+[Unit]
+Description=VARA HF Log Collector for BPQ BBS Dashboard
+After=network.target rsyslog.service
+Wants=rsyslog.service
+
+[Service]
+Type=simple
+# === UPDATE THIS PATH to match your installation ===
+ExecStart=/var/www/html/bpq/vara-logger.sh
+WorkingDirectory=/var/www/html/bpq
+# ===================================================
+Restart=always
+RestartSec=5
+User=root
+
+# Ensure clean shutdown
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

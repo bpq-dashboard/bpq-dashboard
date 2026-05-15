@@ -1,0 +1,39 @@
+# Secrets and live config — never commit
+config.php
+*.local
+
+# Generated data and caches
+cache/*
+!cache/.gitkeep
+logs/*
+!logs/.gitkeep
+data/backups/
+wavenode-logs/
+
+# Common transient files
+*.log
+*.bak
+*.bak-*
+*.tmp
+*.swp
+*.orig
+*~
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Private dev files that shouldn't be public
+SESSION-JOURNAL.txt
+SESSION-JOURNAL_*.txt
+/tmp/
+
+# Generated JSON data that contains live network state
+data/partners.json
+data/stations/*.json
+cache/syslog-parsed.json
+cache/syslog-meta.json
+cache/chat-*.json
+cache/aprs-*.json

@@ -1,0 +1,74 @@
+<?php
+/**
+ * BPQ Dashboard Configuration
+ * ===========================
+ *
+ * 1. Copy this file:  cp config.php.example config.php
+ * 2. Edit config.php and fill in YOUR values (replace every YOURCALL,
+ *    CHANGE_THIS_*, and 0.0 placeholder).
+ * 3. The install.sh script copies + edits this file for you if you run
+ *    it interactively; this template is what gets copied.
+ *
+ * Never commit config.php to version control — it contains passwords.
+ */
+
+return [
+
+    // ---- Your station identity ----
+    'station' => [
+        'callsign' => 'YOURCALL',           // Your FCC callsign (uppercase)
+        'node'     => 'YOURCALL-4',         // Your BPQ node identifier (callsign-SSID)
+        'email'    => 'sysop@example.com',  // Your email (shown on About / map popup)
+        'lat'      => 0.0,                  // Your station latitude (decimal degrees)
+        'lon'      => 0.0,                  // Your station longitude (decimal degrees)
+    ],
+
+    // ---- BBS connection (used by bbs-messages.html, nws-bbs-post.php) ----
+    'bbs' => [
+        'host'    => 'localhost',           // Usually localhost on the same machine as BPQ
+        'port'    => 8010,                  // BPQ telnet port (check your bpq32.cfg)
+        'user'    => 'SYSOPUSER',           // BBS login username from your bpq32.cfg USER line
+        'pass'    => 'CHANGE_THIS_PASSWORD',// BBS login password
+        'alias'   => 'bbs',                 // Application alias to connect to the BBS
+        'timeout' => 30,                    // Connection timeout in seconds
+    ],
+
+    // ---- Database (MariaDB / MySQL) ----
+    // Required only if you want session history, station heatmaps, and
+    // partner-quality features. Without it, the dashboard runs in
+    // "no-db" mode and only shows live/recent data.
+    'db' => [
+        'host' => 'localhost',
+        'name' => 'bpqdash',
+        'user' => 'bpqdash',
+        'pass' => 'CHANGE_THIS_DB_PASSWORD',
+    ],
+
+    // ---- Security ----
+    // 'local'  — trust localhost; minimal restrictions (default)
+    // 'public' — public-internet deployment; rate-limit + lock down APIs
+    'security_mode' => 'local',
+
+    // ---- Feature toggles ----
+    'features'      => ['bbs_read' => true, 'bbs_write' => true, 'nws_post' => true],
+    'rate_limit'    => ['enabled' => false],
+    'cors'          => ['allow_all' => true],
+    'logging'       => ['enabled' => false],
+
+    // ---- Filesystem paths ----
+    // Where the dashboard PHP code reads BPQ logs and finds its scripts.
+    // If install.sh placed the dashboard in /var/www/bpq-dashboard/
+    // (the default), leave these alone.
+    'paths'         => [
+        'logs'    => '/var/www/bpq-dashboard/logs/',
+        'scripts' => '/var/www/bpq-dashboard/scripts/',
+        'datalog' => '/var/www/bpq-dashboard/logs/',
+    ],
+
+    // ---- VARA log file ----
+    // Path under 'paths.logs' where your VARA modem appends its log.
+    // The default convention is <yourcall-lowercase>.vara
+    'logs' => [
+        'vara_file' => 'yourcall.vara',
+    ],
+];
