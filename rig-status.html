@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rig Status — YOURCALL BPQ</title>
+<style>
+:root {
+    --bg:#080a0d;--surface:#0f1318;--surface2:#161b22;
+    --border:#1e242e;--border2:#2a3340;
+    --text:#c8d4e0;--muted:#4a5568;
+    --amber:#e8a020;--amber-dim:#6b4510;--amber-bg:#1a1005;
+    --green:#22c55e;--red:#ef4444;--blue:#3b82f6;--cyan:#22d3ee;
+    --mono:'Courier New','Lucida Console',monospace;
+    --ui:'Segoe UI',system-ui,sans-serif;
+    --r:6px;
+}
+/* Light mode — flip backgrounds/text and darken accent colors for contrast */
+[data-theme="light"] {
+    --bg:#f6f8fa;--surface:#ffffff;--surface2:#f0f2f5;
+    --border:#d0d7de;--border2:#afb8c1;
+    --text:#1f2328;--muted:#656d76;
+    --amber:#bf6a0e;--amber-dim:#fef3c7;--amber-bg:#fffbeb;
+    --green:#16a34a;--red:#dc2626;--blue:#2563eb;--cyan:#0891b2;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--ui)}
+
+#app{
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;min-height:100vh;padding:20px;gap:0;
+}
+
+/* Main frequency display */
+.freq-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:16px;padding:32px 48px;text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,.6);min-width:380px;
+}
+.rig-name{
+    font-size:11px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:1px;margin-bottom:20px;
+}
+.freq-display{
+    font-family:var(--mono);font-size:56px;font-weight:700;
+    color:var(--amber);letter-spacing:3px;line-height:1;
+    margin-bottom:6px;
+    text-shadow:0 0 30px rgba(232,160,32,.25);
+    min-height:64px;transition:color .3s;
+}
+.freq-unit{
+    font-size:13px;color:var(--muted);letter-spacing:2px;
+    text-transform:uppercase;margin-bottom:18px;
+}
+.freq-breakdown{
+    display:flex;gap:6px;justify-content:center;margin-bottom:18px;
+}
+.freq-seg{
+    background:var(--surface2);border:1px solid var(--border2);
+    border-radius:4px;padding:3px 10px;font-family:var(--mono);
+    font-size:11px;color:var(--muted);
+}
+.freq-seg span{color:var(--text);font-weight:700}
+
+.status-row{
+    display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
+    margin-bottom:16px;
+}
+.pill{
+    display:flex;align-items:center;gap:5px;
+    padding:4px 14px;border-radius:20px;
+    font-size:11px;font-weight:700;letter-spacing:.5px;
+    border:1px solid var(--border2);
+}
+.pill.mode{border-color:var(--cyan);color:var(--cyan)}
+.pill.band{border-color:var(--amber);color:var(--amber)}
+
+.update-row{
+    display:flex;align-items:center;gap:8px;
+    font-size:10px;color:var(--muted);justify-content:center;
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);transition:all .3s}
+.dot.stale{background:var(--muted)}
+.dot.error{background:var(--red)}
+
+/* Scanner */
+.scanner-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:12px;padding:20px 24px;min-width:380px;
+}
+.card-title{
+    font-size:10px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:1px;margin-bottom:14px;
+}
+.scanner-freqs{
+    display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+}
+.sf{
+    background:var(--surface2);border:1px solid var(--border2);
+    border-radius:var(--r);padding:10px 14px;text-align:center;
+    transition:all .4s;min-width:80px;
+}
+.sf-mhz{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text)}
+.sf-band{font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+.sf.active{border-color:var(--amber);background:var(--amber-bg)}
+.sf.active .sf-mhz{color:var(--amber)}
+.sf.active .sf-band{color:var(--amber-dim)}
+
+/* Error */
+.err{color:var(--red);font-size:11px;margin-top:10px;display:none}
+
+/* History chart */
+.history-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:12px;padding:18px 22px;width:100%;max-width:900px;
+    margin-top:12px;
+}
+.history-header{
+    display:flex;align-items:center;justify-content:space-between;
+    flex-wrap:wrap;gap:10px;margin-bottom:14px;
+}
+.history-range{display:flex;gap:6px}
+.range-btn{
+    background:transparent;border:1px solid var(--border2);color:var(--muted);
+    border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;
+    letter-spacing:.5px;cursor:pointer;transition:all .2s;
+}
+.range-btn:hover{border-color:var(--amber);color:var(--amber)}
+.range-btn.active{border-color:var(--amber);color:var(--amber);background:var(--amber-bg)}
+.history-stats{
+    display:flex;gap:18px;font-size:11px;color:var(--muted);flex-wrap:wrap;
+}
+.history-stats b{color:var(--text);font-family:var(--mono)}
+.history-chart-wrap{height:220px;position:relative}
+.history-empty{
+    display:flex;align-items:center;justify-content:center;height:220px;
+    color:var(--muted);font-size:12px;text-align:center;
+}
+.history-loading{color:var(--muted);font-size:11px;text-align:center;padding:4px 0 0}
+
+/* PTT Indicator */
+.ptt-led{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:5px 14px;border-radius:20px;font-size:11px;
+    font-weight:700;letter-spacing:.5px;border:1px solid;
+    transition:all .3s;
+}
+.ptt-led.rx{border-color:#22c55e;color:#22c55e;background:rgba(34,197,94,.08)}
+.ptt-led.tx{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.12);
+    animation:ptt-pulse .6s infinite alternate}
+.ptt-led.stuck{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.10)}
+.ptt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ptt-led.rx   .ptt-dot{background:#22c55e}
+.ptt-led.tx   .ptt-dot{background:#ef4444;box-shadow:0 0 8px #ef4444}
+.ptt-led.stuck .ptt-dot{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+@keyframes ptt-pulse{from{opacity:1}to{opacity:.55}}
+
+/* Power Control Panel */
+.power-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:12px;padding:16px 20px;min-width:280px;
+}
+.power-header{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:12px;
+}
+.power-status{
+    display:flex;align-items:center;gap:8px;font-size:11px;
+}
+.outlet-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;transition:all .3s}
+.outlet-dot.on {background:#22c55e;box-shadow:0 0 6px #22c55e}
+.outlet-dot.off{background:var(--muted)}
+.outlet-dot.unknown{background:#f59e0b}
+.power-btn-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.power-btn{
+    padding:7px 18px;border-radius:8px;font-size:11px;font-weight:700;
+    border:1px solid;cursor:pointer;transition:all .2s;letter-spacing:.5px;
+    background:transparent;
+}
+.power-btn:disabled{opacity:.35;cursor:not-allowed}
+.power-btn.on-btn {border-color:#22c55e;color:#22c55e}
+.power-btn.on-btn:hover:not(:disabled){background:rgba(34,197,94,.15)}
+.power-btn.off-btn{border-color:#ef4444;color:#ef4444}
+.power-btn.off-btn:hover:not(:disabled){background:rgba(239,68,68,.15)}
+.power-btn.reboot-btn{border-color:#f59e0b;color:#f59e0b}
+.power-btn.reboot-btn:hover:not(:disabled){background:rgba(245,158,11,.15)}
+.power-btn.stuck-reboot{border-color:#f59e0b;color:#f59e0b;
+    animation:ptt-pulse .8s infinite alternate}
+.lock-btn{
+    background:transparent;border:1px solid var(--border2);
+    border-radius:8px;padding:5px 10px;cursor:pointer;
+    color:var(--muted);font-size:13px;transition:all .2s;
+}
+.lock-btn:hover{border-color:var(--amber);color:var(--amber)}
+.lock-btn.unlocked{border-color:#22c55e;color:#22c55e}
+.power-auth{
+    display:none;margin-top:10px;
+}
+.power-auth input{
+    width:100%;padding:7px 10px;background:var(--surface2);
+    border:1px solid var(--border2);border-radius:6px;
+    color:var(--text);font-size:12px;margin-bottom:8px;
+}
+.power-auth input:focus{outline:none;border-color:var(--amber)}
+.power-msg{font-size:10px;margin-top:8px;text-align:center;min-height:14px}
+.power-msg.ok  {color:#22c55e}
+.power-msg.err {color:#ef4444}
+.power-msg.warn{color:#f59e0b}
+
+/* Meters */
+.meter-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:12px;padding:20px 24px;min-width:380px;
+}
+.meter-label{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:8px;
+}
+.meter-name{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.meter-val{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)}
+.meter-bar-wrap{
+    height:18px;background:var(--surface2);border-radius:9px;
+    overflow:hidden;margin-bottom:14px;border:1px solid var(--border);
+    position:relative;
+}
+.meter-bar{
+    height:100%;border-radius:9px;width:0%;
+    transition:width .4s ease;
+}
+.meter-bar.smeter{
+    background:linear-gradient(90deg,#22c55e 0%,#22c55e 54%,#f59e0b 54%,#f59e0b 72%,#ef4444 72%);
+}
+.meter-bar.power{
+    background:linear-gradient(90deg,#3b82f6 0%,#22c55e 40%,#f59e0b 70%,#ef4444 90%);
+}
+.meter-ticks{
+    display:flex;justify-content:space-between;
+    font-size:9px;color:var(--muted);font-family:var(--mono);
+    margin-top:-10px;margin-bottom:12px;padding:0 2px;
+}
+.tx-badge{
+    display:inline-block;background:var(--red);color:#fff;
+    font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;
+    animation:pulse 0.7s infinite;margin-left:8px;
+    display:none;
+}
+</style>
+</head>
+<body data-nav-page="rig">
+
+<!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
+     Sits above the kiosk-style #app content. The min-height:100vh
+     on #app means the centered content will need a tiny bit of scroll
+     when the nav is visible, but the layout still works. -->
+<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+
+<div id="app">
+
+  <!-- Version badge (top-right corner, discrete) -->
+  <span style="position:fixed; top:60px; right:14px; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700; z-index:10;">v1.5.13</span>
+
+  <!-- Main layout: meters left, freq+scanner right -->
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%;max-width:900px">
+
+    <!-- LEFT COLUMN: S-Meter stacked above Power Meter -->
+    <div style="display:flex;flex-direction:column;gap:12px;flex-shrink:0">
+
+      <!-- S-Meter -->
+      <div class="meter-card" style="padding:14px 16px;min-width:0">
+        <div class="card-title" style="margin-bottom:6px">📶 S-Meter</div>
+        <canvas id="smeterGauge" width="260" height="150"></canvas>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--amber);margin-top:4px;text-align:center" id="smeterVal">–</div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: Frequency readout + scanner -->
+    <div style="display:flex;flex-direction:column;gap:12px;flex:1;min-width:280px">
+
+      <!-- Frequency card -->
+      <div class="freq-card" style="padding:24px 32px">
+        <div class="rig-name" id="rigName">📻 Loading...</div>
+        <div class="freq-display" id="freqDisplay">––– .–––</div>
+        <div class="freq-unit">MHz</div>
+        <div class="freq-breakdown">
+          <div class="freq-seg">Band <span id="segBand">–</span></div>
+          <div class="freq-seg">kHz offset <span id="segHz">–</span></div>
+        </div>
+        <div class="status-row">
+          <div class="pill mode" id="pillMode">–</div>
+          <div class="pill band" id="pillBand">–</div>
+        </div>
+        <div class="update-row">
+          <div class="dot" id="dot"></div>
+          <span id="updateTime">Connecting…</span>
+        </div>
+        <div class="err" id="err">⚠ flrig offline — start flrig on the configured host (see config.php → radio.flrig_host) to enable rig status</div>
+      </div>
+
+      <!-- Scanner card -->
+      <div class="scanner-card">
+        <div class="card-title">📡 RADIO 2 Scan Frequencies</div>
+        <div class="scanner-freqs">
+          <div class="sf" data-freq="3.596000"><div class="sf-mhz">3.596</div><div class="sf-band">80m</div></div>
+          <div class="sf" data-freq="7.103200"><div class="sf-mhz">7.103</div><div class="sf-band">40m</div></div>
+          <div class="sf" data-freq="10.148200"><div class="sf-mhz">10.148</div><div class="sf-band">30m</div></div>
+          <div class="sf" data-freq="14.103000"><div class="sf-mhz">14.103</div><div class="sf-band">20m</div></div>
+          <div class="sf" data-freq="14.106500"><div class="sf-mhz">14.106</div><div class="sf-band">20m</div></div>
+        </div>
+      </div>
+
+      <!-- PTT Indicator + Power Control -->
+      <div class="power-card">
+        <div class="power-header">
+          <div class="card-title" style="margin-bottom:0">⚡ Radio Control</div>
+          <button class="lock-btn" id="lockBtn" onclick="toggleAuth()" title="Unlock power controls">🔒</button>
+        </div>
+
+        <!-- PTT Indicator -->
+        <div style="display:flex;justify-content:center;margin-bottom:14px">
+          <div class="ptt-led rx" id="pttLed">
+            <div class="ptt-dot"></div>
+            <span id="pttText">RX</span>
+          </div>
+        </div>
+
+        <!-- Outlet status -->
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px;font-size:11px;color:var(--muted)">
+          <div class="outlet-dot unknown" id="outletDot"></div>
+          <span>Outlet 1 — </span>
+          <span id="outletStatus" style="color:var(--text);font-weight:700">–</span>
+        </div>
+
+        <!-- Auth overlay -->
+        <div class="power-auth" id="powerAuth">
+          <input type="password" id="powerPassInput" placeholder="Sysop password"
+            onkeydown="if(event.key==='Enter')submitAuth()">
+          <div style="display:flex;gap:8px">
+            <button class="power-btn on-btn" style="flex:1" onclick="submitAuth()">Unlock</button>
+            <button class="power-btn off-btn" style="flex:0" onclick="closeAuth()">✕</button>
+          </div>
+        </div>
+
+        <!-- Power buttons (shown when authenticated) -->
+        <div class="power-btn-row" id="powerBtns" style="display:none">
+          <button class="power-btn on-btn"     id="btnOn"     onclick="doPower('on')">⏻ Power ON</button>
+          <button class="power-btn off-btn"    id="btnOff"    onclick="doPower('off')">⏻ Power OFF</button>
+          <button class="power-btn reboot-btn" id="btnReboot" onclick="doPower('reboot')">↺ Reboot</button>
+        </div>
+
+        <div class="power-msg" id="powerMsg"></div>
+      </div>
+
+    </div>
+  </div>
+
+
+
+</div>
+
+<script>
+const API = 'vara-api.php';
+const BANDS = [
+    [1.8,2.0,'160m'],[3.525,4.0,'80m'],[5.3305,5.4035,'60m'],
+    [7.025,7.3,'40m'],[10.1,10.15,'30m'],[14.025,14.35,'20m'],
+    [18.068,18.168,'17m'],[21.025,21.45,'15m'],
+    [24.89,24.99,'12m'],[28.0,29.7,'10m']
+];
+
+function bandForMhz(mhz){
+    for(const [lo,hi,n] of BANDS) if(mhz>=lo-0.001&&mhz<=hi+0.001) return n;
+    return '?';
+}
+
+function highlightScanner(mhz){
+    document.querySelectorAll('.sf').forEach(el=>{
+        const f=parseFloat(el.dataset.freq);
+        el.classList.toggle('active', Math.abs(mhz-f)<0.0006);
+    });
+}
+
+function setDot(state){
+    document.getElementById('dot').className='dot'+(state==='ok'?'':' '+state);
+}
+
+async function poll(){
+    try{
+        // Use POST to avoid nginx 403 on GET
+        const r = await fetch(API, {
+            method:'POST',
+            credentials:'same-origin',
+            headers:{
+                'Content-Type':'application/json',
+                'X-Requested-With':'XMLHttpRequest'
+            },
+            body: JSON.stringify({action:'get_rig_info'})
+        });
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        const d = await r.json();
+        if(!d.ok) throw new Error(d.error||'API error');
+
+        const mhz = d.mhz;
+        const band = bandForMhz(mhz);
+
+        // Format frequency: 14.103200 → "14.103 200"
+        const mhzStr = mhz.toFixed(6);           // "14.103200"
+        const [int,dec] = mhzStr.split('.');      // "14", "103200"
+        const khz = dec.slice(0,3);               // "103"
+        const hz  = dec.slice(3);                 // "200"
+
+        document.getElementById('freqDisplay').textContent = int+'.'+khz+' '+hz;
+        document.getElementById('segBand').textContent  = band;
+        document.getElementById('segHz').textContent    = parseInt(hz)+' Hz';
+        document.getElementById('pillMode').textContent = d.mode||'–';
+        document.getElementById('pillBand').textContent = band;
+        // Update rig name if returned by API
+        if (d.rig_model && d.rig_make) {
+            document.getElementById('rigName').textContent =
+                '📻 ' + d.rig_make + ' ' + d.rig_model;
+        } else if (d.rig_model) {
+            document.getElementById('rigName').textContent = '📻 ' + d.rig_model;
+        }
+
+        highlightScanner(mhz);
+
+        // Update analog gauges
+        if(typeof updateGauges === 'function'){
+            updateGauges(d.smeter);
+        }
+
+        // PTT indicator — three states
+        updatePTT(d.ptt_state ?? 0, d.pwrmeter ?? 0);
+
+        document.getElementById('updateTime').textContent =
+            'Updated '+new Date().toLocaleTimeString();
+        document.getElementById('err').style.display='none';
+        setDot('ok');
+
+    }catch(e){
+        document.getElementById('updateTime').textContent='Poll failed — retrying…';
+        // Show the actual API error if available — far more useful than a
+        // hardcoded "offline" message. Falls back to the static text in #err.
+        const errEl = document.getElementById('err');
+        const msg = (e && e.message) ? String(e.message) : '';
+        if (msg && msg.length < 200) {
+            errEl.textContent = '⚠ ' + msg;
+        }
+        errEl.style.display='block';
+        setDot('error');
+    }
+}
+
+poll();
+setInterval(poll, 3000);
+
+// ── PTT Indicator ─────────────────────────────────────────────────
+function updatePTT(state, pwr) {
+    const led  = document.getElementById('pttLed');
+    const txt  = document.getElementById('pttText');
+    const btnOff    = document.getElementById('btnOff');
+    const btnReboot = document.getElementById('btnReboot');
+    if (!led) return;
+    led.className = 'ptt-led';
+    if (state === 1) {
+        // Genuine TX — PTT=1, power>0
+        led.classList.add('tx');
+        txt.textContent = '🔴 TX';
+        if (btnOff)    { btnOff.disabled = true;    btnOff.title = 'Cannot power off during TX'; }
+        if (btnReboot) { btnReboot.disabled = true; btnReboot.title = 'Cannot reboot during TX'; }
+        // Remove stuck class if present
+        if (btnReboot) btnReboot.classList.remove('stuck-reboot');
+    } else if (state === 2) {
+        // Stuck PTT — PTT=1 but power=0
+        led.classList.add('stuck');
+        txt.textContent = '⚠ STUCK PTT';
+        if (btnOff)    { btnOff.disabled = true;    btnOff.title = 'Cannot power off — stuck PTT detected'; }
+        if (btnReboot) {
+            btnReboot.disabled = false;
+            btnReboot.classList.add('stuck-reboot');
+            btnReboot.title = 'Reboot recommended — stuck PTT detected';
+        }
+    } else {
+        // RX — normal
+        led.classList.add('rx');
+        txt.textContent = '🟢 RX';
+        if (btnOff)    { btnOff.disabled = false;    btnOff.title = ''; }
+        if (btnReboot) { btnReboot.disabled = false; btnReboot.title = ''; btnReboot.classList.remove('stuck-reboot'); }
+    }
+}
+
+// ── Plug status poller ─────────────────────────────────────────────
+async function pollPlug() {
+    try {
+        const r = await fetch(API, {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({action:'plug_status'})
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!d.ok) return;
+        const dot = document.getElementById('outletDot');
+        const lbl = document.getElementById('outletStatus');
+        if (dot && lbl) {
+            dot.className = 'outlet-dot ' + (d.power === 'on' ? 'on' : d.power === 'off' ? 'off' : 'unknown');
+            lbl.textContent = d.power === 'on' ? 'ON' : d.power === 'off' ? 'OFF' : 'Unknown';
+            lbl.style.color = d.power === 'on' ? '#22c55e' : d.power === 'off' ? '#ef4444' : '#f59e0b';
+        }
+    } catch(e) {}
+}
+pollPlug();
+setInterval(pollPlug, 15000);
+
+// ── Auth ──────────────────────────────────────────────────────────
+let _authed = false;
+let _authExpiry = 0;
+
+function isAuthed() {
+    return _authed && Date.now() < _authExpiry;
+}
+
+function toggleAuth() {
+    if (isAuthed()) {
+        // Already unlocked — lock it
+        _authed = false;
+        document.getElementById('lockBtn').textContent = '🔒';
+        document.getElementById('lockBtn').classList.remove('unlocked');
+        document.getElementById('powerBtns').style.display = 'none';
+        document.getElementById('powerAuth').style.display = 'none';
+        setMsg('', '');
+        return;
+    }
+    // Show password input
+    const authDiv = document.getElementById('powerAuth');
+    authDiv.style.display = authDiv.style.display === 'none' ? 'block' : 'none';
+    if (authDiv.style.display === 'block') {
+        setTimeout(() => document.getElementById('powerPassInput').focus(), 50);
+    }
+}
+
+function closeAuth() {
+    document.getElementById('powerAuth').style.display = 'none';
+    document.getElementById('powerPassInput').value = '';
+}
+
+async function submitAuth() {
+    const pass = document.getElementById('powerPassInput').value;
+    if (!pass) return;
+    setMsg('Verifying...', '');
+    try {
+        const r = await fetch(API, {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({action:'auth', password: pass})
+        });
+        const d = await r.json();
+        if (d.ok && d.authenticated) {
+            _authed     = true;
+            _authExpiry = Date.now() + 3600000; // 1 hour
+            document.getElementById('powerPassInput').value = '';
+            document.getElementById('powerAuth').style.display  = 'none';
+            document.getElementById('powerBtns').style.display  = 'flex';
+            document.getElementById('lockBtn').textContent = '🔓';
+            document.getElementById('lockBtn').classList.add('unlocked');
+            setMsg('Unlocked — controls active for 1 hour', 'ok');
+        } else {
+            setMsg('Incorrect password', 'err');
+        }
+    } catch(e) {
+        setMsg('Auth error — try again', 'err');
+    }
+}
+
+// ── Power actions ─────────────────────────────────────────────────
+async function doPower(action) {
+    if (!isAuthed()) { setMsg('Session expired — click 🔒 to re-authenticate', 'warn'); return; }
+
+    const labels = {on:'Power ON', off:'Power OFF', reboot:'Reboot'};
+    const warns  = {
+        off:    'This will cut power to the radio.\nAre you sure?',
+        reboot: 'This will briefly cut power then restore it.\nAre you sure?',
+        on:     'Power on the radio?'
+    };
+    if (!confirm(warns[action] || 'Are you sure?')) return;
+
+    setMsg('Sending command...', '');
+    setBtns(true);
+
+    try {
+        const r = await fetch(API, {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({action:'plug_' + action})
+        });
+        const d = await r.json();
+        if (d.ok) {
+            const newState = d.power === 'on' ? 'ON' : 'OFF';
+            setMsg(`${labels[action]} — Outlet now ${newState}`, 'ok');
+            await pollPlug();
+        } else {
+            setMsg(d.error || 'Command failed', 'err');
+        }
+    } catch(e) {
+        setMsg('Network error — try again', 'err');
+    } finally {
+        setBtns(false);
+    }
+}
+
+function setBtns(disabled) {
+    ['btnOn','btnOff','btnReboot'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = disabled;
+    });
+}
+
+function setMsg(msg, type) {
+    const el = document.getElementById('powerMsg');
+    if (!el) return;
+    el.textContent = msg;
+    el.className   = 'power-msg' + (type ? ' ' + type : '');
+}
+
+// Auto-lock after 1 hour
+setInterval(() => {
+    if (_authed && Date.now() >= _authExpiry) {
+        _authed = false;
+        document.getElementById('lockBtn').textContent = '🔒';
+        document.getElementById('lockBtn').classList.remove('unlocked');
+        document.getElementById('powerBtns').style.display = 'none';
+        setMsg('Session expired — click 🔒 to re-authenticate', 'warn');
+    }
+}, 60000);
+</script>
+
+<script>
+function drawMeter(canvasId, opts) {
+    const c = document.getElementById(canvasId);
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    const cx = W / 2, cy = H - 18;
+    const R = Math.min(W, H) * 0.80;
+    // Standard meter: pivot at bottom, needle sweeps upward (left=0, right=full)
+    // In canvas coords: Math.PI = 9 o'clock (left), 0 = 3 o'clock (right)
+    // Arc from PI to 0 going counter-clockwise draws the upper semicircle
+    const startAngle = Math.PI;
+    const endAngle   = 0;
+    const sweep      = Math.PI;   // positive = counter-clockwise in our formula
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Face
+    ctx.fillStyle = '#1c1f24';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 12, Math.PI, 0);
+    ctx.lineTo(cx + R + 12, cy + 20);
+    ctx.lineTo(cx - R - 12, cy + 20);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#252830';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 6, Math.PI, 0);
+    ctx.lineTo(cx + R + 6, cy + 14);
+    ctx.lineTo(cx - R - 6, cy + 14);
+    ctx.closePath();
+    ctx.fill();
+
+    // Coloured zones
+    opts.zones.forEach(z => {
+        ctx.strokeStyle = z.color;
+        ctx.lineWidth = 8;
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R - 10, startAngle + sweep * z.from, startAngle + sweep * z.to, false);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    });
+
+    // Ticks and labels
+    opts.ticks.forEach(t => {
+        const angle = startAngle + sweep * t.frac;
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+        const len = t.major ? 14 : 7;
+        ctx.strokeStyle = t.major ? '#aaa' : '#555';
+        ctx.lineWidth = t.major ? 1.5 : 0.8;
+        ctx.beginPath();
+        ctx.moveTo(cx + (R + 2) * cos, cy + (R + 2) * sin);
+        ctx.lineTo(cx + (R + 2 - len) * cos, cy + (R + 2 - len) * sin);
+        ctx.stroke();
+        if (t.label) {
+            const lr = R + 2 - len - 14;
+            ctx.fillStyle = '#bbb';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(t.label, cx + lr * cos, cy + lr * sin);
+        }
+    });
+
+    // Needle
+    const na = startAngle + sweep * Math.min(1, Math.max(0, opts.value));
+    ctx.strokeStyle = '#e8a020';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - 8 * Math.cos(na), cy - 8 * Math.sin(na));
+    ctx.lineTo(cx + (R - 8) * Math.cos(na), cy + (R - 8) * Math.sin(na));
+    ctx.stroke();
+
+    // Pivot
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(cx, cy, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e8a020';
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+}
+
+const S_TICKS = [
+    {frac:0,     major:true,  label:'1'},
+    {frac:0.067, major:false},
+    {frac:0.133, major:true,  label:'3'},
+    {frac:0.2,   major:false},
+    {frac:0.267, major:true,  label:'5'},
+    {frac:0.333, major:false},
+    {frac:0.4,   major:true,  label:'7'},
+    {frac:0.467, major:false},
+    {frac:0.54,  major:true,  label:'9'},
+    {frac:0.62,  major:true,  label:'+10'},
+    {frac:0.72,  major:true,  label:'+20'},
+    {frac:0.86,  major:true,  label:'+40'},
+    {frac:1.0,   major:true,  label:'+60'},
+];
+const S_ZONES = [
+    {from:0,    to:0.54, color:'#22c55e'},
+    {from:0.54, to:0.72, color:'#f59e0b'},
+    {from:0.72, to:1.0,  color:'#ef4444'},
+];
+let curSmeter = 0;
+
+function updateGauges(smeter) {
+    if (smeter !== null && smeter !== undefined) {
+        curSmeter = smeter / 100;
+        drawMeter('smeterGauge', {value: curSmeter, ticks: S_TICKS, zones: S_ZONES});
+        let label;
+        if      (smeter <= 6)  label = 'S1';
+        else if (smeter <= 12) label = 'S2';
+        else if (smeter <= 18) label = 'S3';
+        else if (smeter <= 24) label = 'S4';
+        else if (smeter <= 30) label = 'S5';
+        else if (smeter <= 36) label = 'S6';
+        else if (smeter <= 42) label = 'S7';
+        else if (smeter <= 48) label = 'S8';
+        else if (smeter <= 54) label = 'S9';
+        else if (smeter <= 60) label = 'S9+10';
+        else if (smeter <= 72) label = 'S9+20';
+        else if (smeter <= 86) label = 'S9+30';
+        else                   label = 'S9+40';
+        document.getElementById('smeterVal').textContent = label + ' (' + smeter + ')';
+    }
+}
+
+// Draw initial empty meter on load
+window.addEventListener('load', () => {
+    drawMeter('smeterGauge', {value: 0, ticks: S_TICKS, zones: S_ZONES});
+});
+</script>
+</body>
+</html>

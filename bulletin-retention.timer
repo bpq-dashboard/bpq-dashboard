@@ -1,0 +1,14 @@
+[Unit]
+Description=Run BPQ Dashboard bulletin retention purge daily
+
+[Timer]
+# Runs once a day at a quiet, off-peak hour. Persistent=true means if
+# the server was down/rebooting when this would have fired, it runs
+# once as soon as the system is back up instead of waiting for the
+# next scheduled time.
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

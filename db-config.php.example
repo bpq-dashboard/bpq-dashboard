@@ -1,0 +1,27 @@
+<?php
+/**
+ * db-config.php — database credentials for this install (LOCAL ONLY).
+ *
+ *   cp db-config.php.example db-config.php
+ *   nano db-config.php                      # fill in your values
+ *   chmod 640 db-config.php                 # see the deploy doc for owner/group
+ *
+ * NEVER commit db-config.php to Git — it's listed in .gitignore.
+ *
+ * Read by tprfn-db.php (all DB-backed PHP pages/APIs) and by the Python
+ * parsers in scripts/ (via scripts/bpq_db_config.py). If this file is
+ * absent, the 'db' section of config.php is used instead.
+ *
+ * Keep it to plain quoted strings / numbers as below — the Python side
+ * has a simple fallback reader that expects this exact shape if the
+ * `php` command-line binary isn't available.
+ *
+ * Being a .php file, requesting it over the web returns nothing.
+ */
+return [
+    'host' => 'localhost',
+    'port' => 3306,
+    'name' => 'tprfn',
+    'user' => 'tprfn_app',
+    'pass' => 'CHANGE_THIS_DB_PASSWORD',
+];

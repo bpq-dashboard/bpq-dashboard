@@ -1,0 +1,23 @@
+[Unit]
+Description=VARA HF Callsign Validation Proxy
+Documentation=https://github.com/your-repo/bpq-dashboard
+# Requires network to be up so we can reach the Windows VARA HF machine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust User= to match the account that runs BPQ32 on this machine
+User=pi
+ExecStart=/usr/bin/python3 /usr/local/bin/vara-callsign-validator.py
+Restart=on-failure
+RestartSec=5
+# If VARA HF (Windows) isn't reachable yet, back off and retry
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

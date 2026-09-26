@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telnet Client — YOURCALL BPQ</title>
+<style>
+:root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --surface2: #1c2128;
+    --border:   #30363d;
+    --text:     #e6edf3;
+    --muted:    #8b949e;
+    --accent:   #4a9eff;
+    --green:    #3fb950;
+    --red:      #f85149;
+    --amber:    #d29922;
+    --orange:   #e3783a;
+    --purple:   #bc8cff;
+    --term-bg:  #0a0e14;
+    --term-fg:  #cdd6f4;
+    --term-green: #a6e3a1;
+    --term-red:   #f38ba8;
+    --term-amber: #f9e2af;
+    --term-blue:  #89b4fa;
+    --term-cyan:  #89dceb;
+    --term-purple:#cba6f7;
+    --font-mono: 'Courier New', 'Lucida Console', monospace;
+    --font-ui:   system-ui, -apple-system, sans-serif;
+}
+/* Light mode — UI backgrounds/text flip; the terminal area itself stays
+   dark because green-on-black is the conventional terminal look. */
+[data-theme="light"] {
+    --bg:       #f6f8fa;
+    --surface:  #ffffff;
+    --surface2: #f0f2f5;
+    --border:   #d0d7de;
+    --text:     #1f2328;
+    --muted:    #656d76;
+    --accent:   #0969da;
+    --green:    #1a7f37;
+    --red:      #cf222e;
+    --amber:    #9a6700;
+    --orange:   #bc4c00;
+    --purple:   #8250df;
+    /* Terminal colors deliberately unchanged — terminal stays dark */
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Top bar ─────────────────────────────────────────── */
+#topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+#topbar h1 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+}
+#statusDot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--red);
+    transition: background .3s;
+    flex-shrink: 0;
+}
+#statusDot.connected { background: var(--green); }
+#statusDot.connecting { background: var(--amber); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+#statusLabel {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 80px;
+}
+.tb-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.tb-btn:hover { background: var(--border); }
+.tb-btn.danger { color: var(--red); border-color: var(--red); }
+.tb-btn.danger:hover { background: rgba(248,81,73,.15); }
+.tb-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tb-btn.primary:hover { opacity: .85; }
+#sessionInfo {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+/* ── Main layout ─────────────────────────────────────── */
+#main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+#sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sidebar-section {
+    padding: 10px 12px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+}
+.quick-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    transition: background .15s;
+    font-size: 12px;
+}
+.quick-btn:hover { background: var(--surface2); }
+.quick-btn .qicon { font-size: 14px; width: 18px; text-align: center; }
+.quick-btn .qname { flex: 1; }
+.quick-btn .qport {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+}
+
+/* Custom connect form */
+#customForm {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.form-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.form-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    width: 100%;
+}
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Command reference */
+.cmd-ref-section {
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.cmd-ref-toggle {
+    padding: 8px 12px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+.cmd-ref-toggle:hover { color: var(--text); }
+.cmd-ref-body {
+    overflow-y: auto;
+    max-height: 300px;
+    display: none;
+}
+.cmd-ref-body.open { display: block; }
+.cmd-group {
+    padding: 4px 12px 2px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--accent);
+    margin-top: 4px;
+}
+.cmd-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 12px;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+    cursor: pointer;
+    transition: background .1s;
+}
+.cmd-row:hover { background: var(--surface2); }
+.cmd-code {
+    font-family: var(--font-mono);
+    color: var(--term-green);
+    font-size: 11px;
+    flex-shrink: 0;
+    min-width: 70px;
+}
+.cmd-desc {
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.3;
+}
+
+/* Session log */
+#sessionLog {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+}
+.log-entry {
+    padding: 5px 12px;
+    font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+    cursor: pointer;
+    transition: background .1s;
+}
+.log-entry:hover { background: var(--surface2); }
+.log-time { color: var(--muted); font-family: var(--font-mono); }
+.log-host { color: var(--accent); }
+
+/* ── Terminal area ───────────────────────────────────── */
+#termArea {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--term-bg);
+}
+
+/* Connect prompt shown when disconnected */
+#connectPrompt {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--muted);
+}
+#connectPrompt .big-icon { font-size: 48px; }
+#connectPrompt p { font-size: 13px; }
+
+/* Terminal output */
+#terminal {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--term-fg);
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+#terminal::-webkit-scrollbar { width: 6px; }
+#terminal::-webkit-scrollbar-track { background: transparent; }
+#terminal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ANSI colour classes */
+.ansi-0 { color: var(--term-fg); }
+.ansi-1 { font-weight: bold; }
+.ansi-31 { color: var(--term-red); }
+.ansi-32 { color: var(--term-green); }
+.ansi-33 { color: var(--term-amber); }
+.ansi-34 { color: var(--term-blue); }
+.ansi-35 { color: var(--term-purple); }
+.ansi-36 { color: var(--term-cyan); }
+.ansi-37 { color: #fff; }
+.ansi-sys { color: var(--muted); font-style: italic; }
+
+/* Input bar */
+#inputBar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    align-items: center;
+}
+#inputPrompt {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+#termInput {
+    flex: 1;
+    background: var(--term-bg);
+    border: 1px solid var(--border);
+    color: var(--term-fg);
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+}
+#termInput:focus { border-color: var(--accent); }
+#sendBtn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    cursor: pointer;
+}
+#sendBtn:hover { opacity: .85; }
+#sendBtn:disabled { opacity: .4; cursor: not-allowed; }
+</style>
+</head>
+<body data-nav-page="telnet">
+
+<!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
+     Sits ABOVE the page's own #topbar, which preserves the per-page
+     status (Disconnected/Connected, session info) and tool buttons. -->
+<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+
+<!-- Top Bar -->
+<div id="topbar">
+    <h1>⚡ BPQ Telnet Client <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.13</span></h1>
+    <div id="statusDot"></div>
+    <span id="statusLabel">Disconnected</span>
+    <button class="tb-btn" id="clearBtn" onclick="clearTerminal()">🗑 Clear</button>
+    <button class="tb-btn" id="copyBtn" onclick="copySession()">📋 Copy</button>
+    <button class="tb-btn danger" id="disconnectBtn" onclick="doDisconnect()" style="display:none">⏹ Disconnect</button>
+    <span id="sessionInfo"></span>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <div class="sidebar-section">Local</div>
+
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ Node')">
+            <span class="qicon">📡</span>
+            <span class="qname">BPQ Node</span>
+            <span class="qport">:8010</span>
+        </div>
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ BBS', 'BBS')">
+            <span class="qicon">📬</span>
+            <span class="qname">BPQ BBS</span>
+            <span class="qport">:8010</span>
+        </div>
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ Chat', 'CHAT')">
+            <span class="qicon">💬</span>
+            <span class="qname">BPQ Chat</span>
+            <span class="qport">:8010</span>
+        </div>
+        <div class="quick-btn" onclick="quickConnect('server.winlink.org', 8772, 'WL2K CMS')">
+            <span class="qicon">✉</span>
+            <span class="qname">WL2K CMS</span>
+            <span class="qport">:8772</span>
+        </div>
+
+        <div class="sidebar-section" style="margin-top:4px">
+            NetROM Nodes
+            <span id="nodesRefreshBtn" onclick="loadNodes()" title="Refresh"
+                  style="float:right;cursor:pointer;font-size:11px;color:var(--accent)">↻</span>
+        </div>
+        <div id="nodesList" style="overflow-y:auto;max-height:260px">
+            <div style="padding:8px 12px;font-size:11px;color:var(--muted)">Loading…</div>
+        </div>
+
+        <div class="sidebar-section" style="margin-top:4px">Custom</div>
+        <div id="customForm">
+            <div class="form-label">Host</div>
+            <input class="form-input" id="customHost" value="127.0.0.1" placeholder="host or IP">
+            <div class="form-label">Port</div>
+            <input class="form-input" id="customPort" value="8010" placeholder="port" type="number">
+            <button class="tb-btn primary" onclick="customConnect()" style="margin-top:4px">⚡ Connect</button>
+        </div>
+
+        <div class="sidebar-section" style="margin-top:4px">Session Log</div>
+        <div id="sessionLog"></div>
+
+        <!-- BPQ Command Reference -->
+        <div class="cmd-ref-section">
+            <div class="cmd-ref-toggle" onclick="toggleCmdRef()" id="cmdRefToggle">
+                <span>BPQ Commands</span>
+                <span id="cmdRefArrow">▸</span>
+            </div>
+            <div class="cmd-ref-body" id="cmdRefBody">
+
+                <div class="cmd-group">Node</div>
+                <div class="cmd-row" onclick="pasteCmd('?')" title="Send command">
+                    <span class="cmd-code">?</span>
+                    <span class="cmd-desc">List commands</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('NODES')">
+                    <span class="cmd-code">NODES</span>
+                    <span class="cmd-desc">List known NetROM nodes</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('ROUTES')">
+                    <span class="cmd-code">ROUTES</span>
+                    <span class="cmd-desc">Show active routes + quality</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('LINKS')">
+                    <span class="cmd-code">LINKS</span>
+                    <span class="cmd-desc">Active AX.25 sessions</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('PORTS')">
+                    <span class="cmd-code">PORTS</span>
+                    <span class="cmd-desc">List radio ports</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('INFO')">
+                    <span class="cmd-code">INFO</span>
+                    <span class="cmd-desc">Node info / version</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('BBS')">
+                    <span class="cmd-code">BBS</span>
+                    <span class="cmd-desc">Connect to local BBS</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('CHAT')">
+                    <span class="cmd-code">CHAT</span>
+                    <span class="cmd-desc">Connect to chat server</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('BYE')">
+                    <span class="cmd-code">BYE</span>
+                    <span class="cmd-desc">Disconnect from node</span>
+                </div>
+
+                <div class="cmd-group">BBS</div>
+                <div class="cmd-row" onclick="pasteCmd('L')">
+                    <span class="cmd-code">L</span>
+                    <span class="cmd-desc">List new messages</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('LA')">
+                    <span class="cmd-code">LA</span>
+                    <span class="cmd-desc">List all messages</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('LM')">
+                    <span class="cmd-code">LM</span>
+                    <span class="cmd-desc">List messages to me</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('R ')">
+                    <span class="cmd-code">R #</span>
+                    <span class="cmd-desc">Read message #</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('S ')">
+                    <span class="cmd-code">S CALL</span>
+                    <span class="cmd-desc">Send message to callsign</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('SP ')">
+                    <span class="cmd-code">SP CALL</span>
+                    <span class="cmd-desc">Send private message</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('SB ')">
+                    <span class="cmd-code">SB TOPIC</span>
+                    <span class="cmd-desc">Send bulletin</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('K ')">
+                    <span class="cmd-code">K #</span>
+                    <span class="cmd-desc">Kill (delete) message #</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('F ')">
+                    <span class="cmd-code">F #</span>
+                    <span class="cmd-desc">Forward message #</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('NODE')">
+                    <span class="cmd-code">NODE</span>
+                    <span class="cmd-desc">Return to node prompt</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('B')">
+                    <span class="cmd-code">B</span>
+                    <span class="cmd-desc">Bye / disconnect BBS</span>
+                </div>
+
+                <div class="cmd-group">Connect</div>
+                <div class="cmd-row" onclick="pasteCmd('C ')">
+                    <span class="cmd-code">C CALL</span>
+                    <span class="cmd-desc">Connect to node/station</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('C ')">
+                    <span class="cmd-code">C ALIAS</span>
+                    <span class="cmd-desc">Connect via NetROM alias</span>
+                </div>
+                <div class="cmd-row" onclick="pasteCmd('MHEARD ')">
+                    <span class="cmd-code">MH #</span>
+                    <span class="cmd-desc">Stations heard on port #</span>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Terminal -->
+    <div id="termArea">
+        <div id="connectPrompt">
+            <div class="big-icon">📡</div>
+            <p>Select a target from the sidebar or enter a custom host to connect</p>
+        </div>
+        <div id="terminal" style="display:none"></div>
+
+        <!-- Input Bar -->
+        <div id="inputBar">
+            <span id="inputPrompt">&gt;</span>
+            <input id="termInput" placeholder="Type command and press Enter..."
+                   autocomplete="off" autocorrect="off" autocapitalize="off"
+                   spellcheck="false" disabled
+                   onkeydown="handleInputKey(event)">
+            <button id="yappBtn" onclick="openYappModal()" disabled
+                    title="YAPP binary file transfer (send/receive)"
+                    style="background:#7c3aed; color:#fff; border:none;
+                           padding:8px 12px; border-radius:4px;
+                           font-weight:600; margin-right:4px;
+                           cursor:pointer;">📁 YAPP</button>
+            <button id="sendBtn" onclick="sendCommand()" disabled>Send ↵</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- ─── YAPP file transfer panel (non-modal) ────────────────────────
+     Floats over the right side of the screen but does NOT block the
+     terminal underneath. You can interact with the terminal while
+     the panel is open — essential because YAPP receive requires
+     arming first and THEN typing the BBS command. -->
+<div id="yappModal" style="display:none; position:fixed; right:20px;
+     top:80px; background:#1a1a2e; color:#e0e0e0; border-radius:8px;
+     padding:18px; width:420px; max-width:90vw;
+     border:1px solid #444; box-shadow:0 10px 40px rgba(0,0,0,0.5);
+     z-index:1000; max-height:80vh; overflow-y:auto;">
+    <div>
+        <div style="display:flex; justify-content:space-between;
+             align-items:center; margin-bottom:14px;">
+            <h2 style="margin:0; color:#a78bfa; font-size:16px;">📁 YAPP File Transfer</h2>
+            <button onclick="closeYappModal()" style="background:none;
+                    border:none; color:#888; font-size:24px; cursor:pointer;
+                    padding:0 8px; line-height:1;">&times;</button>
+        </div>
+
+        <div style="background:#0e2a1a; border:1px solid #1a5c3a;
+             color:#7ee0a3; padding:8px 10px; border-radius:4px;
+             font-size:11px; margin-bottom:12px;">
+            💡 The terminal below stays active. You can type BBS commands
+            while this panel is open.
+        </div>
+
+        <!-- FBB mode notice + connect button. YAPP requires FBB mode
+             (port 8011, transparent TCP, no telnet IAC). The standard
+             interactive telnet (port 8010) won't work for YAPP because
+             text-mode escape processing corrupts the binary frames. -->
+        <div id="yappFbbSection" style="background:#2a1e0e; border:1px solid #5c4a1a;
+             color:#e0c87a; padding:10px; border-radius:4px;
+             font-size:11px; margin-bottom:12px;">
+            <div style="font-weight:600; margin-bottom:6px;">⚠ FBB Mode Required for YAPP</div>
+            <div id="yappFbbStatus" style="margin-bottom:8px;">
+                Your current connection is on port <span id="yappFbbCurrentPort">?</span>.
+                YAPP requires a separate FBB-mode connection (port 8011).
+            </div>
+            <div id="yappFbbCreds" style="display:flex; gap:6px; align-items:center;
+                 margin-bottom:6px; flex-wrap:wrap;">
+                <input id="yappFbbUser" placeholder="BPQ user"
+                       style="flex:1; min-width:100px; padding:4px 6px;
+                              background:#0e0e1c; border:1px solid #444;
+                              color:#ccc; border-radius:3px; font-size:12px;">
+                <input id="yappFbbPass" type="password" placeholder="password"
+                       style="flex:1; min-width:100px; padding:4px 6px;
+                              background:#0e0e1c; border:1px solid #444;
+                              color:#ccc; border-radius:3px; font-size:12px;">
+            </div>
+            <button id="yappConnectFbbBtn" onclick="yappConnectFbb()"
+                    style="background:#a78bfa; color:#1a1a2e; border:none;
+                           padding:6px 12px; border-radius:3px;
+                           font-size:12px; font-weight:600; cursor:pointer;">
+                Switch to FBB Mode (port 8011)
+            </button>
+        </div>
+
+        <!-- Tab bar -->
+        <div style="display:flex; gap:4px; margin-bottom:16px;
+             border-bottom:1px solid #333;">
+            <button id="yappTabSend" onclick="yappTab('send')"
+                    class="yapp-tab active">⬆ Send File</button>
+            <button id="yappTabRecv" onclick="yappTab('recv')"
+                    class="yapp-tab">⬇ Receive File</button>
+        </div>
+
+        <!-- Send panel -->
+        <div id="yappPanelSend" class="yapp-panel">
+            <p style="color:#aaa; font-size:13px; margin-bottom:12px;">
+                Select a file to send via YAPP to the connected station.
+                Your terminal will switch to binary mode for the duration
+                of the transfer. The receiving end must be expecting a
+                YAPP transfer (typically you'd type a command like
+                <code style="background:#333; padding:1px 4px;">UPLOAD filename</code>
+                at the BBS prompt first).
+            </p>
+            <input type="file" id="yappFileInput"
+                   style="margin-bottom:12px; color:#ccc;">
+            <div id="yappFileInfo" style="font-size:12px; color:#888;
+                 margin-bottom:12px;"></div>
+            <button id="yappStartSendBtn" onclick="yappStartSend()"
+                    style="background:#7c3aed; color:#fff; border:none;
+                           padding:10px 20px; border-radius:4px;
+                           font-weight:600; cursor:pointer;"
+                    disabled>Start Sending</button>
+        </div>
+
+        <!-- Receive panel -->
+        <div id="yappPanelRecv" class="yapp-panel" style="display:none;">
+            <p style="color:#aaa; font-size:13px; margin-bottom:12px;">
+                Arm the receiver to watch for an incoming YAPP transfer.
+                Before clicking Start, you should have already typed the
+                appropriate command at the BBS prompt to initiate the
+                send from the remote side (e.g.
+                <code style="background:#333; padding:1px 4px;">YAPP filename</code>).
+                Files are saved to <code style="background:#333; padding:1px 4px;">/yapp-files/</code>
+                on the server and a download link will appear when done.
+                <br><br>
+                <strong>Tip:</strong> If you're connected to a BBS (local or
+                remote) and don't know what filenames are available, click
+                <em>Browse Files</em> to list them and click one to start
+                receiving.
+            </p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button id="yappBrowseBtn" onclick="yappBrowseFiles()"
+                        style="background:#3b82f6; color:#fff; border:none;
+                               padding:10px 18px; border-radius:4px;
+                               font-weight:600; cursor:pointer;">
+                    📂 Browse Files
+                </button>
+                <button id="yappStartRecvBtn" onclick="yappStartRecv()"
+                        style="background:#7c3aed; color:#fff; border:none;
+                               padding:10px 20px; border-radius:4px;
+                               font-weight:600; cursor:pointer;">
+                    🛰 Arm Receiver
+                </button>
+            </div>
+
+            <!-- File listing — populated by yappBrowseFiles() -->
+            <div id="yappFilesList" style="display:none; margin-top:14px;
+                 max-height:260px; overflow-y:auto; background:#0e0e1c;
+                 border:1px solid #333; border-radius:4px; padding:6px;">
+                <!-- Rendered file rows go here -->
+            </div>
+            <div id="yappFilesStatus" style="display:none; margin-top:8px;
+                 font-size:12px; color:#888;"></div>
+        </div>
+
+        <!-- Status / progress / result — shared across both modes -->
+        <div id="yappStatus" style="margin-top:16px; padding:12px;
+             background:#0e0e1c; border-radius:4px; border:1px solid #333;
+             min-height:80px; display:none;">
+            <div id="yappStatusText" style="font-size:13px; margin-bottom:8px;"></div>
+            <div id="yappProgressBar" style="display:none; background:#222;
+                 border-radius:4px; height:20px; overflow:hidden;
+                 margin-bottom:8px;">
+                <div id="yappProgressFill" style="background:linear-gradient(90deg, #7c3aed, #a78bfa);
+                     height:100%; width:0%; transition:width 0.2s;"></div>
+            </div>
+            <div id="yappProgressText" style="font-size:11px; color:#aaa;"></div>
+            <div id="yappResult" style="margin-top:8px;"></div>
+            <button id="yappAbortBtn" onclick="yappAbort()" style="display:none;
+                    background:#dc2626; color:#fff; border:none;
+                    padding:6px 12px; border-radius:4px; font-size:12px;
+                    cursor:pointer; margin-top:8px;">Abort Transfer</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .yapp-tab {
+        background:none; border:none; color:#888; padding:8px 16px;
+        cursor:pointer; font-size:14px; border-bottom:2px solid transparent;
+        margin-bottom:-1px;
+    }
+    .yapp-tab.active { color:#a78bfa; border-bottom-color:#a78bfa; }
+    .yapp-tab:hover { color:#ccc; }
+</style>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let ws          = null;
+let connected   = false;
+let cmdHistory  = [];
+let histIdx     = -1;
+let sessionStart= null;
+let currentHost = '';
+let currentPort = 0;
+let pendingCmd  = '';  // command to send after connect (quick-connect auto-nav)
+let sessionLog  = JSON.parse(localStorage.getItem('bpq_telnet_log') || '[]');
+
+// ── WebSocket ──────────────────────────────────────────────────────
+// Use wss:// if served over HTTPS (routes through nginx proxy)
+// Use ws:// if served over HTTP (direct to daemon port)
+const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
+const WS_URL   = location.protocol === 'https:'
+    ? `wss://${location.hostname}/ws/telnet`
+    : `ws://${location.hostname}:8765`;
+
+function connect(host, port, label, autoCmd, opts) {
+    if (ws) { ws.close(); ws = null; }
+    opts = opts || {};
+    const fbb = !!opts.fbb;
+    const username = opts.username || '';
+    const password = opts.password || '';
+
+    setStatus('connecting', `Connecting to ${host}:${port}…${fbb ? ' (FBB)' : ''}`);
+    currentHost = host;
+    currentPort = port;
+    pendingCmd  = autoCmd || '';
+
+    showTerminal();
+    appendSys(`Connecting to ${host}:${port}…${fbb ? ' (FBB mode)' : ''}`);
+
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+        const connectMsg = { action: 'connect', host, port };
+        if (fbb) {
+            connectMsg.fbb = true;
+            connectMsg.username = username;
+            connectMsg.password = password;
+        }
+        ws.send(JSON.stringify(connectMsg));
+    };
+
+    ws.onmessage = (evt) => {
+        try {
+            const msg = JSON.parse(evt.data);
+            handleMessage(msg, host, port, label);
+        } catch(e) {
+            appendText(evt.data);
+        }
+    };
+
+    ws.onclose = () => {
+        if (connected) {
+            setStatus('disconnected', 'Disconnected');
+            appendSys('Connection closed');
+            connected = false;
+            setInputEnabled(false);
+        }
+    };
+
+    ws.onerror = () => {
+        setStatus('disconnected', 'Connection error');
+        appendSys('WebSocket error — is the telnet daemon running?');
+        appendSys('Check: sudo systemctl status bpq-telnet');
+    };
+}
+
+function handleMessage(msg, host, port, label) {
+    switch(msg.type) {
+        case 'connected':
+            connected = true;
+            currentFbbMode = !!msg.fbb;
+            sessionStart = Date.now();
+            setStatus('connected', `${host}:${port}${currentFbbMode ? ' (FBB)' : ''}`);
+            appendSys(`Connected to ${host}:${port}${currentFbbMode ? ' in FBB mode' : ''}`);
+            setInputEnabled(true);
+            addSessionLog(host, port, label);
+            document.getElementById('disconnectBtn').style.display = '';
+            if (pendingCmd) {
+                setTimeout(() => sendRaw(pendingCmd), 800);
+                pendingCmd = '';
+            }
+            // Refresh YAPP modal status if it happens to be open
+            try { yappRefreshFbbStatus(); } catch(e) {}
+            break;
+
+        case 'data':
+            appendText(msg.data);
+            break;
+
+        case 'disconnected':
+            connected = false;
+            setStatus('disconnected', 'Disconnected');
+            appendSys('Disconnected from server');
+            setInputEnabled(false);
+            document.getElementById('disconnectBtn').style.display = 'none';
+            updateSessionInfo();
+            break;
+
+        case 'error':
+            appendSys(`Error: ${msg.message}`);
+            break;
+
+        case 'pong':
+            break;
+
+        // ─── YAPP file transfer messages ──────────────────────
+        case 'yapp_started':
+            yappOnStarted(msg);
+            break;
+        case 'yapp_progress':
+            yappOnProgress(msg);
+            break;
+        case 'yapp_complete':
+            yappOnComplete(msg);
+            break;
+        case 'yapp_error':
+            yappOnError(msg);
+            break;
+        case 'yapp_files_list':
+            yappOnFilesList(msg);
+            break;
+    }
+}
+
+function doDisconnect() {
+    if (ws) ws.send(JSON.stringify({ action: 'disconnect' }));
+    setTimeout(() => { if (ws) { ws.close(); ws = null; } }, 300);
+    connected = false;
+    setStatus('disconnected', 'Disconnected');
+    setInputEnabled(false);
+    document.getElementById('disconnectBtn').style.display = 'none';
+    updateSessionInfo();
+}
+
+// ── Quick connect ─────────────────────────────────────────────────
+function quickConnect(host, port, label, autoCmd) {
+    connect(host, port, label, autoCmd);
+}
+
+function customConnect() {
+    const host = document.getElementById('customHost').value.trim();
+    const port = parseInt(document.getElementById('customPort').value);
+    if (!host || !port) return;
+    connect(host, port, `${host}:${port}`);
+}
+
+// ── Input handling ────────────────────────────────────────────────
+function handleInputKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        sendCommand();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (histIdx < cmdHistory.length - 1) {
+            histIdx++;
+            document.getElementById('termInput').value = cmdHistory[cmdHistory.length - 1 - histIdx];
+        }
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (histIdx > 0) {
+            histIdx--;
+            document.getElementById('termInput').value = cmdHistory[cmdHistory.length - 1 - histIdx];
+        } else {
+            histIdx = -1;
+            document.getElementById('termInput').value = '';
+        }
+    }
+}
+
+function sendCommand() {
+    const input = document.getElementById('termInput');
+    const text  = input.value;
+    if (!connected || !ws) return;
+    // Echo command locally
+    appendText(`> ${text}\n`);
+    sendRaw(text);
+    // History
+    if (text.trim()) {
+        cmdHistory.push(text);
+        if (cmdHistory.length > 100) cmdHistory.shift();
+    }
+    histIdx = -1;
+    input.value = '';
+}
+
+function sendRaw(text) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ action: 'send', data: text }));
+    }
+}
+
+// ── Terminal output ───────────────────────────────────────────────
+function appendText(text) {
+    const term = document.getElementById('terminal');
+    const span = document.createElement('span');
+    span.innerHTML = ansiToHtml(escapeHtml(text));
+    term.appendChild(span);
+    term.scrollTop = term.scrollHeight;
+}
+
+function appendSys(text) {
+    const term = document.getElementById('terminal');
+    const span = document.createElement('span');
+    span.className = 'ansi-sys';
+    span.textContent = `[${new Date().toLocaleTimeString()}] ${text}\n`;
+    term.appendChild(span);
+    term.scrollTop = term.scrollHeight;
+}
+
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function ansiToHtml(text) {
+    // Convert common ANSI escape sequences to HTML spans
+    return text.replace(/\x1b\[([0-9;]*)m/g, (match, codes) => {
+        if (!codes || codes === '0') return '</span><span class="ansi-0">';
+        const parts = codes.split(';');
+        const classes = parts.map(c => `ansi-${c}`).join(' ');
+        return `</span><span class="${classes}">`;
+    }).replace(/\x1b\[[^m]*m/g, ''); // strip remaining escape sequences
+}
+
+function clearTerminal() {
+    document.getElementById('terminal').innerHTML = '';
+}
+
+function copySession() {
+    const text = document.getElementById('terminal').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✓ Copied';
+        setTimeout(() => btn.textContent = '📋 Copy', 2000);
+    });
+}
+
+// ── UI helpers ────────────────────────────────────────────────────
+function setStatus(state, label) {
+    const dot = document.getElementById('statusDot');
+    dot.className = state;
+    document.getElementById('statusLabel').textContent = label;
+}
+
+function setInputEnabled(enabled) {
+    document.getElementById('termInput').disabled = !enabled;
+    document.getElementById('sendBtn').disabled   = !enabled;
+    document.getElementById('yappBtn').disabled   = !enabled;
+    if (enabled) {
+        setTimeout(() => document.getElementById('termInput').focus(), 50);
+    }
+}
+
+function showTerminal() {
+    document.getElementById('connectPrompt').style.display = 'none';
+    document.getElementById('terminal').style.display = '';
+}
+
+function updateSessionInfo() {
+    if (!sessionStart) return;
+    const secs = Math.round((Date.now() - sessionStart) / 1000);
+    const m = Math.floor(secs / 60), s = secs % 60;
+    document.getElementById('sessionInfo').textContent =
+        `Session: ${m}m ${s}s`;
+}
+
+// ── Session log ───────────────────────────────────────────────────
+function addSessionLog(host, port, label) {
+    const entry = {
+        time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+        host, port,
+        label: label || `${host}:${port}`
+    };
+    sessionLog.unshift(entry);
+    if (sessionLog.length > 20) sessionLog.pop();
+    localStorage.setItem('bpq_telnet_log', JSON.stringify(sessionLog));
+    renderSessionLog();
+}
+
+function renderSessionLog() {
+    const container = document.getElementById('sessionLog');
+    container.innerHTML = sessionLog.map(e => `
+        <div class="log-entry" onclick="quickConnect('${e.host}', ${e.port}, '${e.label}')">
+            <div class="log-time">${e.time}</div>
+            <div class="log-host">${e.label}</div>
+        </div>
+    `).join('');
+}
+
+// ── Session timer ─────────────────────────────────────────────────
+setInterval(updateSessionInfo, 10000);
+
+// ── Command reference ────────────────────────────────────────────
+function toggleCmdRef() {
+    const body  = document.getElementById('cmdRefBody');
+    const arrow = document.getElementById('cmdRefArrow');
+    const open  = body.classList.toggle('open');
+    arrow.textContent = open ? '▾' : '▸';
+}
+
+function pasteCmd(cmd) {
+    const input = document.getElementById('termInput');
+    input.value = cmd;
+    input.focus();
+    // Place cursor at end
+    input.setSelectionRange(cmd.length, cmd.length);
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+renderSessionLog();
+loadNodes();
+setInterval(loadNodes, 30000);  // refresh NetROM nodes every 30s
+
+// ── NetROM Nodes ──────────────────────────────────────────────────
+async function loadNodes() {
+    const container = document.getElementById('nodesList');
+    try {
+        const resp = await fetch('bpq-nodes-api.php');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        // Update header count with active route count
+        const activeCount = (data.nodes || []).filter(n => n.active).length;
+        const hdr = document.getElementById('nodesRefreshBtn').parentElement;
+        hdr.childNodes[0].textContent = `NetROM (${activeCount})`;
+        renderNodes(data.nodes);
+    } catch(e) {
+        container.innerHTML = `<div style="padding:8px 12px;font-size:11px;color:var(--red)">
+            ⚠ ${e.message}</div>`;
+    }
+}
+
+function renderNodes(nodes) {
+    const container = document.getElementById('nodesList');
+    if (!nodes || nodes.length === 0) {
+        container.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted)">No nodes found</div>';
+        return;
+    }
+
+    // Only show active direct neighbours — filter out inactive nodes
+    const active_nodes = nodes.filter(n => n.active);
+
+    if (active_nodes.length === 0) {
+        container.innerHTML = '<div style="padding:8px 12px;font-size:11px;color:var(--muted)">No active routes</div>';
+        return;
+    }
+
+    // Sort alphabetically by alias
+    active_nodes.sort((a, b) => {
+        const aLabel = a.alias || a.call;
+        const bLabel = b.alias || b.call;
+        return aLabel.localeCompare(bLabel);
+    });
+
+    container.innerHTML = active_nodes.map(n => {
+        const label = n.alias || n.call;
+        const sub   = n.alias ? n.call : '';
+        const qual  = n.qual
+            ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">${n.qual}</span>`
+            : '';
+        const cmd   = `<span style="display:block;font-size:9px;color:var(--accent);font-family:var(--font-mono)">C ${n.call}</span>`;
+        return `<div class="quick-btn" style="cursor:pointer" onclick="quickConnect('127.0.0.1', 8010, '${label}')">
+            <span class="qicon"><span style="color:var(--green);font-size:9px">●</span></span>
+            <span class="qname" style="flex:1;min-width:0">
+                <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
+                ${sub ? `<span style="display:block;font-size:9px;color:var(--muted);font-family:var(--font-mono)">${sub}</span>` : ''}
+                ${cmd}
+            </span>
+            ${qual}
+        </div>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// YAPP file transfer modal
+// ═══════════════════════════════════════════════════════════════
+
+let yappActive = false;   // is a transfer currently in progress?
+let yappFile = null;      // File object selected for sending
+
+function openYappModal() {
+    if (!connected) {
+        appendSys('Connect to a station first before opening YAPP');
+        return;
+    }
+    const modal = document.getElementById('yappModal');
+    if (!modal) {
+        appendSys('YAPP modal missing from page — please reload (Ctrl+Shift+R)');
+        return;
+    }
+    // Toggle: if currently visible, close it. Otherwise open.
+    // Use computed style rather than inline style — initial inline style
+    // might be empty string after some browser cycles.
+    const isVisible = modal.style.display === 'block'
+        || (modal.style.display !== 'none' &&
+            getComputedStyle(modal).display !== 'none');
+    if (isVisible) {
+        closeYappModal();
+        return;
+    }
+    modal.style.display = 'block';
+    // Default to Send tab
+    try {
+        yappTab('send');
+        yappResetStatus();
+        // Refresh the FBB-mode status section based on current connection
+        yappRefreshFbbStatus();
+    } catch(e) {
+        console.error('YAPP modal init error:', e);
+        appendSys('YAPP modal error: ' + e.message);
+    }
+}
+
+// Update the "FBB Mode Required" section based on whether the
+// current connection is already on the FBB port (8011) or still on
+// the regular telnet port (8010). If on FBB, hide the warning.
+function yappRefreshFbbStatus() {
+    const section = document.getElementById('yappFbbSection');
+    const portEl  = document.getElementById('yappFbbCurrentPort');
+    if (!section || !portEl) return;
+    portEl.textContent = currentPort;
+    // If user is on the FBB port (8011), they're good
+    if (currentPort === 8011 || currentFbbMode === true) {
+        section.style.background = '#0e2a1a';
+        section.style.borderColor = '#1a5c3a';
+        section.style.color = '#7ee0a3';
+        section.innerHTML = `<div style="font-weight:600;">✓ FBB Mode Active (port ${currentPort})</div>
+            <div style="margin-top:4px;">Ready for YAPP file transfers.</div>`;
+    } else {
+        // Still need to switch — restore the warning + connect UI
+        section.style.background = '#2a1e0e';
+        section.style.borderColor = '#5c4a1a';
+        section.style.color = '#e0c87a';
+        // (HTML preserved — don't overwrite if it still has inputs)
+    }
+}
+
+// Switch to an FBB-mode connection on port 8011, using the credentials
+// the user enters in the YAPP modal. This DISCONNECTS the current
+// session and opens a fresh one in FBB mode. After successful connect,
+// the user can use YAPP normally.
+function yappConnectFbb() {
+    const user = document.getElementById('yappFbbUser').value.trim();
+    const pass = document.getElementById('yappFbbPass').value;
+    if (!user || !pass) {
+        alert('BPQ username and password are required for FBB mode.');
+        return;
+    }
+    // Remember the credentials for the rest of this browser session so
+    // re-opening the YAPP modal doesn't require re-typing them. (Stored
+    // only in JS memory, NOT persisted to localStorage.)
+    lastFbbUser = user;
+    lastFbbPass = pass;
+    appendSys(`Switching to FBB mode (port 8011) as user '${user}'…`);
+    // Use current host but FBB port. Mark connection state so
+    // yappRefreshFbbStatus can detect it.
+    connect(currentHost || '127.0.0.1', 8011,
+            `${currentHost || '127.0.0.1'}:8011 (FBB)`, '',
+            { fbb: true, username: user, password: pass });
+}
+
+// Track whether current session is FBB mode (set by 'connected' message)
+let currentFbbMode = false;
+let lastFbbUser = '';
+let lastFbbPass = '';
+
+function closeYappModal() {
+    document.getElementById('yappModal').style.display = 'none';
+}
+
+function yappTab(which) {
+    document.getElementById('yappTabSend').classList.toggle('active', which === 'send');
+    document.getElementById('yappTabRecv').classList.toggle('active', which === 'recv');
+    document.getElementById('yappPanelSend').style.display = which === 'send' ? '' : 'none';
+    document.getElementById('yappPanelRecv').style.display = which === 'recv' ? '' : 'none';
+}
+
+// File input changes — show info, enable Start button
+document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('yappFileInput');
+    if (inp) {
+        inp.addEventListener('change', (e) => {
+            yappFile = e.target.files[0] || null;
+            const info = document.getElementById('yappFileInfo');
+            const btn  = document.getElementById('yappStartSendBtn');
+            if (yappFile) {
+                const sizeKB = (yappFile.size / 1024).toFixed(1);
+                info.textContent = `Selected: ${yappFile.name} (${sizeKB} KB)`;
+                btn.disabled = false;
+            } else {
+                info.textContent = '';
+                btn.disabled = true;
+            }
+        });
+    }
+});
+
+function yappResetStatus() {
+    document.getElementById('yappStatus').style.display = 'none';
+    document.getElementById('yappStatusText').textContent = '';
+    document.getElementById('yappProgressBar').style.display = 'none';
+    document.getElementById('yappProgressFill').style.width = '0%';
+    document.getElementById('yappProgressText').textContent = '';
+    document.getElementById('yappResult').innerHTML = '';
+    document.getElementById('yappAbortBtn').style.display = 'none';
+}
+
+function yappShowStatus(text) {
+    document.getElementById('yappStatus').style.display = '';
+    document.getElementById('yappStatusText').textContent = text;
+}
+
+async function yappStartSend() {
+    if (!yappFile) return;
+    if (yappActive) return;
+    if (yappFile.size > 10 * 1024 * 1024) {
+        yappShowStatus('File too large (max 10 MB).');
+        return;
+    }
+    // Read file as base64
+    yappShowStatus('Reading file…');
+    const buf = await yappFile.arrayBuffer();
+    const b64 = arrayBufferToBase64(buf);
+    yappActive = true;
+    yappShowStatus(`Starting YAPP send: ${yappFile.name} (${(yappFile.size/1024).toFixed(1)} KB)`);
+    document.getElementById('yappAbortBtn').style.display = '';
+    ws.send(JSON.stringify({
+        action: 'yapp_send',
+        filename: yappFile.name,
+        data: b64,
+    }));
+}
+
+function yappStartRecv() {
+    if (yappActive) return;
+    yappActive = true;
+    yappShowStatus('Armed for incoming YAPP transfer. Now type the BBS command to send the file.');
+    document.getElementById('yappAbortBtn').style.display = '';
+    ws.send(JSON.stringify({ action: 'yapp_recv' }));
+}
+
+function yappAbort() {
+    if (!yappActive) return;
+    ws.send(JSON.stringify({ action: 'yapp_abort' }));
+}
+
+// ── Browse Files ─────────────────────────────────────────────────
+// Asks the daemon to issue `Files` to the BBS and parse the response,
+// then renders clickable rows. Click a row → arm receiver + send the
+// YAPP <filename> command automatically.
+//
+// Requires the user to already be in BBS state (typed BBS at the
+// Node prompt). If they're at the Node prompt or somewhere else,
+// BPQ will return "Invalid command" and we'll show an error.
+
+function yappBrowseFiles() {
+    const list = document.getElementById('yappFilesList');
+    const status = document.getElementById('yappFilesStatus');
+    const btn = document.getElementById('yappBrowseBtn');
+
+    if (!connected) {
+        status.style.display = '';
+        status.textContent = '⚠ Not connected. Connect to BBS first.';
+        return;
+    }
+    if (yappActive) {
+        status.style.display = '';
+        status.textContent = '⚠ YAPP transfer in progress — abort first.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Requesting…';
+    list.style.display = 'none';
+    list.innerHTML = '';
+    status.style.display = '';
+    status.textContent = 'Asking BBS for file listing…';
+
+    // Send the request. Server returns a yapp_files_list message.
+    ws.send(JSON.stringify({ action: 'yapp_list_files' }));
+}
+
+function yappOnFilesList(msg) {
+    const list = document.getElementById('yappFilesList');
+    const status = document.getElementById('yappFilesStatus');
+    const btn = document.getElementById('yappBrowseBtn');
+
+    btn.disabled = false;
+    btn.textContent = '📂 Browse Files';
+
+    if (!msg.ok) {
+        list.style.display = 'none';
+        status.style.display = '';
+        status.textContent = '⚠ ' + (msg.error || 'Failed to list files');
+        return;
+    }
+
+    const files = msg.files || [];
+    if (files.length === 0) {
+        list.style.display = 'none';
+        status.style.display = '';
+        // The BBS may have returned "Invalid command" if the user
+        // wasn't in BBS mode. Common gotcha.
+        status.innerHTML = 'No files listed. ' +
+            '<br><small style="color:#888;">' +
+            'If you\'re at the BPQ Node prompt, type <code>BBS</code> first, ' +
+            'then try Browse Files again. If you\'re connected to a remote ' +
+            'BBS, that BBS may not have files available.' +
+            '</small>';
+        return;
+    }
+
+    // Render file rows
+    status.style.display = '';
+    status.textContent = `${files.length} file${files.length === 1 ? '' : 's'} available — click to receive`;
+
+    list.innerHTML = '';
+    files.forEach(f => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; justify-content:space-between; ' +
+                            'align-items:center; padding:8px 10px; ' +
+                            'border-bottom:1px solid #222; cursor:pointer; ' +
+                            'transition:background 0.15s;';
+        row.onmouseover = () => row.style.background = '#1a1a2e';
+        row.onmouseout  = () => row.style.background = '';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.style.cssText = 'color:#e5e7eb; font-family:monospace; ' +
+                                 'font-size:13px; flex:1; overflow:hidden; ' +
+                                 'text-overflow:ellipsis; white-space:nowrap;';
+        nameSpan.textContent = f.name;
+        nameSpan.title = f.name;
+
+        const sizeSpan = document.createElement('span');
+        sizeSpan.style.cssText = 'color:#888; font-size:11px; margin-left:12px; ' +
+                                 'font-family:monospace;';
+        sizeSpan.textContent = formatFileSize(f.size);
+
+        row.appendChild(nameSpan);
+        row.appendChild(sizeSpan);
+        row.onclick = () => yappRequestFile(f.name);
+        list.appendChild(row);
+    });
+    list.style.display = '';
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+function yappRequestFile(filename) {
+    // Click on a file row: arm the receiver, then type YAPP <filename>
+    // into the terminal. Daemon's TX of YAPP <filename> goes to BPQ
+    // which initiates the transfer.
+    if (yappActive) {
+        appendSys('YAPP transfer already in progress; abort first.');
+        return;
+    }
+    if (!connected) {
+        appendSys('Not connected.');
+        return;
+    }
+
+    // Hide the file list while transfer runs
+    document.getElementById('yappFilesList').style.display = 'none';
+    document.getElementById('yappFilesStatus').textContent =
+        `Requesting: ${filename}`;
+
+    // Step 1: arm the receiver
+    yappActive = true;
+    yappShowStatus(`Requesting ${filename} from BBS…`);
+    document.getElementById('yappAbortBtn').style.display = '';
+    ws.send(JSON.stringify({ action: 'yapp_recv' }));
+
+    // Step 2: send the YAPP command after a brief delay so the daemon
+    // has armed the receiver before BPQ starts sending the SI packet.
+    setTimeout(() => {
+        ws.send(JSON.stringify({
+            action: 'send',
+            data: `YAPP ${filename}\r`
+        }));
+    }, 200);
+}
+
+function yappOnStarted(msg) {
+    if (msg.direction === 'send') {
+        yappShowStatus(`Sending: ${msg.filename} (${msg.bytes_total} bytes)`);
+    } else {
+        yappShowStatus('Waiting for incoming YAPP transfer…');
+    }
+    document.getElementById('yappProgressBar').style.display = '';
+}
+
+function yappOnProgress(msg) {
+    const pct = msg.percent || 0;
+    document.getElementById('yappProgressFill').style.width = pct + '%';
+    const kb = (msg.bytes / 1024).toFixed(1);
+    const totalKb = msg.total ? (msg.total / 1024).toFixed(1) : '?';
+    document.getElementById('yappProgressText').textContent =
+        `${kb} / ${totalKb} KB  (${pct}%)`;
+}
+
+function yappOnComplete(msg) {
+    yappActive = false;
+    document.getElementById('yappAbortBtn').style.display = 'none';
+    document.getElementById('yappProgressFill').style.width = '100%';
+    const yappcTag = msg.yappc ? '<span style="color:#a78bfa">YAPP-C</span>' : 'classic YAPP';
+    if (msg.direction === 'recv' && msg.url) {
+        document.getElementById('yappResult').innerHTML =
+            `<div style="color:#10b981; font-weight:600;">
+                ✓ Received ${msg.bytes} bytes (${yappcTag})
+            </div>
+            <div style="margin-top:6px;">
+                <a href="${msg.url}" download="${msg.filename}"
+                   style="color:#a78bfa; text-decoration:underline;">
+                    Download ${msg.filename}
+                </a>
+            </div>`;
+    } else {
+        document.getElementById('yappResult').innerHTML =
+            `<div style="color:#10b981; font-weight:600;">
+                ✓ Sent ${msg.bytes} bytes via ${yappcTag}
+            </div>`;
+    }
+    yappShowStatus('Transfer complete.');
+    appendSys(`YAPP transfer complete: ${msg.filename || ''} (${msg.bytes} bytes)`);
+}
+
+function yappOnError(msg) {
+    yappActive = false;
+    document.getElementById('yappAbortBtn').style.display = 'none';
+    document.getElementById('yappResult').innerHTML =
+        `<div style="color:#ef4444; font-weight:600;">
+            ✗ ${escapeHtmlYapp(msg.message || 'Transfer failed')}
+        </div>`;
+    yappShowStatus('Transfer aborted or failed.');
+    appendSys(`YAPP error: ${msg.message || 'unknown'}`);
+}
+
+function escapeHtmlYapp(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    }[c]));
+}
+
+// Convert ArrayBuffer to base64 string (chunked to avoid call-stack limits
+// on large files — each chunk goes through String.fromCharCode separately)
+function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    const CHUNK = 8192;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(
+            null, bytes.subarray(i, i + CHUNK)
+        );
+    }
+    return btoa(binary);
+}
+</script>
+</body>
+</html>

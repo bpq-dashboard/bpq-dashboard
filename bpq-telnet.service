@@ -1,0 +1,18 @@
+[Unit]
+Description=BPQ Dashboard - Telnet proxy daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/python3 /var/www/bpq-dashboard/scripts/bpq-telnet-daemon.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bpq-telnet
+
+[Install]
+WantedBy=multi-user.target

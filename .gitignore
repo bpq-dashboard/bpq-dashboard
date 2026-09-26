@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────────────────────────────────
+# BPQ Dashboard — files that must never go to GitHub (2026-09-26)
+# This working copy doubles as the future public repo: everything specific
+# to one station (passwords, domains, logs, data) stays out of Git.
+# Committed instead: the *.example templates next to each one.
+# ─────────────────────────────────────────────────────────────────────────
+
+# Local configuration / credentials  (templates: *.example)
+/db-config.php
+/config.php
+/bbs-config.php
+/nws-config.php
+
+# Station-specific files (live nginx config etc.) — see private/README.md
+/private/
+
+# The session journal is this station's working memory (server paths,
+# security incidents, deploy history) — kept in the working copy/zip,
+# never published.
+/docs/SESSION-JOURNAL.md
+
+# Message forms: third-party (TPRFN HTML Forms by N3MEL), downloaded at install
+# time by scripts/fetch-forms.sh rather than published here.
+/pktnet-forms/
+
+# Runtime data written by the dashboard
+/logs/*
+!/logs/.gitkeep
+/cache/*
+!/cache/.gitkeep
+/data/stations/*
+/data/backups/*
+/archives/*
+!/archives/README.md
+/wavenode-logs/
+
+# Deploy leftovers
+*.bak
+*.bak-*
+*.bak.*
+*~
+.DS_Store
+__pycache__/
+*.pyc

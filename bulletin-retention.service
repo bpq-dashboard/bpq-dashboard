@@ -1,0 +1,11 @@
+[Unit]
+Description=BPQ Dashboard — Bulletin Retention Purge
+After=network.target mysql.service mariadb.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/php /var/www/bpq-dashboard/scripts/purge-old-bulletins.php
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 70" width="900" height="70">
+  <!-- Background — light mode nav bar -->
+  <rect width="900" height="70" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Brand / station identifier (left) -->
+  <rect x="10" y="15" width="160" height="40" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1"/>
+  <circle cx="32" cy="35" r="10" fill="#7c3aed"/>
+  <text x="32" y="40" font-family="Helvetica" font-size="11" fill="white" text-anchor="middle" font-weight="bold">📡</text>
+  <text x="50" y="40" font-family="Helvetica" font-size="13" fill="#1f2937" font-weight="600">W1AW BPQ</text>
+
+  <!-- Nav buttons (center) -->
+  <g font-family="Helvetica" font-size="12" fill="#4b5563" font-weight="500">
+    <rect x="185" y="18" width="60" height="34" rx="4" fill="transparent"/>
+    <text x="215" y="40" text-anchor="middle">Comms ▾</text>
+
+    <rect x="252" y="18" width="55" height="34" rx="4" fill="transparent"/>
+    <text x="280" y="40" text-anchor="middle">Email ▾</text>
+
+    <rect x="314" y="18" width="50" height="34" rx="4" fill="transparent"/>
+    <text x="339" y="40" text-anchor="middle">Logs ▾</text>
+
+    <rect x="371" y="18" width="50" height="34" rx="4" fill="transparent"/>
+    <text x="396" y="40" text-anchor="middle">Map ▾</text>
+
+    <rect x="428" y="18" width="50" height="34" rx="4" fill="transparent"/>
+    <text x="453" y="40" text-anchor="middle">Wx ▾</text>
+  </g>
+
+  <!-- Clocks -->
+  <g font-family="JetBrains Mono, monospace" font-size="11" fill="#374151">
+    <text x="540" y="32" font-weight="600" fill="#6b7280" font-size="9">LOCAL</text>
+    <text x="540" y="48" font-weight="700">14:23:51</text>
+
+    <text x="610" y="32" font-weight="600" fill="#6b7280" font-size="9">UTC</text>
+    <text x="610" y="48" font-weight="700">18:23:51</text>
+  </g>
+
+  <!-- Theme toggle -->
+  <circle cx="715" cy="35" r="17" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="715" y="42" font-family="Helvetica" font-size="20" fill="#d97706" text-anchor="middle">☀</text>
+
+  <!-- Admin gear -->
+  <rect x="755" y="18" width="40" height="34" rx="4" fill="transparent" stroke="#d1d5db" stroke-width="1"/>
+  <text x="775" y="42" font-family="Helvetica" font-size="20" fill="#6b7280" text-anchor="middle">⚙</text>
+
+  <!-- Subtle bottom border -->
+  <line x1="0" y1="69" x2="900" y2="69" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Caption -->
+  <text x="450" y="68" font-family="Helvetica" font-size="9" fill="#9ca3af" text-anchor="middle" font-style="italic">Shared navigation bar (light theme) — present on every page</text>
+</svg>

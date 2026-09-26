@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 540" width="900" height="540">
+  <!-- Page background -->
+  <rect width="900" height="540" fill="#f3f4f6"/>
+
+  <!-- Page title -->
+  <text x="20" y="35" font-family="Helvetica" font-size="22" fill="#1f2937" font-weight="700">Email Client</text>
+  <text x="160" y="35" font-family="Helvetica" font-size="12" fill="#7c3aed" font-weight="600">BBS Messages</text>
+
+  <!-- Toolbar -->
+  <g transform="translate(20, 55)">
+    <rect width="120" height="32" rx="4" fill="#7c3aed"/>
+    <text x="60" y="20" font-family="Helvetica" font-size="13" fill="white" font-weight="600" text-anchor="middle">+ Compose</text>
+
+    <rect x="130" width="80" height="32" rx="4" fill="white" stroke="#d1d5db" stroke-width="1"/>
+    <text x="170" y="20" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500" text-anchor="middle">↻ Refresh</text>
+
+    <rect x="220" width="60" height="32" rx="4" fill="white" stroke="#d1d5db" stroke-width="1"/>
+    <text x="250" y="20" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500" text-anchor="middle">Reply</text>
+
+    <rect x="290" width="80" height="32" rx="4" fill="white" stroke="#d1d5db" stroke-width="1"/>
+    <text x="330" y="20" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500" text-anchor="middle">Forward</text>
+
+    <rect x="380" width="60" height="32" rx="4" fill="white" stroke="#d1d5db" stroke-width="1"/>
+    <text x="410" y="20" font-family="Helvetica" font-size="13" fill="#dc2626" font-weight="500" text-anchor="middle">Delete</text>
+
+    <!-- Search box -->
+    <rect x="600" width="270" height="32" rx="4" fill="white" stroke="#d1d5db" stroke-width="1"/>
+    <text x="615" y="20" font-family="Helvetica" font-size="13" fill="#9ca3af">🔍 Search messages…</text>
+  </g>
+
+  <!-- 3-pane layout -->
+  <!-- Folder list (left sidebar) -->
+  <g transform="translate(20, 100)">
+    <rect width="160" height="420" rx="6" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+
+    <text x="12" y="22" font-family="Helvetica" font-size="11" fill="#6b7280" font-weight="700">FOLDERS</text>
+
+    <!-- Personal (selected) -->
+    <rect x="0" y="30" width="160" height="34" fill="#ede9fe"/>
+    <rect x="0" y="30" width="3" height="34" fill="#7c3aed"/>
+    <text x="14" y="51" font-family="Helvetica" font-size="13" fill="#5b21b6" font-weight="700">📥 Personal</text>
+    <rect x="125" y="40" width="25" height="16" rx="8" fill="#7c3aed"/>
+    <text x="137" y="52" font-family="Helvetica" font-size="10" fill="white" font-weight="700" text-anchor="middle">12</text>
+
+    <!-- NTS -->
+    <rect x="0" y="64" width="160" height="34" fill="white"/>
+    <text x="14" y="85" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">📬 NTS</text>
+    <rect x="125" y="74" width="25" height="16" rx="8" fill="#fbbf24"/>
+    <text x="137" y="86" font-family="Helvetica" font-size="10" fill="white" font-weight="700" text-anchor="middle">3</text>
+
+    <!-- Bulletins (top-level umbrella) -->
+    <text x="14" y="119" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">📢 Bulletins</text>
+    <text x="140" y="119" font-family="Helvetica" font-size="11" fill="#9ca3af">45</text>
+
+    <!-- Sent -->
+    <text x="14" y="143" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">📤 Sent</text>
+    <text x="140" y="143" font-family="Helvetica" font-size="11" fill="#9ca3af">47</text>
+
+    <!-- Trash -->
+    <text x="14" y="167" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">🗑 Trash</text>
+    <text x="140" y="167" font-family="Helvetica" font-size="11" fill="#9ca3af">3</text>
+
+    <!-- Custom folders -->
+    <line x1="12" y1="185" x2="148" y2="185" stroke="#e5e7eb"/>
+    <text x="12" y="205" font-family="Helvetica" font-size="11" fill="#6b7280" font-weight="700">BULLETIN GROUPS</text>
+
+    <text x="14" y="227" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">📁 Bulletins - NEWS</text>
+    <text x="140" y="227" font-family="Helvetica" font-size="11" fill="#9ca3af">8</text>
+
+    <text x="14" y="251" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">📁 Bulletins - PKTNET</text>
+    <text x="140" y="251" font-family="Helvetica" font-size="11" fill="#9ca3af">5</text>
+
+    <!-- Address book -->
+    <line x1="12" y1="275" x2="148" y2="275" stroke="#e5e7eb"/>
+    <text x="14" y="297" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">📒 Address Book</text>
+
+    <!-- Settings -->
+    <text x="14" y="321" font-family="Helvetica" font-size="13" fill="#374151" font-weight="500">⚙ Settings</text>
+  </g>
+
+  <!-- Message list (center) -->
+  <g transform="translate(190, 100)">
+    <rect width="320" height="420" rx="6" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+
+    <!-- Header -->
+    <rect width="320" height="32" fill="#f9fafb"/>
+    <text x="12" y="20" font-family="Helvetica" font-size="11" fill="#6b7280" font-weight="700">PERSONAL — 12 messages</text>
+
+    <!-- Selected message (highlighted) -->
+    <rect x="0" y="32" width="320" height="62" fill="#ede9fe"/>
+    <rect x="0" y="32" width="3" height="62" fill="#7c3aed"/>
+    <text x="14" y="50" font-family="Helvetica" font-size="12" fill="#1f2937" font-weight="700">KE0GB</text>
+    <text x="14" y="68" font-family="Helvetica" font-size="13" fill="#1f2937" font-weight="600">Re: SCS Pactor settings</text>
+    <text x="14" y="84" font-family="Helvetica" font-size="11" fill="#6b7280">Thanks for the help with the modem cfg…</text>
+    <text x="285" y="50" font-family="Helvetica" font-size="10" fill="#6b7280" text-anchor="end">14:32</text>
+    <circle cx="297" cy="78" r="4" fill="#7c3aed"/>
+
+    <!-- Other messages -->
+    <g transform="translate(0, 94)">
+      <line x1="12" y1="0" x2="308" y2="0" stroke="#e5e7eb"/>
+      <text x="14" y="18" font-family="Helvetica" font-size="12" fill="#1f2937" font-weight="600">N3MEL</text>
+      <text x="14" y="34" font-family="Helvetica" font-size="13" fill="#1f2937">Field day setup question</text>
+      <text x="14" y="50" font-family="Helvetica" font-size="11" fill="#6b7280">Setting up a portable station for FD…</text>
+      <text x="285" y="18" font-family="Helvetica" font-size="10" fill="#6b7280" text-anchor="end">13:18</text>
+    </g>
+
+    <g transform="translate(0, 154)">
+      <line x1="12" y1="0" x2="308" y2="0" stroke="#e5e7eb"/>
+      <text x="14" y="18" font-family="Helvetica" font-size="12" fill="#1f2937" font-weight="600">W1AW @ARRL</text>
+      <text x="14" y="34" font-family="Helvetica" font-size="13" fill="#1f2937" font-weight="600">ARRL Bulletin 27</text>
+      <text x="14" y="50" font-family="Helvetica" font-size="11" fill="#6b7280">ARLB027 - Solar Cycle 25 update…</text>
+      <text x="285" y="18" font-family="Helvetica" font-size="10" fill="#6b7280" text-anchor="end">12:01</text>
+      <circle cx="297" cy="44" r="4" fill="#7c3aed"/>
+    </g>
+
+    <g transform="translate(0, 214)">
+      <line x1="12" y1="0" x2="308" y2="0" stroke="#e5e7eb"/>
+      <text x="14" y="18" font-family="Helvetica" font-size="12" fill="#1f2937" font-weight="600">KA3VSP</text>
+      <text x="14" y="34" font-family="Helvetica" font-size="13" fill="#1f2937">Re: Forwarding partner request</text>
+      <text x="14" y="50" font-family="Helvetica" font-size="11" fill="#6b7280">Approved — schedule attached…</text>
+      <text x="280" y="18" font-family="Helvetica" font-size="10" fill="#6b7280" text-anchor="end">Yesterday</text>
+    </g>
+
+    <g transform="translate(0, 274)">
+      <line x1="12" y1="0" x2="308" y2="0" stroke="#e5e7eb"/>
+      <text x="14" y="18" font-family="Helvetica" font-size="12" fill="#1f2937" font-weight="600">NTS Net</text>
+      <text x="14" y="34" font-family="Helvetica" font-size="13" fill="#1f2937">Traffic for W1AW</text>
+      <text x="14" y="50" font-family="Helvetica" font-size="11" fill="#6b7280">2 messages on net last night…</text>
+      <text x="280" y="18" font-family="Helvetica" font-size="10" fill="#6b7280" text-anchor="end">Yesterday</text>
+    </g>
+
+    <g transform="translate(0, 334)">
+      <line x1="12" y1="0" x2="308" y2="0" stroke="#e5e7eb"/>
+      <text x="14" y="18" font-family="Helvetica" font-size="12" fill="#1f2937" font-weight="600">VE3CGR</text>
+      <text x="14" y="34" font-family="Helvetica" font-size="13" fill="#1f2937">Re: Cross-border forwarding</text>
+      <text x="14" y="50" font-family="Helvetica" font-size="11" fill="#6b7280">Working great — thanks for the…</text>
+      <text x="280" y="18" font-family="Helvetica" font-size="10" fill="#6b7280" text-anchor="end">May 23</text>
+    </g>
+  </g>
+
+  <!-- Reading pane (right) -->
+  <g transform="translate(520, 100)">
+    <rect width="360" height="420" rx="6" fill="white" stroke="#e5e7eb" stroke-width="1"/>
+
+    <!-- Header -->
+    <rect width="360" height="100" fill="#f9fafb"/>
+    <text x="15" y="25" font-family="Helvetica" font-size="16" fill="#1f2937" font-weight="700">Re: SCS Pactor settings</text>
+    <line x1="15" y1="35" x2="345" y2="35" stroke="#e5e7eb"/>
+
+    <text x="15" y="55" font-family="Helvetica" font-size="11" fill="#6b7280" font-weight="600">FROM</text>
+    <text x="65" y="55" font-family="Helvetica" font-size="12" fill="#1f2937" font-weight="600">KE0GB @KE0GB</text>
+
+    <text x="15" y="72" font-family="Helvetica" font-size="11" fill="#6b7280" font-weight="600">TO</text>
+    <text x="65" y="72" font-family="Helvetica" font-size="12" fill="#1f2937">W1AW @W1AW</text>
+
+    <text x="15" y="89" font-family="Helvetica" font-size="11" fill="#6b7280" font-weight="600">DATE</text>
+    <text x="65" y="89" font-family="Helvetica" font-size="12" fill="#1f2937">2026-05-24 14:32 EST</text>
+
+    <!-- Body -->
+    <g font-family="Helvetica" font-size="12" fill="#374151">
+      <text x="15" y="125">Tony,</text>
+      <text x="15" y="148">Thanks for the help with the SCS Pactor</text>
+      <text x="15" y="166">modem configuration. After applying your</text>
+      <text x="15" y="184">settings the linkup time dropped from</text>
+      <text x="15" y="202">35 seconds down to 12. Big improvement.</text>
+
+      <text x="15" y="225">One more question — do you have any</text>
+      <text x="15" y="243">tips for setting up the auto-routing for</text>
+      <text x="15" y="261">NTS traffic? I see your node has it but</text>
+      <text x="15" y="279">I can't find documentation.</text>
+
+      <text x="15" y="302">73,</text>
+      <text x="15" y="320">Glen — KE0GB</text>
+    </g>
+
+    <!-- Forwarding indicator at bottom -->
+    <rect x="15" y="365" width="330" height="40" rx="6" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+    <text x="25" y="385" font-family="Helvetica" font-size="11" fill="#1e40af" font-weight="600">✓ Forwarded to partner BBSes:</text>
+    <text x="25" y="400" font-family="Helvetica" font-size="11" fill="#1e40af">VE3CGR @ 14:42 · GB7BED @ 15:08</text>
+  </g>
+
+  <text x="450" y="535" font-family="Helvetica" font-size="10" fill="#6b7280" text-anchor="middle" font-style="italic">Email Client — folder sidebar, message list, reading pane with forwarding visibility</text>
+</svg>

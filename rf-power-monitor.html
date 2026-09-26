@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RF Power Monitor — YOURCALL BPQ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* Light mode — RF Power Monitor uses Tailwind dark utilities by
+           default. These overrides flip the most-used utility classes
+           when [data-theme="light"] is set on <html>. Charts and the
+           meter-card retain their dark instrument look intentionally
+           (high-contrast readouts work better dark). */
+        [data-theme="light"] body { background-color:#f3f4f6 !important; color:#1f2937 !important; }
+        [data-theme="light"] .bg-gray-900 { background-color:#ffffff !important; }
+        [data-theme="light"] .bg-gray-800 { background-color:#f9fafb !important; }
+        [data-theme="light"] .bg-gray-700 { background-color:#e5e7eb !important; }
+        [data-theme="light"] .bg-gray-600 { background-color:#d1d5db !important; }
+        [data-theme="light"] .text-white { color:#1f2937 !important; }
+        [data-theme="light"] .text-gray-200 { color:#374151 !important; }
+        [data-theme="light"] .text-gray-300 { color:#4b5563 !important; }
+        [data-theme="light"] .text-gray-400 { color:#6b7280 !important; }
+        [data-theme="light"] .text-gray-500 { color:#6b7280 !important; }
+        [data-theme="light"] .text-gray-600 { color:#9ca3af !important; }
+        [data-theme="light"] .border-gray-700 { border-color:#d1d5db !important; }
+        [data-theme="light"] .border-gray-600 { border-color:#9ca3af !important; }
+        /* Meter card and chart containers keep instrument-dark look in both themes */
+        [data-theme="light"] .meter-card { background:linear-gradient(145deg,#2a3441 0%,#1a2330 100%) !important; }
+        [data-theme="light"] .meter-card * { color:#e5e7eb !important; }
+
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(34, 197, 94, 0.5); } 50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.8); } }
+        .transmitting { animation: pulse-glow 0.5s ease-in-out infinite; border-color: #22c55e !important; }
+        /* Digital RF Power Meter — modern broadcast-style instrument
+           Replaces the old CSS-stacked-divs analog gauge with an SVG bar meter.
+           Design choices:
+             - Dark bezel with subtle inner highlight for "instrument panel" feel
+             - Tabular numerals so digits don't shift width during updates
+             - Subtle text-shadow glow on the big readout (LED-style without being kitschy)
+             - Gentle 2-second pulse animation on the card during TX (peripheral-vision cue) */
+        .meter-card {
+            /* Brighter gradient than the original — was rgb(26,33,40)→rgb(15,20,25)
+               which read as "is this thing on" at idle. New range gives the panel
+               actual presence on the page while still feeling like instrument metal. */
+            background: linear-gradient(145deg, #2a3441 0%, #1a2330 100%);
+            border: 1px solid #3a4655;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .digital-readout {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: 'tnum';
+            letter-spacing: -0.02em;
+        }
+        .digital-glow { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+        @keyframes tx-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.0), inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 20px rgba(0,0,0,0.5); }
+            50%      { box-shadow: 0 0 30px 0 rgba(34,197,94,0.4), inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 20px rgba(0,0,0,0.5); }
+        }
+        .tx-active { animation: tx-pulse 2s ease-in-out infinite; }
+        .status-pill {
+            font-family: 'SF Mono', 'Monaco', monospace;
+            font-size: 0.8rem;
+            letter-spacing: 0.12em;
+            font-weight: 700;
+        }
+        .seg-active { transition: opacity 0.1s linear; }
+        .bar-bg-texture {
+            background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 3px);
+        }
+        /* SWR mini-bar: width is set inline */
+        .swr-mini-bar { transition: width 0.3s ease-out, background-color 0.2s linear; }
+        /* Trend arrow: rotates based on direction, fades out when no change */
+        .trend-arrow { transition: transform 0.3s ease-out, opacity 0.3s linear; }
+        /* Calibrate menu (right-click context popup) */
+        .calibrate-menu {
+            position: absolute; z-index: 50;
+            background: #1f2937; border: 1px solid #374151;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            border-radius: 0.5rem; padding: 0.5rem;
+            font-size: 0.875rem; min-width: 180px;
+        }
+        .swr-bar { transition: width 0.3s ease-out; }
+        .heatmap-cell { transition: all 0.2s ease; }
+        .heatmap-cell:hover { transform: scale(1.1); z-index: 10; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #374151; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 3px; }
+        .tab-active { background: linear-gradient(to bottom, #3b82f6, #2563eb); color: white; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-4" data-nav-page="rf-power">
+    <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
+         The active link is driven by the data-nav-page attribute on <body>. -->
+    <script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500">⚡ RF Power Monitor <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full" style="font-size:0.4em; vertical-align:middle;">v1.5.13</span></h1>
+                <p id="dateRange" class="text-gray-400 text-sm">Loading transmitter power data...</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <!-- Clocks were here — now provided by shared nav. -->
+                <div id="statusIndicator" class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-full">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span id="statusText" class="text-sm text-gray-300">Loading...</span>
+                    <span id="dataSourceBadge" class="text-xs px-2 py-0.5 rounded-full hidden"></span>
+                </div>
+                <!-- Data Range Selector — Today / 2 Days / Pick a Day -->
+                <div class="flex bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+                    <button id="rangeToday" onclick="setDataRange('today')" class="range-btn px-3 py-2 text-sm font-semibold bg-blue-600 text-white transition-colors">Today</button>
+                    <button id="range2d" onclick="setDataRange('2d')" class="range-btn px-3 py-2 text-sm font-semibold text-gray-400 hover:bg-gray-700 transition-colors">2 Days</button>
+                </div>
+                <!-- Day picker — pulls up a specific past day from the rolling 7-day live JSON.
+                     The min/max attributes are set in JS based on what's available. Native HTML5
+                     date input — uses the browser's built-in picker UI. -->
+                <input type="date" id="dayPicker" onchange="pickDay(this.value)"
+                       class="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 cursor-pointer hover:border-gray-600">
+                <!-- Indicator shown when viewing a specific past day (vs Today/2 Days) -->
+                <span id="archiveBadge" class="hidden text-xs px-2 py-1 rounded-full bg-amber-900/40 text-amber-300 border border-amber-700/50 font-mono"></span>
+            </div>
+        </div>
+
+        <!-- RF Power Meter — modern digital broadcast-style instrument -->
+        <!-- Right-click on this card opens the calibrate menu (set full-scale watts) -->
+        <div id="channel1Card" class="meter-card rounded-xl p-6 mb-6">
+
+            <!-- Header bar: name + frequency/band tag (TX only) + status pill -->
+            <div class="flex justify-between items-start mb-5">
+                <div>
+                    <div class="text-xs text-gray-500 uppercase tracking-widest">RF Power</div>
+                    <div class="text-lg font-semibold text-gray-200">RF Power Out</div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Frequency / band — populated from connection log during TX, hidden when idle -->
+                    <span id="ch1BandInfo" class="text-xs text-gray-400 font-mono hidden"></span>
+                    <span id="ch1Status" class="status-pill px-3 py-1 rounded-full bg-gray-700 text-gray-300 border border-gray-600">IDLE</span>
+                </div>
+            </div>
+
+            <!-- Big digital peak readout with trend arrow -->
+            <div class="text-center mb-1">
+                <div class="flex items-baseline justify-center gap-2">
+                    <span id="ch1Power" class="digital-readout digital-glow text-7xl font-bold text-green-400">0.0</span>
+                    <span class="text-2xl text-gray-500 font-light">W</span>
+                    <!-- Trend arrow: ↑ rising, ↓ falling, hidden when steady or idle. Updated by updateChannel() -->
+                    <span id="ch1Trend" class="trend-arrow text-2xl text-gray-500 ml-1 opacity-0">↑</span>
+                </div>
+                <div class="text-xs text-gray-500 uppercase tracking-widest mt-1">Peak Forward</div>
+            </div>
+
+            <!-- Horizontal segmented bar meter (SVG) -->
+            <div class="my-6 px-2">
+                <svg id="ch1BarMeter" viewBox="0 0 600 90" class="w-full" style="max-height: 100px;">
+                    <!-- Background track -->
+                    <rect x="10" y="30" width="580" height="30" rx="3" fill="#0a0e14" stroke="#475569" stroke-width="1"/>
+                    <!-- Segment group — populated by buildBarSegments() at startup -->
+                    <g id="ch1Segments"></g>
+                    <!-- Peak-hold marker: vertical line + small triangle, opacity controlled by JS -->
+                    <line id="ch1PeakHoldMarker" x1="10" y1="28" x2="10" y2="62" stroke="#fbbf24" stroke-width="2" opacity="0"/>
+                    <polygon id="ch1PeakHoldArrow" points="10,24 6,18 14,18" fill="#fbbf24" opacity="0"/>
+                    <!-- Scale ticks. Major ticks at 0/25/50/75/100% of full-scale.
+                         IDs are stable so JS can update label text when full-scale changes via calibrate. -->
+                    <g id="ch1Scale" font-family="SF Mono, Monaco, monospace" font-size="9" fill="#64748b">
+                        <line x1="10"  y1="62" x2="10"  y2="68" stroke="#475569" stroke-width="1"/>
+                        <text id="ch1ScaleT0"  x="10"  y="80" text-anchor="middle">0</text>
+                        <line x1="153" y1="62" x2="153" y2="68" stroke="#475569" stroke-width="1"/>
+                        <text id="ch1ScaleT25" x="153" y="80" text-anchor="middle">25</text>
+                        <line x1="297" y1="62" x2="297" y2="68" stroke="#475569" stroke-width="1"/>
+                        <text id="ch1ScaleT50" x="297" y="80" text-anchor="middle">50</text>
+                        <line x1="440" y1="62" x2="440" y2="68" stroke="#475569" stroke-width="1"/>
+                        <text id="ch1ScaleT75" x="440" y="80" text-anchor="middle">75</text>
+                        <line x1="583" y1="62" x2="583" y2="68" stroke="#475569" stroke-width="1"/>
+                        <text id="ch1ScaleT100" x="583" y="80" text-anchor="middle">100</text>
+                        <text x="595" y="50" text-anchor="end" font-size="8" fill="#475569">WATTS</text>
+                    </g>
+                    <!-- Threshold zone markers: yellow triangle at 50%, red at 90% -->
+                    <g>
+                        <polygon points="297,28 293,22 301,22" fill="#fbbf24" opacity="0.5"/>
+                        <polygon points="525,28 521,22 529,22" fill="#ef4444" opacity="0.5"/>
+                    </g>
+                </svg>
+            </div>
+
+            <!-- Secondary readouts grid -->
+            <div class="grid grid-cols-3 gap-3">
+                <!-- Average -->
+                <div class="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50">
+                    <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Average</div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="ch1Avg" class="digital-readout text-xl font-bold text-cyan-400">0.0</span>
+                        <span class="text-xs text-gray-500">W</span>
+                    </div>
+                </div>
+                <!-- Reflected -->
+                <div class="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50">
+                    <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Reflected</div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="ch1Rfld" class="digital-readout text-xl font-bold text-yellow-400">0.0</span>
+                        <span class="text-xs text-gray-500">W</span>
+                    </div>
+                </div>
+                <!-- SWR (with mini-bar below) -->
+                <div class="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50">
+                    <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">SWR</div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="ch1SWR" class="digital-readout text-xl font-bold text-green-400">1.00</span>
+                        <span class="text-xs text-gray-500">:1</span>
+                    </div>
+                    <!-- Tiny SWR bar: 1.0 = empty (good), 3.0+ = full red. Reads at-a-glance. -->
+                    <div class="mt-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                        <div id="ch1SWRBar" class="swr-mini-bar h-full bg-green-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="bg-gradient-to-br from-green-900/50 to-green-800/30 rounded-xl p-3 border border-green-700/50"><div class="text-green-400 text-xs font-semibold"><span class="range-label">1d</span> Peak</div><div id="totalPeak" class="text-xl font-bold text-white">0.0 W</div></div>
+            <div class="bg-gradient-to-br from-orange-900/50 to-orange-800/30 rounded-xl p-3 border border-orange-700/50"><div class="text-orange-400 text-xs font-semibold">TX Events</div><div id="txCount" class="text-xl font-bold text-white">0</div></div>
+            <div class="bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 rounded-xl p-3 border border-cyan-700/50"><div class="text-cyan-400 text-xs font-semibold">Avg TX Power</div><div id="avgTxPower" class="text-xl font-bold text-white">0.0 W</div></div>
+            <div class="bg-gradient-to-br from-pink-900/50 to-pink-800/30 rounded-xl p-3 border border-pink-700/50"><div class="text-pink-400 text-xs font-semibold">Duty Cycle</div><div id="dutyCycle" class="text-xl font-bold text-white">0.0%</div></div>
+        </div>
+
+        <!-- Tabbed Section -->
+        <div class="bg-gray-800 rounded-xl p-4 mb-6">
+            <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-700 pb-3">
+                <button onclick="showTab('power')" id="tabPower" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold tab-active">📊 Power History</button>
+                <button onclick="showTab('hourly')" id="tabHourly" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-700 hover:bg-gray-600">🕐 Hourly Stats</button>
+                <button onclick="showTab('heatmap')" id="tabHeatmap" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-700 hover:bg-gray-600">🔥 Activity Heatmap</button>
+            </div>
+            <div id="panelPower" class="tab-panel">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-4">
+                        <select id="chartMetric" onchange="updateChart()" class="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"><option value="peak">Peak Power</option><option value="avg">Average Power</option><option value="rfld">Reflected Power</option></select>
+                    </div>
+                </div>
+                <div class="h-72"><canvas id="powerChart"></canvas></div>
+            </div>
+            <div id="panelHourly" class="tab-panel hidden">
+                <div class="h-72"><canvas id="hourlyChart"></canvas></div>
+                <div class="mt-4 max-h-48 overflow-y-auto custom-scrollbar"><table class="w-full text-sm"><thead class="text-gray-400 text-xs sticky top-0 bg-gray-800"><tr><th class="text-left p-2">Hour</th><th class="text-right p-2">TX Events</th><th class="text-right p-2">Ch1 Peak</th><th class="text-right p-2">Total Wh</th></tr></thead><tbody id="hourlyTableBody" class="text-gray-300"></tbody></table></div>
+            </div>
+            <div id="panelHeatmap" class="tab-panel hidden">
+                <div class="flex items-center gap-4 mb-4"><select id="heatmapMetric" onchange="renderHeatmap()" class="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"><option value="txCount">TX Events</option><option value="power">Peak Power</option><option value="wh">Watt-Hours</option></select><select id="heatmapChannel" onchange="renderHeatmap()" class="bg-gray-700 rounded-lg px-3 py-1.5 text-sm"><option value="all">Both Channels</option><option value="1">RF Power Out</option></select></div>
+                <div class="overflow-x-auto custom-scrollbar"><div id="heatmapContainer" class="min-w-[600px]"><div class="text-gray-500 text-center py-8">Load data to see heatmap</div></div></div>
+                <div class="flex items-center justify-center gap-4 mt-4 text-xs text-gray-400"><span>Less</span><div class="flex gap-1"><div class="w-4 h-4 rounded bg-gray-700"></div><div class="w-4 h-4 rounded bg-green-900"></div><div class="w-4 h-4 rounded bg-green-700"></div><div class="w-4 h-4 rounded bg-yellow-600"></div><div class="w-4 h-4 rounded bg-orange-500"></div><div class="w-4 h-4 rounded bg-red-500"></div></div><span>More</span></div>
+            </div>
+        </div>
+
+        <!-- Playback -->
+        <div class="bg-gray-800 rounded-xl p-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <button id="playBtn" onclick="togglePlayback()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">▶️ Play</button>
+                    <button onclick="stepBack()" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">⏮️</button>
+                    <button onclick="stepForward()" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">⏭️</button>
+                    <select id="playbackSpeed" onchange="updatePlaybackSpeed()" class="bg-gray-700 rounded-lg px-3 py-2 text-sm"><option value="1">1x</option><option value="10" selected>10x</option><option value="50">50x</option><option value="100">100x</option><option value="500">500x</option></select>
+                </div>
+                <div class="flex items-center gap-2 text-sm"><span id="playbackDate" class="font-mono text-gray-500">--/--/----</span><span id="playbackTime" class="font-mono text-white text-lg">--:--:--</span><span id="playbackFreq" class="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-500 ml-2"></span></div>
+            </div>
+            <div class="mt-4"><input type="range" id="playbackSlider" min="0" max="100" value="100" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer" oninput="seekPlayback(this.value)"></div>
+        </div>
+    </div>
+
+    <script>
+        const LOG_PATH = './logs/', TX_THRESHOLD_DEFAULT = 5;
+        const CHANNEL_NAMES = { 1: 'RF Power Out', 2: 'Channel 2' };
+        const CHANNEL_COLORS = { 1: { border: '#22c55e', bg: 'rgba(34,197,94,0.2)' } };
+        
+        const BAND_COLORS = { '160m': '#7c3aed', '80m': '#ef4444', '40m': '#f59e0b', '30m': '#10b981', '20m': '#3b82f6', '17m': '#8b5cf6', '15m': '#ec4899', '12m': '#14b8a6', '10m': '#f97316' };
+        // Frequency-range -> band name lookup, used by pollLiveRig() to tag
+        // the live card with a band derived straight from the rig's
+        // reported frequency (mirrors the same table in rig-status.html).
+        const BANDS = [
+            [1.8,2.0,'160m'],[3.525,4.0,'80m'],[5.3305,5.4035,'60m'],
+            [7.025,7.3,'40m'],[10.1,10.15,'30m'],[14.025,14.35,'20m'],
+            [18.068,18.168,'17m'],[21.025,21.45,'15m'],
+            [24.89,24.99,'12m'],[28.0,29.7,'10m']
+        ];
+        
+        
+        // === STATE === (var for console access during debugging)
+        var allLogData = [];      // ALL loaded raw samples
+        var logData = [];          // Filtered to selected range
+        var playbackIndex = 0, isPlaying = false, playbackInterval = null, playbackSpeed = 10;
+        var powerChart = null, hourlyChart = null, txEvents = [], maxPower = 100, txThreshold = TX_THRESHOLD_DEFAULT, hourlyStats = {};
+        var channelStats = { 1: {} };
+        // Data range mode — replaces the old selectedDays integer:
+        //   'today'    — UTC midnight to now (calendar day)
+        //   '2d'       — yesterday's UTC midnight to now (yesterday + today)
+        //   'archive'  — a specific past day, archiveDate = 'YYYY-MM-DD' UTC
+        var rangeMode = 'today';
+        var archiveDate = null;
+        var isLoading = false;     // Prevent double-loading
+        var dataSource = '';       // 'rig' — data loaded from vara-api.php (FLRIG)
+        
+        // Connection time windows from VARA/BBS logs for frequency correlation
+        // Each entry: { startTs, endTs, callsign, freqMHz, band }
+        var connectionWindows = [];
+
+        function calcSWR(fwd, rfl) {
+            if (fwd <= 0 || rfl < 0) return 1.0;
+            if (rfl >= fwd) return 10.0;
+            const gamma = Math.sqrt(rfl / fwd);
+            return Math.min((1 + gamma) / (1 - gamma), 10.0);
+        }
+
+        // Compute SWR for a completed TX session, accounting for auto-tuner transient.
+        // Strategy: peak forward (worst-case for SWR formula denominator effect) paired with
+        // the MEDIAN of the second half of reflected samples (post-tuner-settle reading).
+        // For very short sessions, fall back to peak-instant reflected.
+        function calcSwrFromTx(tx) {
+            const fwd = tx.peakPower;
+            const refl = tx.reflecteds || [];
+            if (refl.length < 4) return calcSWR(fwd, tx.peakReflected || 0);
+            const secondHalf = refl.slice(Math.floor(refl.length / 2)).slice().sort((a, b) => a - b);
+            const median = secondHalf[Math.floor(secondHalf.length / 2)];
+            return calcSWR(fwd, median);
+        }
+
+        function parseDateTime(dateStr, timeStr) {
+            try {
+                const [mm, dd, yyyy] = dateStr.split('/').map(Number);
+                const [hh, mi, ss] = timeStr.split(':').map(Number);
+                return new Date(yyyy, mm - 1, dd, hh, mi, ss);
+            } catch (e) {
+                return new Date();
+            }
+        }
+
+        function initCharts() {
+            powerChart = new Chart(document.getElementById('powerChart').getContext('2d'), {
+                type: 'line', 
+                data: { labels: [], datasets: [
+                    { label: 'RF Power Out', data: [], borderColor: CHANNEL_COLORS[1].border, backgroundColor: CHANNEL_COLORS[1].bg, fill: true, tension: 0.2, pointRadius: 0, borderWidth: 2, yAxisID: 'y' },
+                    // SWR — plotted on its own right-side axis so it's readable against
+                    // a totally different scale (ratio ~1-5) than watts. spanGaps:false
+                    // means the line breaks during receive periods (SWR isn't meaningful
+                    // when not transmitting) instead of drawing a misleading flat line.
+                    { label: 'SWR', data: [], borderColor: '#eab308', backgroundColor: 'rgba(234,179,8,0.15)', fill: false, tension: 0.2, pointRadius: 2, pointHoverRadius: 4, borderWidth: 2, borderDash: [4,2], yAxisID: 'y1', spanGaps: false }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 }, interaction: { intersect: false, mode: 'index' },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af', maxTicksLimit: 12 } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af' }, title: { display: true, text: 'Watts', color: '#9ca3af' } },
+                        y1: { position: 'right', min: 1, suggestedMax: 5, grid: { drawOnChartArea: false }, ticks: { color: '#eab308' }, title: { display: true, text: 'SWR', color: '#eab308' } }
+                    },
+                    plugins: { legend: { labels: { color: '#9ca3af', usePointStyle: true } } } }
+            });
+            hourlyChart = new Chart(document.getElementById('hourlyChart').getContext('2d'), {
+                type: 'bar', 
+                data: { labels: [], datasets: [
+                    { label: 'Ch1 TX', data: [], backgroundColor: 'rgba(34,197,94,0.7)', yAxisID: 'y' },
+                    { label: 'Total Wh', data: [], backgroundColor: 'rgba(168,85,247,0.7)', yAxisID: 'y1' }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+                    scales: { x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af' } }, 
+                        y: { position: 'left', beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#22c55e' } }, 
+                        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: '#a855f7' } } },
+                    plugins: { legend: { labels: { color: '#9ca3af' } } } }
+            });
+        }
+
+        // === FREQUENCY CORRELATION ===
+        // Load connection windows from server API (VARA + BBS logs parsed server-side)
+        async function loadConnectionData() {
+            connectionWindows = [];
+            try {
+                // Always fetch a 7-day connection window — it's small and we want
+                // enough context to correlate TX events even when viewing past days.
+                const r = await fetch(`api/data.php?source=connections&days=7&t=${Date.now()}`);
+                if (!r.ok) {
+                    console.error('[RF-FREQ] connections endpoint returned', r.status);
+                    return;
+                }
+                const json = await r.json();
+                
+                if (json.connections && json.connections.length > 0) {
+                    connectionWindows = json.connections.map(c => ({
+                        startTs: c.startTs * 1000,
+                        endTs: c.endTs ? c.endTs * 1000 : null,
+                        callsign: c.callsign,
+                        freqMHz: c.freq || null,
+                        band: c.band || null,
+                        type: c.type || null,
+                        failed: !!c.failed
+                    }));
+                } else {
+                    console.warn('[RF-FREQ] No connections returned from API');
+                }
+            } catch(e) {
+                console.error('[RF-FREQ] Connection data load failed:', e.message);
+            }
+        }
+        
+        // Log diagnostic info after both datasets are loaded (called from processLoadedData)
+        function logCorrelationDiagnostics() {
+            if (connectionWindows.length === 0) {
+                console.warn('[RF-FREQ] No connection windows — frequency correlation disabled');
+                console.warn('[RF-FREQ] Check: api/data.php?source=connections&days=7&debug=1');
+                return;
+            }
+            if (logData.length === 0) return;
+            
+            const cFirst = connectionWindows[0], cLast = connectionWindows[connectionWindows.length - 1];
+            const dFirst = logData[0], dLast = logData[logData.length - 1];
+            
+            
+            // Check for overlap
+            const connStart = cFirst.startTs, connEnd = cLast.endTs || cLast.startTs;
+            const dataStart = dFirst.timestamp.getTime(), dataEnd = dLast.timestamp.getTime();
+            const hasOverlap = connStart <= dataEnd && connEnd >= dataStart;
+            
+            if (!hasOverlap) {
+                const gapMs = Math.min(Math.abs(connEnd - dataStart), Math.abs(dataEnd - connStart));
+                console.error(`[RF-FREQ] Gap between datasets: ${(gapMs / 3600000).toFixed(1)} hours — likely a timezone mismatch`);
+            }
+            
+            // Test correlation on last few TX events
+            const recentTx = txEvents.slice(0, 5);
+            for (const tx of recentTx) {
+                const txTs = logData[tx.startIndex].timestamp.getTime();
+                const conn = findConnectionAt(txTs);
+            }
+        }
+        
+        // === TIMESTAMP OFFSET AUTO-DETECTION ===
+        // DataLog CSVs may be in local time while connections (VARA/BBS) are UTC.
+        // If the server is UTC, mktime() misinterprets local timestamps.
+        // Detect and compensate automatically.
+        let connectionOffsetMs = 0;  // Added to DataLog timestamps to align with connection timestamps
+        
+        function detectTimestampOffset() {
+            connectionOffsetMs = 0;
+            if (connectionWindows.length === 0 || logData.length === 0) return;
+            
+            // Compare the time spans of both datasets
+            const cFirst = connectionWindows[0].startTs;
+            const cLast = connectionWindows[connectionWindows.length - 1].endTs || connectionWindows[connectionWindows.length - 1].startTs;
+            const dFirst = logData[0].timestamp.getTime();
+            const dLast = logData[logData.length - 1].timestamp.getTime();
+            
+            // Check if they already overlap — no offset needed
+            if (cFirst <= dLast && cLast >= dFirst) {
+                return;
+            }
+            
+            // They don't overlap. Estimate offset from midpoints.
+            const cMid = (cFirst + cLast) / 2;
+            const dMid = (dFirst + dLast) / 2;
+            const rawOffset = cMid - dMid;
+            
+            // Round to nearest whole hour (timezone offsets are always whole or half hours)
+            const offsetHours = Math.round(rawOffset / 3600000);
+            if (offsetHours === 0) {
+                console.warn('[RF-FREQ] Datasets don\'t overlap but offset is <30min — data may be from different time periods');
+                return;
+            }
+            
+            connectionOffsetMs = offsetHours * 3600000;
+            
+            // Verify the offset creates overlap
+            const adjDFirst = dFirst + connectionOffsetMs;
+            const adjDLast = dLast + connectionOffsetMs;
+            const nowOverlaps = cFirst <= adjDLast && cLast >= adjDFirst;
+        }
+        
+        // Find which connection (if any) overlaps a given DataLog timestamp (ms)
+        // Applies connectionOffsetMs to correct for timezone mismatch
+        function findConnectionAt(datalogTs) {
+            const ts = datalogTs + connectionOffsetMs;  // Adjust DataLog time to match connection time base
+            // Scan backwards (connections sorted ascending by startTs)
+            for (let i = connectionWindows.length - 1; i >= 0; i--) {
+                const w = connectionWindows[i];
+                const end = w.endTs || (w.startTs + 120000); // assume 2min if no end
+                // ±30s tolerance for clock drift between DataLog and VARA/BBS logs
+                if (ts >= w.startTs - 30000 && ts <= end + 30000) {
+                    return w;
+                }
+                // Stop searching once connections are more than 5 min before our target
+                if (w.startTs < ts - 300000) break;
+            }
+            return null;
+        }
+
+        // === DATA LOADING ===
+        // Data source: vara-api.php (FLRIG rig meter), replacing the
+        // now-decommissioned WaveNode USB hardware this page originally
+        // read from. Every downstream function (session/TX-event
+        // detection, hourly stats, heatmap, chart, playback) still
+        // consumes the exact same per-sample object shape as before —
+        // only this adapter and the live poll changed.
+
+        // FLRIG reports SWR as a raw 0-100 meter value, same convention
+        // rig-status.html already uses: 0 -> 1.0:1, 100 -> ~5.0:1.
+        function flrigSwrRawToRatio(raw) {
+            if (raw === null || raw === undefined) return null;
+            return 1 + Math.min(1, raw / 100) * 4;
+        }
+
+        // calcSWR(fwd, rfl) computes SWR from forward+reflected watts via
+        // gamma = sqrt(rfl/fwd). FLRIG never reports real reflected watts
+        // (only a derived SWR reading), so we invert that same formula to
+        // synthesize a "reflected power" value which, fed back through
+        // calcSWR(), reproduces FLRIG's actual reported ratio exactly.
+        // This means calcSWR/calcSwrFromTx and every consumer of ch1.rfld
+        // downstream need ZERO changes — they just work.
+        function reflectedFromSwr(fwd, swrRatio) {
+            if (!fwd || fwd <= 0 || !swrRatio || swrRatio <= 1) return 0;
+            const gamma = (swrRatio - 1) / (swrRatio + 1);
+            return fwd * gamma * gamma;
+        }
+
+        // Convert one vara-api.php get_rig_history entry — {ts, pwr, swr,
+        // tx, mhz, band} — into the canonical data object every rendering
+        // function in this file already expects.
+        function rigHistoryEntryToDataObj(e) {
+            const d = new Date(e.ts);
+            const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(d.getUTCDate()).padStart(2, '0');
+            const yyyy = d.getUTCFullYear();
+            const hh = String(d.getUTCHours()).padStart(2, '0');
+            const mi = String(d.getUTCMinutes()).padStart(2, '0');
+            const ss = String(d.getUTCSeconds()).padStart(2, '0');
+            const fwd = e.pwr || 0;
+            const swrRatio = e.tx ? (flrigSwrRawToRatio(e.swr) || 1.0) : null;
+            const rfld = swrRatio ? reflectedFromSwr(fwd, swrRatio) : 0;
+            return {
+                date:      `${mm}/${dd}/${yyyy}`,
+                time:      `${hh}:${mi}:${ss}`,
+                timestamp: d,
+                // SWR ratio (1.0-5.0), only meaningful during TX — null the
+                // rest of the time so the chart shows a gap instead of a
+                // false flat line at 0 when the rig isn't keyed up.
+                swr: swrRatio,
+                ch1: { peak: fwd, rfld: rfld, avg: fwd },
+                // mhz/band are absent on entries logged before this field
+                // was added — older samples just won't carry a band tag,
+                // same "sparse until backfilled by new polling" pattern
+                // used elsewhere in this dashboard.
+                freqMHz: e.mhz ?? null,
+                band:    e.band ?? null,
+                wh1: 0,
+            };
+        }
+
+        // Compute the start/end timestamps for the current range mode.
+        // Returns { startTs (Date), endTs (Date), hoursToFetch (number) }
+        // - 'today':   UTC midnight today -> now
+        // - '2d':      UTC midnight yesterday -> now (yesterday + today)
+        // - 'archive': the picked day's UTC midnight -> next day's UTC midnight
+        function computeRangeWindow() {
+            const now = new Date();
+            const utcMidnightToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+            if (rangeMode === 'today') {
+                return { startTs: utcMidnightToday, endTs: now,
+                         hoursToFetch: Math.max(1, Math.ceil((now - utcMidnightToday) / 3600000)) };
+            }
+            if (rangeMode === '2d') {
+                const utcMidnightYesterday = new Date(utcMidnightToday.getTime() - 24 * 3600000);
+                return { startTs: utcMidnightYesterday, endTs: now,
+                         hoursToFetch: Math.max(1, Math.ceil((now - utcMidnightYesterday) / 3600000)) };
+            }
+            if (rangeMode === 'archive' && archiveDate) {
+                // archiveDate is 'YYYY-MM-DD'; treat as UTC midnight start
+                const [y, m, d] = archiveDate.split('-').map(Number);
+                const start = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+                const end   = new Date(start.getTime() + 24 * 3600000);
+                // hours from start to NOW so the rig-history endpoint returns the full day (it filters
+                // on its own cutoff window by hours-back-from-now)
+                const hoursBack = Math.max(24, Math.ceil((now - start) / 3600000));
+                return { startTs: start, endTs: end, hoursToFetch: hoursBack };
+            }
+            // Fallback: today
+            return { startTs: utcMidnightToday, endTs: now, hoursToFetch: 24 };
+        }
+
+        async function loadAllData(refreshOnly) {
+            if (isLoading) return;
+            isLoading = true;
+            document.getElementById('statusText').textContent = refreshOnly ? 'Refreshing...' : 'Loading data...';
+
+            const now = new Date();
+            const win = computeRangeWindow();
+            const hours = refreshOnly ? Math.min(48, win.hoursToFetch) : win.hoursToFetch;
+            // vara-api.php's get_rig_history takes `days` (float), not hours —
+            // convert and clamp to what the endpoint accepts (1h .. 30d).
+            const days = Math.max(1/24, Math.min(30, hours / 24));
+
+            try {
+                const r = await fetch('vara-api.php', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ action: 'get_rig_history', days }),
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const json = await r.json();
+                if (!json.ok) throw new Error(json.error || 'API error');
+
+                const newData = (json.entries || []).map(rigHistoryEntryToDataObj);
+                if (refreshOnly && allLogData.length > 0) {
+                    const cutoff = new Date(now.getTime() - 48 * 3600000);
+                    const older  = allLogData.filter(d => d.timestamp < cutoff);
+                    const merged = older.concat(newData);
+                    merged.sort((a, b) => a.timestamp - b.timestamp);
+                    const seen = new Set();
+                    allLogData = merged.filter(d => {
+                        const k = d.timestamp.getTime();
+                        if (seen.has(k)) return false;
+                        seen.add(k); return true;
+                    });
+                } else {
+                    allLogData = newData;
+                }
+                dataSource = 'rig';
+
+                if (allLogData.length === 0) {
+                    document.getElementById('statusText').textContent = 'No history logged yet — data accumulates as the rig is polled.';
+                    isLoading = false;
+                    return;
+                }
+            } catch(e) {
+                console.warn('[RF] vara-api.php get_rig_history failed:', e.message);
+                if (allLogData.length === 0) {
+                    document.getElementById('statusText').textContent = 'Could not load rig history — ' + e.message;
+                    isLoading = false;
+                    return;
+                }
+            }
+
+            await loadConnectionData();
+            isLoading = false;
+            filterByRange();
+        }
+
+        // === RANGE FILTERING ===
+        // With at-most-2-days of data, no downsampling is needed — raw 1-sec
+        // samples for 2 days is ~172,800 entries, still fast to chart with the
+        // existing dynamic step in updateChart() (~800 max points rendered).
+        function filterByRange() {
+            const win = computeRangeWindow();
+            
+            const filtered = allLogData.filter(d => d.timestamp >= win.startTs && d.timestamp <= win.endTs);
+            const rangeData = filtered.length > 0 ? filtered : allLogData;
+            logData = rangeData;
+            
+            // Update range label in summary cards
+            let label;
+            if (rangeMode === 'today')        label = 'today';
+            else if (rangeMode === '2d')      label = '2d';
+            else if (rangeMode === 'archive') label = archiveDate || 'archive';
+            else                              label = '';
+            document.querySelectorAll('.range-label').forEach(el => el.textContent = label);
+            
+            processLoadedData();
+        }
+        
+        // Downsample data by averaging into time buckets of `bucketSecs` seconds
+        // (Kept available — currently unused since we max at 2 days. Left in place
+        // in case we re-introduce a longer range in the future or wire up an
+        // archive viewer that crosses day boundaries.)
+        function downsample(data, bucketSecs) {
+            if (data.length === 0) return [];
+            const bucketMs = bucketSecs * 1000;
+            const result = [];
+            let bucketStart = data[0].timestamp.getTime();
+            let bucket = { ch1Peak: 0, ch1Rfld: 0, ch1Avg: 0, wh1: 0, count: 0, lastEntry: null };
+            
+            for (const d of data) {
+                const t = d.timestamp.getTime();
+                
+                if (t >= bucketStart + bucketMs && bucket.count > 0) {
+                    // Emit averaged bucket — use peak of peaks (not average of peaks) for power
+                    const e = bucket.lastEntry;
+                    result.push({
+                        date: e.date, time: e.time, timestamp: e.timestamp,
+                        ch1: { peak: bucket.ch1Peak, rfld: bucket.ch1Rfld / bucket.count, avg: bucket.ch1Avg / bucket.count },
+                        wh1: bucket.wh1
+                    });
+                    // Reset bucket
+                    bucketStart = t;
+                    bucket = { ch1Peak: 0, ch1Rfld: 0, ch1Avg: 0, wh1: 0, count: 0, lastEntry: null };
+                }
+                
+                // Accumulate — track peak as max, others as running sum for averaging
+                if (d.ch1.peak > bucket.ch1Peak) bucket.ch1Peak = d.ch1.peak;
+                bucket.ch1Rfld += d.ch1.rfld;
+                bucket.ch1Avg += d.ch1.avg;
+                bucket.wh1 = d.wh1;  // Wh is cumulative — use latest value
+                bucket.count++;
+                bucket.lastEntry = d;
+            }
+            
+            // Emit final bucket
+            if (bucket.count > 0) {
+                const e = bucket.lastEntry;
+                result.push({
+                    date: e.date, time: e.time, timestamp: e.timestamp,
+                    ch1: { peak: bucket.ch1Peak, rfld: bucket.ch1Rfld / bucket.count, avg: bucket.ch1Avg / bucket.count },
+                    wh1: bucket.wh1
+                });
+            }
+            
+            return result;
+        }
+
+        // === RANGE SELECTOR ===
+        // Set the data range mode. mode = 'today' | '2d'.
+        // Archive mode is set via pickDay() below.
+        function setDataRange(mode) {
+            rangeMode = mode;
+            archiveDate = null;
+            
+            // Reset day picker UI (remove archive badge, clear picker value)
+            const dp = document.getElementById('dayPicker');
+            if (dp) dp.value = '';
+            const ab = document.getElementById('archiveBadge');
+            if (ab) ab.classList.add('hidden');
+            
+            // Update button styles — highlight the active range button
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('text-gray-400', 'hover:bg-gray-700');
+            });
+            const btnId = mode === 'today' ? 'rangeToday' : 'range2d';
+            const activeBtn = document.getElementById(btnId);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-blue-600', 'text-white');
+                activeBtn.classList.remove('text-gray-400', 'hover:bg-gray-700');
+            }
+            
+            // Reload from the API for the new range — vara-api.php's get_rig_history
+            // covers up to 30 days, so we always have what we need.
+            loadAllData(false);
+        }
+
+        // Day picker handler — load a specific past day from the rolling 7-day window.
+        // dateStr is 'YYYY-MM-DD' (UTC interpretation). Skips if the input is empty.
+        function pickDay(dateStr) {
+            if (!dateStr) return;
+            rangeMode = 'archive';
+            archiveDate = dateStr;
+            
+            // Clear range button highlighting (neither Today nor 2 Days is active now)
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('text-gray-400', 'hover:bg-gray-700');
+            });
+            
+            // Show the archive indicator badge
+            const ab = document.getElementById('archiveBadge');
+            if (ab) {
+                ab.textContent = '📅 ' + dateStr;
+                ab.classList.remove('hidden');
+            }
+            
+            loadAllData(false);
+        }
+
+        // Configure the day picker's allowed range based on what's in the rolling
+        // 7-day live JSON. Called once at startup.
+        function configureDayPicker() {
+            const dp = document.getElementById('dayPicker');
+            if (!dp) return;
+            const now = new Date();
+            const today = now.toISOString().slice(0, 10);  // 'YYYY-MM-DD'
+            const sevenAgo = new Date(now.getTime() - 7 * 24 * 3600000).toISOString().slice(0, 10);
+            // Limit to last 7 days (current rolling window). Future dates blocked.
+            dp.min = sevenAgo;
+            dp.max = today;
+        }
+
+        function updateDataSourceBadge() {
+            const badge = document.getElementById('dataSourceBadge');
+            if (dataSource === 'rig') {
+                badge.textContent = '📻 Rig Meter (FLRIG)';
+                badge.style.background = '#14532d';
+                badge.style.color = '#86efac';
+                badge.classList.remove('hidden');
+            }
+        }
+        
+        function processLoadedData() {
+            if (logData.length === 0) return;
+            
+            updateDataSourceBadge();
+            
+            maxPower = Math.max(100, ...logData.map(d => d.ch1.peak));
+            maxPower = Math.ceil(maxPower / 10) * 10;
+            detectTimestampOffset();  // Auto-detect and compensate timezone mismatch before correlation
+            calculateStats();
+            
+            const first = logData[0], last = logData[logData.length - 1];
+            let rangeLabel, statusSuffix;
+            if (rangeMode === 'today')        { rangeLabel = 'Today (UTC)';            statusSuffix = 'today'; }
+            else if (rangeMode === '2d')      { rangeLabel = 'Yesterday + Today (UTC)'; statusSuffix = '2d'; }
+            else if (rangeMode === 'archive') { rangeLabel = 'Archive: ' + archiveDate;  statusSuffix = archiveDate; }
+            else                              { rangeLabel = 'Loaded';                  statusSuffix = ''; }
+            document.getElementById('dateRange').textContent = `${rangeLabel}: ${first.date} ${first.time} → ${last.date} ${last.time}`;
+            document.getElementById('statusText').textContent = `${logData.length.toLocaleString()} samples (${statusSuffix})`;
+            
+            playbackIndex = logData.length - 1;
+            updateDisplay();
+            updateHourlyChart();
+            renderHeatmap();
+            logCorrelationDiagnostics();
+        }
+
+        function calculateStats() {
+            hourlyStats = {}; 
+            txEvents = [];
+            channelStats = { 1: { txCount: 0, txTime: 0, peakPower: 0, powers: [] } };
+            let currentTx = null;
+            
+            for (let i = 0; i < logData.length; i++) {
+                const d = logData[i];
+                const hour = d.date + ' ' + d.time.substring(0, 2) + ':00';
+                
+                if (!hourlyStats[hour]) {
+                    hourlyStats[hour] = { txCount: 0, txTime: 0, peakPower: 0, totalPower: 0, samples: 0, wh: 0, 
+                        channels: { 1: { tx: 0, peak: 0, wh: 0 } } };
+                }
+                const hs = hourlyStats[hour];
+                
+                // Single-channel processing — only ch1 in use
+                const power = d.ch1.peak;
+                if (power > channelStats[1].peakPower) channelStats[1].peakPower = power;
+                if (power > hs.channels[1].peak) hs.channels[1].peak = power;
+                if (power > hs.peakPower) hs.peakPower = power;
+                hs.channels[1].wh = d.wh1;
+                
+                if (power >= txThreshold) {
+                    channelStats[1].powers.push(power);
+                    hs.totalPower += power;
+                    hs.samples++;
+                    
+                    if (!currentTx) { 
+                        currentTx = { channel: 1, startIndex: i, startTime: d.time, startDate: d.date, peakPower: power, peakReflected: d.ch1.rfld, powers: [power], reflecteds: [d.ch1.rfld] }; 
+                        channelStats[1].txCount++;
+                        hs.txCount++;
+                        hs.channels[1].tx++; 
+                    } else { 
+                        currentTx.powers.push(power); 
+                        currentTx.reflecteds.push(d.ch1.rfld);
+                        if (power > currentTx.peakPower) {
+                            currentTx.peakPower = power;
+                            currentTx.peakReflected = d.ch1.rfld;
+                        }
+                    }
+                    channelStats[1].txTime++;
+                    hs.txTime++;
+                } else if (currentTx) {
+                    currentTx.endIndex = i - 1;
+                    currentTx.endTime = logData[i - 1].time;
+                    currentTx.duration = currentTx.powers.length;
+                    currentTx.avgPower = currentTx.powers.reduce((a, b) => a + b, 0) / currentTx.powers.length;
+                    // SWR: use peak forward and the MEDIAN of the second half of reflected samples.
+                    // Why: auto-tuners may show high reflected during the first part of TX while
+                    // tuning, then settle to the actual matched value. Using the second-half median
+                    // avoids tune-up transient bias. For very short sessions (<4 samples), fall back
+                    // to peak-instant reflected since there's no settled state to sample.
+                    currentTx.swr = calcSwrFromTx(currentTx);
+                    // Frequency/band — prefer the rig's own direct reading
+                    // on the TX-start sample (set by rigHistoryEntryToDataObj),
+                    // falling back to the old VARA-connection-log correlation
+                    // for older entries logged before that field existed.
+                    const txStartEntry = logData[currentTx.startIndex];
+                    if (txStartEntry.band && txStartEntry.freqMHz) {
+                        currentTx.freqMHz = txStartEntry.freqMHz;
+                        currentTx.band = txStartEntry.band;
+                    } else {
+                        const conn = findConnectionAt(txStartEntry.timestamp.getTime());
+                        if (conn) { currentTx.freqMHz = conn.freqMHz; currentTx.band = conn.band; currentTx.connCallsign = conn.callsign; currentTx.connFailed = conn.failed; }
+                    }
+                    txEvents.push(currentTx);
+                    currentTx = null;
+                }
+            }
+            
+            // Close open TX event if still active at end of data
+            if (currentTx) { 
+                const last = logData[logData.length - 1];
+                currentTx.endIndex = logData.length - 1;
+                currentTx.endTime = last.time;
+                currentTx.duration = currentTx.powers.length;
+                currentTx.avgPower = currentTx.powers.reduce((a, b) => a + b, 0) / currentTx.powers.length;
+                currentTx.swr = calcSwrFromTx(currentTx);
+                const txStartEntry = logData[currentTx.startIndex];
+                if (txStartEntry.band && txStartEntry.freqMHz) {
+                    currentTx.freqMHz = txStartEntry.freqMHz;
+                    currentTx.band = txStartEntry.band;
+                } else {
+                    const conn = findConnectionAt(txStartEntry.timestamp.getTime());
+                    if (conn) { currentTx.freqMHz = conn.freqMHz; currentTx.band = conn.band; currentTx.connCallsign = conn.callsign; currentTx.connFailed = conn.failed; }
+                }
+                txEvents.push(currentTx); 
+            }
+            
+            Object.values(hourlyStats).forEach(hs => { 
+                if (hs.samples > 0) hs.avgPower = hs.totalPower / hs.samples;
+                hs.wh = hs.channels[1].wh;
+            });
+            
+            txEvents.sort((a, b) => b.startIndex - a.startIndex);
+            if (txEvents.length > 0) {
+                const first = logData[txEvents[txEvents.length-1].startIndex];
+                const last = logData[txEvents[0].startIndex];
+            }
+            if (connectionWindows.length > 0) {
+                const cFirst = new Date(connectionWindows[0].startTs);
+                const cLast = new Date(connectionWindows[connectionWindows.length-1].startTs);
+            }
+        }
+
+        // ── Digital RF Power Meter — state and helpers ─────────────────────────
+        // Configuration. METER_FULL_SCALE is the watts value at the right end of
+        // the bar; persisted in localStorage so right-click "Calibrate" sticks.
+        // SEGMENTS controls bar resolution; 50 reads as classic LED bar graph.
+        // PEAK_HOLD_MS is how long the yellow peak marker lingers after a peak.
+        // ZONE_GREEN_END / ZONE_YELLOW_END are color-zone thresholds as fractions.
+        let METER_FULL_SCALE = parseFloat(localStorage.getItem('rfpm.fullScale')) || 100;
+        const METER_SEGMENTS = 50;
+        const METER_SEG_WIDTH = 580 / METER_SEGMENTS;
+        const PEAK_HOLD_MS = 3000;
+        const ZONE_GREEN_END  = 0.50;
+        const ZONE_YELLOW_END = 0.85;
+
+        // Per-channel meter state — generalized for ch index even though only ch1
+        // is wired today. peakHoldValue lingers for PEAK_HOLD_MS, trendHistory
+        // keeps the last few power readings to compute rising/falling direction.
+        const meterState = {
+            1: { peakHoldValue: 0, peakHoldExpires: 0, trendHistory: [] }
+        };
+
+        // Build the bar segments for a channel. Called once at init.
+        function buildBarSegments(ch) {
+            const g = document.getElementById(`ch${ch}Segments`);
+            if (!g) return;
+            g.innerHTML = '';
+            for (let i = 0; i < METER_SEGMENTS; i++) {
+                const fraction = (i + 1) / METER_SEGMENTS;
+                let color;
+                if (fraction <= ZONE_GREEN_END) color = '#22c55e';
+                else if (fraction <= ZONE_YELLOW_END) color = '#eab308';
+                else color = '#ef4444';
+                const x = 10 + i * METER_SEG_WIDTH + 1;
+                const w = METER_SEG_WIDTH - 2;
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', x);
+                rect.setAttribute('y', 32);
+                rect.setAttribute('width', w);
+                rect.setAttribute('height', 26);
+                rect.setAttribute('fill', color);
+                rect.setAttribute('rx', 1);
+                rect.classList.add('seg-active');
+                rect.style.opacity = '0.15';   // off — visible but clearly inactive
+                g.appendChild(rect);
+            }
+        }
+
+        // Update the scale labels — called on init and after calibrate change.
+        function updateMeterScale(ch) {
+            const fs = METER_FULL_SCALE;
+            const set = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = (Math.round(v * 10) / 10).toString();
+            };
+            set(`ch${ch}ScaleT0`, 0);
+            set(`ch${ch}ScaleT25`, fs * 0.25);
+            set(`ch${ch}ScaleT50`, fs * 0.50);
+            set(`ch${ch}ScaleT75`, fs * 0.75);
+            set(`ch${ch}ScaleT100`, fs);
+        }
+
+        // Compute trend direction over recent samples. Returns -1 (falling),
+        // 0 (steady), or +1 (rising). Looks at the last 5 samples of the
+        // channel's trendHistory.
+        function computeTrend(history) {
+            if (history.length < 3) return 0;
+            const recent = history.slice(-5);
+            const first = recent[0];
+            const last = recent[recent.length - 1];
+            const delta = last - first;
+            // Threshold: ignore changes smaller than 2W or 5% of current value
+            const threshold = Math.max(2, last * 0.05);
+            if (delta > threshold) return 1;
+            if (delta < -threshold) return -1;
+            return 0;
+        }
+
+        // Right-click "Calibrate" menu — opens a small popup at the click point
+        // with a number input for full-scale watts. Persisted to localStorage.
+        function showCalibrateMenu(ev, ch) {
+            ev.preventDefault();
+            // Remove any existing menu first
+            document.querySelectorAll('.calibrate-menu').forEach(m => m.remove());
+            const menu = document.createElement('div');
+            menu.className = 'calibrate-menu';
+            menu.style.left = ev.pageX + 'px';
+            menu.style.top  = ev.pageY + 'px';
+            menu.innerHTML = `
+                <div class="text-xs text-gray-400 mb-2 uppercase tracking-widest">Calibrate Full-Scale</div>
+                <div class="flex items-center gap-2">
+                    <input id="calInput" type="number" min="10" max="2000" step="10" value="${METER_FULL_SCALE}"
+                           class="w-20 bg-gray-700 text-white rounded px-2 py-1 text-sm" />
+                    <span class="text-xs text-gray-500">W</span>
+                    <button id="calApply" class="ml-2 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs font-semibold">Set</button>
+                </div>
+                <div class="text-[10px] text-gray-500 mt-2">Current: ${METER_FULL_SCALE}W &nbsp;·&nbsp; Saved between sessions</div>
+            `;
+            document.body.appendChild(menu);
+
+            const input = menu.querySelector('#calInput');
+            input.focus();
+            input.select();
+
+            const apply = () => {
+                const v = parseFloat(input.value);
+                if (v >= 10 && v <= 2000) {
+                    METER_FULL_SCALE = v;
+                    localStorage.setItem('rfpm.fullScale', String(v));
+                    updateMeterScale(ch);
+                    if (logData.length > 0) updateDisplay();
+                }
+                menu.remove();
+            };
+            menu.querySelector('#calApply').addEventListener('click', apply);
+            input.addEventListener('keydown', e => { if (e.key === 'Enter') apply(); else if (e.key === 'Escape') menu.remove(); });
+            // Click outside to dismiss
+            setTimeout(() => {
+                document.addEventListener('click', function dismiss(e) {
+                    if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', dismiss); }
+                });
+            }, 0);
+        }
+
+        // ── Main per-channel update — called from updateDisplay() once per render
+        function updateChannel(ch, data) {
+            const chData = data[`ch${ch}`];
+            const power = chData.peak, avg = chData.avg, rfld = chData.rfld, wh = data[`wh${ch}`] || 0;
+            const swr = calcSWR(power, rfld);
+            const state = meterState[ch];
+            if (!state) return;
+
+            // ─ Bar segments: light up segments below current power ─
+            const segments = document.querySelectorAll(`#ch${ch}Segments rect`);
+            const fraction = Math.min(power / METER_FULL_SCALE, 1);
+            const litCount = Math.round(fraction * METER_SEGMENTS);
+            segments.forEach((seg, idx) => {
+                if (idx < litCount) {
+                    seg.style.opacity = '1';
+                    seg.style.filter = 'brightness(1.15) drop-shadow(0 0 2px currentColor)';
+                } else {
+                    seg.style.opacity = '0.15';
+                    seg.style.filter = 'none';
+                }
+            });
+
+            // ─ Peak-hold marker: hangs for PEAK_HOLD_MS after each new peak ─
+            const now = Date.now();
+            if (power >= state.peakHoldValue) {
+                state.peakHoldValue = power;
+                state.peakHoldExpires = now + PEAK_HOLD_MS;
+            } else if (now > state.peakHoldExpires) {
+                // Decay: snap toward current value once the hold has expired
+                state.peakHoldValue = power;
+                state.peakHoldExpires = now + PEAK_HOLD_MS;
+            }
+            const marker = document.getElementById(`ch${ch}PeakHoldMarker`);
+            const arrow  = document.getElementById(`ch${ch}PeakHoldArrow`);
+            if (state.peakHoldValue > 0.5 && power < state.peakHoldValue) {
+                const peakX = 10 + (Math.min(state.peakHoldValue, METER_FULL_SCALE) / METER_FULL_SCALE) * 580;
+                marker.setAttribute('x1', peakX);
+                marker.setAttribute('x2', peakX);
+                marker.setAttribute('opacity', 0.9);
+                arrow.setAttribute('points', `${peakX},24 ${peakX-4},18 ${peakX+4},18`);
+                arrow.setAttribute('opacity', 0.9);
+            } else {
+                marker.setAttribute('opacity', 0);
+                arrow.setAttribute('opacity', 0);
+            }
+
+            // ─ Trend tracking: keep last 10 samples, derive direction ─
+            state.trendHistory.push(power);
+            if (state.trendHistory.length > 10) state.trendHistory.shift();
+            const trend = computeTrend(state.trendHistory);
+            const trendEl = document.getElementById(`ch${ch}Trend`);
+            if (trendEl) {
+                if (trend === 0 || power < txThreshold) {
+                    trendEl.style.opacity = '0';
+                } else {
+                    trendEl.style.opacity = '0.7';
+                    trendEl.textContent = trend > 0 ? '↑' : '↓';
+                    trendEl.className = 'trend-arrow text-2xl ml-1 ' + (trend > 0 ? 'text-green-400' : 'text-orange-400');
+                }
+            }
+
+            // ─ Big peak readout, color-zoned ─
+            const peakEl = document.getElementById(`ch${ch}Power`);
+            peakEl.textContent = power.toFixed(1);
+            peakEl.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400');
+            if (fraction <= ZONE_GREEN_END)        peakEl.classList.add('text-green-400');
+            else if (fraction <= ZONE_YELLOW_END)  peakEl.classList.add('text-yellow-400');
+            else                                   peakEl.classList.add('text-red-400');
+
+            // ─ Secondary readouts ─
+            document.getElementById(`ch${ch}Avg`).textContent  = avg.toFixed(1);
+            document.getElementById(`ch${ch}Rfld`).textContent = rfld.toFixed(1);
+
+            // ─ SWR readout (color-coded) and SWR mini-bar ─
+            const swrEl = document.getElementById(`ch${ch}SWR`);
+            swrEl.textContent = swr.toFixed(2);
+            swrEl.classList.remove('text-green-400', 'text-yellow-400', 'text-red-400');
+            if (swr <= 1.5)      swrEl.classList.add('text-green-400');
+            else if (swr <= 2.5) swrEl.classList.add('text-yellow-400');
+            else                 swrEl.classList.add('text-red-400');
+
+            // SWR bar: 1.0 = 0% width (good), 3.0+ = 100% (bad).
+            const swrPercent = Math.min(Math.max((swr - 1) / 2 * 100, 0), 100);
+            const swrBar = document.getElementById(`ch${ch}SWRBar`);
+            if (swrBar) {
+                swrBar.style.width = swrPercent + '%';
+                swrBar.className = 'swr-mini-bar h-full rounded-full ' +
+                    (swr <= 1.5 ? 'bg-green-500' :
+                     swr <= 2.5 ? 'bg-yellow-500' :
+                     swr <= 3.5 ? 'bg-orange-500' : 'bg-red-500');
+            }
+
+            // ─ Card pulse + status pill ─
+            const card = document.getElementById(`channel${ch}Card`);
+            const status = document.getElementById(`ch${ch}Status`);
+            const bandInfo = document.getElementById(`ch${ch}BandInfo`);
+
+            if (power >= txThreshold) {
+                card.classList.add('tx-active');
+                if (fraction > ZONE_YELLOW_END) {
+                    status.textContent = 'PEAK';
+                    status.className = 'status-pill px-3 py-1 rounded-full bg-red-900/50 text-red-300 border border-red-700';
+                } else {
+                    status.textContent = 'TX';
+                    status.className = 'status-pill px-3 py-1 rounded-full bg-green-900/50 text-green-300 border border-green-700';
+                }
+                // Frequency / band tag — prefer the rig's own reported
+                // frequency (data.band/data.freqMHz, set directly by
+                // pollLiveRig() and rigHistoryEntryToDataObj()) since it's
+                // exact; fall back to the old VARA-connection-log
+                // correlation only for older history entries logged before
+                // that field existed.
+                if (bandInfo) {
+                    if (data.band && data.freqMHz) {
+                        bandInfo.textContent = `${data.freqMHz.toFixed(3)} MHz · ${data.band}`;
+                        bandInfo.classList.remove('hidden');
+                    } else if (data.timestamp) {
+                        const conn = findConnectionAt(data.timestamp.getTime());
+                        if (conn && conn.band && conn.freqMHz) {
+                            bandInfo.textContent = `${conn.freqMHz.toFixed(3)} MHz · ${conn.band}`;
+                            bandInfo.classList.remove('hidden');
+                        } else {
+                            bandInfo.classList.add('hidden');
+                        }
+                    } else {
+                        bandInfo.classList.add('hidden');
+                    }
+                }
+            } else {
+                card.classList.remove('tx-active');
+                status.textContent = 'IDLE';
+                status.className = 'status-pill px-3 py-1 rounded-full bg-gray-700 text-gray-300 border border-gray-600';
+                if (bandInfo) bandInfo.classList.add('hidden');
+            }
+        }
+
+        function updateSummary() {
+            const data = logData[playbackIndex];
+
+            // 1d Peak — max forward power within the SELECTED RANGE (matches range-label).
+            // channelStats[1].peakPower is computed once over logData (which is already
+            // filtered to selectedDays), so this number is naturally range-bounded.
+            document.getElementById('totalPeak').textContent = channelStats[1].peakPower.toFixed(1) + ' W';
+
+            document.getElementById('txCount').textContent = txEvents.length;
+
+            // Avg TX Power — average of PEAK watts across TX SESSIONS in the selected range.
+            // (Was: average of every per-second sample above threshold, which biased low when
+            // sessions had ramp-up/ramp-down samples close to the 5W threshold.)
+            // txEvents is already the list of completed TX sessions across logData, which is
+            // filtered to selectedDays — so this reading follows the range button automatically.
+            const avgOfPeaks = txEvents.length > 0
+                ? txEvents.reduce((sum, e) => sum + (e.peakPower || 0), 0) / txEvents.length
+                : 0;
+            document.getElementById('avgTxPower').textContent = avgOfPeaks.toFixed(1) + ' W';
+
+            document.getElementById('dutyCycle').textContent = (logData.length > 0 ? (channelStats[1].txTime / logData.length) * 100 : 0).toFixed(1) + '%';
+        }
+
+        function updateDisplay() {
+            if (logData.length === 0) return;
+            const data = logData[playbackIndex];
+            updateChannel(1, data);
+            updateSummary();
+            updateChart();
+            document.getElementById('playbackDate').textContent = data.date;
+            document.getElementById('playbackTime').textContent = data.time;
+            document.getElementById('playbackSlider').value = (playbackIndex / (logData.length - 1)) * 100;
+            
+            // Show frequency/band if a connection is active at this timestamp
+            const freqEl = document.getElementById('playbackFreq');
+            const isTx = data.ch1.peak >= txThreshold;
+            if (isTx) {
+                const conn = findConnectionAt(data.timestamp.getTime());
+                if (conn && conn.band) {
+                    const icon = conn.failed ? '✗ ' : '✓ ';
+                    freqEl.textContent = `${icon}${conn.callsign} • ${conn.band}${conn.freqMHz ? ' • ' + conn.freqMHz.toFixed(3) : ''}`;
+                    freqEl.style.background = conn.failed ? '#991b1b' : (BAND_COLORS[conn.band] || '#374151');
+                    freqEl.style.color = 'white';
+                } else if (conn) {
+                    const icon = conn.failed ? '✗ ' : '✓ ';
+                    freqEl.textContent = icon + conn.callsign;
+                    freqEl.style.background = conn.failed ? '#991b1b' : '#374151';
+                    freqEl.style.color = conn.failed ? '#fca5a5' : '#9ca3af';
+                } else {
+                    freqEl.textContent = '';
+                }
+            } else {
+                freqEl.textContent = '';
+            }
+        }
+
+        function updateChart() {
+            if (logData.length === 0 || !powerChart) return;
+            const metric = document.getElementById('chartMetric').value;
+
+            // With chart-zoom buttons removed, the chart always renders the full
+            // loaded range (at most 2 days). Slice from start of data to playback
+            // position so scrubbing the playback slider still works.
+            const chartData = logData.slice(0, playbackIndex + 1);
+            // Dynamic step: keep chart under ~800 points for smooth rendering
+            const step = Math.max(1, Math.floor(chartData.length / 800));
+            
+            const labels = [], ds1 = [], ds2 = [];
+            for (let i = 0; i < chartData.length; i += step) { 
+                const d = chartData[i]; 
+                labels.push(d.date.substring(0,5) + ' ' + d.time.substring(0,5)); 
+                ds1.push(d.ch1[metric]);
+                // d.swr is null outside TX (see rigHistoryEntryToDataObj) — Chart.js
+                // will leave a gap in the line there since spanGaps is false.
+                ds2.push(d.swr);
+            }
+            
+            powerChart.data.labels = labels;
+            powerChart.data.datasets[0].data = ds1;
+            powerChart.data.datasets[1].data = ds2;
+            powerChart.update('none');
+        }
+
+        function updateHourlyChart() {
+            if (!hourlyChart || Object.keys(hourlyStats).length === 0) return;
+            const hours = Object.keys(hourlyStats).sort();
+            
+            // Today and Archive modes show only one calendar day, so just hour labels.
+            // 2 Days mode spans midnight, so include date+hour for clarity.
+            const labelFormat = (rangeMode === '2d')
+                ? h => { const parts = h.split(' '); return parts[0].substring(0,5) + ' ' + (parts[1] || ''); }
+                : h => (h.split(' ')[1] || h);
+            
+            hourlyChart.data.labels = hours.map(labelFormat);
+            // Datasets: [0] = ch1 TX count (bar), [1] = Wh (line, was index 2 with ch2 between).
+            // Indices renumbered after dropping ch2 dataset.
+            hourlyChart.data.datasets[0].data = hours.map(h => hourlyStats[h].channels[1].tx);
+            hourlyChart.data.datasets[1].data = hours.map(h => hourlyStats[h].wh);
+            hourlyChart.update('none');
+            
+            // For 7d/30d, limit table to most recent 168 hours (7 days) to prevent massive DOM
+            const displayHours = hours.length > 200 ? hours.slice(-200) : hours;
+            document.getElementById('hourlyTableBody').innerHTML = displayHours.map(h => {
+                const hs = hourlyStats[h];
+                return `<tr class="border-t border-gray-700 hover:bg-gray-700/50"><td class="p-2 font-mono">${h}</td><td class="p-2 text-right">${hs.txCount}</td><td class="p-2 text-right text-green-400">${hs.channels[1].peak.toFixed(1)}</td><td class="p-2 text-right text-purple-400">${hs.wh.toFixed(1)}</td></tr>`;
+            }).join('');
+        }
+
+        function renderHeatmap() {
+            const container = document.getElementById('heatmapContainer');
+            const metric = document.getElementById('heatmapMetric').value;
+            const channel = document.getElementById('heatmapChannel').value;
+            
+            if (Object.keys(hourlyStats).length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-8">Load data</div>';
+                return;
+            }
+            
+            const dateHourData = {}, dates = new Set();
+            Object.entries(hourlyStats).forEach(([key, stats]) => {
+                const [date, time] = key.split(' ');
+                const hour = parseInt(time.split(':')[0]);
+                dates.add(date);
+                if (!dateHourData[date]) dateHourData[date] = {};
+                
+                let val = 0;
+                if (metric === 'txCount') val = channel === 'all' ? stats.txCount : stats.channels[channel]?.tx || 0;
+                else if (metric === 'power') val = channel === 'all' ? stats.peakPower : stats.channels[channel]?.peak || 0;
+                else val = channel === 'all' ? stats.wh : stats.channels[channel]?.wh || 0;
+                dateHourData[date][hour] = val;
+            });
+            
+            const sortedDates = Array.from(dates).sort();
+            let maxVal = 0;
+            sortedDates.forEach(date => { for (let h = 0; h < 24; h++) maxVal = Math.max(maxVal, dateHourData[date]?.[h] || 0); });
+            
+            let html = '<div class="flex flex-col gap-1"><div class="flex gap-1 ml-24">';
+            for (let h = 0; h < 24; h++) html += `<div class="w-6 text-center text-xs text-gray-500">${h}</div>`;
+            html += '</div>';
+            
+            sortedDates.forEach(date => {
+                html += `<div class="flex items-center gap-1"><div class="w-24 text-xs text-gray-400 text-right pr-2">${date}</div>`;
+                for (let h = 0; h < 24; h++) {
+                    const val = dateHourData[date]?.[h] || 0;
+                    const intensity = maxVal > 0 ? val / maxVal : 0;
+                    const color = intensity === 0 ? '#374151' : intensity < 0.2 ? '#14532d' : intensity < 0.4 ? '#15803d' : intensity < 0.6 ? '#ca8a04' : intensity < 0.8 ? '#ea580c' : '#dc2626';
+                    html += `<div class="heatmap-cell w-6 h-6 rounded cursor-pointer" style="background-color:${color}" title="${date} ${String(h).padStart(2,'0')}:00 - ${metric === 'txCount' ? val + ' events' : val.toFixed(1) + (metric === 'power' ? 'W' : ' Wh')}"></div>`;
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function showTab(tab) {
+            // Map tab names to ID suffixes (handles multi-word tab names properly)
+            const idSuffix = {
+                'power':    'Power',
+                'hourly':   'Hourly',
+                'heatmap':  'Heatmap',
+            }[tab] || (tab.charAt(0).toUpperCase() + tab.slice(1));
+            
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('tab-active'); b.classList.add('bg-gray-700', 'hover:bg-gray-600'); });
+            document.getElementById(`panel${idSuffix}`).classList.remove('hidden');
+            const btn = document.getElementById(`tab${idSuffix}`);
+            btn.classList.add('tab-active');
+            btn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+            if (tab === 'hourly') updateHourlyChart();
+            if (tab === 'heatmap') renderHeatmap();
+        }
+        
+        function togglePlayback() {
+            isPlaying = !isPlaying;
+            document.getElementById('playBtn').textContent = isPlaying ? '⏸️ Pause' : '▶️ Play';
+            if (isPlaying) {
+                playbackInterval = setInterval(() => {
+                    playbackIndex = Math.min(playbackIndex + 1, logData.length - 1);
+                    updateDisplay();
+                    if (playbackIndex >= logData.length - 1) togglePlayback();
+                }, 1000 / playbackSpeed);
+            } else {
+                clearInterval(playbackInterval);
+            }
+        }
+        
+        function stepBack() { playbackIndex = Math.max(0, playbackIndex - 300); updateDisplay(); }
+        function stepForward() { playbackIndex = Math.min(logData.length - 1, playbackIndex + 300); updateDisplay(); }
+        function seekPlayback(percent) { playbackIndex = Math.floor((percent / 100) * (logData.length - 1)); updateDisplay(); }
+        function updatePlaybackSpeed() { playbackSpeed = parseInt(document.getElementById('playbackSpeed').value); if (isPlaying) { clearInterval(playbackInterval); togglePlayback(); togglePlayback(); } }
+        
+        // (setTimeRange removed — chart-zoom buttons no longer exist; the chart
+        //  always shows the full loaded range, which is at most 2 days now.)
+
+        // Initialize
+        initCharts();
+        // Build the digital meter — segments, scale labels, right-click handler
+        buildBarSegments(1);
+        updateMeterScale(1);
+        document.getElementById('channel1Card').addEventListener('contextmenu', e => showCalibrateMenu(e, 1));
+        // Configure day picker min/max based on what's in the rolling 7-day live JSON
+        configureDayPicker();
+        loadAllData(false);
+        // Begin polling the rig's live meter every 3 seconds (independent of
+        // the 10-min historical refresh, same cadence rig-status.html uses).
+        // pollLiveRig() is defined below alongside AUTO_REFRESH constants.
+        setTimeout(() => { if (typeof startLivePoll === 'function') startLivePoll(); }, 0);
+        
+        // === AUTO-REFRESH: Reload 1-day data every 10 minutes ===
+        const AUTO_REFRESH_MS = 10 * 60 * 1000;  // 10 minutes
+        let autoRefreshTimer = null;
+        let countdownTimer = null;
+        let nextRefreshAt = 0;
+
+        // === LIVE RIG POLL: drives the Channel 1 card every 3 sec ===
+        // Polls vara-api.php's get_rig_info action — the same live FLRIG
+        // endpoint rig-status.html uses — so the Channel 1 gauge/readouts
+        // feel responsive between the coarser historical-log refreshes.
+        // Band/frequency come straight from the rig (mhz), which is more
+        // accurate than the old VARA-connection-log correlation this page
+        // used to rely on for that tag.
+        const LIVE_POLL_MS = 3000;
+        let livePollTimer = null;
+        // Last known-good SWR ratio, held across polls where the radio's
+        // swrmeter read failed/was unavailable (see pwr_ok/swr_ok below) —
+        // so a single missed CAT read doesn't flash the gauge to a fake
+        // "perfect 1:1" SWR.
+        let lastGoodSwrRatio = 1.0;
+
+        async function pollLiveRig() {
+            try {
+                const r = await fetch('vara-api.php', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ action: 'get_rig_info' }),
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const j = await r.json();
+                if (!j.ok) throw new Error(j.error || 'API error');
+
+                // pwr_ok/swr_ok distinguish "FLRIG answered and it's really
+                // 0/unknown" from "the CAT read itself failed this poll".
+                // A failed read must NOT be shown as a power drop to 0 —
+                // that was the source of the reported "TX power reporting
+                // drops and starts again" symptom. Instead, just skip this
+                // poll's UI update entirely and hold whatever was already
+                // on screen; the next successful poll (3s later) picks
+                // back up on its own.
+                if (j.pwr_ok === false) {
+                    console.warn('[RF] live poll: pwrmeter read failed this cycle, holding last display');
+                    return;
+                }
+
+                // Only drive the live card when the user is looking at "now"
+                // (not mid-playback/scrubbing an older point) — same guard
+                // the old WaveNode live poll used.
+                if (!isPlaying && playbackIndex >= logData.length - 2) {
+                    const fwd = j.pwrmeter || 0;
+                    const isTx = !!j.tx;
+                    let swrRatio;
+                    if (!isTx) {
+                        swrRatio = 1.0;
+                    } else if (j.swr_ok === false) {
+                        // SWR read failed this cycle but we're genuinely
+                        // transmitting — hold the last good ratio instead
+                        // of falsely showing a perfect 1:1 match.
+                        swrRatio = lastGoodSwrRatio;
+                    } else {
+                        swrRatio = flrigSwrRawToRatio(j.swrmeter) || 1.0;
+                        lastGoodSwrRatio = swrRatio;
+                    }
+                    const rfld = isTx ? reflectedFromSwr(fwd, swrRatio) : 0;
+                    let band = null;
+                    if (j.mhz) {
+                        for (const [lo, hi, n] of BANDS) {
+                            if (j.mhz >= lo - 0.001 && j.mhz <= hi + 0.001) { band = n; break; }
+                        }
+                    }
+                    const synthetic = {
+                        timestamp: new Date(),
+                        ch1: { peak: fwd, rfld: rfld, avg: fwd },
+                        freqMHz: j.mhz || null,
+                        band: band,
+                        wh1: (logData.length > 0) ? (logData[logData.length - 1].wh1 || 0) : 0,
+                    };
+                    updateChannel(1, synthetic);
+                }
+            } catch (e) {
+                console.warn('[RF] live rig poll failed:', e.message);
+            }
+        }
+
+        function startLivePoll() {
+            if (livePollTimer) return;
+            pollLiveRig();  // immediate first call so the card populates fast
+            livePollTimer = setInterval(pollLiveRig, LIVE_POLL_MS);
+        }
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            // Auto-refresh applies to live ranges only (today / 2d).
+            // Archive viewing of a fixed past day is static — no point refreshing.
+            if (rangeMode === 'today' || rangeMode === '2d') {
+                nextRefreshAt = Date.now() + AUTO_REFRESH_MS;
+                autoRefreshTimer = setInterval(() => {
+                    if (!isLoading && (rangeMode === 'today' || rangeMode === '2d')) {
+                        loadAllData(true);
+                        nextRefreshAt = Date.now() + AUTO_REFRESH_MS;
+                    }
+                }, AUTO_REFRESH_MS);
+                // Update countdown in status every 30 seconds
+                countdownTimer = setInterval(updateCountdown, 30000);
+                updateCountdown();
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+            if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+        }
+
+        function updateCountdown() {
+            if (rangeMode === 'archive' || !nextRefreshAt) return;
+            const secsLeft = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+            const mins = Math.floor(secsLeft / 60);
+            const statusEl = document.getElementById('statusText');
+            // Only append countdown if not currently loading
+            if (!isLoading && logData.length > 0) {
+                statusEl.textContent = `${logData.length.toLocaleString()} samples (1d) • refresh ${mins}m`;
+            }
+        }
+
+        // Wire auto-refresh into setDataRange
+        const _baseSetDataRange = setDataRange;
+        setDataRange = function(days) {
+            _baseSetDataRange(days);
+            startAutoRefresh();
+        };
+
+        startAutoRefresh();
+        // Nav bar clock
+        (function updateNavClocks(){var n=new Date(),u=String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0'),l=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'),a=document.getElementById('navUtcClock'),b=document.getElementById('navLocalClock');if(a)a.textContent=u+' Z';if(b)b.textContent=l+' L';setTimeout(updateNavClocks,1000-n.getMilliseconds())})();
+    </script>
+<script src="shared/settings-modal.js"></script>
+</body>
+</html>

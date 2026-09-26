@@ -1,0 +1,22 @@
+[Unit]
+Description=BPQ Dashboard Rig History Poller (TX power / SWR, independent of browser)
+Documentation=https://github.com/your-repo/bpq-dashboard
+After=network.target flrig.service
+Wants=flrig.service
+
+[Service]
+Type=simple
+# Must match the user/group vara-api.php's own writes run as, since this
+# writes to the same rig-history.jsonl file (see $CONFIG['paths']['datalog']
+# / $RIG_HISTORY_DIR in vara-api.php).
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/bpq-dashboard
+ExecStart=/usr/bin/php /var/www/bpq-dashboard/scripts/rig-history-poller.php
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 580" width="900" height="580">
+  <!-- Page background -->
+  <rect width="900" height="580" fill="#0d1117"/>
+
+  <!-- Page title -->
+  <text x="20" y="32" font-family="JetBrains Mono, monospace" font-size="20" fill="#e6edf3" font-weight="700">System Audit</text>
+  <text x="160" y="32" font-family="DM Sans, sans-serif" font-size="11" fill="#7d8590">W1AW · Server · Live health check</text>
+
+  <!-- Last run -->
+  <text x="775" y="32" font-family="DM Sans, sans-serif" font-size="11" fill="#7d8590">Last run: 23:47 UTC</text>
+
+  <!-- Summary cards -->
+  <g transform="translate(20, 50)">
+    <!-- OK -->
+    <rect width="140" height="60" rx="6" fill="#0f1c14" stroke="#1a4428" stroke-width="1"/>
+    <text x="70" y="22" font-family="DM Sans" font-size="11" fill="#3fb950" text-anchor="middle" font-weight="700">OK</text>
+    <text x="70" y="48" font-family="DM Sans" font-size="26" fill="#3fb950" text-anchor="middle" font-weight="700">24</text>
+
+    <!-- Warn -->
+    <g transform="translate(150, 0)">
+      <rect width="140" height="60" rx="6" fill="#1a1305" stroke="#3d2b05" stroke-width="1"/>
+      <text x="70" y="22" font-family="DM Sans" font-size="11" fill="#d29922" text-anchor="middle" font-weight="700">WARN</text>
+      <text x="70" y="48" font-family="DM Sans" font-size="26" fill="#d29922" text-anchor="middle" font-weight="700">2</text>
+    </g>
+
+    <!-- Crit -->
+    <g transform="translate(300, 0)">
+      <rect width="140" height="60" rx="6" fill="#1a0a08" stroke="#3d0c0a" stroke-width="1"/>
+      <text x="70" y="22" font-family="DM Sans" font-size="11" fill="#f85149" text-anchor="middle" font-weight="700">CRIT</text>
+      <text x="70" y="48" font-family="DM Sans" font-size="26" fill="#f85149" text-anchor="middle" font-weight="700">0</text>
+    </g>
+
+    <!-- Total -->
+    <g transform="translate(450, 0)">
+      <rect width="140" height="60" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="70" y="22" font-family="DM Sans" font-size="11" fill="#7d8590" text-anchor="middle" font-weight="700">CHECKS</text>
+      <text x="70" y="48" font-family="DM Sans" font-size="26" fill="#e6edf3" text-anchor="middle" font-weight="700">26</text>
+    </g>
+
+    <!-- Daemons -->
+    <g transform="translate(600, 0)">
+      <rect width="270" height="60" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="15" y="22" font-family="DM Sans" font-size="11" fill="#7d8590" font-weight="700">DAEMONS</text>
+      <text x="15" y="48" font-family="DM Sans" font-size="22" fill="#3fb950" font-weight="700">8/8 active</text>
+      <text x="180" y="48" font-family="DM Sans" font-size="12" fill="#7d8590">all healthy</text>
+    </g>
+  </g>
+
+  <!-- Findings list -->
+  <g transform="translate(20, 125)">
+
+    <!-- Security category -->
+    <text x="0" y="0" font-family="JetBrains Mono, monospace" font-size="12" fill="#bc8cff" font-weight="700">▸ SECURITY (6)</text>
+
+    <!-- Finding 1: OK fw-policy -->
+    <g transform="translate(0, 15)">
+      <rect width="850" height="46" rx="6" fill="#0f1c14" stroke="#1a4428" stroke-width="1"/>
+      <circle cx="20" cy="23" r="6" fill="#3fb950"/>
+      <text x="38" y="20" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">Firewall policy is DROP</text>
+      <text x="38" y="36" font-family="DM Sans" font-size="11" fill="#7d8590">INPUT chain default policy is DROP — all unmatched traffic is rejected.</text>
+      <text x="838" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#3fb950" text-anchor="end">fw-policy</text>
+    </g>
+
+    <!-- Finding 2: OK ssh-port -->
+    <g transform="translate(0, 67)">
+      <rect width="850" height="36" rx="6" fill="#0f1c14" stroke="#1a4428" stroke-width="1"/>
+      <circle cx="20" cy="18" r="6" fill="#3fb950"/>
+      <text x="38" y="15" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">SSH on non-standard port 2222</text>
+      <text x="38" y="29" font-family="DM Sans" font-size="11" fill="#7d8590">Reduces automated scan exposure.</text>
+      <text x="838" y="15" font-family="JetBrains Mono, monospace" font-size="10" fill="#3fb950" text-anchor="end">ssh-port</text>
+    </g>
+
+    <!-- Finding 3: OK fail2ban with jails -->
+    <g transform="translate(0, 109)">
+      <rect width="850" height="36" rx="6" fill="#0f1c14" stroke="#1a4428" stroke-width="1"/>
+      <circle cx="20" cy="18" r="6" fill="#3fb950"/>
+      <text x="38" y="15" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">Fail2ban active · 2 jails configured (sshd, nginx-env-scan)</text>
+      <text x="38" y="29" font-family="DM Sans" font-size="11" fill="#7d8590">SSHD: 0 banned · NGINX-ENV-SCAN: 3 banned in last 24h</text>
+      <text x="838" y="15" font-family="JetBrains Mono, monospace" font-size="10" fill="#3fb950" text-anchor="end">fail2ban</text>
+    </g>
+
+    <!-- Resources category -->
+    <text x="0" y="170" font-family="JetBrains Mono, monospace" font-size="12" fill="#bc8cff" font-weight="700">▸ RESOURCES (4)</text>
+
+    <!-- WARN: disk -->
+    <g transform="translate(0, 180)">
+      <rect width="850" height="50" rx="6" fill="#1a1305" stroke="#3d2b05" stroke-width="1"/>
+      <circle cx="20" cy="25" r="6" fill="#d29922"/>
+      <text x="38" y="20" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">/var disk usage 74%</text>
+      <text x="38" y="36" font-family="DM Sans" font-size="11" fill="#7d8590">2.1 GB free of 8.0 GB. Consider archival or cleanup.</text>
+      <text x="38" y="48" font-family="JetBrains Mono, monospace" font-size="10" fill="#d29922">→ sudo /usr/local/bin/archive-bpq-data.sh</text>
+      <text x="838" y="20" font-family="JetBrains Mono, monospace" font-size="10" fill="#d29922" text-anchor="end">disk-var</text>
+    </g>
+
+    <!-- Application category -->
+    <text x="0" y="252" font-family="JetBrains Mono, monospace" font-size="12" fill="#bc8cff" font-weight="700">▸ APPLICATION (12)</text>
+
+    <!-- All daemons -->
+    <g transform="translate(0, 262)">
+      <rect width="420" height="56" rx="6" fill="#0f1c14" stroke="#1a4428" stroke-width="1"/>
+      <text x="15" y="20" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">All daemons active</text>
+      <g font-family="JetBrains Mono, monospace" font-size="10" fill="#3fb950">
+        <text x="15" y="36">● nginx  ● php8.3-fpm  ● bpq  ● vara-validator</text>
+        <text x="15" y="50">● bpq-vara  ● bpq-telnet  ● bpq-chat  ● bpq-aprs</text>
+      </g>
+    </g>
+
+    <!-- SSL multi-domain -->
+    <g transform="translate(430, 262)">
+      <rect width="420" height="56" rx="6" fill="#0f1c14" stroke="#1a4428" stroke-width="1"/>
+      <text x="15" y="20" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">SSL certificates · 2 domains</text>
+      <g font-family="JetBrains Mono, monospace" font-size="10" fill="#3fb950">
+        <text x="15" y="36">● bpq.w1aw.net — expires in 67 days</text>
+        <text x="15" y="50">● tprfn.w1aw.net — expires in 51 days</text>
+      </g>
+    </g>
+
+    <!-- WARN: YAPP files -->
+    <g transform="translate(0, 325)">
+      <rect width="420" height="56" rx="6" fill="#1a1305" stroke="#3d2b05" stroke-width="1"/>
+      <circle cx="20" cy="28" r="6" fill="#d29922"/>
+      <text x="38" y="22" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">YAPP files directory · 87 MB</text>
+      <text x="38" y="38" font-family="DM Sans" font-size="11" fill="#7d8590">Approaching 100 MB threshold — consider cleanup.</text>
+      <text x="38" y="50" font-family="JetBrains Mono, monospace" font-size="10" fill="#d29922">→ find /var/www/html/bpq/yapp-files/ -mtime +30 -delete</text>
+    </g>
+
+    <!-- OK: NetROM nodes -->
+    <g transform="translate(430, 325)">
+      <rect width="420" height="56" rx="6" fill="#0f1c14" stroke="#1a4428" stroke-width="1"/>
+      <text x="15" y="20" font-family="DM Sans" font-size="13" fill="#e6edf3" font-weight="600">NetROM routing table</text>
+      <text x="15" y="38" font-family="DM Sans" font-size="11" fill="#7d8590">47 known nodes · last update 4 min ago</text>
+      <text x="15" y="50" font-family="JetBrains Mono, monospace" font-size="10" fill="#7d8590">Top: VK2RZ-1 (q=180) · KE0GB-1 (q=176)</text>
+    </g>
+
+  </g>
+
+  <!-- Footer -->
+  <text x="450" y="575" font-family="DM Sans, sans-serif" font-size="10" fill="#7d8590" text-anchor="middle" font-style="italic">System Audit — 30 checks across security, resources, web stack, database, and application health</text>
+</svg>
