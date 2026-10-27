@@ -1,6 +1,6 @@
 <?php
 /**
- * BPQ Dashboard v1.5.14 — Post-Installation Check
+ * BPQ Dashboard v1.5.15 — Post-Installation Check
  * Checks every component installed by bpq-dashboard-install.sh
  * Access: https://your.domain/install-check.php  (behind the admin login)
  *
@@ -538,6 +538,27 @@ foreach ($optDaemons as $svc => $label) {
     }
 }
 
+// 2026-10-27: VARA HF log for RF Connections (Installation Manual §10.11):
+// VARA HF sends syslog (UDP 514) -> rsyslog -> /var/log/syslog ->
+// vara-logger -> logs/<vara_file>. Warnings only: VARA HF is optional.
+$udp514 = preg_match('/:514\s/', (string)shell_exec('ss -uln 2>/dev/null')) === 1;
+chk('Daemons', 'VARA HF log — syslog receiver (UDP 514)', $udp514,
+    $udp514 ? 'This server listens for syslog on UDP 514'
+            : 'Nothing listens on UDP 514 — VARA HF\'s log can\'t arrive',
+    'Re-run install.sh and answer Yes to the VARA HF log question, or set up rsyslog by hand (Installation Manual §10.11)', true);
+$vfName = basename((string)($cfg['logs']['vara_file'] ?? ''));
+$vfDir  = rtrim((string)($cfg['paths']['logs'] ?? "$BASE/logs"), '/');
+if ($vfName !== '') {
+    $vf  = "$vfDir/$vfName";
+    $vSz = fileOk($vf) ? (int)@filesize($vf) : -1;
+    $vAg = fileOk($vf) ? time() - (int)@filemtime($vf) : null;
+    chk('Daemons', "VARA HF log — $vfName", $vSz > 0 && $vAg !== null && $vAg < 7 * 86400,
+        $vSz < 0  ? "Not found in $vfDir — vara-logger creates it when it starts"
+      : ($vSz === 0 ? 'Empty — no VARA HF lines received yet'
+      : ($vAg >= 7 * 86400 ? 'Last line ' . floor($vAg / 86400) . ' days ago' : 'Last line ' . ($vAg < 3600 ? floor($vAg / 60) . ' min' : floor($vAg / 3600) . ' h') . ' ago')),
+        "In VARA HF: Settings > VARA Setup > Syslog on, Host = this server, port 514, Station Name H-<call-SSID>; then: sudo systemctl enable --now vara-logger; grep VARAHF /var/log/syslog | tail -3", true);
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // 8. LINBPQ CONNECTIVITY
 // ═══════════════════════════════════════════════════════════════════
@@ -819,7 +840,7 @@ function renderPage($results,$pass,$fail,$warn,$score,$sc) {
 $total = $pass+$fail+$warn; ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BPQ Dashboard v1.5.14 — Install Check</title>
+<title>BPQ Dashboard v1.5.15 — Install Check</title>
 <style>
 :root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;
       --acc:#4a9eff;--grn:#3fb950;--red:#f85149;--org:#d29922;--pur:#bc8cff;}
@@ -865,7 +886,7 @@ h1{font-size:20px;color:var(--acc);margin-bottom:4px;}
         color:var(--org);font-size:12px;text-align:center;line-height:1.8;}
 .footer strong{color:var(--red);}
 </style></head><body>
-<h1>🔧 BPQ Dashboard v1.5.14 — Post-Installation Check</h1>
+<h1>🔧 BPQ Dashboard v1.5.15 — Post-Installation Check</h1>
 <p class="sub"><?=date('Y-m-d H:i:s T')?> · PHP <?=phpversion()?> · <?=htmlspecialchars(php_uname('n'))?></p>
 
 <div class="card">
@@ -913,7 +934,7 @@ foreach ($cats as $cat => $items):
 <div class="footer">
     <strong>⚠ Security reminder:</strong> Remove this file when done troubleshooting.<br>
     <code>sudo rm <?=htmlspecialchars($GLOBALS['BASE'])?>/install-check.php</code><br>
-    BPQ Dashboard v1.5.14 · Access: <?=htmlspecialchars("https://".($_SERVER['HTTP_HOST'] ?? 'your-server')."/install-check.php")?> (admin login)
+    BPQ Dashboard v1.5.15 · Access: <?=htmlspecialchars("https://".($_SERVER['HTTP_HOST'] ?? 'your-server')."/install-check.php")?> (admin login)
 </div>
 </body></html>
 <?php }

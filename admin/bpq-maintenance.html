@@ -511,10 +511,10 @@
 <body data-nav-page="maint">
 <!-- Shared navigation (loaded from /_nav.html via /bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-10-27-1"></script>
+<script src="/bpq-nav-loader.js?v=2026-10-27-2"></script>
 
 <!--
-  Maintenance reference — v1.5.14 (rebuilt 2026-10-03, checked against the code 2026-10-25)
+  Maintenance reference — v1.5.15 (rebuilt 2026-10-03, checked against the code 2026-10-25)
   This page must only be reachable after the admin login: it lives in
   /admin/, which nginx (location ^~ /admin/) or Apache (<Directory …/admin>)
   protects with /etc/nginx/.bpq-mgmt-auth. The status box below checks that.
@@ -524,7 +524,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.14 · updated October 2026
+    v1.5.15 · updated October 2026
   </div>
 </header>
 
@@ -745,6 +745,14 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <code>systemctl status vara-logger <span class="flag">--no-pager</span>; ls <span class="flag">-l</span> <var data-v="root">/var/www/bpq-dashboard</var>/logs/*.vara</code>
       <div class="cmd-label">vara-logger feeds the VARA parser. The .vara file's time should move whenever VARA is active. If the parser reads the wrong file, check <span class="kw">logs.vara_file</span> in config.php.</div>
     </div><div class="cmd-tag cyan">source</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>ss <span class="flag">-uln</span> | grep <span class="flag">':514 '</span>; grep VARAHF /var/log/syslog | tail <span class="flag">-3</span>; cat /etc/rsyslog.d/10-bpq-dashboard-vara.conf</code>
+      <div class="cmd-label">Is VARA HF's log arriving? VARA HF (registered) sends it as syslog: <span class="kw">Settings → VARA Setup → Syslog</span>, Host = this server, UDP port 514, Station Name <span class="kw">H-&lt;call-SSID&gt;</span>. The first command shows rsyslog listening on UDP 514; the second the newest VARA lines; the third which senders the installer's receiver accepts (<span class="kw">$AllowedSender</span>). Nothing in syslog: check VARA's Syslog settings, the allowed address and the firewall (UDP 514 from the VARA computer). Installation Manual §10.11.</div>
+    </div><div class="cmd-tag cyan">syslog</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>logger <span class="flag">-n</span> 127.0.0.1 <span class="flag">-P</span> 514 <span class="flag">-d</span> <span class="flag">-t</span> VARATEST "receiver test"; sleep 1; grep VARATEST /var/log/syslog | tail <span class="flag">-1</span></code>
+      <div class="cmd-label">Tests the receiver itself from this server (the VARATEST tag keeps it out of the VARA log). If this line appears but VARA's don't, the problem is on the VARA computer's side or the firewall.</div>
+    </div><div class="cmd-tag cyan">test</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> crontab <span class="flag">-l</span> <span class="flag">-u</span> www-data | grep nodes-rtt; ls <span class="flag">-l</span> <var data-v="root">/var/www/bpq-dashboard</var>/logs/nodesrtt.txt</code>
       <div class="cmd-label">Optional NetROM round-trip times for System Logs: <span class="kw">nodes-rtt.sh</span> (every 10 min) writes nodesrtt.txt, which parse-system-logs.py picks up.</div>

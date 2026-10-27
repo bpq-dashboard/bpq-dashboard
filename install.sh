@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.14 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.15 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -80,7 +80,7 @@ fi
 if [[ ! -f "$SCRIPT_DIR/config.php.example" ]] || \
    [[ ! -f "$SCRIPT_DIR/bbs-messages.html" ]]; then
     die "Could not find the dashboard files. Are you running this script
-   from the folder where you unzipped BPQ-Dashboard-v1.5.14.zip?
+   from the folder where you unzipped BPQ-Dashboard-v1.5.15.zip?
 
    Current folder: $SCRIPT_DIR"
 fi
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.14 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.15 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -240,6 +240,36 @@ else
     ok "Automatic NWS bulletins: off (can be turned on later in config.php)"
 fi
 
+# 2026-10-27: VARA HF's session log for RF Connections arrives as syslog
+# (UDP 514). Debian 12 doesn't install rsyslog, and nothing received UDP
+# syslog before this question. Installation Manual §10.11.
+VARA_SYSLOG="n"; VARA_IP=""
+ask "Receive VARA HF's log for the RF Connections page? (recommended if you run VARA HF)"
+explain "RF Connections is built from VARA HF's session log. The registered VARA HF"
+explain "sends it as syslog: VARA Settings > VARA Setup > tick Syslog, Syslog Host ="
+explain "this server's IP address, port 514, Station Name = H-<VARA call-SSID>"
+explain "(e.g. H-${INPUT_CALL}-7). The installer sets this server up to receive it"
+explain "(rsyslog on UDP 514, accepting only the VARA computer)."
+if yesno "Set up the VARA HF log receiver?" Y; then
+    while true; do
+        ask "IP address of the computer running VARA HF (Enter = VARA runs on this server):"
+        explain "Usually a Windows PC on your network, e.g. 192.168.1.50. Give it a fixed"
+        explain "address (DHCP reservation in your router) so this stays right."
+        read -r VARA_IP
+        VARA_IP=$(echo "$VARA_IP" | tr -d '[:space:]')
+        if [[ -z "$VARA_IP" ]]; then VARA_IP="127.0.0.1"; break; fi
+        if [[ "$VARA_IP" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] \
+           && (( BASH_REMATCH[1] <= 255 && BASH_REMATCH[2] <= 255 && BASH_REMATCH[3] <= 255 && BASH_REMATCH[4] <= 255 )); then
+            break
+        fi
+        echo "  '$VARA_IP' is not an IPv4 address (like 192.168.1.50). Try again, or press ENTER for this server."
+    done
+    VARA_SYSLOG="y"
+    ok "VARA HF log: received from $( [[ "$VARA_IP" == "127.0.0.1" ]] && echo "this server" || echo "$VARA_IP" ) on UDP 514"
+else
+    ok "VARA HF log receiver: skipped (Installation Manual §10.11 to set it up later)"
+fi
+
 # ============================================================================
 hdr "STEP 2 — Tell me about your BPQ node"
 # ============================================================================
@@ -367,8 +397,10 @@ else
 fi
 
 # Useful utilities
-say "Installing a few small utilities (curl, jq, sudo)..."
-apt-get install -y -qq curl jq sudo rsync >/dev/null 2>&1 && ok "Utilities installed"
+say "Installing a few small utilities (curl, jq, sudo, rsyslog)..."
+# rsyslog writes /var/log/syslog, which vara-logger reads (Debian 12 no longer
+# installs it by default).
+apt-get install -y -qq curl jq sudo rsync rsyslog >/dev/null 2>&1 && ok "Utilities installed"
 
 # ============================================================================
 # Give long-running pages (log parsing, reports) enough time: PHP's
@@ -1304,6 +1336,50 @@ if [[ "$NWS_AUTO" == "y" ]]; then
 else
     say "Automatic NWS bulletins off. To turn on later: set 'nws' => 'auto_post' in config.php"
     say "('enabled' => true, 'area' => 'XX'), then: sudo systemctl enable --now nws-auto-post.timer"
+fi
+
+# VARA HF log receiver (Step 1 question; Installation Manual §10.11)
+if [[ "$VARA_SYSLOG" == "y" ]]; then
+    RSYS_CONF=/etc/rsyslog.d/10-bpq-dashboard-vara.conf
+    if grep -qsE '^[[:space:]]*(module\(load="imudp"|\$ModLoad[[:space:]]+imudp|\$UDPServerRun)' \
+            /etc/rsyslog.conf /etc/rsyslog.d/*.conf && [[ ! -f "$RSYS_CONF" ]]; then
+        warn "rsyslog already receives UDP syslog (another config loads imudp) - left as it is."
+        warn "Make sure it accepts $VARA_IP on port 514 (Installation Manual §10.11)."
+    else
+        cat > "$RSYS_CONF" <<RSYS
+# BPQ Dashboard (install.sh, $(date +%F)): receive VARA HF's syslog on UDP 514.
+# Only these senders are accepted (add another with a comma). VARA HF:
+# Settings > VARA Setup > Syslog, Host = this server, port 514,
+# Station Name = H-<call-SSID>. Installation Manual §10.11.
+\$AllowedSender UDP, 127.0.0.1, $VARA_IP
+module(load="imudp")
+input(type="imudp" port="514")
+RSYS
+        if rsyslogd -N1 >/dev/null 2>&1; then
+            systemctl enable rsyslog >/dev/null 2>&1
+            if systemctl restart rsyslog >/dev/null 2>&1; then
+                ok "rsyslog receives VARA HF's log on UDP 514 from $VARA_IP ($RSYS_CONF)"
+            else
+                warn "rsyslog didn't restart - check: sudo systemctl status rsyslog"
+            fi
+        else
+            rm -f "$RSYS_CONF"
+            warn "rsyslog rejected the receiver config - removed it. See Installation Manual §10.11."
+        fi
+    fi
+    if [[ "$VARA_IP" != "127.0.0.1" ]] && command -v ufw >/dev/null 2>&1 \
+            && ufw status 2>/dev/null | grep -q "Status: active"; then
+        ufw allow from "$VARA_IP" to any port 514 proto udp comment 'VARA HF syslog' >/dev/null 2>&1 \
+            && ok "Firewall (ufw): UDP 514 open to $VARA_IP only"
+    elif [[ "$VARA_IP" != "127.0.0.1" ]]; then
+        say "If this server runs a firewall, allow UDP 514 from $VARA_IP only."
+    fi
+    if [[ -f /etc/systemd/system/vara-logger.service ]]; then
+        systemctl enable --now vara-logger >/dev/null 2>&1 \
+            && ok "vara-logger started: VARA lines go to $WEB_ROOT/logs/$INPUT_CALL_LC.vara"
+    fi
+    say "In VARA HF: Settings > VARA Setup > tick Syslog; Syslog Host = $( [[ "$VARA_IP" == "127.0.0.1" ]] && echo "localhost" || echo "this server's IP" ),"
+    say "port 514; Station Name = H-<your VARA call-SSID>, e.g. H-${INPUT_CALL}-7."
 fi
 
 # ============================================================================

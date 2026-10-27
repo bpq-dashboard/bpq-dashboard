@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.14**
+**Version 1.5.15**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -70,7 +70,7 @@ Most sysops are all three. Read everything that applies to you.
 24. What runs behind the pages
 25. Where your settings are kept
 26. Common messages and what they mean
-27. Known limitations in v1.5.14
+27. Known limitations in v1.5.15
 28. Keyboard shortcuts
 29. Page URL reference
 30. Getting help
@@ -684,7 +684,7 @@ Every station you've connected with, coloured by success rate, plus your own sta
 
 ### Where the data comes from
 
-Sessions come from the VARA log (written by `vara-logger`, read every 5 minutes by `parse-vara-log.py` into the database); messages and frequencies from BPQ's BBS logs; the queue live from the BBS. Without the database the page falls back to reading the log files in your browser, which is much slower — see "(DB)" in Section 26. The page reloads its data every 15 minutes.
+Sessions come from the VARA log: VARA HF sends its session log to the server as syslog (the registered VARA HF's Syslog setting, *Installation Manual* §10.11), `vara-logger` keeps the lines in `logs/<callsign>.vara`, and `parse-vara-log.py` reads them into the database every 5 minutes; messages and frequencies from BPQ's BBS logs; the queue live from the BBS. Without the database the page falls back to reading the log files in your browser, which is much slower — see "(DB)" in Section 26. The page reloads its data every 15 minutes.
 
 ---
 
@@ -1020,6 +1020,7 @@ Runs dozens of checks on this install and reports each one with what it found an
 - services and daemons are running, PHP and the database work, the log parsers are scheduled
 - the web server's site file serves this folder, the admin folder and the station-acting pages are behind the login, and the login reaches PHP
 - LinBPQ is reachable, with mail and chat enabled, and the FLRIG `RADIO` block is readable
+- the VARA HF log arrives: the server listens for syslog on UDP 514 and the `.vara` file has had a line in the last 7 days (warnings only — VARA HF is optional)
 
 It shows a score and a fix for each failure; work down the red items first. Some checks can't see root-only things (such as root's crontab) and say so.
 
@@ -1111,7 +1112,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"Chat daemon not connected"* | `bpq-chat` isn't connected to BPQ | `sudo systemctl restart bpq-chat` |
 | *"WebSocket error — check: sudo systemctl status bpq-vara"* | The VARA page can't reach its service | Section 7. If the service stopped, `sudo journalctl -u bpq-vara -n 20` says why (e.g. no VARA port found, `bbs` login not set) |
 | *"flrig offline"* | The server can't reach flrig | Section 16 |
-| *"No VARA Log File Found"* (RF Connections) | No VARA log yet, and no database data | Check `vara-logger` and `logs.vara_file` in `config.php` |
+| *"No VARA Log File Found"* (RF Connections) | No VARA log yet, and no database data | VARA HF's Syslog setting, the rsyslog receiver and `vara-logger` (*Installation Manual* §10.11); Install Check's *VARA HF log* rows say which step is missing |
 | "API KEY REQUIRED" across the APRS map | No CARTO key | Section 8, *Map tiles* |
 | A page looks old or its menu is missing an item after an update | Browser cache | Ctrl+Shift+R |
 | *"nws-auto-post: disabled …"* (journal) | Automatic NWS bulletins are off | Nothing, or turn them on (*Installation Manual* §10.4) |
@@ -1121,7 +1122,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.14
+## 27. Known limitations in v1.5.15
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1179,7 +1180,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.14-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.15-User-Guide.pdf` | None |
 
 ## 30. Getting help
 
@@ -1200,7 +1201,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.14 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.15 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1215,6 +1216,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.14 — User Guide**
+**73 — BPQ Dashboard v1.5.15 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

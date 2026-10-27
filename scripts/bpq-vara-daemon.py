@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 bpq-vara-daemon.py — WebSocket to BPQ Telnet proxy for VARA HF terminal
-BPQ Dashboard v1.5.14
+BPQ Dashboard v1.5.15
 
 Bridges browser WebSocket connections to BPQ telnet (config.php 'bbs'),
 logging in and attaching to the VARA HF port for keyboard-to-keyboard

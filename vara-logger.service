@@ -1,38 +1,29 @@
 # /etc/systemd/system/vara-logger.service
-# Systemd service for VARA HF log collection
-# Part of BPQ BBS Dashboard Suite v1.0.4
+# BPQ Dashboard: copies VARA HF's syslog lines (tag VARAHF) from
+# /var/log/syslog into logs/<callsign>.vara for RF Connections.
+# Installation Manual §10.11 (VARA HF syslog setup, rsyslog receiver).
 #
-# Installation:
-#   1. Run setup.sh to configure paths automatically, OR
-#   2. Manually edit ExecStart path below
-#   3. Copy this file to /etc/systemd/system/vara-logger.service
-#   4. sudo systemctl daemon-reload
-#   5. sudo systemctl enable vara-logger
-#   6. sudo systemctl start vara-logger
-#
-# Commands:
-#   Start:   sudo systemctl start vara-logger
-#   Stop:    sudo systemctl stop vara-logger
-#   Status:  sudo systemctl status vara-logger
-#   Logs:    sudo journalctl -u vara-logger -f
+# install.sh fixes the path below and installs this file. By hand:
+#   sudo cp vara-logger.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now vara-logger
+# Status: sudo systemctl status vara-logger    Log: sudo journalctl -u vara-logger
 
 [Unit]
-Description=VARA HF Log Collector for BPQ BBS Dashboard
+Description=VARA HF log collector for BPQ Dashboard
 After=network.target rsyslog.service
 Wants=rsyslog.service
 
 [Service]
 Type=simple
-# === UPDATE THIS PATH to match your installation ===
 ExecStart=/var/www/bpq-dashboard/vara-logger.sh
 WorkingDirectory=/var/www/bpq-dashboard
-# ===================================================
 Restart=always
 RestartSec=5
 User=root
 
-# Ensure clean shutdown
-KillMode=process
+# Stop the whole pipeline (tail | grep | loop) on stop/restart; with
+# KillMode=process (before 2026-10-27) each restart left an extra copier running.
+KillMode=control-group
 KillSignal=SIGTERM
 TimeoutStopSec=10
 

@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.14**
+**Version 1.5.15**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -80,6 +80,11 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.15
+
+- **VARA HF log for RF Connections, set up by the installer:** a new question sets this server up to receive VARA HF's session log as syslog (rsyslog on UDP 514, from the VARA computer only), installs rsyslog where it's missing (Debian 12), and starts `vara-logger`. §10.11 explains the VARA HF side (Settings → VARA Setup → Syslog) step by step.
+- **Fresh installs on Debian 12 / Ubuntu 24.04:** RF Connections no longer stays empty — `vara-logger` converts the new rsyslog timestamps to the form the parsers read. Install Check shows whether the VARA log is arriving.
 
 ### In v1.5.14
 
@@ -203,6 +208,7 @@ The installer asks these questions. Having the answers ready makes it quick.
 | Latitude / longitude | Decimal degrees. **South and West are negative** | Google Maps: right-click your location, click the numbers to copy them | `41.7148` / `-72.7272` |
 | CARTO map key *(optional, press Enter to skip)* | The free key for the APRS map | See **Step 10 — Get a CARTO map key**. You can add it later | `cb1_xxxx_x_xxxxxxxx…` |
 | Automatic NWS bulletins *(optional, default No)* | If Yes: your **2-letter state code**, the bulletin address (default `WX@` + state) and Warnings + Watches or Warnings only | The address should be a flood area your forwarding partners carry. See §10.4. You can turn it on later | `GA`, `WX@GA`, `1` |
+| VARA HF log receiver *(default Yes)* | If Yes: the **IP address of the computer running VARA HF** (Enter = VARA runs on this server) | Then in VARA HF: Settings → VARA Setup → Syslog on, Host = this server, port 514, Station Name `H-<call-SSID>` (§10.11). Skip if you don't run VARA HF | `192.168.1.50` |
 | BPQ telnet port | A number | In `bpq32.cfg`, the Telnet port section, `TCPPORT=` | `8010` |
 | BPQ sysop username *(default `SYSOP`)* | First field of your `USER=` line | `bpq32.cfg`, e.g. `USER=John,secret,W1AW-4,NODE,SYSOP` | `John` |
 | BPQ sysop password | Second field of that same line | as above | `secret` |
@@ -221,14 +227,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.14.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.15.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.14
+cd bpq-dashboard-1.5.15
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -423,6 +429,7 @@ W=/var/www/bpq-dashboard
   (`bpqdash` is the database name from `config.php`; run it in the unzipped folder.) System Audit lists any update your database still lacks.
 - **Telnet and VARA pages, NetROM list** (2026-10-25): the reinstall writes the new site file and the new scripts read `config.php`. If you had edited `scripts/bpq-vara-daemon.py` or `bpq-nodes-api.php` by hand, check `config.php`'s `bbs` login and `station.node` (and `vara.bpq_port` if your VARA port isn't found), then `sudo systemctl restart bpq-vara`. Both pages now ask for the admin login.
 - **NTS Report login and power switch (2026-10-27):** the reinstall writes the new site file, which puts `nts-forwarding-report.php` behind the admin login; with a hand-made site file the report answers "needs the dashboard admin login" until you add it to the login locations (compare `nginx-bpq-dashboard.conf`). If Rig Status showed your power switch without a `smartplug` section in `config.php` (the old built-in `192.168.1.100`, `admin`/`admin`), add the section with those values.
+- **VARA HF log on Debian 12 / Ubuntu 24.04 (2026-10-27):** rsyslog there writes timestamps the parsers didn't read, so RF Connections stayed empty; the new `vara-logger.sh` converts them — after updating, `sudo systemctl restart vara-logger`. If the installer never asked you about the VARA HF log receiver, set it up with §10.11 steps 1–3.
 - **Apache installs from before 2026-10-25:** the installer didn't hook PHP-FPM into Apache, so PHP pages were sent as text and nothing that reads data worked. Re-running the installer fixes it; by hand: `sudo a2enmod proxy_fcgi setenvif proxy proxy_http proxy_wstunnel && sudo a2enconf php*-fpm && sudo systemctl reload apache2`.
 
 ---
@@ -996,21 +1003,78 @@ sudo crontab -u www-data -e
 
 ### 10.11 VARA log collection
 
-RF Connections is built from VARA HF's session log lines (`… VARAHF <CALL> connected VARA HF`, bitrate and S/N lines). They have to arrive in this server's `/var/log/syslog`, tagged `VARAHF` — typically the VARA computer sends syslog to this server (rsyslog accepting remote UDP 514 input; allow only that computer through the firewall).
+RF Connections is built from VARA HF's session log (`… VARAHF <CALL> connected VARA HF`, bitrate and S/N lines). It travels like this:
 
-`vara-logger.sh` copies every new `VARAHF` line from `/var/log/syslog` into one file that survives log rotation, `logs/<callsign>.vara` — the file `parse-vara-log.py` reads (`logs.vara_file` in `config.php`). The installer fills in the file name and installs `vara-logger.service` (runs as root, to read syslog).
+**VARA HF** (Syslog on) → UDP 514 → **rsyslog** on this server → `/var/log/syslog` → **`vara-logger`** → `logs/<callsign>.vara` → `parse-vara-log.py` (every 5 minutes) → the database → RF Connections.
 
-Manual install:
+**If you answered Yes to the installer's VARA HF log question**, the server side is done: rsyslog is installed and accepts UDP 514 from the VARA computer only (`/etc/rsyslog.d/10-bpq-dashboard-vara.conf`), ufw (if active) lets that address in, and `vara-logger` is running. Do step 1 below in VARA HF, then the test in step 5.
+
+**1. VARA HF — send the log.** Syslog is in the **registered (paid) version** of VARA HF. In VARA HF: **Settings → VARA Setup**:
+
+| Setting | Value |
+|---|---|
+| **Syslog** | ticked |
+| **Syslog Host** | this server's IP address (e.g. `192.168.1.10`); `localhost` only if VARA runs on this server |
+| **UDP Port** | `514` |
+| **Station Name** | `H-` + your VARA call-SSID, e.g. `H-W1AW-7`. RF Connections looks for lines from `H-…`, so keep the `H-` |
+
+Give the VARA computer a fixed address (a DHCP reservation in your router): the receiver only accepts that address.
+
+**2. rsyslog — receive it** (by hand; the installer does this). Debian 12 doesn't install rsyslog, so:
+
+```bash
+sudo apt install -y rsyslog
+grep -rn imudp /etc/rsyslog.conf /etc/rsyslog.d/ | grep -v ':#'
+```
+
+If the `grep` prints nothing (only commented-out `#` lines exist), create the receiver (replace `192.168.1.50` with the VARA computer's address):
+
+```bash
+sudo tee /etc/rsyslog.d/10-bpq-dashboard-vara.conf >/dev/null <<'EOF'
+# BPQ Dashboard: receive VARA HF's syslog on UDP 514, from these senders only
+$AllowedSender UDP, 127.0.0.1, 192.168.1.50
+module(load="imudp")
+input(type="imudp" port="514")
+EOF
+sudo rsyslogd -N1 && sudo systemctl restart rsyslog
+ss -uln | grep ':514 '
+```
+
+`rsyslogd -N1` must end with "End of config validation run"; `ss` shows `0.0.0.0:514`. If the `grep` printed a line, UDP reception is already on: don't add a second receiver: add the VARA computer to that receiver's allowed senders instead.
+
+**3. Firewall — let only the VARA computer in:**
+
+```bash
+sudo ufw allow from 192.168.1.50 to any port 514 proto udp comment 'VARA HF syslog'
+```
+
+(Other firewalls: allow UDP 514 from that address only. Never open 514 to the internet.)
+
+**4. vara-logger — keep the lines.** `vara-logger.sh` copies every new `VARAHF` line from `/var/log/syslog` into `logs/<callsign>.vara` (`logs.vara_file` in `config.php`), a file that survives log rotation. rsyslog on Debian 12 and Ubuntu 24.04 writes timestamps like `2026-10-27T13:15:48-04:00`; vara-logger rewrites them to the `Oct 27 13:15:48` form the parsers read. The installer sets the file name and installs the service; by hand:
 
 ```bash
 sudo nano /var/www/bpq-dashboard/vara-logger.sh        # set OUTPUT_FILE to …/logs/<yourcall>.vara
 sudo cp /var/www/bpq-dashboard/vara-logger.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now vara-logger
-tail -f /var/www/bpq-dashboard/logs/<yourcall>.vara    # new lines appear during VARA sessions
 ```
 
-If the file stays empty, check that `grep VARAHF /var/log/syslog` finds anything.
+**5. Test.**
+
+```bash
+logger -n 127.0.0.1 -P 514 -d -t VARATEST "receiver test"; sleep 1; grep VARATEST /var/log/syslog | tail -1
+```
+
+shows the test line (rsyslog works; the `VARATEST` tag keeps it out of the VARA log). Then make or receive a VARA HF connection:
+
+```bash
+grep VARAHF /var/log/syslog | tail -3                   # arrived from VARA
+tail -3 /var/www/bpq-dashboard/logs/<yourcall>.vara     # kept by vara-logger
+```
+
+The lines start with the time and `H-<your call-SSID> VARAHF`. Within 5 minutes the session is on RF Connections. Install Check's *VARA HF log* rows show the receiver and when the last line arrived.
+
+**If nothing arrives:** VARA's Syslog box ticked and the Host/port right; the VARA computer's address is the one allowed (rsyslog and firewall); a Windows firewall on the VARA computer isn't blocking outgoing UDP 514; `sudo systemctl status rsyslog vara-logger`.
 
 ### 10.12 NetROM RTT collection
 
@@ -1376,10 +1440,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.14-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.15-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.14 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.15 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

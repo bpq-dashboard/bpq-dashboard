@@ -4,6 +4,45 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.15] - 2026-10-27
+
+VARA HF log for RF Connections on fresh installs: the installer now sets up
+the syslog receiver for VARA HF (rsyslog, UDP 514, VARA computer only) and
+installs rsyslog where it's missing; `vara-logger` converts the timestamps
+rsyslog writes on Debian 12 / Ubuntu 24.04, which left RF Connections empty
+on a fresh install; Install Check shows whether the log arrives; Manual §10.11
+walks through VARA HF's Syslog setting. Upgrading from 1.5.14: re-run
+`install.sh`, or replace `vara-logger.sh` and restart `vara-logger` (USER-MANUAL
+"Updating to a newer version").
+
+### Fixed (2026-10-27) — VARA HF log on fresh installs
+- **`vara-logger.sh`**: rsyslog on Debian 12 and Ubuntu 24.04 writes
+  timestamps as `2026-10-27T13:15:48-04:00`; the VARA parser and RF
+  Connections only read `Oct 27 13:15:48`, so a fresh install's RF
+  Connections stayed empty. Lines are now rewritten to the traditional form
+  (same local time) as they are saved; traditional lines pass unchanged.
+  Header rewritten (no `setup.sh`, unused `BPQ_LOG_DIR` removed).
+- **`vara-logger.service`**: `KillMode=control-group` (was `process`, which
+  left the `tail | grep | loop` pipeline running after each restart, so
+  copies piled up); header rewritten.
+- **`install.sh`**: installs `rsyslog` (Debian 12 doesn't), and a new Step 1
+  question (default Yes) sets up the receiver for VARA HF's syslog:
+  `/etc/rsyslog.d/10-bpq-dashboard-vara.conf` (UDP 514, `$AllowedSender`
+  127.0.0.1 + the VARA computer), checked with `rsyslogd -N1`; left alone if
+  another config already receives UDP; ufw rule for that address when ufw is
+  active; starts `vara-logger`; prints the VARA HF settings.
+- **Install Check**: *VARA HF log — syslog receiver (UDP 514)* and *VARA HF
+  log — <file>* (missing / empty / last line age; warning after 7 days).
+- Docs: Manual §10.11 rewritten step by step (VARA HF: Settings → VARA Setup
+  → Syslog, Host, UDP 514, Station Name `H-<call-SSID>`; rsyslog receiver;
+  firewall; vara-logger; test with `logger -t VARATEST`), Part A installer
+  table, *Updating*; Guide §12 *Where the data comes from*, §23 Install
+  Check, §26 *No VARA Log File Found*; maintenance page: receiver and test
+  commands. PDFs regenerated.
+- Version 1.5.15: badges, menu (`NAV_VERSION` 2026-10-27-2), PDFs
+  `BPQ-Dashboard-v1.5.15-*.pdf`, installer and script headers, README and
+  Manual download commands (tag v1.5.15); Manual *What's New* "In v1.5.15".
+
 ## [1.5.14] - 2026-10-27
 
 Everything since 1.5.13 (2026-09-26). Highlights: the admin login now
