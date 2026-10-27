@@ -12,7 +12,7 @@ Usage:
     python3 prop-scheduler.py --apply --force    # Apply even if no changes
 
 Cron (every 48 hours):
-    0 6 */2 * * /usr/bin/python3 /var/www/html/bpq/scripts/prop-scheduler.py --apply
+    0 6 */2 * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/prop-scheduler.py --apply
 
 Author: BPQ Dashboard Project
 Version: 1.0.1
@@ -42,31 +42,44 @@ import platform
 # Auto-detect platform
 IS_WINDOWS = platform.system() == 'Windows'
 
+# Linux paths (2026-10-19): from where this script is installed — <web root>/
+# scripts/prop-scheduler.py — and config.php 'paths' (logs, linbpq), the same
+# way the other scripts find them. Before, they were hard-coded to
+# /var/www/html/bpq, so on a standard /var/www/bpq-dashboard install the script
+# stopped at start-up (its log folder didn't exist). data/settings.json
+# 'paths' still override all of these (see apply_settings_json()).
+if not IS_WINDOWS:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bpq_db_config  # noqa: E402
+    _WEB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _LOGS_DIR = bpq_db_config.default_logs_dir()
+    _LINBPQ_DIR = (bpq_db_config.load_config_section('paths').get('linbpq') or '/home/linbpq').rstrip('/')
+
 CONFIG = {
     # Paths — auto-detect by platform
     'linmail_cfg': (
         os.path.join(os.environ.get('APPDATA', 'C:\\'), 'BPQ32', 'linmail.cfg')
-        if IS_WINDOWS else '/home/SYSOP/linbpq/linmail.cfg'
+        if IS_WINDOWS else os.path.join(_LINBPQ_DIR, 'linmail.cfg')
     ),
     'bbs_log_dir': (
         'C:\\UniServerZ\\www\\bpq\\logs'
-        if IS_WINDOWS else '/var/www/html/bpq/logs'
+        if IS_WINDOWS else _LOGS_DIR
     ),
     'vara_log': (
         'C:\\UniServerZ\\www\\bpq\\logs\\yourcall.vara'
-        if IS_WINDOWS else '/var/www/html/bpq/logs/yourcall.vara'
+        if IS_WINDOWS else os.path.join(_LOGS_DIR, 'yourcall.vara')
     ),
     'backup_dir': (
         'C:\\UniServerZ\\www\\bpq\\scripts\\prop-backups'
-        if IS_WINDOWS else '/var/www/html/bpq/scripts/prop-backups'
+        if IS_WINDOWS else os.path.join(_WEB_ROOT, 'scripts', 'prop-backups')
     ),
     'state_file': (
         'C:\\UniServerZ\\www\\bpq\\cache\\prop-state.json'
-        if IS_WINDOWS else '/var/www/html/bpq/cache/prop-state.json'
+        if IS_WINDOWS else os.path.join(_WEB_ROOT, 'cache', 'prop-state.json')
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\prop-scheduler.log'
-        if IS_WINDOWS else '/var/www/html/bpq/logs/prop-scheduler.log'
+        if IS_WINDOWS else os.path.join(_LOGS_DIR, 'prop-scheduler.log')
     ),
 
     # Home station
@@ -94,10 +107,10 @@ CONFIG = {
     # e.g., 'sudo systemctl restart bpq32' or 'killall -HUP linbpq'
 
     # Propagation data URLs
-    # Database credentials (matches config.php db section)
-    'db_user': 'bpqdash_user',
-    'db_pass': 'YOURDBPASSWORD',
-    'db_name': 'bpqdash',
+    # Database credentials: not set here (2026-10-19). They come from
+    # scripts/bpq_db_config.py like the other scripts — BPQ_DB_* environment
+    # variables, db-config.php, or config.php's 'db' section. Only add
+    # 'db_user' / 'db_pass' / 'db_name' / 'db_host' here to override those.
     'noaa_sfi_url': 'https://services.swpc.noaa.gov/json/solar-cycle/observed-solar-cycle-indices.json',
     'noaa_kp_url': 'https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',  # Returns objects: {time_tag, Kp, a_running}
     'noaa_forecast_url': 'https://services.swpc.noaa.gov/text/3-day-forecast.txt',
@@ -447,6 +460,58 @@ log = logging.getLogger('prop-scheduler')
 # PROPAGATION DATA FETCHERS
 # ============================================================================
 
+# ─── Database access (2026-10-19) ──────────────────────────────────────────
+
+_PLACEHOLDER_DB_VALUES = {'', 'YOURDBPASSWORD', 'CHANGE_THIS_DB_PASSWORD'}
+
+
+def _db_settings():
+    """host/port/user/password/database for the sessions table.
+
+    Base values come from scripts/bpq_db_config.py (BPQ_DB_* env vars,
+    db-config.php, config.php 'db'), the same source as the log parsers.
+    db_host/db_user/db_pass/db_name in CONFIG (or settings.json) override
+    them, except placeholder values left over from older versions.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bpq_db_config
+    db = bpq_db_config.load_db_config()
+    for key, field in (('db_host', 'host'), ('db_user', 'user'),
+                       ('db_pass', 'password'), ('db_name', 'database')):
+        val = CONFIG.get(key)
+        if val is not None and str(val) not in _PLACEHOLDER_DB_VALUES:
+            db[field] = val
+    return db
+
+
+def _mysql_query(db, sql, timeout=10):
+    """Run one query with the mysql client; returns the CompletedProcess.
+
+    The password goes in a private (0600) option file passed with
+    --defaults-extra-file, never on the command line, where any local user
+    could read it from the process list.
+    """
+    import tempfile
+    fd, opt_path = tempfile.mkstemp(prefix='prop-scheduler-', suffix='.cnf')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            pw = str(db.get('password', '')).replace('\\', '\\\\').replace('"', '\\"')
+            f.write('[client]\n')
+            f.write(f'user="{db["user"]}"\n')
+            f.write(f'password="{pw}"\n')
+            f.write(f'host="{db.get("host", "localhost")}"\n')
+            f.write(f'port={int(db.get("port", 3306))}\n')
+        os.chmod(opt_path, 0o600)
+        cmd = ['mysql', f'--defaults-extra-file={opt_path}', db['database'],
+               '--batch', '--skip-column-names', '-e', sql]
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    finally:
+        try:
+            os.unlink(opt_path)
+        except OSError:
+            pass
+
+
 def fetch_json(url, timeout=15):
     """Fetch JSON data from a URL."""
     try:
@@ -572,15 +637,9 @@ GROUP BY station;
 """
 
     try:
-        # Use bpqdash_user user (read credentials from bpqdash-db.php or config)
-        db_user = CONFIG.get('db_user', 'bpqdash_user')
-        db_pass = CONFIG.get('db_pass', 'CHANGE_THIS_DB_PASSWORD')
-        db_name = CONFIG.get('db_name', 'bpqdash')
-        cmd = ['mysql', f'-u{db_user}', f'-p{db_pass}', db_name,
-               '--batch', '--skip-column-names', '-e', sql]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=10
-        )
+        # 2026-10-19: credentials from bpq_db_config (db-config.php / config.php
+        # 'db' / BPQ_DB_* env), same as the parsers; CONFIG db_* keys override.
+        result = _mysql_query(_db_settings(), sql)
         if result.returncode != 0:
             log.warning(f"  DB query failed for {partner_call}: {result.stderr.strip()}")
             return {}

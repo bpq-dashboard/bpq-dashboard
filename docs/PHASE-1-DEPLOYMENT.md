@@ -305,36 +305,36 @@ touch `rf_connections`/`rf_parser_state` if they already exist, it'll just
 add the new `rf_messages` table.
 
 ```bash
-sudo mysql -u root -p tprfn < /var/www/tprfn/data/rf-connections-schema.sql
-sudo mysql -u root -p tprfn -e "SHOW TABLES LIKE 'rf_messages'"
+sudo mysql -u root -p bpqdash < /var/www/bpq-dashboard/data/rf-connections-schema.sql
+sudo mysql -u root -p bpqdash -e "SHOW TABLES LIKE 'rf_messages'"
 ```
 
 ### 2. Deploy the updated parser and API
 
 ```bash
-sudo cp parse-vara-log.py /var/www/tprfn/scripts/parse-vara-log.py
-sudo cp rf-connections-api.php /var/www/tprfn/rf-connections-api.php
+sudo cp parse-vara-log.py /var/www/bpq-dashboard/scripts/parse-vara-log.py
+sudo cp rf-connections-api.php /var/www/bpq-dashboard/rf-connections-api.php
 ```
 
 ### 3. Backfill message history
 
 ```bash
 # Dry-run first to sanity check the message count looks reasonable
-sudo -u www-data python3 /var/www/tprfn/scripts/parse-vara-log.py \
-    --dry-run --verbose --log /var/www/tprfn/logs/k1ajd.vara
+sudo -u www-data python3 /var/www/bpq-dashboard/scripts/parse-vara-log.py \
+    --dry-run --verbose --log /var/www/bpq-dashboard/logs/k1ajd.vara
 
 # Real run — messages have no separate offset/checkpoint, so a normal
 # (non --reset) run already backfills everything within the lookback
 # window. For full history, use --reset (also re-parses sessions from
 # scratch, same as the original Phase 1 backfill).
-sudo -u www-data python3 /var/www/tprfn/scripts/parse-vara-log.py \
-    --reset --verbose --log /var/www/tprfn/logs/k1ajd.vara
+sudo -u www-data python3 /var/www/bpq-dashboard/scripts/parse-vara-log.py \
+    --reset --verbose --log /var/www/bpq-dashboard/logs/k1ajd.vara
 ```
 
 Verify:
 
 ```bash
-sudo mysql -u root -p tprfn -e "
+sudo mysql -u root -p bpqdash -e "
     SELECT COUNT(*) AS total, MIN(msg_time) AS earliest, MAX(msg_time) AS latest
     FROM rf_messages"
 ```
@@ -342,7 +342,7 @@ sudo mysql -u root -p tprfn -e "
 ### 4. Deploy the updated HTML page
 
 ```bash
-sudo cp bpq-rf-connections.html /var/www/tprfn/bpq-rf-connections.html
+sudo cp bpq-rf-connections.html /var/www/bpq-dashboard/bpq-rf-connections.html
 ```
 
 Hard-refresh the page. Open the browser console and look for:

@@ -66,5 +66,5 @@ DEALLOCATE PREPARE stmt;
 -- Note: adding the column does NOT retroactively populate it for rows
 -- already in the table (including the two N3MEL/NET-ROM rows that
 -- prompted this migration) — that needs the parser to re-scan those
--- messages against ConnectLog. See RF-MESSAGES-MEDIUM-MIGRATION.md for
--- the backfill step (parse-vara-log.py --reset).
+-- messages against ConnectLog: run parse-vara-log.py once with
+-- --rescan-messages-days N (USER-MANUAL.md, "Updating to a newer version").

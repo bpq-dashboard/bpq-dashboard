@@ -1,309 +1,205 @@
 <?php
 /**
  * firewall-api.php — Firewall status API
- * Version: 1.2.0 — added VARA HF / flrig (Wine-local) port labels (2026-05-01)
+ * Version: 2.0.0 (2026-10-25)
  *
- * Returns iptables rules parsed into structured JSON.
- * Requires www-data to have sudo access to iptables -L -n --line-numbers
+ * Returns the firewall rules, the ports this server listens on and whether
+ * each is reachable from the internet, plus fail2ban jails, as JSON.
  *
- * Add to /etc/sudoers.d/www-data-iptables:
- *   www-data ALL=(ALL) NOPASSWD: /sbin/iptables -L -n --line-numbers -v
- *   www-data ALL=(ALL) NOPASSWD: /sbin/iptables -L INPUT -n --line-numbers -v
- *   www-data ALL=(ALL) NOPASSWD: /usr/bin/fail2ban-client status
- *   www-data ALL=(ALL) NOPASSWD: /usr/bin/fail2ban-client status *
+ * 2026-10-25:
+ *  - Port list = what actually listens (ss) + what the rules mention, with
+ *    the program behind each port. "Localhost" now means bound to 127.0.0.1
+ *    (it was never set before; the filter showed IP-restricted ports).
+ *  - Reachability follows jumps (ufw, fail2ban, custom chains) instead of
+ *    reading INPUT only, and LAN = every private range (10/8, 172.16/12,
+ *    192.168/16, 100.64/10, IPv6 ULA / link-local), not just 10.0.0.x.
+ *  - IPv6: ip6tables policy and the ports open over IPv6 when the server has
+ *    a public IPv6 address.
+ *  - Port labels from config.php / bpq32.cfg; the station-specific list
+ *    (Wine, PAT, XRDP, CUPS …) is gone. Port ranges shown in full.
+ *  - fail2ban: totals and recent bans across all jails; the fail2ban-client
+ *    path matches the sudoers file (/usr/bin).
  *
- * IMPORTANT: BOTH fail2ban lines are required.
- *   - 'status' (no args) lists all jails — used to discover jail names
- *   - 'status *' lets us query each jail individually
- *   The sudoers wildcard '*' requires AT LEAST ONE argument; without
- *   the bare 'status' rule, the "list all jails" call fails silently.
+ * Needs /etc/sudoers.d/www-data-tools (copy of www-data-tools.sudoers).
  */
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
-// ── Auth — require BBS password ───────────────────────────────────────────────
-$configFile = __DIR__ . '/dashboard-config.php';
-if (file_exists($configFile)) {
-    $cfg = include $configFile;
-    $bbsPassword = $cfg['bbs_password'] ?? $cfg['password'] ?? null;
-} else {
-    $bbsPassword = null;
+require_once dirname(__DIR__) . '/includes/web-login.php';
+bpq_require_web_login('Firewall Status');
+require_once dirname(__DIR__) . '/includes/admin-firewall.php';
+$cfg = bpq_config_all();
+
+function sudo_run(string $cmd): array {
+    $out = (string)shell_exec('sudo -n ' . $cmd . ' 2>&1');
+    $refused = preg_match('/^sudo: |a password is required|not allowed to execute|may not run sudo/m', $out);
+    return [!$refused, $out];
 }
 
-$providedPassword = $_GET['password'] ?? $_SERVER['HTTP_X_BBS_PASSWORD'] ?? null;
-if ($bbsPassword && $providedPassword !== $bbsPassword) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-
-// ── Port labels ───────────────────────────────────────────────────────────────
-$PORT_LABELS = [
-    '22'    => 'SSH (legacy)',
-    '2222'  => 'SSH',
-    '80'    => 'HTTP',
-    '443'   => 'HTTPS',
-    '21'    => 'FTP',
-    '3389'  => 'RDP',
-    '5903'  => 'VNC',
-    '139'   => 'Samba NetBIOS',
-    '445'   => 'Samba SMB',
-    '8080'  => 'PAT Winlink',
-    '8008'  => 'BPQ HTTP',
-    '8010'  => 'BPQ Telnet',
-    '8011'  => 'BPQ KISS',
-    '8300'  => 'VARA HF Cmd (Wine local)',
-    '8301'  => 'VARA HF Data (Wine local)',
-    '8765'  => 'BPQ Telnet WS (localhost)',
-    '8767'  => 'BPQ VARA WS (localhost)',
-    '8772'  => 'BPQ AX.25',
-    '9025'  => 'VARA validator Cmd (BPQ → validator → 8300)',
-    '9026'  => 'VARA validator Data (BPQ → validator → 8301)',
-    '10000' => 'Webmin',
-    '10'    => 'AX.25',
-    '25'    => 'SMTP (BPQ)',
-    '110'   => 'POP3 (BPQ)',
-    '119'   => 'NNTP (BPQ)',
-    '514'   => 'Syslog UDP',
-    '520'   => 'RIP UDP',
-    '631'   => 'CUPS (localhost)',
-    '2947'  => 'GPSD (localhost)',
-    '3306'  => 'MariaDB (localhost)',
-    '3350'  => 'XRDP Sesman (localhost)',
-    '5432'  => 'PostgreSQL (localhost)',
-    '8999'  => 'FastCGI (localhost)',
-    '10093' => 'VARA FM UDP',
-    '12345' => 'flrig RPC (Wine local)',
+// ── Port labels: well-known services + this station's own ports ───────────
+$LABELS = [
+    21 => 'FTP', 22 => 'SSH', 23 => 'Telnet', 25 => 'SMTP', 53 => 'DNS', 80 => 'HTTP',
+    110 => 'POP3', 119 => 'NNTP', 139 => 'Samba NetBIOS', 143 => 'IMAP', 443 => 'HTTPS',
+    445 => 'Samba SMB', 587 => 'SMTP submission', 631 => 'CUPS printing', 993 => 'IMAPS',
+    3306 => 'MariaDB / MySQL', 3389 => 'RDP', 5432 => 'PostgreSQL',
+    5900 => 'VNC', 5901 => 'VNC', 5902 => 'VNC', 5903 => 'VNC', 10000 => 'Webmin',
+    8765 => 'bpq-telnet WebSocket (dashboard)', 8767 => 'bpq-vara WebSocket (dashboard)',
+    8300 => 'VARA HF command', 8301 => 'VARA HF data',
+    9025 => 'VARA validator command', 9026 => 'VARA validator data',
 ];
-
-// ── Run iptables ──────────────────────────────────────────────────────────────
-function run_iptables() {
-    $output = shell_exec('sudo /usr/sbin/iptables -L INPUT -n --line-numbers -v 2>&1');
-    if (!$output) {
-        $output = shell_exec('sudo /usr/sbin/iptables -L INPUT -n --line-numbers -v 2>&1');
+$flrigPort = (int)($cfg['radio']['flrig_port'] ?? 12345);
+$LABELS[$flrigPort] = 'flrig (radio control)';
+$LABELS[(int)($cfg['bbs']['port'] ?? 8010)] = 'BPQ telnet';
+$bpqCfg = '';
+foreach (array_filter([!empty($cfg['paths']['linbpq']) ? rtrim($cfg['paths']['linbpq'], '/') . '/bpq32.cfg' : null,
+                       '/opt/linbpq/bpq32.cfg', '/home/linbpq/bpq32.cfg', '/etc/linbpq/bpq32.cfg']) as $c) {
+    if (is_readable($c)) { $bpqCfg = (string)@file_get_contents($c); break; }
+}
+foreach (['HTTPPORT' => 'BPQ web management', 'TCPPORT' => 'BPQ telnet', 'FBBPORT' => 'BPQ FBB (YAPP / forwarding)'] as $k => $lab) {
+    if (preg_match_all('/^\s*' . $k . '\s*=\s*([\d, ]+)/mi', $bpqCfg, $mm)) {
+        foreach ($mm[1] as $list) foreach (preg_split('/[\s,]+/', trim($list)) as $p) if ($p !== '') $LABELS[(int)$p] = $lab;
+    } elseif ($bpqCfg === '') {
+        $LABELS += [8008 => 'BPQ web management (default)', 8011 => 'BPQ FBB (default)'];
     }
-    return $output;
 }
 
-function run_fail2ban() {
-    $status = shell_exec('sudo /usr/bin/fail2ban-client status 2>&1');
-    $sshd   = shell_exec('sudo /usr/bin/fail2ban-client status sshd 2>&1');
-    
-    // Extract jail names from status output, then query each one
-    $jailDetails = [];
-    if (preg_match('/Jail list:\s*(.+)/i', $status, $m)) {
-        $jailNames = array_map('trim', explode(',', $m[1]));
-        foreach ($jailNames as $jail) {
-            if ($jail === '') continue;
-            // Sanitize jail name (alphanumeric + dash + underscore only)
-            $safeJail = preg_replace('/[^a-zA-Z0-9_-]/', '', $jail);
-            if ($safeJail === '') continue;
-            $detail = shell_exec("sudo /usr/bin/fail2ban-client status $safeJail 2>&1");
-            $jailDetails[$jail] = $detail;
-        }
-    }
-    
-    return ['status' => $status, 'sshd' => $sshd, 'per_jail' => $jailDetails];
+// ── Listening sockets, with the program name when sudo allows -p ──────────
+[$ssok, $ss] = sudo_run('/usr/bin/ss -tlnp');
+if (!$ssok) $ss = (string)shell_exec('ss -tln 2>/dev/null');
+$listening = [];   // port => ['binds'=>[], 'procs'=>[]]
+foreach (explode("\n", $ss) as $l) {
+    $p = preg_split('/\s+/', trim($l));
+    if (count($p) < 4 || $p[0] !== 'LISTEN') continue;
+    if (!preg_match('/^(.*):(\d+)$/', $p[3], $m)) continue;
+    $port = (int)$m[2];
+    $bind = preg_replace('/%.*$/', '', trim($m[1], '[]'));
+    $listening[$port]['binds'][$bind] = true;
+    if (preg_match_all('/\("([^"]+)"/', $l, $pm)) foreach ($pm[1] as $proc) $listening[$port]['procs'][$proc] = true;
 }
 
-// ── Parse iptables output ─────────────────────────────────────────────────────
-function parse_iptables(string $raw, array $portLabels): array {
-    $lines  = explode("\n", $raw);
-    $policy = 'UNKNOWN';
-    $rules  = [];
+// ── Firewall: IPv4 and IPv6, all chains ───────────────────────────────────
+[$ok4, $raw4] = sudo_run('/usr/sbin/iptables -L -n --line-numbers -v');
+$chains4 = $ok4 ? bpq_fw_parse_all($raw4) : [];
+$policy4 = $chains4['INPUT']['policy'] ?? 'UNKNOWN';
 
-    foreach ($lines as $line) {
-        $line = trim($line);
-
-        // Policy line
-        if (preg_match('/^Chain INPUT \(policy (\w+)/', $line, $m)) {
-            $policy = $m[1];
-            continue;
-        }
-
-        // Skip headers
-        if (preg_match('/^num|^pkts/', $line)) continue;
-        if (empty($line)) continue;
-
-        // Rule line: num pkts bytes target prot opt in out source destination [extra]
-        // e.g.: 1    f2b-sshd   6    --  0.0.0.0/0  0.0.0.0/0  multiport dports 22
-        if (!preg_match('/^\d+/', $line)) continue;
-
-        $parts = preg_split('/\s+/', $line, 12);
-        if (count($parts) < 9) continue;
-
-        $num    = $parts[0];
-        $pkts   = $parts[1];
-        $bytes  = $parts[2];
-        $target = $parts[3];
-        $prot   = $parts[4];
-        // Column layout (12 fields from preg_split, limit=12):
-        //   0:num 1:pkts 2:bytes 3:target 4:prot 5:opt 6:in 7:out
-        //   8:source 9:destination 10+:extra (joined by remainder)
-        $source = $parts[8];
-        $dest   = $parts[9];
-        // 'extra' is everything from $parts[10] onwards. Since preg_split
-        // with limit=12 leaves $parts[11] as the rest of the line joined,
-        // we need to concatenate $parts[10] and $parts[11] back together.
-        $extra  = trim(($parts[10] ?? '') . ' ' . ($parts[11] ?? ''));
-
-        // Extract port
-        $port = null;
-        if (preg_match('/dpt[s]?:(\d+)/', $extra, $pm)) {
-            $port = $pm[1];
-        } elseif (preg_match('/dpts:(\d+):(\d+)/', $extra, $pm)) {
-            $port = $pm[1] . '-' . $pm[2];
-        } elseif (preg_match('/multiport dports ([\d,]+)/', $extra, $pm)) {
-            $port = $pm[1];
-        }
-
-        // Classify
-        $category = 'other';
-        if ($target === 'ACCEPT') {
-            if ($source === '0.0.0.0/0' || $source === '::/0') {
-                $category = 'public-allow';
-            } elseif (strpos($source, '10.0.0.') === 0 || strpos($source, '192.168.') === 0) {
-                $category = 'lan-allow';
-            } else {
-                $category = 'ip-allow';
-            }
-        } elseif ($target === 'DROP' || $target === 'REJECT') {
-            $category = 'block';
-        } elseif (strpos($target, 'f2b-') === 0) {
-            $category = 'fail2ban';
-        }
-
-        $label = $port ? ($portLabels[$port] ?? "Port $port") : null;
-
-        $rules[] = [
-            'num'      => (int)$num,
-            'target'   => $target,
-            'prot'     => $prot,
-            'source'   => $source,
-            'dest'     => $dest,
-            'port'     => $port,
-            'label'    => $label,
-            'extra'    => $extra,
-            'pkts'     => $pkts,
-            'bytes'    => $bytes,
-            'category' => $category,
-        ];
-    }
-
-    return ['policy' => $policy, 'rules' => $rules];
+$globalV6 = false;
+foreach (@file('/proc/net/if_inet6', FILE_IGNORE_NEW_LINES) ?: [] as $l) {
+    $p = preg_split('/\s+/', trim($l));
+    if (count($p) >= 6 && $p[3] === '00' && $p[5] !== 'lo' && !preg_match('/^f[cd]/', $p[0])) { $globalV6 = true; break; }
 }
+[$ok6, $raw6] = sudo_run('/usr/sbin/ip6tables -L -n --line-numbers -v');
+$chains6 = $ok6 ? bpq_fw_parse_all($raw6) : [];
 
-// ── Parse fail2ban output ─────────────────────────────────────────────────────
-function parse_fail2ban(array $raw): array {
-    $result = [
-        'jails'         => [],     // list of jail names
-        'jail_summary'  => [],     // per-jail counts
-        'banned_count'  => 0,      // sshd jail Total banned (back-compat)
-        'sshd_banned'   => 0,      // sshd jail Currently banned (back-compat)
-        'total_banned'  => 0,      // sum across all jails (new)
+// Rules shown on the page: INPUT, plus the rules of chains INPUT jumps to
+// (ufw-user-input holds ufw's "allow" rules), one level deep.
+$rules = [];
+foreach (($chains4['INPUT']['rules'] ?? []) as $r) {
+    $r['chain'] = 'INPUT';
+    $rules[] = $r;
+}
+foreach ($chains4 as $name => $ch) {
+    if ($name === 'INPUT' || !preg_match('/^(ufw-user-input|ufw-user-limit-accept)$/', $name)) continue;
+    foreach ($ch['rules'] as $r) { $r['chain'] = $name; $rules[] = $r; }
+}
+foreach ($rules as &$r) {
+    if ($r['target'] === 'ACCEPT') {
+        $r['category'] = bpq_fw_is_any($r['source']) ? 'public-allow' : (bpq_fw_is_lan($r['source']) || bpq_fw_is_loopback($r['source']) ? 'lan-allow' : 'ip-allow');
+        if ($r['in'] === 'lo') $r['category'] = 'loopback';
+    } elseif (in_array($r['target'], ['DROP', 'REJECT'], true)) {
+        $r['category'] = 'block';
+    } elseif (strpos($r['target'], 'f2b-') === 0) {
+        $r['category'] = 'fail2ban';
+    } else {
+        $r['category'] = 'other';
+    }
+    $first = $r['ports'][0][0] ?? null;
+    $r['label'] = $first !== null && count($r['ports']) === 1 && $r['ports'][0][0] === $r['ports'][0][1] ? ($LABELS[$first] ?? null) : null;
+}
+unset($r);
+
+// ── Port summary: listening ports + ports named in ACCEPT rules ───────────
+$ports = array_keys($listening);
+foreach ($rules as $r) {
+    if ($r['target'] !== 'ACCEPT') continue;
+    foreach ($r['ports'] as [$a, $b]) if ($b - $a < 50) for ($i = $a; $i <= $b; $i++) $ports[] = $i;
+}
+$ports = array_values(array_unique($ports));
+sort($ports);
+
+$summary = [];
+foreach ($ports as $port) {
+    $L = $listening[$port] ?? null;
+    $binds = $L ? array_keys($L['binds']) : [];
+    $onlyLoop = $binds && !array_filter($binds, fn($b) => !preg_match('/^(127\.|::1$|::ffff:127\.)/', $b));
+    $allowed = [];
+    foreach ($rules as $r) {
+        if ($r['target'] !== 'ACCEPT' || $r['in'] === 'lo' || !$r['ports']) continue;
+        foreach ($r['ports'] as [$a, $b]) if ($port >= $a && $port <= $b) {
+            $allowed[] = bpq_fw_is_any($r['source']) ? 'Internet (all)' : (bpq_fw_is_lan($r['source']) ? "LAN ({$r['source']})" : $r['source']);
+        }
+    }
+    $pub4 = $chains4 ? bpq_fw_port_public($chains4, $port) : null;
+    $pub6 = ($globalV6 && $chains6) ? bpq_fw_port_public($chains6, $port) : null;
+    if ($L && $onlyLoop)                        $status = 'localhost';
+    elseif ($pub4 === true || $pub6 === true)   $status = 'public';
+    elseif ($pub4 === null && !$chains4)        $status = 'unknown';
+    elseif (array_filter($allowed, fn($a) => strpos($a, 'LAN') === 0)) $status = 'lan-only';
+    elseif ($allowed)                           $status = 'ip-restricted';
+    else                                        $status = 'blocked';
+    $summary[] = [
+        'port'      => $port,
+        'label'     => $LABELS[$port] ?? ($L && !empty($L['procs']) ? implode(', ', array_keys($L['procs'])) : "Port $port"),
+        'process'   => $L ? implode(', ', array_keys($L['procs'] ?? [])) : '',
+        'binds'     => $binds,
+        'listening' => (bool)$L,
+        'allowed'   => array_values(array_unique($allowed)),
+        'status'    => $status,
+        'public_v4' => $pub4,
+        'public_v6' => $pub6,
     ];
-
-    if (preg_match('/Jail list:\s*(.+)/i', $raw['status'], $m)) {
-        $result['jails'] = array_map('trim', explode(',', $m[1]));
-    }
-
-    if (preg_match('/Currently banned:\s*(\d+)/i', $raw['sshd'], $m)) {
-        $result['sshd_banned'] = (int)$m[1];
-    }
-    if (preg_match('/Total banned:\s*(\d+)/i', $raw['sshd'], $m)) {
-        $result['banned_count'] = (int)$m[1];
-    }
-
-    // Extract a sample of recently banned IPs from sshd jail (last 10)
-    if (preg_match('/Banned IP list:\s*(.+)/i', $raw['sshd'], $m)) {
-        $ips = array_slice(array_filter(explode(' ', trim($m[1]))), -10);
-        $result['recent_banned'] = array_values($ips);
-    }
-
-    // Per-jail summary — currently/total banned for each jail
-    if (isset($raw['per_jail']) && is_array($raw['per_jail'])) {
-        foreach ($raw['per_jail'] as $jailName => $jailOutput) {
-            $currBan = 0;
-            $totBan  = 0;
-            if (preg_match('/Currently banned:\s*(\d+)/i', $jailOutput, $m)) {
-                $currBan = (int)$m[1];
-            }
-            if (preg_match('/Total banned:\s*(\d+)/i', $jailOutput, $m)) {
-                $totBan = (int)$m[1];
-            }
-            $result['jail_summary'][$jailName] = [
-                'banned' => $currBan,
-                'total'  => $totBan,
-            ];
-            $result['total_banned'] += $currBan;
-        }
-    }
-
-    return $result;
 }
 
-// ── Build port summary ────────────────────────────────────────────────────────
-function build_port_summary(array $rules, array $portLabels): array {
-    $ports = [];
-
-    foreach ($rules as $rule) {
-        if (!$rule['port']) continue;
-        $port = $rule['port'];
-        if (!isset($ports[$port])) {
-            $ports[$port] = [
-                'port'    => $port,
-                'label'   => $portLabels[$port] ?? "Port $port",
-                'allowed' => [],
-                'blocked' => false,
-                'status'  => 'unknown',
-            ];
-        }
-
-        if ($rule['target'] === 'ACCEPT') {
-            $src = $rule['source'];
-            if ($src === '0.0.0.0/0') {
-                $ports[$port]['allowed'][] = 'Internet (all)';
-                $ports[$port]['status'] = 'public';
-            } elseif (strpos($src, '10.0.0.') === 0 || strpos($src, '192.168.') === 0) {
-                $ports[$port]['allowed'][] = "LAN ($src)";
-                if ($ports[$port]['status'] !== 'public') {
-                    $ports[$port]['status'] = 'lan-only';
-                }
-            } else {
-                $ports[$port]['allowed'][] = $src;
-                if ($ports[$port]['status'] === 'unknown') {
-                    $ports[$port]['status'] = 'ip-restricted';
-                }
+// ── fail2ban ──────────────────────────────────────────────────────────────
+$f2b = ['installed' => trim((string)shell_exec('command -v fail2ban-client 2>/dev/null')) !== '',
+        'readable' => false, 'jails' => [], 'jail_summary' => [], 'total_banned' => 0,
+        'sshd_banned' => 0, 'banned_count' => 0, 'recent_banned' => []];
+if ($f2b['installed']) {
+    [$fok, $fs] = sudo_run('/usr/bin/fail2ban-client status');
+    if ($fok && preg_match('/Jail list:\s*(.*)/i', $fs, $m)) {
+        $f2b['readable'] = true;
+        $f2b['jails'] = array_values(array_filter(array_map('trim', explode(',', $m[1]))));
+        foreach ($f2b['jails'] as $jail) {
+            $safe = preg_replace('/[^a-zA-Z0-9_-]/', '', $jail);
+            if ($safe === '') continue;
+            [, $jo] = sudo_run('/usr/bin/fail2ban-client status ' . $safe);
+            $cur = preg_match('/Currently banned:\s*(\d+)/i', $jo, $mm) ? (int)$mm[1] : 0;
+            $tot = preg_match('/Total banned:\s*(\d+)/i', $jo, $mm) ? (int)$mm[1] : 0;
+            $f2b['jail_summary'][$jail] = ['banned' => $cur, 'total' => $tot];
+            $f2b['total_banned'] += $cur;
+            if (preg_match('/Banned IP list:\s*(.*)/i', $jo, $mm)) {
+                foreach (array_filter(preg_split('/\s+/', trim($mm[1]))) as $ip) $f2b['recent_banned'][] = $ip;
             }
-        } elseif (in_array($rule['target'], ['DROP','REJECT'])) {
-            $ports[$port]['blocked'] = true;
-            if ($ports[$port]['status'] === 'unknown') {
-                $ports[$port]['status'] = 'blocked';
-            }
+            if ($jail === 'sshd') { $f2b['sshd_banned'] = $cur; $f2b['banned_count'] = $tot; }
         }
+        $f2b['recent_banned'] = array_slice($f2b['recent_banned'], -10);
     }
-
-    // Sort by port number
-    uksort($ports, function($a, $b) {
-        return (int)$a - (int)$b;
-    });
-
-    return array_values($ports);
 }
-
-// ── Main ──────────────────────────────────────────────────────────────────────
-$raw       = run_iptables();
-$parsed    = parse_iptables($raw, $PORT_LABELS);
-$f2b_raw   = run_fail2ban();
-$f2b       = parse_fail2ban($f2b_raw);
-$portSummary = build_port_summary($parsed['rules'], $PORT_LABELS);
 
 echo json_encode([
-    'policy'       => $parsed['policy'],
-    'rules'        => $parsed['rules'],
-    'port_summary' => $portSummary,
-    'fail2ban'     => $f2b,
-    'generated_at' => gmdate('Y-m-d H:i:s') . ' UTC',
-    'raw'          => $raw,  // include raw for debugging
-], JSON_PRETTY_PRINT);
+    'policy'        => $policy4,
+    'readable'      => (bool)$chains4,
+    'ufw'           => bpq_fw_is_ufw($chains4),
+    'rules'         => $rules,
+    'port_summary'  => $summary,
+    'ss_processes'  => $ssok,
+    'ipv6'          => [
+        'has_global' => $globalV6,
+        'readable'   => (bool)$chains6,
+        'policy'     => $chains6['INPUT']['policy'] ?? 'UNKNOWN',
+        'public_ports' => array_values(array_map(fn($s) => $s['port'], array_filter($summary, fn($s) => $s['public_v6'] === true && $s['listening']))),
+    ],
+    'fail2ban'      => $f2b,
+    'sudo_hint'     => 'sudo cp ' . dirname(__DIR__) . '/www-data-tools.sudoers /etc/sudoers.d/www-data-tools && sudo chmod 440 /etc/sudoers.d/www-data-tools && sudo visudo -c',
+    'generated_at'  => gmdate('Y-m-d H:i:s') . ' UTC',
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

@@ -30,8 +30,28 @@ return [
     // ---- APRS-IS (scripts/bpq-aprs-daemon.py) ----
     'aprs' => [
         'callsign' => 'YOURCALL-1',         // APRS-IS login (callsign-SSID)
-        'passcode' => '-1',                 // Your APRS-IS passcode; -1 = receive-only
+        'passcode' => '-1',                 // Your APRS-IS passcode; -1 = receive-only (APRS page can't send, no BBS beacon)
         'filter'   => '',                   // APRS-IS server filter; empty = r/<station lat>/<lon>/80
+        // 'server' => 'rotate.aprs2.net:14580', // optional: APRS-IS server the APRS page sends through
+    ],
+
+    // ---- Map tiles (APRS page) ----
+    // CARTO now needs a free API key for its map tiles; without one the APRS
+    // map shows "API KEY REQUIRED" across every tile. Get a key at
+    // https://www.carto.com/basemaps/apikey/ and paste it here. The key is
+    // sent to visitors' browsers with each map tile, so it is not secret:
+    // limit it to your dashboard's web address in CARTO's dashboard.
+    'map' => [
+        'carto_key' => '',                  // e.g. 'cb1_xxxx_x_xxxxxxxxxxxxxxxxxxxxxxxx'
+    ],
+
+    // ---- QRZ.com callsign locations (callsign-lookup.php, the maps) ----
+    // Optional: needs a QRZ XML Logbook Data subscription. Without it, US
+    // calls are still placed through callook.info. Use SINGLE quotes for the
+    // password. Check it: sudo -u www-data php callsign-lookup.php --qrz-test
+    'qrz' => [
+        'username' => '',                   // QRZ.com login (your callsign); empty = QRZ not used
+        'password' => '',
     ],
 
     // ---- BBS connection (used by bbs-messages.html, nws-bbs-post.php) ----
@@ -42,6 +62,13 @@ return [
         'pass'    => 'CHANGE_THIS_PASSWORD',// BBS login password
         'alias'   => 'bbs',                 // Application alias to connect to the BBS
         'timeout' => 30,                    // Connection timeout in seconds
+    ],
+
+    // ---- Message text saved to the database (message-bodies.timer) ----
+    // Personal mail and NTS traffic always. Bulletins: 'all', 'pinned'
+    // (only groups pinned 📌 in the Email Client) or 'none'.
+    'messages' => [
+        'bulletin_text' => 'all',
     ],
 
     // ---- Database (MariaDB / MySQL) ----
@@ -60,10 +87,42 @@ return [
     // 'public' — public-internet deployment; rate-limit + lock down APIs
     'security_mode' => 'local',
 
+    // The Email Client, NWS posting, Chat, APRS sending and map saves refuse
+    // unless the web server checked the admin login (nginx passes
+    // BPQ_WEB_LOGIN; see the LOGIN section of the nginx templates). Set false
+    // ONLY if the whole dashboard is protected another way (VPN-only, an
+    // authenticating proxy). Default: true.
+    // 'require_web_login' => true,
+
     // ---- Feature toggles ----
     'features'      => ['bbs_read' => true, 'bbs_write' => true, 'nws_post' => true],
+
+    // ---- NWS weather alerts ----
+    // post_destination: default address for the NWS page's Post buttons.
+    // auto_post: scripts/nws-auto-post.php (nws-auto-post.timer, every 5 min)
+    //   posts the FIRST ISSUE of each new Warning/Watch for one state as a
+    //   bulletin (SB). No updates, extensions or cancellations; nothing that
+    //   has already ended. A watch issued by several NWS offices is combined
+    //   into one bulletin. Independent of features.nws_post / public mode.
+    'nws' => [
+        'post_destination' => 'WX@ALLUS',
+        'auto_post' => [
+            'enabled'            => false,          // true to start posting
+            'area'               => '',             // your 2-letter state code, e.g. 'GA'
+            'destination'        => '',             // bulletin address; empty = WX@<area>, e.g. WX@GA
+            'events'             => ['Warning', 'Watch'],  // event names ending in these
+                                                    //   (['Warning'] = warnings only)
+            'exclude'            => [],             // exact names never posted, e.g. 'Red Flag Warning'
+            'watch_hold_minutes' => 10,             // wait for other offices' pieces of a watch
+            'max_per_run'        => 10,             // the rest go out on the next run
+            'timezone'           => 'America/New_York',  // times shown in the bulletin
+        ],
+    ],
     'rate_limit'    => ['enabled' => false],
-    'cors'          => ['allow_all' => true],
+    // Other web sites allowed to call this dashboard's endpoints from a
+    // browser. The dashboard's own pages don't need this. Example:
+    //   'cors' => ['allow_all' => false, 'allowed_origins' => ['https://club.example.org']],
+    'cors'          => ['allow_all' => false, 'allowed_origins' => []],
     'logging'       => ['enabled' => false],
 
     // ---- Filesystem paths ----
@@ -75,6 +134,40 @@ return [
         'scripts' => '/var/www/bpq-dashboard/scripts/',
         'datalog' => '/var/www/bpq-dashboard/logs/',
         'linbpq'  => '/home/linbpq',        // Your LinBPQ directory (bpq32.cfg, WP.cfg, linmail.cfg)
+    ],
+
+    // ---- Rig control via flrig (Rig Status, RF Power Monitor) ----
+    // Both pages need flrig. install.sh leaves them out when you skip flrig
+    // (enabled => false); to add them later, re-run install.sh.
+    'radio' => [
+        'enabled'    => true,           // false = no flrig: Rig pages not installed
+        'flrig_host' => '127.0.0.1',    // machine running flrig
+        'flrig_port' => 12345,          // flrig XML-RPC port (Config > Setup > XML-RPC Server)
+        'bpq_radio'  => 0,              // bpq32.cfg RADIO number whose scan list the Rig page
+                                        //   shows; 0 = the RADIO block with an FLRIG line
+        'max_power'  => 0,              // highest TX power (W) the Rig page may set;
+                                        //   0 = the radio's own maximum (from flrig)
+        // 'min_power' => 5,            // lowest TX power the Rig page may set (default 1)
+        // 'model'     => 'FTdx3000',   // force a radio profile instead of auto-detect
+    ],
+
+    // ---- Network power switch for the radio (Rig Status page, optional) ----
+    // Written for a Synaccess NP-05B-style switch (cmd.cgi). Leave host empty
+    // if you have none: the outlet card then shows "Not set up".
+    'smartplug' => [
+        'host'   => '',                     // switch LAN address, e.g. '192.168.1.60'
+        'user'   => 'admin',
+        'pass'   => '',
+        'outlet' => 1,                      // outlet the radio is plugged into
+    ],
+
+    // ---- VARA HF Terminal (scripts/bpq-vara-daemon.py, bpq-vara service) ----
+    // Logs in with the 'bbs' user above (a user whose default application is
+    // the BBS) and attaches your VARA HF port. Restart bpq-vara after changes.
+    'vara' => [
+        'bpq_port' => 0,                    // BPQ port number of your VARA HF port;
+                                            //   0 = the first DRIVER=VARA port (not VARA FM) in bpq32.cfg
+        // 'user' => '', 'pass' => '',      // a different BPQ login for the VARA terminal (optional)
     ],
 
     // ---- VARA log file ----

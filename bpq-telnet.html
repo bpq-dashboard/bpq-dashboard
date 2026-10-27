@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Telnet Client — YOURCALL BPQ</title>
+<title>Telnet Client - BPQ Dashboard</title>
 <style>
 :root {
     --bg:       #0d1117;
@@ -355,11 +355,11 @@ body {
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Sits ABOVE the page's own #topbar, which preserves the per-page
      status (Disconnected/Connected, session info) and tool buttons. -->
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 <!-- Top Bar -->
 <div id="topbar">
-    <h1>⚡ BPQ Telnet Client <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.13</span></h1>
+    <h1>⚡ BPQ Telnet Client <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.14</span></h1>
     <div id="statusDot"></div>
     <span id="statusLabel">Disconnected</span>
     <button class="tb-btn" id="clearBtn" onclick="clearTerminal()">🗑 Clear</button>
@@ -544,11 +544,11 @@ body {
                    spellcheck="false" disabled
                    onkeydown="handleInputKey(event)">
             <button id="yappBtn" onclick="openYappModal()" disabled
-                    title="YAPP binary file transfer (send/receive)"
+                    title="File transfer (YAPP): download from / upload to the BBS"
                     style="background:#7c3aed; color:#fff; border:none;
                            padding:8px 12px; border-radius:4px;
                            font-weight:600; margin-right:4px;
-                           cursor:pointer;">📁 YAPP</button>
+                           cursor:pointer;">📁 Files</button>
             <button id="sendBtn" onclick="sendCommand()" disabled>Send ↵</button>
         </div>
     </div>
@@ -557,161 +557,149 @@ body {
 
 <!-- ─── YAPP file transfer panel (non-modal) ────────────────────────
      Floats over the right side of the screen but does NOT block the
-     terminal underneath. You can interact with the terminal while
-     the panel is open — essential because YAPP receive requires
-     arming first and THEN typing the BBS command. -->
+     terminal underneath. 2026-10-24: reworked — one click switches to
+     file-transfer (FBB) mode with the login typed in this session,
+     enters the BBS and lists its files; uploads need no command. -->
 <div id="yappModal" style="display:none; position:fixed; right:20px;
      top:80px; background:#1a1a2e; color:#e0e0e0; border-radius:8px;
-     padding:18px; width:420px; max-width:90vw;
+     padding:18px; width:440px; max-width:calc(100vw - 32px);
      border:1px solid #444; box-shadow:0 10px 40px rgba(0,0,0,0.5);
-     z-index:1000; max-height:80vh; overflow-y:auto;">
+     z-index:1000; max-height:82vh; overflow-y:auto;">
     <div>
         <div style="display:flex; justify-content:space-between;
-             align-items:center; margin-bottom:14px;">
-            <h2 style="margin:0; color:#a78bfa; font-size:16px;">📁 YAPP File Transfer</h2>
+             align-items:center; margin-bottom:12px;">
+            <h2 style="margin:0; color:#a78bfa; font-size:16px;">📁 File Transfer (YAPP)</h2>
             <button onclick="closeYappModal()" style="background:none;
                     border:none; color:#888; font-size:24px; cursor:pointer;
-                    padding:0 8px; line-height:1;">&times;</button>
+                    padding:0 8px; line-height:1;" title="Close (the transfer keeps going)">&times;</button>
         </div>
 
-        <div style="background:#0e2a1a; border:1px solid #1a5c3a;
-             color:#7ee0a3; padding:8px 10px; border-radius:4px;
-             font-size:11px; margin-bottom:12px;">
-            💡 The terminal below stays active. You can type BBS commands
-            while this panel is open.
-        </div>
-
-        <!-- FBB mode notice + connect button. YAPP requires FBB mode
-             (port 8011, transparent TCP, no telnet IAC). The standard
-             interactive telnet (port 8010) won't work for YAPP because
-             text-mode escape processing corrupts the binary frames. -->
-        <div id="yappFbbSection" style="background:#2a1e0e; border:1px solid #5c4a1a;
-             color:#e0c87a; padding:10px; border-radius:4px;
-             font-size:11px; margin-bottom:12px;">
-            <div style="font-weight:600; margin-bottom:6px;">⚠ FBB Mode Required for YAPP</div>
-            <div id="yappFbbStatus" style="margin-bottom:8px;">
-                Your current connection is on port <span id="yappFbbCurrentPort">?</span>.
-                YAPP requires a separate FBB-mode connection (port 8011).
-            </div>
-            <div id="yappFbbCreds" style="display:flex; gap:6px; align-items:center;
-                 margin-bottom:6px; flex-wrap:wrap;">
-                <input id="yappFbbUser" placeholder="BPQ user"
-                       style="flex:1; min-width:100px; padding:4px 6px;
-                              background:#0e0e1c; border:1px solid #444;
-                              color:#ccc; border-radius:3px; font-size:12px;">
-                <input id="yappFbbPass" type="password" placeholder="password"
-                       style="flex:1; min-width:100px; padding:4px 6px;
-                              background:#0e0e1c; border:1px solid #444;
-                              color:#ccc; border-radius:3px; font-size:12px;">
-            </div>
-            <button id="yappConnectFbbBtn" onclick="yappConnectFbb()"
-                    style="background:#a78bfa; color:#1a1a2e; border:none;
-                           padding:6px 12px; border-radius:3px;
-                           font-size:12px; font-weight:600; cursor:pointer;">
-                Switch to FBB Mode (port 8011)
-            </button>
-        </div>
+        <!-- Connection mode: ready / one-click switch / login form (yappRenderMode) -->
+        <div id="yappFbbSection" class="yapp-box"></div>
 
         <!-- Tab bar -->
-        <div style="display:flex; gap:4px; margin-bottom:16px;
+        <div style="display:flex; gap:4px; margin:14px 0 12px;
              border-bottom:1px solid #333;">
-            <button id="yappTabSend" onclick="yappTab('send')"
-                    class="yapp-tab active">⬆ Send File</button>
             <button id="yappTabRecv" onclick="yappTab('recv')"
-                    class="yapp-tab">⬇ Receive File</button>
+                    class="yapp-tab active">⬇ Download from BBS</button>
+            <button id="yappTabSend" onclick="yappTab('send')"
+                    class="yapp-tab">⬆ Upload to BBS</button>
         </div>
 
-        <!-- Send panel -->
-        <div id="yappPanelSend" class="yapp-panel">
-            <p style="color:#aaa; font-size:13px; margin-bottom:12px;">
-                Select a file to send via YAPP to the connected station.
-                Your terminal will switch to binary mode for the duration
-                of the transfer. The receiving end must be expecting a
-                YAPP transfer (typically you'd type a command like
-                <code style="background:#333; padding:1px 4px;">UPLOAD filename</code>
-                at the BBS prompt first).
-            </p>
-            <input type="file" id="yappFileInput"
-                   style="margin-bottom:12px; color:#ccc;">
-            <div id="yappFileInfo" style="font-size:12px; color:#888;
-                 margin-bottom:12px;"></div>
-            <button id="yappStartSendBtn" onclick="yappStartSend()"
-                    style="background:#7c3aed; color:#fff; border:none;
-                           padding:10px 20px; border-radius:4px;
-                           font-weight:600; cursor:pointer;"
-                    disabled>Start Sending</button>
-        </div>
-
-        <!-- Receive panel -->
-        <div id="yappPanelRecv" class="yapp-panel" style="display:none;">
-            <p style="color:#aaa; font-size:13px; margin-bottom:12px;">
-                Arm the receiver to watch for an incoming YAPP transfer.
-                Before clicking Start, you should have already typed the
-                appropriate command at the BBS prompt to initiate the
-                send from the remote side (e.g.
-                <code style="background:#333; padding:1px 4px;">YAPP filename</code>).
-                Files are saved to <code style="background:#333; padding:1px 4px;">/yapp-files/</code>
-                on the server and a download link will appear when done.
-                <br><br>
-                <strong>Tip:</strong> If you're connected to a BBS (local or
-                remote) and don't know what filenames are available, click
-                <em>Browse Files</em> to list them and click one to start
-                receiving.
-            </p>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button id="yappBrowseBtn" onclick="yappBrowseFiles()"
-                        style="background:#3b82f6; color:#fff; border:none;
-                               padding:10px 18px; border-radius:4px;
-                               font-weight:600; cursor:pointer;">
+        <!-- Download panel -->
+        <div id="yappPanelRecv" class="yapp-panel">
+            <div style="display:flex; gap:8px; align-items:center;">
+                <button id="yappBrowseBtn" onclick="yappBrowseFiles()" class="yapp-btn blue">
                     📂 Browse Files
                 </button>
-                <button id="yappStartRecvBtn" onclick="yappStartRecv()"
-                        style="background:#7c3aed; color:#fff; border:none;
-                               padding:10px 20px; border-radius:4px;
-                               font-weight:600; cursor:pointer;">
-                    🛰 Arm Receiver
-                </button>
-            </div>
-
-            <!-- File listing — populated by yappBrowseFiles() -->
-            <div id="yappFilesList" style="display:none; margin-top:14px;
-                 max-height:260px; overflow-y:auto; background:#0e0e1c;
-                 border:1px solid #333; border-radius:4px; padding:6px;">
-                <!-- Rendered file rows go here -->
+                <input id="yappFilter" placeholder="Filter…" oninput="yappRenderFiles()"
+                       class="yapp-input" style="flex:1; display:none;">
             </div>
             <div id="yappFilesStatus" style="display:none; margin-top:8px;
                  font-size:12px; color:#888;"></div>
+            <div id="yappFilesList" style="display:none; margin-top:8px;
+                 max-height:240px; overflow-y:auto; background:#0e0e1c;
+                 border:1px solid #333; border-radius:4px;"></div>
+            <details style="margin-top:12px; font-size:12px; color:#999;">
+                <summary style="cursor:pointer;">Other BBS software (manual receive)</summary>
+                <p style="margin:8px 0;">If the file list doesn't work on that BBS: click
+                    <em>Arm Receiver</em>, then type the BBS's own download command in the
+                    terminal (on BPQ: <code class="yapp-code">YAPP filename</code>).</p>
+                <button id="yappStartRecvBtn" onclick="yappStartRecv()" class="yapp-btn">🛰 Arm Receiver</button>
+            </details>
+        </div>
+
+        <!-- Upload panel -->
+        <div id="yappPanelSend" class="yapp-panel" style="display:none;">
+            <label id="yappDrop" for="yappFileInput" class="yapp-drop">
+                <div style="font-size:26px;">⬆</div>
+                <div><strong>Drop a file here</strong> or click to choose</div>
+                <div style="font-size:11px; color:#888; margin-top:4px;">Up to 10 MB</div>
+            </label>
+            <input type="file" id="yappFileInput" style="display:none;">
+            <div id="yappFileInfo" style="font-size:12px; color:#bbb; margin:10px 0 6px;"></div>
+            <div id="yappDupWarn" style="display:none; font-size:12px; color:#fbbf24;
+                 background:#2a1e0e; border:1px solid #5c4a1a; padding:8px; border-radius:4px;
+                 margin-bottom:8px;"></div>
+            <button id="yappStartSendBtn" onclick="yappStartSend()" class="yapp-btn purple" disabled>
+                ⬆ Send to BBS
+            </button>
+            <p style="color:#888; font-size:11px; margin:10px 0 0;">
+                A BPQ BBS saves uploads in its <code class="yapp-code">Files</code> folder by
+                itself, so there's no command to type. Just be at the BBS prompt
+                (<code class="yapp-code">de CALL&gt;</code>). Other BBS software may need its
+                own upload command typed first.
+            </p>
         </div>
 
         <!-- Status / progress / result — shared across both modes -->
-        <div id="yappStatus" style="margin-top:16px; padding:12px;
+        <div id="yappStatus" style="margin-top:14px; padding:12px;
              background:#0e0e1c; border-radius:4px; border:1px solid #333;
-             min-height:80px; display:none;">
+             display:none;">
             <div id="yappStatusText" style="font-size:13px; margin-bottom:8px;"></div>
             <div id="yappProgressBar" style="display:none; background:#222;
-                 border-radius:4px; height:20px; overflow:hidden;
-                 margin-bottom:8px;">
+                 border-radius:4px; height:16px; overflow:hidden;
+                 margin-bottom:6px;">
                 <div id="yappProgressFill" style="background:linear-gradient(90deg, #7c3aed, #a78bfa);
                      height:100%; width:0%; transition:width 0.2s;"></div>
             </div>
             <div id="yappProgressText" style="font-size:11px; color:#aaa;"></div>
+            <div id="yappSpeedText" style="font-size:11px; color:#a78bfa; margin-top:2px;"></div>
             <div id="yappResult" style="margin-top:8px;"></div>
             <button id="yappAbortBtn" onclick="yappAbort()" style="display:none;
                     background:#dc2626; color:#fff; border:none;
                     padding:6px 12px; border-radius:4px; font-size:12px;
                     cursor:pointer; margin-top:8px;">Abort Transfer</button>
         </div>
+
+        <!-- Files received in this browser (kept across visits) -->
+        <div id="yappRecentWrap" style="display:none; margin-top:14px;">
+            <div style="font-size:11px; font-weight:600; color:#888; text-transform:uppercase;
+                 letter-spacing:.5px; margin-bottom:4px;">Received recently</div>
+            <div id="yappRecentList" style="font-size:12px;"></div>
+        </div>
     </div>
 </div>
 
 <style>
     .yapp-tab {
-        background:none; border:none; color:#888; padding:8px 16px;
-        cursor:pointer; font-size:14px; border-bottom:2px solid transparent;
+        background:none; border:none; color:#888; padding:8px 14px;
+        cursor:pointer; font-size:13px; border-bottom:2px solid transparent;
         margin-bottom:-1px;
     }
     .yapp-tab.active { color:#a78bfa; border-bottom-color:#a78bfa; }
     .yapp-tab:hover { color:#ccc; }
+    .yapp-box { padding:10px; border-radius:4px; font-size:12px; border:1px solid #444; }
+    .yapp-box.ok   { background:#0e2a1a; border-color:#1a5c3a; color:#7ee0a3; }
+    .yapp-box.warn { background:#2a1e0e; border-color:#5c4a1a; color:#e0c87a; }
+    .yapp-btn { background:#374151; color:#fff; border:none; padding:9px 16px;
+        border-radius:4px; font-weight:600; cursor:pointer; font-size:13px; }
+    .yapp-btn.blue { background:#3b82f6; }
+    .yapp-btn.purple { background:#7c3aed; }
+    .yapp-btn.big { width:100%; padding:11px; font-size:14px; background:#a78bfa; color:#1a1a2e; }
+    .yapp-btn:disabled { opacity:.45; cursor:not-allowed; }
+    .yapp-input { padding:6px 8px; background:#0e0e1c; border:1px solid #444;
+        color:#ddd; border-radius:3px; font-size:12px; min-width:0; }
+    .yapp-code { background:#333; padding:1px 4px; border-radius:2px; }
+    .yapp-link { background:none; border:none; color:#a78bfa; cursor:pointer;
+        text-decoration:underline; font-size:11px; padding:0; }
+    .yapp-drop { display:block; border:2px dashed #555; border-radius:6px;
+        padding:18px; text-align:center; cursor:pointer; color:#ccc; transition:all .15s; }
+    .yapp-drop:hover, .yapp-drop.over { border-color:#a78bfa; background:#221a3a; }
+    .yapp-row { display:flex; justify-content:space-between; align-items:center;
+        padding:7px 10px; border-bottom:1px solid #222; cursor:pointer; gap:10px; }
+    .yapp-row:hover { background:#1a1a2e; }
+    .yapp-row .n { color:#e5e7eb; font-family:monospace; font-size:13px; flex:1;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .yapp-row .s { color:#888; font-size:11px; font-family:monospace; white-space:nowrap; }
+    .yapp-row .get { color:#a78bfa; font-size:11px; white-space:nowrap; }
+    /* moving stripes while the node sends the file on and we wait for the BBS */
+    .yapp-busy #yappProgressFill {
+        background: repeating-linear-gradient(45deg, #7c3aed 0 12px, #a78bfa 12px 24px);
+        background-size: 34px 34px; animation: yappStripes 1s linear infinite;
+    }
+    @keyframes yappStripes { from { background-position: 0 0; } to { background-position: 34px 0; } }
+    @media (prefers-reduced-motion: reduce) { .yapp-busy #yappProgressFill { animation: none; } }
 </style>
 
 <script>
@@ -724,15 +712,16 @@ let sessionStart= null;
 let currentHost = '';
 let currentPort = 0;
 let pendingCmd  = '';  // command to send after connect (quick-connect auto-nav)
+let autoCmd     = '';  // ...waiting for the login to finish
+let autoCmdLoginSeen = false;
 let sessionLog  = JSON.parse(localStorage.getItem('bpq_telnet_log') || '[]');
 
 // ── WebSocket ──────────────────────────────────────────────────────
-// Use wss:// if served over HTTPS (routes through nginx proxy)
-// Use ws:// if served over HTTP (direct to daemon port)
+// Always through the web server's /ws/telnet (wss:// over HTTPS, ws:// over
+// HTTP). 2026-10-25: over HTTP this went straight to port 8765, which the
+// service only opens on the server itself — so it failed from any other machine.
 const WS_PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
-const WS_URL   = location.protocol === 'https:'
-    ? `wss://${location.hostname}/ws/telnet`
-    : `ws://${location.hostname}:8765`;
+const WS_URL   = `${WS_PROTO}://${location.host}/ws/telnet`;
 
 function connect(host, port, label, autoCmd, opts) {
     if (ws) { ws.close(); ws = null; }
@@ -750,6 +739,9 @@ function connect(host, port, label, autoCmd, opts) {
     appendSys(`Connecting to ${host}:${port}…${fbb ? ' (FBB mode)' : ''}`);
 
     ws = new WebSocket(WS_URL);
+    // 2026-10-24: events from a connection we've already replaced (e.g. the
+    // switch to file-transfer mode) must not touch the new one's state.
+    const thisWs = ws;
 
     ws.onopen = () => {
         const connectMsg = { action: 'connect', host, port };
@@ -762,6 +754,7 @@ function connect(host, port, label, autoCmd, opts) {
     };
 
     ws.onmessage = (evt) => {
+        if (ws !== thisWs) return;
         try {
             const msg = JSON.parse(evt.data);
             handleMessage(msg, host, port, label);
@@ -771,6 +764,7 @@ function connect(host, port, label, autoCmd, opts) {
     };
 
     ws.onclose = () => {
+        if (ws !== thisWs) return;
         if (connected) {
             setStatus('disconnected', 'Disconnected');
             appendSys('Connection closed');
@@ -798,15 +792,29 @@ function handleMessage(msg, host, port, label) {
             addSessionLog(host, port, label);
             document.getElementById('disconnectBtn').style.display = '';
             if (pendingCmd) {
-                setTimeout(() => sendRaw(pendingCmd), 800);
+                // 2026-10-24: the old code cleared pendingCmd before its timer
+                // fired, so "BPQ BBS"/"BPQ Chat" sent an empty line. Sending it
+                // on a timer would also be wrong on port 8010: BPQ is still
+                // asking "user:" then. So: FBB (login sent by the daemon) →
+                // shortly after connect; otherwise once the login is done, or
+                // straight away if BPQ asks for no login.
+                autoCmd = pendingCmd;
                 pendingCmd = '';
+                autoCmdLoginSeen = false;
+                setTimeout(() => {
+                    if (autoCmd && (currentFbbMode || !autoCmdLoginSeen)) {
+                        const c = autoCmd; autoCmd = ''; sendRaw(c);
+                    }
+                }, currentFbbMode ? 800 : 1500);
             }
-            // Refresh YAPP modal status if it happens to be open
-            try { yappRefreshFbbStatus(); } catch(e) {}
+            // File-transfer panel: carry on a one-click switch, refresh status
+            recentRx = ''; lastPrompt = null;
+            try { yappOnConnected(); } catch(e) {}
             break;
 
         case 'data':
             appendText(msg.data);
+            try { yappWatchText(msg.data); } catch(e) {}
             break;
 
         case 'disconnected':
@@ -816,6 +824,7 @@ function handleMessage(msg, host, port, label) {
             setInputEnabled(false);
             document.getElementById('disconnectBtn').style.display = 'none';
             updateSessionInfo();
+            try { yappOnDisconnected(); } catch(e) {}
             break;
 
         case 'error':
@@ -840,6 +849,12 @@ function handleMessage(msg, host, port, label) {
             break;
         case 'yapp_files_list':
             yappOnFilesList(msg);
+            break;
+        case 'yapp_stopping':
+            yappDraining = msg.handed_all ? 'handed' : true;
+            break;
+        case 'yapp_stopped':
+            yappOnStopped();
             break;
     }
 }
@@ -893,8 +908,8 @@ function sendCommand() {
     const input = document.getElementById('termInput');
     const text  = input.value;
     if (!connected || !ws) return;
-    // Echo command locally
-    appendText(`> ${text}\n`);
+    // Echo command locally (a password typed at BPQ's prompt is masked)
+    appendText(`> ${yappNoteTyped(text)}\n`);
     sendRaw(text);
     // History
     if (text.trim()) {
@@ -1096,100 +1111,215 @@ function renderNodes(nodes) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// YAPP file transfer modal
+// YAPP file transfer panel
+// 2026-10-24 rework: one-click file-transfer mode (reuses the login typed
+// in this session), auto BBS + file list, drag-and-drop uploads with a
+// duplicate check, speed / time left, and a recent-downloads list.
 // ═══════════════════════════════════════════════════════════════
 
 let yappActive = false;   // is a transfer currently in progress?
 let yappFile = null;      // File object selected for sending
-
-function openYappModal() {
-    if (!connected) {
-        appendSys('Connect to a station first before opening YAPP');
-        return;
-    }
-    const modal = document.getElementById('yappModal');
-    if (!modal) {
-        appendSys('YAPP modal missing from page — please reload (Ctrl+Shift+R)');
-        return;
-    }
-    // Toggle: if currently visible, close it. Otherwise open.
-    // Use computed style rather than inline style — initial inline style
-    // might be empty string after some browser cycles.
-    const isVisible = modal.style.display === 'block'
-        || (modal.style.display !== 'none' &&
-            getComputedStyle(modal).display !== 'none');
-    if (isVisible) {
-        closeYappModal();
-        return;
-    }
-    modal.style.display = 'block';
-    // Default to Send tab
-    try {
-        yappTab('send');
-        yappResetStatus();
-        // Refresh the FBB-mode status section based on current connection
-        yappRefreshFbbStatus();
-    } catch(e) {
-        console.error('YAPP modal init error:', e);
-        appendSys('YAPP modal error: ' + e.message);
-    }
-}
-
-// Update the "FBB Mode Required" section based on whether the
-// current connection is already on the FBB port (8011) or still on
-// the regular telnet port (8010). If on FBB, hide the warning.
-function yappRefreshFbbStatus() {
-    const section = document.getElementById('yappFbbSection');
-    const portEl  = document.getElementById('yappFbbCurrentPort');
-    if (!section || !portEl) return;
-    portEl.textContent = currentPort;
-    // If user is on the FBB port (8011), they're good
-    if (currentPort === 8011 || currentFbbMode === true) {
-        section.style.background = '#0e2a1a';
-        section.style.borderColor = '#1a5c3a';
-        section.style.color = '#7ee0a3';
-        section.innerHTML = `<div style="font-weight:600;">✓ FBB Mode Active (port ${currentPort})</div>
-            <div style="margin-top:4px;">Ready for YAPP file transfers.</div>`;
-    } else {
-        // Still need to switch — restore the warning + connect UI
-        section.style.background = '#2a1e0e';
-        section.style.borderColor = '#5c4a1a';
-        section.style.color = '#e0c87a';
-        // (HTML preserved — don't overwrite if it still has inputs)
-    }
-}
-
-// Switch to an FBB-mode connection on port 8011, using the credentials
-// the user enters in the YAPP modal. This DISCONNECTS the current
-// session and opens a fresh one in FBB mode. After successful connect,
-// the user can use YAPP normally.
-function yappConnectFbb() {
-    const user = document.getElementById('yappFbbUser').value.trim();
-    const pass = document.getElementById('yappFbbPass').value;
-    if (!user || !pass) {
-        alert('BPQ username and password are required for FBB mode.');
-        return;
-    }
-    // Remember the credentials for the rest of this browser session so
-    // re-opening the YAPP modal doesn't require re-typing them. (Stored
-    // only in JS memory, NOT persisted to localStorage.)
-    lastFbbUser = user;
-    lastFbbPass = pass;
-    appendSys(`Switching to FBB mode (port 8011) as user '${user}'…`);
-    // Use current host but FBB port. Mark connection state so
-    // yappRefreshFbbStatus can detect it.
-    connect(currentHost || '127.0.0.1', 8011,
-            `${currentHost || '127.0.0.1'}:8011 (FBB)`, '',
-            { fbb: true, username: user, password: pass });
-}
+let yappFilesCache = null;   // last BBS file list [{name,size}] for this connection
+let yappFlow = null;         // one-click switch in progress: {stage, timer}
+let yappXfer = null;         // speed/ETA tracking for the running transfer
+let yappTicker = null;       // 1 s timer while waiting for upload confirmation
+let yappSendAfterList = false;
+let yappLoginForm = false;   // show the login form instead of the one-click button
+let yappDraining = false;    // cancelled; the other end is still flushing what it had queued
 
 // Track whether current session is FBB mode (set by 'connected' message)
 let currentFbbMode = false;
 let lastFbbUser = '';
 let lastFbbPass = '';
+// Login typed at BPQ's prompts in this tab (memory only, never stored)
+let sessionLogin = { user: '', pass: '', host: '' };
+let lastPrompt = null;       // 'user' | 'pass' | null — what BPQ just asked for
+let recentRx = '';           // tail of received text, for prompt detection
+let autoCmdLoggedIn = false; // password just typed — next text means logged in
+
+// Called from handleMessage('data') for every chunk of terminal text
+function yappWatchText(text) {
+    recentRx = (recentRx + text).slice(-300);
+    const tail = recentRx.replace(/[\s\x00]+$/, '').toLowerCase();
+    if (!currentFbbMode) {
+        if (autoCmd && /(user|callsign|login|password):$/.test(tail)) autoCmdLoginSeen = true;
+        else if (autoCmd && autoCmdLoginSeen && autoCmdLoggedIn && !/invalid|incorrect|fail/.test(tail)) {
+            const c = autoCmd; autoCmd = ''; autoCmdLoggedIn = false;
+            setTimeout(() => sendRaw(c), 300);
+        }
+        if (/(user|callsign|login):$/.test(tail)) lastPrompt = 'user';
+        else if (/password:$/.test(tail)) lastPrompt = 'pass';
+        else if (tail) lastPrompt = null;
+    }
+    if (yappFlow && yappFlow.stage === 'bbs' && /[^\s>]>$/.test(tail)) {
+        // BBS prompt ("de CALL>") is up — list the files
+        clearTimeout(yappFlow.timer);
+        yappFlow = null;
+        yappTab('recv');
+        yappRenderMode();
+        yappBrowseFiles();
+    }
+}
+
+// Called from sendCommand() before a typed line goes out. Returns the text
+// to echo locally (passwords are masked).
+function yappNoteTyped(text) {
+    if (currentFbbMode) return text;
+    if (lastPrompt === 'user') {
+        sessionLogin = { user: text.trim(), pass: '', host: currentHost };
+        lastPrompt = null;
+    } else if (lastPrompt === 'pass') {
+        sessionLogin.pass = text;
+        lastPrompt = null;
+        autoCmdLoggedIn = true;   // the next text from BPQ is the welcome
+        return '********';
+    }
+    return text;
+}
+
+function openYappModal() {
+    if (!connected) {
+        appendSys('Connect to your node first, then open File Transfer');
+        return;
+    }
+    const modal = document.getElementById('yappModal');
+    if (!modal) {
+        appendSys('YAPP panel missing from page — please reload (Ctrl+Shift+R)');
+        return;
+    }
+    if (modal.style.display === 'block') { closeYappModal(); return; }
+    modal.style.display = 'block';
+    try {
+        if (!yappActive) yappResetStatus();
+        yappRenderMode();
+        yappRenderRecent();
+        yappTab(currentFbbMode ? 'recv' : (yappFile ? 'send' : 'recv'));
+        // Already in FBB mode with nothing listed yet → list right away
+        if (currentFbbMode && !yappFilesCache && !yappActive) yappBrowseFiles();
+    } catch(e) {
+        console.error('YAPP panel init error:', e);
+        appendSys('YAPP panel error: ' + e.message);
+    }
+}
 
 function closeYappModal() {
     document.getElementById('yappModal').style.display = 'none';
+}
+
+// Kept for older callers ('connected' handler)
+function yappRefreshFbbStatus() { yappRenderMode(); }
+
+// The box at the top: ready / one-click switch / login form
+function yappRenderMode() {
+    const box = document.getElementById('yappFbbSection');
+    if (!box) return;
+    if (yappFlow) {
+        box.className = 'yapp-box warn';
+        box.innerHTML = yappFlow.stage === 'login'
+            ? '⏳ Reconnecting in file-transfer mode…'
+            : '⏳ Opening the BBS…';
+        return;
+    }
+    if (connected && currentFbbMode) {
+        box.className = 'yapp-box ok';
+        box.innerHTML = `<div style="font-weight:600;">✓ File-transfer mode (FBB, port ${currentPort})</div>
+            <div style="margin-top:4px;">Be at the BBS prompt for file lists and uploads.
+            <button class="yapp-link" onclick="sendRaw('BBS'); setTimeout(yappBrowseFiles, 2500)">Enter BBS</button></div>`;
+        return;
+    }
+    box.className = 'yapp-box warn';
+    const haveLogin = sessionLogin.user && sessionLogin.pass &&
+                      sessionLogin.host === currentHost && !yappLoginForm;
+    const intro = `<div style="margin-bottom:8px;">Files need <strong>file-transfer mode</strong>
+        (BPQ's FBB port 8011). This reconnects to your node, opens the BBS and lists
+        its files. Your current terminal session closes.</div>`;
+    if (haveLogin) {
+        box.innerHTML = intro +
+            `<button class="yapp-btn big" onclick="yappSwitch()">⚡ Switch to file-transfer mode</button>
+             <div style="margin-top:6px; font-size:11px;">Uses the login you typed this session
+             (<strong>${escapeHtmlYapp(sessionLogin.user)}</strong>).
+             <button class="yapp-link" onclick="yappLoginForm=true; yappRenderMode()">Use a different login</button></div>`;
+    } else {
+        const u = escapeHtmlYapp(lastFbbUser || sessionLogin.user || '');
+        box.innerHTML = intro +
+            `<div style="display:flex; gap:6px; margin-bottom:8px;">
+                <input id="yappFbbUser" class="yapp-input" style="flex:1" placeholder="BPQ user" value="${u}"
+                       autocomplete="username">
+                <input id="yappFbbPass" class="yapp-input" style="flex:1" type="password" placeholder="password"
+                       autocomplete="current-password" onkeydown="if(event.key==='Enter')yappConnectFbb()">
+             </div>
+             <button id="yappConnectFbbBtn" class="yapp-btn big" onclick="yappConnectFbb()">⚡ Switch to file-transfer mode</button>`;
+    }
+}
+
+// One click: reconnect on 8011 in FBB mode, then BBS, then list files
+function yappSwitch(user, pass) {
+    user = user || sessionLogin.user;
+    pass = pass || sessionLogin.pass;
+    if (!user || !pass) { yappLoginForm = true; yappRenderMode(); return; }
+    lastFbbUser = user;
+    lastFbbPass = pass;
+    yappLoginForm = false;
+    yappFilesCache = null;
+    yappFlow = { stage: 'login', timer: null };
+    yappRenderMode();
+    appendSys(`Switching to file-transfer mode (FBB, port 8011) as '${user}'…`);
+    const host = currentHost || '127.0.0.1';
+    connect(host, 8011, `${host}:8011 (FBB)`, '',
+            { fbb: true, username: user, password: pass });
+}
+
+// Login form button (also used when no login was captured)
+function yappConnectFbb() {
+    const user = (document.getElementById('yappFbbUser') || {}).value?.trim() || '';
+    const pass = (document.getElementById('yappFbbPass') || {}).value || '';
+    if (!user || !pass) { appendSys('Enter your BPQ user name and password first.'); return; }
+    yappSwitch(user, pass);
+}
+
+// From handleMessage('connected')
+function yappOnConnected() {
+    yappFilesCache = null;
+    if (!yappFlow || !currentFbbMode) { yappRenderMode(); return; }
+    yappFlow.stage = 'opening';
+    yappRenderMode();
+    // Give BPQ a moment to take the login, then open the BBS. Only text
+    // after this point counts as the BBS prompt.
+    setTimeout(() => {
+        if (!yappFlow) return;
+        recentRx = '';
+        yappFlow.stage = 'bbs';
+        sendRaw('BBS');
+    }, 1500);
+    yappFlow.timer = setTimeout(() => {
+        if (!yappFlow) return;
+        yappFlow = null;
+        yappRenderMode();
+        const st = document.getElementById('yappFilesStatus');
+        st.style.display = '';
+        st.innerHTML = '⚠ The BBS prompt didn\'t appear. Check the terminal: if the login ' +
+            'was refused, use <em>Use a different login</em>; otherwise type ' +
+            '<code class="yapp-code">BBS</code> and press Browse Files.';
+    }, 15000);
+}
+
+// From handleMessage('disconnected')
+function yappOnDisconnected() {
+    if (yappFlow) {
+        // The node dropped the new FBB connection — almost always a refused login
+        clearTimeout(yappFlow.timer);
+        yappFlow = null;
+        yappLoginForm = true;
+        sessionLogin.pass = '';
+        yappRenderMode();
+        const st = document.getElementById('yappFilesStatus');
+        st.style.display = '';
+        st.textContent = '⚠ The node closed the file-transfer connection. That usually means ' +
+            'the user name or password was refused. Enter them above and try again.';
+    } else {
+        yappRenderMode();
+    }
+    yappCheckFile();
 }
 
 function yappTab(which) {
@@ -1199,32 +1329,71 @@ function yappTab(which) {
     document.getElementById('yappPanelRecv').style.display = which === 'recv' ? '' : 'none';
 }
 
-// File input changes — show info, enable Start button
+// ── File choice / drag-and-drop ──────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     const inp = document.getElementById('yappFileInput');
-    if (inp) {
-        inp.addEventListener('change', (e) => {
-            yappFile = e.target.files[0] || null;
-            const info = document.getElementById('yappFileInfo');
-            const btn  = document.getElementById('yappStartSendBtn');
-            if (yappFile) {
-                const sizeKB = (yappFile.size / 1024).toFixed(1);
-                info.textContent = `Selected: ${yappFile.name} (${sizeKB} KB)`;
-                btn.disabled = false;
-            } else {
-                info.textContent = '';
-                btn.disabled = true;
-            }
+    if (inp) inp.addEventListener('change', e => yappChooseFile(e.target.files[0] || null));
+    const drop = document.getElementById('yappDrop');
+    if (drop) {
+        ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+            e.preventDefault(); drop.classList.add('over');
+        }));
+        ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+            e.preventDefault(); drop.classList.remove('over');
+        }));
+        drop.addEventListener('drop', e => {
+            const f = e.dataTransfer && e.dataTransfer.files[0];
+            if (f) yappChooseFile(f);
         });
     }
 });
 
+// Same rule as the daemon (yapp_start_send): the name the BBS will see
+function yappBbsName(name) {
+    return (name || 'upload.bin').replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 64);
+}
+
+function yappChooseFile(f) {
+    yappFile = f;
+    yappCheckFile();
+    // Know what the BBS already has, so a duplicate is caught before sending
+    if (f && !yappFilesCache && connected && currentFbbMode && !yappActive) yappBrowseFiles();
+}
+
+function yappCheckFile() {
+    const info = document.getElementById('yappFileInfo');
+    const warn = document.getElementById('yappDupWarn');
+    const btn  = document.getElementById('yappStartSendBtn');
+    warn.style.display = 'none';
+    if (!yappFile) { info.textContent = ''; btn.disabled = true; return; }
+    const bbsName = yappBbsName(yappFile.name);
+    const mins = Math.max(1, Math.round(yappFile.size / 70 / 60));
+    info.innerHTML = `<strong>${escapeHtmlYapp(yappFile.name)}</strong> — ${formatFileSize(yappFile.size)}` +
+        (bbsName !== yappFile.name ? `<br>Saved on the BBS as <code class="yapp-code">${escapeHtmlYapp(bbsName)}</code>` : '') +
+        `<br><span style="color:#888">Seconds on a local BBS; over a link it depends on the link ` +
+        `(about ${mins} min at 1200 baud radio).</span>`;
+    let problem = '';
+    if (yappFile.size > 10 * 1024 * 1024) problem = 'This file is over the 10 MB limit.';
+    else if (yappFilesCache && yappFilesCache.some(x => x.name.toLowerCase() === bbsName.toLowerCase()))
+        problem = `The BBS already has a file called <strong>${escapeHtmlYapp(bbsName)}</strong>. ` +
+                  'BPQ refuses to overwrite it, so rename your file first (or delete the old one on the BBS).';
+    if (problem) { warn.innerHTML = '⚠ ' + problem; warn.style.display = ''; }
+    btn.disabled = !!problem || yappActive || yappDraining || !connected;
+    if (!connected || !currentFbbMode) {
+        btn.title = 'Switch to file-transfer mode first';
+        btn.disabled = true;
+    } else btn.title = '';
+}
+
+// ── Status / progress helpers ────────────────────────────────────
 function yappResetStatus() {
     document.getElementById('yappStatus').style.display = 'none';
     document.getElementById('yappStatusText').textContent = '';
     document.getElementById('yappProgressBar').style.display = 'none';
     document.getElementById('yappProgressFill').style.width = '0%';
+    document.getElementById('yappProgressBar').classList.remove('yapp-busy');
     document.getElementById('yappProgressText').textContent = '';
+    document.getElementById('yappSpeedText').textContent = '';
     document.getElementById('yappResult').innerHTML = '';
     document.getElementById('yappAbortBtn').style.display = 'none';
 }
@@ -1234,135 +1403,139 @@ function yappShowStatus(text) {
     document.getElementById('yappStatusText').textContent = text;
 }
 
+function yappFmtTime(s) {
+    s = Math.max(0, Math.round(s));
+    if (s < 60) return s + ' s';
+    if (s < 3600) return Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0') + ' s';
+    return Math.floor(s / 3600) + ' h ' + Math.floor((s % 3600) / 60) + ' min';
+}
+
+function yappStopTicker() {
+    if (yappTicker) { clearInterval(yappTicker); yappTicker = null; }
+    const bar = document.getElementById('yappProgressBar');
+    if (bar) bar.classList.remove('yapp-busy');
+}
+
+// ── Send ─────────────────────────────────────────────────────────
 async function yappStartSend() {
-    if (!yappFile) return;
-    if (yappActive) return;
-    if (yappFile.size > 10 * 1024 * 1024) {
-        yappShowStatus('File too large (max 10 MB).');
+    if (!yappFile || yappActive) return;
+    if (!connected || !currentFbbMode) { appendSys('Switch to file-transfer mode first.'); return; }
+    if (yappFile.size > 10 * 1024 * 1024) { yappShowStatus('File too large (max 10 MB).'); return; }
+    if (!yappFilesCache) {
+        // Check the BBS's list first; carries on in yappOnFilesList
+        yappSendAfterList = true;
+        yappShowStatus('Checking what the BBS already has…');
+        yappBrowseFiles();
         return;
     }
-    // Read file as base64
+    yappCheckFile();
+    if (document.getElementById('yappStartSendBtn').disabled) return;
+    yappResetStatus();
     yappShowStatus('Reading file…');
     const buf = await yappFile.arrayBuffer();
     const b64 = arrayBufferToBase64(buf);
     yappActive = true;
-    yappShowStatus(`Starting YAPP send: ${yappFile.name} (${(yappFile.size/1024).toFixed(1)} KB)`);
+    yappXfer = { dir: 'send', t0: Date.now(), total: yappFile.size };
+    yappShowStatus(`Starting upload: ${yappBbsName(yappFile.name)} (${formatFileSize(yappFile.size)})`);
     document.getElementById('yappAbortBtn').style.display = '';
-    ws.send(JSON.stringify({
-        action: 'yapp_send',
-        filename: yappFile.name,
-        data: b64,
-    }));
+    document.getElementById('yappStartSendBtn').disabled = true;
+    ws.send(JSON.stringify({ action: 'yapp_send', filename: yappFile.name, data: b64 }));
 }
 
 function yappStartRecv() {
     if (yappActive) return;
     yappActive = true;
-    yappShowStatus('Armed for incoming YAPP transfer. Now type the BBS command to send the file.');
+    yappResetStatus();
+    yappXfer = { dir: 'recv', t0: Date.now() };
+    yappShowStatus('Receiver armed. Now type the BBS command that sends the file.');
     document.getElementById('yappAbortBtn').style.display = '';
     ws.send(JSON.stringify({ action: 'yapp_recv' }));
 }
 
 function yappAbort() {
     if (!yappActive) return;
+    const btn = document.getElementById('yappAbortBtn');
+    btn.disabled = true;
+    btn.textContent = 'Stopping…';
+    yappShowStatus('Stopping the transfer…');
     ws.send(JSON.stringify({ action: 'yapp_abort' }));
 }
 
-// ── Browse Files ─────────────────────────────────────────────────
-// Asks the daemon to issue `Files` to the BBS and parse the response,
-// then renders clickable rows. Click a row → arm receiver + send the
-// YAPP <filename> command automatically.
-//
-// Requires the user to already be in BBS state (typed BBS at the
-// Node prompt). If they're at the Node prompt or somewhere else,
-// BPQ will return "Invalid command" and we'll show an error.
+// The other end has acknowledged the cancel (or gone quiet)
+function yappOnStopped() {
+    const handed = yappDraining === 'handed';
+    yappDraining = false;
+    yappShowStatus('Transfer stopped. The BBS is ready again.');
+    document.getElementById('yappResult').innerHTML =
+        '<div style="color:#fbbf24; font-weight:600;">■ Stopped</div>' +
+        (handed ? '<div style="font-size:12px; color:#aaa; margin-top:4px;">The node had the whole ' +
+                  'file before the cancel, so check the BBS list — it may have kept it.</div>' : '');
+    if (handed) { yappFilesCache = null; setTimeout(() => { if (connected && currentFbbMode && !yappActive) yappBrowseFiles(); }, 800); }
+    appendSys('YAPP transfer stopped');
+    yappCheckFile();
+}
 
+// ── Browse Files ─────────────────────────────────────────────────
+// Asks the daemon to issue `Files` to the BBS and parse the response.
 function yappBrowseFiles() {
     const list = document.getElementById('yappFilesList');
     const status = document.getElementById('yappFilesStatus');
     const btn = document.getElementById('yappBrowseBtn');
-
-    if (!connected) {
-        status.style.display = '';
-        status.textContent = '⚠ Not connected. Connect to BBS first.';
-        return;
-    }
-    if (yappActive) {
-        status.style.display = '';
-        status.textContent = '⚠ YAPP transfer in progress — abort first.';
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = '⏳ Requesting…';
-    list.style.display = 'none';
-    list.innerHTML = '';
     status.style.display = '';
-    status.textContent = 'Asking BBS for file listing…';
-
-    // Send the request. Server returns a yapp_files_list message.
+    if (!connected) { status.textContent = '⚠ Not connected.'; return; }
+    if (!currentFbbMode) { status.textContent = '⚠ Switch to file-transfer mode first (button above).'; return; }
+    if (yappActive) { status.textContent = '⚠ A transfer is running — wait or abort first.'; return; }
+    if (yappDraining) { status.textContent = '⚠ Still stopping the last transfer — try again in a moment.'; return; }
+    btn.disabled = true;
+    btn.textContent = '⏳ Asking BBS…';
+    list.style.display = 'none';
+    status.textContent = 'Asking the BBS for its file list…';
     ws.send(JSON.stringify({ action: 'yapp_list_files' }));
 }
 
 function yappOnFilesList(msg) {
-    const list = document.getElementById('yappFilesList');
     const status = document.getElementById('yappFilesStatus');
     const btn = document.getElementById('yappBrowseBtn');
-
     btn.disabled = false;
-    btn.textContent = '📂 Browse Files';
-
+    btn.textContent = '⟳ Refresh list';
+    status.style.display = '';
     if (!msg.ok) {
-        list.style.display = 'none';
-        status.style.display = '';
+        document.getElementById('yappFilesList').style.display = 'none';
         status.textContent = '⚠ ' + (msg.error || 'Failed to list files');
+        yappSendAfterList = false;
         return;
     }
+    yappFilesCache = msg.files || [];
+    yappRenderFiles();
+    yappCheckFile();
+    if (yappSendAfterList) { yappSendAfterList = false; yappStartSend(); }
+}
 
-    const files = msg.files || [];
+function yappRenderFiles() {
+    const list = document.getElementById('yappFilesList');
+    const status = document.getElementById('yappFilesStatus');
+    const filterEl = document.getElementById('yappFilter');
+    const files = yappFilesCache || [];
+    filterEl.style.display = files.length > 8 ? '' : 'none';
     if (files.length === 0) {
         list.style.display = 'none';
-        status.style.display = '';
-        // The BBS may have returned "Invalid command" if the user
-        // wasn't in BBS mode. Common gotcha.
-        status.innerHTML = 'No files listed. ' +
-            '<br><small style="color:#888;">' +
-            'If you\'re at the BPQ Node prompt, type <code>BBS</code> first, ' +
-            'then try Browse Files again. If you\'re connected to a remote ' +
-            'BBS, that BBS may not have files available.' +
-            '</small>';
+        status.innerHTML = 'No files listed.<br><small style="color:#888;">At the node prompt? ' +
+            'Use <button class="yapp-link" onclick="sendRaw(\'BBS\'); setTimeout(yappBrowseFiles, 2500)">Enter BBS</button>, ' +
+            'then refresh. Otherwise the BBS has no files to offer.</small>';
         return;
     }
-
-    // Render file rows
-    status.style.display = '';
-    status.textContent = `${files.length} file${files.length === 1 ? '' : 's'} available — click to receive`;
-
+    const q = (filterEl.value || '').toLowerCase();
+    const shown = files.filter(f => !q || f.name.toLowerCase().includes(q));
+    status.textContent = `${files.length} file${files.length === 1 ? '' : 's'} on the BBS — click one to download` +
+        (q ? ` (${shown.length} match)` : '');
     list.innerHTML = '';
-    files.forEach(f => {
+    shown.forEach(f => {
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex; justify-content:space-between; ' +
-                            'align-items:center; padding:8px 10px; ' +
-                            'border-bottom:1px solid #222; cursor:pointer; ' +
-                            'transition:background 0.15s;';
-        row.onmouseover = () => row.style.background = '#1a1a2e';
-        row.onmouseout  = () => row.style.background = '';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.style.cssText = 'color:#e5e7eb; font-family:monospace; ' +
-                                 'font-size:13px; flex:1; overflow:hidden; ' +
-                                 'text-overflow:ellipsis; white-space:nowrap;';
-        nameSpan.textContent = f.name;
-        nameSpan.title = f.name;
-
-        const sizeSpan = document.createElement('span');
-        sizeSpan.style.cssText = 'color:#888; font-size:11px; margin-left:12px; ' +
-                                 'font-family:monospace;';
-        sizeSpan.textContent = formatFileSize(f.size);
-
-        row.appendChild(nameSpan);
-        row.appendChild(sizeSpan);
-        row.onclick = () => yappRequestFile(f.name);
+        row.className = 'yapp-row';
+        row.title = 'Download ' + f.name;
+        row.innerHTML = `<span class="n"></span><span class="s">${formatFileSize(f.size)}</span><span class="get">⬇ Get</span>`;
+        row.querySelector('.n').textContent = f.name;
+        row.onclick = () => yappRequestFile(f.name, f.size);
         list.appendChild(row);
     });
     list.style.display = '';
@@ -1374,93 +1547,160 @@ function formatFileSize(bytes) {
     return (bytes / 1024 / 1024).toFixed(2) + ' MB';
 }
 
-function yappRequestFile(filename) {
-    // Click on a file row: arm the receiver, then type YAPP <filename>
-    // into the terminal. Daemon's TX of YAPP <filename> goes to BPQ
-    // which initiates the transfer.
-    if (yappActive) {
-        appendSys('YAPP transfer already in progress; abort first.');
-        return;
-    }
-    if (!connected) {
-        appendSys('Not connected.');
-        return;
-    }
-
-    // Hide the file list while transfer runs
-    document.getElementById('yappFilesList').style.display = 'none';
-    document.getElementById('yappFilesStatus').textContent =
-        `Requesting: ${filename}`;
-
-    // Step 1: arm the receiver
+function yappRequestFile(filename, size) {
+    // Arm the receiver, then type YAPP <filename> for the BBS
+    if (yappActive) { appendSys('A transfer is already running; abort it first.'); return; }
+    if (yappDraining) { appendSys('Still stopping the last transfer — try again in a moment.'); return; }
+    if (!connected) { appendSys('Not connected.'); return; }
     yappActive = true;
-    yappShowStatus(`Requesting ${filename} from BBS…`);
+    yappResetStatus();
+    yappXfer = { dir: 'recv', t0: Date.now(), total: size || 0 };
+    yappShowStatus(`Requesting ${filename} from the BBS…`);
     document.getElementById('yappAbortBtn').style.display = '';
     ws.send(JSON.stringify({ action: 'yapp_recv' }));
-
-    // Step 2: send the YAPP command after a brief delay so the daemon
-    // has armed the receiver before BPQ starts sending the SI packet.
-    setTimeout(() => {
-        ws.send(JSON.stringify({
-            action: 'send',
-            data: `YAPP ${filename}\r`
-        }));
-    }, 200);
+    // Give the daemon a moment to arm before BPQ sends its first packet
+    setTimeout(() => sendRaw(`YAPP ${filename}`), 200);
 }
 
 function yappOnStarted(msg) {
     if (msg.direction === 'send') {
-        yappShowStatus(`Sending: ${msg.filename} (${msg.bytes_total} bytes)`);
+        yappShowStatus(`Uploading ${msg.filename} (${formatFileSize(msg.bytes_total)})`);
     } else {
-        yappShowStatus('Waiting for incoming YAPP transfer…');
+        yappShowStatus(document.getElementById('yappStatusText').textContent ||
+                       'Waiting for the file to start…');
     }
     document.getElementById('yappProgressBar').style.display = '';
 }
 
 function yappOnProgress(msg) {
     const pct = msg.percent || 0;
-    document.getElementById('yappProgressFill').style.width = pct + '%';
-    const kb = (msg.bytes / 1024).toFixed(1);
-    const totalKb = msg.total ? (msg.total / 1024).toFixed(1) : '?';
-    document.getElementById('yappProgressText').textContent =
-        `${kb} / ${totalKb} KB  (${pct}%)`;
+    const fill = document.getElementById('yappProgressFill');
+    const text = document.getElementById('yappProgressText');
+    const speed = document.getElementById('yappSpeedText');
+    const now = Date.now();
+    if (!yappXfer) yappXfer = { t0: now };
+
+    if (msg.phase === 'confirming') {
+        // Everything is with the node; it sends it on and the BBS confirms
+        // when it has all of it. No progress comes back in between (YAPP has
+        // no per-block replies), so show a moving bar, not a "done" 100 %.
+        fill.style.width = '100%';
+        if (!yappXfer.handedAt) yappXfer.handedAt = now;
+        yappShowStatus('Sending to the BBS…');
+        const tick = () => {
+            const waited = (Date.now() - yappXfer.handedAt) / 1000;
+            text.textContent = `Your node has the whole file and is sending it on now. The BBS ` +
+                `confirms when it has all of it: seconds on a local BBS, minutes over a radio or ` +
+                `AXIP link. Waiting ${yappFmtTime(waited)}.`;
+        };
+        tick();
+        yappStopTicker();
+        document.getElementById('yappProgressBar').classList.add('yapp-busy');
+        yappTicker = setInterval(tick, 1000);
+        const ab = document.getElementById('yappAbortBtn');
+        if (!ab.disabled) {
+            ab.textContent = 'Cancel upload';
+            ab.title = 'The node already has the whole file, so the BBS may still save it';
+        }
+        speed.textContent = '';
+        return;
+    }
+
+    fill.style.width = pct + '%';
+    const total = msg.total || yappXfer.total || 0;
+    text.textContent = `${formatFileSize(msg.bytes || 0)} / ${total ? formatFileSize(total) : '?'}  (${pct}%)` +
+        (msg.phase === 'handing' ? ' handed to the node' : '');
+    if (msg.bytes > 0 && !yappXfer.firstAt) { yappXfer.firstAt = now; yappXfer.firstBytes = msg.bytes; }
+    if (yappXfer.firstAt && now - yappXfer.firstAt > 2000 && msg.bytes > yappXfer.firstBytes) {
+        const bps = (msg.bytes - yappXfer.firstBytes) / ((now - yappXfer.firstAt) / 1000);
+        const left = total > msg.bytes ? (total - msg.bytes) / bps : 0;
+        speed.textContent = `${bps >= 1024 ? (bps / 1024).toFixed(1) + ' KB/s' : Math.round(bps) + ' B/s'}` +
+            (left > 0 ? ` · about ${yappFmtTime(left)} left` : '');
+    }
 }
 
 function yappOnComplete(msg) {
     yappActive = false;
+    yappResetAbortBtn();
+    yappStopTicker();
     document.getElementById('yappAbortBtn').style.display = 'none';
     document.getElementById('yappProgressFill').style.width = '100%';
-    const yappcTag = msg.yappc ? '<span style="color:#a78bfa">YAPP-C</span>' : 'classic YAPP';
-    if (msg.direction === 'recv' && msg.url) {
+    const took = yappXfer ? yappFmtTime((Date.now() - yappXfer.t0) / 1000) : '';
+    yappXfer = null;
+    document.getElementById('yappSpeedText').textContent = took ? `Took ${took}` : '';
+    const yappcTag = msg.yappc ? '<span style="color:#a78bfa">YAPP-C, checksum verified</span>' : 'classic YAPP';
+    // msg.filename comes from the other station: escape it (2026-10-04).
+    // The link only ever points into /yapp-files/.
+    const yUrl  = String(msg.url || '');
+    const yName = escapeHtmlYapp(msg.filename || 'file');
+    const yBytes = Number(msg.bytes) || 0;
+    if (msg.direction === 'recv' && /^\/yapp-files\/[A-Za-z0-9._-]+$/.test(yUrl)) {
         document.getElementById('yappResult').innerHTML =
-            `<div style="color:#10b981; font-weight:600;">
-                ✓ Received ${msg.bytes} bytes (${yappcTag})
-            </div>
-            <div style="margin-top:6px;">
-                <a href="${msg.url}" download="${msg.filename}"
-                   style="color:#a78bfa; text-decoration:underline;">
-                    Download ${msg.filename}
-                </a>
-            </div>`;
+            `<div style="color:#10b981; font-weight:600;">✓ Received ${formatFileSize(yBytes)} (${yappcTag})</div>
+             <div style="margin-top:6px;">
+                <a href="${escapeHtmlYapp(yUrl)}" download="${yName}"
+                   style="color:#a78bfa; text-decoration:underline; font-weight:600;">⬇ Save ${yName}</a>
+             </div>`;
+        yappAddRecent({ name: msg.filename || 'file', url: yUrl, bytes: yBytes, at: Date.now() });
     } else {
         document.getElementById('yappResult').innerHTML =
-            `<div style="color:#10b981; font-weight:600;">
-                ✓ Sent ${msg.bytes} bytes via ${yappcTag}
-            </div>`;
+            `<div style="color:#10b981; font-weight:600;">✓ Uploaded ${yName} (${formatFileSize(yBytes)}, ${yappcTag})</div>
+             <div style="margin-top:4px; font-size:12px; color:#aaa;">The BBS has it in its Files folder.</div>`;
+        yappFile = null;
+        document.getElementById('yappFileInput').value = '';
+        yappCheckFile();
+        // The BBS list changed — refresh it once the prompt is back
+        yappFilesCache = null;
+        setTimeout(() => { if (connected && currentFbbMode && !yappActive) yappBrowseFiles(); }, 2000);
     }
     yappShowStatus('Transfer complete.');
     appendSys(`YAPP transfer complete: ${msg.filename || ''} (${msg.bytes} bytes)`);
 }
 
+function yappResetAbortBtn() {
+    const btn = document.getElementById('yappAbortBtn');
+    btn.disabled = false;
+    btn.title = '';
+    btn.textContent = 'Abort Transfer';
+}
+
 function yappOnError(msg) {
     yappActive = false;
+    yappResetAbortBtn();
+    yappStopTicker();
+    yappXfer = null;
     document.getElementById('yappAbortBtn').style.display = 'none';
+    document.getElementById('yappSpeedText').textContent = '';
     document.getElementById('yappResult').innerHTML =
-        `<div style="color:#ef4444; font-weight:600;">
-            ✗ ${escapeHtmlYapp(msg.message || 'Transfer failed')}
-        </div>`;
-    yappShowStatus('Transfer aborted or failed.');
-    appendSys(`YAPP error: ${msg.message || 'unknown'}`);
+        `<div style="color:#ef4444; font-weight:600;">✗ ${escapeHtmlYapp(msg.message || 'Transfer failed')}</div>`;
+    yappShowStatus(yappDraining ? 'Stopping — waiting for the other station…' : 'Transfer stopped.');
+    appendSys(`YAPP: ${msg.message || 'unknown error'}`);
+    yappCheckFile();
+}
+
+// ── Recently received (this browser only) ────────────────────────
+function yappLoadRecent() {
+    try { return JSON.parse(localStorage.getItem('bpq_yapp_recent') || '[]'); } catch(e) { return []; }
+}
+function yappAddRecent(item) {
+    const list = [item].concat(yappLoadRecent().filter(x => x.url !== item.url)).slice(0, 10);
+    try { localStorage.setItem('bpq_yapp_recent', JSON.stringify(list)); } catch(e) {}
+    yappRenderRecent(list);
+}
+function yappRenderRecent(list) {
+    list = (list || yappLoadRecent()).filter(x => /^\/yapp-files\/[A-Za-z0-9._-]+$/.test(String(x.url || '')));
+    const wrap = document.getElementById('yappRecentWrap');
+    const el = document.getElementById('yappRecentList');
+    if (!wrap) return;
+    wrap.style.display = list.length ? '' : 'none';
+    el.innerHTML = list.map(x => {
+        const when = new Date(x.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return `<div style="display:flex; gap:8px; padding:3px 0; border-bottom:1px solid #222;">
+            <a href="${escapeHtmlYapp(x.url)}" download="${escapeHtmlYapp(x.name)}"
+               style="color:#a78bfa; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtmlYapp(x.name)}</a>
+            <span style="color:#888;">${formatFileSize(Number(x.bytes) || 0)}</span>
+            <span style="color:#666;">${escapeHtmlYapp(when)}</span></div>`;
+    }).join('');
 }
 
 function escapeHtmlYapp(s) {

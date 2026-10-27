@@ -1,7 +1,11 @@
 <?php
 /**
  * NWS Alert BBS Poster
- * Version: 1.3.0
+ * Version: 1.4.0
+ *
+ * 1.4.0 (2026-10-27): addresses like WX@GA are sent as a bulletin (SB), a
+ * callsign as a private message (SP) — before, everything went as SP.
+ * GET ?action=config returns the default destination for the page.
  * 
  * This script receives NWS alert data via POST and sends it to the BPQ BBS
  * via telnet connection.
@@ -9,6 +13,9 @@
 
 // Load configuration and security
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/web-login.php';
+// Posts bulletins to the BBS as the station: admin login only (2026-10-04)
+bpq_require_web_login('Posting NWS bulletins');
 
 // Check if NWS posting is enabled
 if (!isFeatureEnabled('nws_post')) {
@@ -22,7 +29,7 @@ $config = [
     'bbs_user'  => getConfig('bbs', 'user', 'SYSOP'),
     'bbs_pass'  => getConfig('bbs', 'pass'),
     'from_call' => getConfig('station', 'callsign', 'N0CALL'),
-    'to_addr'   => getConfig('nws', 'post_destination', 'WX@ALLUS'),
+    'to_addr'   => nwsDefaultDestination(),
     'timeout'   => getConfig('bbs', 'timeout', 30),
     'enabled'   => isFeatureEnabled('nws_post'),
     'log_file'  => getConfig('logging', 'file', './logs/dashboard.log'),
@@ -31,6 +38,25 @@ $config = [
 // ================================
 // HELPER FUNCTIONS
 // ================================
+
+/** config.php nws.post_destination; else WX@<nws.auto_post.area>; else WX@ALLUS. */
+function nwsDefaultDestination(): string {
+    $d = strtoupper(trim((string)getConfig('nws', 'post_destination', '')));
+    if ($d !== '') return $d;
+    $auto = getConfig('nws', 'auto_post', []);
+    $area = is_array($auto) ? strtoupper(trim((string)($auto['area'] ?? ''))) : '';
+    return preg_match('/^[A-Z]{2}$/', $area) ? "WX@$area" : 'WX@ALLUS';
+}
+
+/**
+ * BBS send command for an address (2026-10-27): a callsign before the @
+ * (K1AJD, KD4WLE-1, 2E0ABC) gets a private message, SP; anything else (WX,
+ * ALL, NTSGA …) is a bulletin, SB, which floods to the BBSs that carry it.
+ */
+function bbsSendCommand(string $toAddr): string {
+    $to = explode('@', strtoupper($toAddr), 2)[0];
+    return preg_match('/^(?:[A-Z]{1,2}[0-9]|[0-9][A-Z][0-9])[A-Z]{1,4}(?:-[0-9]{1,2})?$/', $to) ? 'SP' : 'SB';
+}
 
 function logMessage($msg) {
     global $config;
@@ -49,8 +75,9 @@ function sendResponse($success, $message, $data = null) {
     exit;
 }
 
-function postToBBS($subject, $message) {
+function postToBBS($subject, $message, $toAddr = null) {
     global $config;
+    if ($toAddr === null || $toAddr === '') $toAddr = $config['to_addr'];
     
     if (!$config['enabled']) {
         return ['success' => false, 'message' => 'BBS posting is disabled in configuration'];
@@ -102,13 +129,14 @@ function postToBBS($subject, $message) {
             throw new Exception("Failed to connect to BBS: " . cleanLog($response));
         }
         
-        // Step 8: Send SP command
-        fwrite($socket, "SP " . $config['to_addr'] . "\r\n");
-        logMessage("Sent: SP " . $config['to_addr']);
+        // Step 8: Send SB (bulletin) or SP (callsign) — bbsSendCommand()
+        $cmd = bbsSendCommand($toAddr);
+        fwrite($socket, $cmd . " " . $toAddr . "\r\n");
+        logMessage("Sent: $cmd " . $toAddr);
         
         // Step 9: Wait for "Enter Title" prompt
         $response = readUntilPrompt($socket, 5);
-        logMessage("After SP: " . cleanLog($response));
+        logMessage("After $cmd: " . cleanLog($response));
         
         if (stripos($response, 'Title') === false && 
             stripos($response, 'ubject') === false) {
@@ -159,10 +187,10 @@ function postToBBS($subject, $message) {
             // Extract message number if possible
             if (preg_match('/Message:\s*(\d+)/i', $response, $matches)) {
                 logMessage("SUCCESS: Posted as Message #" . $matches[1]);
-                return ['success' => true, 'message' => 'Posted as Message #' . $matches[1]];
+                return ['success' => true, 'message' => ($cmd === 'SB' ? 'Posted as bulletin #' : 'Posted as private message #') . $matches[1] . " to $toAddr"];
             }
             logMessage("SUCCESS: Message posted");
-            return ['success' => true, 'message' => 'Message posted to BBS'];
+            return ['success' => true, 'message' => ($cmd === 'SB' ? 'Bulletin' : 'Private message') . " posted to $toAddr"];
         } else {
             logMessage("Sent but unconfirmed: " . cleanLog($response));
             return ['success' => true, 'message' => 'Message sent (unconfirmed)'];
@@ -218,6 +246,14 @@ function cleanLog($str) {
 // CORS preflight is handled by bootstrap.php
 
 // Only accept POST
+// GET ?action=config — the page's default destination (2026-10-27)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'config') {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'destination' => $config['to_addr'],
+                      'command' => bbsSendCommand($config['to_addr'])]);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     apiError('Only POST method allowed', 405);
 }
@@ -229,12 +265,7 @@ if (!$input) {
     apiError('Invalid JSON input');
 }
 
-// Check required fields
-if (empty($input['subject']) || empty($input['message'])) {
-    apiError('Missing required fields: subject, message');
-}
-
-// Check if this is just a status check
+// Check if this is just a status check (needs no subject/message)
 if (isset($input['action']) && $input['action'] === 'status') {
     sendResponse(true, 'BBS Poster Status', [
         'enabled' => $config['enabled'],
@@ -243,7 +274,26 @@ if (isset($input['action']) && $input['action'] === 'status') {
     ]);
 }
 
+// Title must be one line (a CR/LF would be read by the BBS as a command)
+// and BPQ caps titles at 60 characters.
+$subject = trim(preg_replace('/\s+/', ' ', (string)($input['subject'] ?? '')));
+$subject = substr($subject, 0, 60);
+$message = (string)($input['message'] ?? '');
+
+if ($subject === '' || trim($message) === '') {
+    apiError('Missing required fields: subject, message');
+}
+
+// Destination from the page, else the configured default. Restricted to
+// BBS address characters so nothing else can reach the SB/SP command line.
+$toAddr = strtoupper(trim((string)($input['destination'] ?? '')));
+if ($toAddr === '') {
+    $toAddr = $config['to_addr'];
+} elseif (!preg_match('/^[A-Z0-9][A-Z0-9_.#@-]{0,59}$/', $toAddr)) {
+    apiError('Invalid destination address: use a form like WX@ALLUS');
+}
+
 // Post the message
-$result = postToBBS($input['subject'], $input['message']);
+$result = postToBBS($subject, $message, $toAddr);
 
 sendResponse($result['success'], $result['message']);

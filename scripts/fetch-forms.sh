@@ -82,6 +82,19 @@ fi
 mkdir -p "$TARGET"
 cp -a "$SRC/." "$TARGET/"
 rm -rf "$TARGET/.git" "$TARGET/.github" "$TARGET/.gitea" "$TARGET/.forgejo"
+# Folder names must match the case the index links use (2026-10-19): the
+# suite ships General/ ICS/ Weather/ but index.html links general/ ics/
+# weather/, which works on Windows and macOS but is a 404 on Linux. Rename
+# any folder the index links to under a different case; nothing to do once
+# the two agree.
+for linked in $(grep -oE 'href="[^":/?#]+/' "$TARGET/index.html" | sed 's/^href="//; s#/$##' | sort -u); do
+    [[ -d "$TARGET/$linked" ]] && continue
+    actual="$(find "$TARGET" -mindepth 1 -maxdepth 1 -type d -iname "$linked" -printf '%f\n' | head -1)"
+    if [[ -n "$actual" ]]; then
+        mv "$TARGET/$actual" "$TARGET/$linked" && echo "Renamed folder $actual/ to $linked/ to match the index links"
+    fi
+done
+
 printf 'source=%s\nmethod=%s\nfetched=%s\n' "$FORMS_REPO" "$got" "$(date -u +%FT%TZ)" > "$TARGET/.source"
 
 # Same owner as the web root; plain static-file permissions.

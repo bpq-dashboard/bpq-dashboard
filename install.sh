@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.13 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.14 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -80,7 +80,7 @@ fi
 if [[ ! -f "$SCRIPT_DIR/config.php.example" ]] || \
    [[ ! -f "$SCRIPT_DIR/bbs-messages.html" ]]; then
     die "Could not find the dashboard files. Are you running this script
-   from the folder where you unzipped BPQ-Dashboard-v1.5.13.zip?
+   from the folder where you unzipped BPQ-Dashboard-v1.5.14.zip?
 
    Current folder: $SCRIPT_DIR"
 fi
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.13 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.14 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -167,6 +167,78 @@ explain "Positive = East, negative = West. (USA is negative.)"
 read -r INPUT_LON
 INPUT_LON="${INPUT_LON:-0.0}"
 ok "Longitude: $INPUT_LON"
+
+ask "Your CARTO map key for the APRS map (press Enter to skip and add it later):"
+explain "Free from https://www.carto.com/basemaps/apikey/ . Without it the APRS"
+explain "map works but shows \"API KEY REQUIRED\" across the map. See the guide, Step 10."
+read -r INPUT_CARTO_KEY
+INPUT_CARTO_KEY=$(echo "$INPUT_CARTO_KEY" | tr -d '[:space:]')
+if [[ -z "$INPUT_CARTO_KEY" ]]; then
+    warn "No CARTO map key - the APRS map will be stamped \"API KEY REQUIRED\" until you add one to config.php ('map' => 'carto_key')"
+elif [[ ! "$INPUT_CARTO_KEY" =~ ^[A-Za-z0-9_-]{8,128}$ ]]; then
+    warn "That doesn't look like a CARTO key (letters, numbers, _ and - only) - skipped; add it to config.php later"
+    INPUT_CARTO_KEY=""
+else
+    ok "CARTO map key: set"
+fi
+
+# 2026-10-26: optional automatic NWS Warning/Watch bulletins (scripts/nws-auto-post.php)
+NWS_AUTO="n"; NWS_STATE=""; NWS_DEST=""; NWS_EVENTS="'Warning', 'Watch'"; NWS_TZ="America/New_York"
+# Time zone for the times printed in the bulletins: the state's main zone
+# (servers usually run on UTC). Edit 'timezone' in config.php if yours differs.
+nws_state_tz() {
+    case "$1" in
+        AL|AR|IL|IA|KS|LA|MN|MS|MO|NE|ND|OK|SD|TN|TX|WI) echo "America/Chicago" ;;
+        CO|ID|MT|NM|UT|WY) echo "America/Denver" ;;
+        AZ)                echo "America/Phoenix" ;;
+        CA|NV|OR|WA)       echo "America/Los_Angeles" ;;
+        AK)                echo "America/Anchorage" ;;
+        HI)                echo "Pacific/Honolulu" ;;
+        PR|VI)             echo "America/Puerto_Rico" ;;
+        GU|MP)             echo "Pacific/Guam" ;;
+        AS)                echo "Pacific/Pago_Pago" ;;
+        *)                 echo "America/New_York" ;;
+    esac
+}
+NWS_STATES="AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU AS MP"
+ask "Post NWS weather Warnings and Watches to your BBS automatically? (optional)"
+explain "Every 5 minutes the server checks api.weather.gov for your state and posts"
+explain "the FIRST issue of each new Warning or Watch as a bulletin (e.g. WX@GA)."
+explain "No updates or cancellations, nothing already expired, never the same alert"
+explain "twice. You can switch it on or off later in config.php ('nws' => 'auto_post')."
+if yesno "Turn on automatic NWS bulletins?" N; then
+    while true; do
+        ask "Your 2-letter state code (e.g. GA, TX, NY):"
+        explain "Alerts for this state are posted. US territories: PR VI GU AS MP."
+        read -r NWS_STATE
+        NWS_STATE=$(echo "$NWS_STATE" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+        if [[ -z "$NWS_STATE" ]]; then
+            NWS_AUTO="n"; warn "No state entered - automatic NWS bulletins left off (config.php 'nws' => 'auto_post' to turn on later)"; break
+        elif [[ " $NWS_STATES " == *" $NWS_STATE "* ]]; then
+            break
+        fi
+        echo "  '$NWS_STATE' is not a US state/territory code. Try again, or press ENTER to skip."
+    done
+    if [[ -n "$NWS_STATE" ]]; then
+        NWS_AUTO="y"
+        NWS_TZ=$(nws_state_tz "$NWS_STATE")
+        ask "Bulletin address to post them to [WX@$NWS_STATE]:"
+        explain "Use a flood area your forwarding partners carry (e.g. WX@$NWS_STATE, WX@USA)."
+        read -r NWS_DEST
+        NWS_DEST=$(echo "${NWS_DEST:-WX@$NWS_STATE}" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+        if [[ ! "$NWS_DEST" =~ ^[A-Z0-9][A-Z0-9_.#@-]{0,59}$ ]]; then
+            warn "'$NWS_DEST' is not a valid BBS address - using WX@$NWS_STATE"
+            NWS_DEST="WX@$NWS_STATE"
+        fi
+        ask "Which alerts?  1 = Warnings and Watches   2 = Warnings only   [1]:"
+        explain "Watches add Tornado / Severe Thunderstorm / Hurricane Watches etc."
+        read -r _nws_ev
+        [[ "$_nws_ev" == "2" ]] && NWS_EVENTS="'Warning'"
+        ok "Automatic NWS bulletins: $NWS_STATE -> $NWS_DEST ($( [[ "$_nws_ev" == "2" ]] && echo "Warnings only" || echo "Warnings and Watches" ))"
+    fi
+else
+    ok "Automatic NWS bulletins: off (can be turned on later in config.php)"
+fi
 
 # ============================================================================
 hdr "STEP 2 — Tell me about your BPQ node"
@@ -387,7 +459,8 @@ SQL
             "$SCRIPT_DIR/data/traffic-schema.sql" \
             "$SCRIPT_DIR/data/system-logs-schema.sql" \
             "$SCRIPT_DIR/sql/2026-09-21-rf-messages-medium.sql" \
-            "$SCRIPT_DIR/sql/2026-09-26-message-keep-and-bodies.sql"
+            "$SCRIPT_DIR/sql/2026-09-26-message-keep-and-bodies.sql" \
+            "$SCRIPT_DIR/sql/2026-10-06-rf-messages-delivery.sql"   # 2026-10-25: was missing — Forwarded Messages Via/Status
         do
             [[ -f "$SCHEMA_FILE" ]] || continue
             SCHEMA_TOTAL=$((SCHEMA_TOTAL + 1))
@@ -634,9 +707,25 @@ FLRIGSVC
         fi
     fi
 else
-    warn "Skipping flrig setup — Rig Status and RF Power Monitor won't show"
-    warn "live data until this is configured (edit config.php's 'radio'"
-    warn "section manually, or re-run this script)."
+    warn "Skipping flrig — the Rig Status and RF Power Monitor pages are not installed"
+    warn "(both need flrig). To add them later, re-run this script and answer Y here."
+fi
+
+# 2026-10-05: Rig Status and RF Power Monitor only work through flrig, so
+# without it they are left out entirely (pages, nav links, history poller)
+# rather than installed as pages that can only show "flrig offline".
+if [[ "$FLRIG_MODE" == "skip" ]]; then
+    for f in rig-status.html rf-power-monitor.html \
+             rig-history-poller.service scripts/rig-history-poller.php; do
+        rm -f "$WEB_ROOT/$f"
+    done
+    if sed -i -e '/href="\/rig-status\.html"/d' -e '/href="\/rf-power-monitor\.html"/d' \
+          "$WEB_ROOT/_nav.html"; then
+        chown "$WEB_USER:$WEB_USER" "$WEB_ROOT/_nav.html"
+        ok "Rig Status / RF Power Monitor left out (no flrig)"
+    else
+        warn "Could not remove the Rig / RF Power links from $WEB_ROOT/_nav.html"
+    fi
 fi
 
 # ============================================================================
@@ -676,6 +765,9 @@ return [
         'passcode' => '-1',            // your APRS-IS passcode; -1 = receive-only
         'filter'   => '',              // empty = 80 km around your station
     ],
+    'map' => [
+        'carto_key' => '$INPUT_CARTO_KEY', // APRS map tiles; free key: https://www.carto.com/basemaps/apikey/
+    ],
     'bbs' => [
         'host'    => 'localhost',
         'port'    => $INPUT_BPQ_PORT,
@@ -693,8 +785,21 @@ return [
     ],
     'security_mode' => 'local',
     'features'      => ['bbs_read' => true, 'bbs_write' => true, 'nws_post' => true],
+    'nws' => [                  // NWS alerts; auto_post = scripts/nws-auto-post.php (nws-auto-post.timer)
+        'post_destination' => 'WX@ALLUS',   // default address for the NWS page's Post buttons
+        'auto_post' => [
+            'enabled'            => $( [[ "$NWS_AUTO" == "y" ]] && echo "true" || echo "false" ),
+            'area'               => '$NWS_STATE',      // 2-letter state code
+            'destination'        => '$NWS_DEST',       // empty = WX@<area>
+            'events'             => [$NWS_EVENTS],     // ['Warning'] = warnings only
+            'exclude'            => [],             // exact names never posted, e.g. 'Red Flag Warning'
+            'watch_hold_minutes' => 10,             // wait for other NWS offices' pieces of a watch
+            'max_per_run'        => 10,
+            'timezone'           => '$NWS_TZ',   // times shown in the bulletins
+        ],
+    ],
     'rate_limit'    => ['enabled' => false],
-    'cors'          => ['allow_all' => true],
+    'cors'          => ['allow_all' => false, 'allowed_origins' => []],   // same-origin only
     'logging'       => ['enabled' => false],
     'paths'         => [
         'logs'    => '$WEB_ROOT/logs/',
@@ -705,9 +810,16 @@ return [
     'logs' => [
         'vara_file' => '$INPUT_CALL_LC.vara',
     ],
+    'vara' => [                 // VARA HF Terminal (bpq-vara service)
+        'bpq_port' => 0,        // BPQ port number of your VARA HF port; 0 = found in bpq32.cfg
+        // 'user' => '', 'pass' => '',   // BPQ login for it, if not the 'bbs' one above
+    ],
     'radio' => [
+        'enabled'    => $( [[ "$FLRIG_MODE" == "skip" ]] && echo "false" || echo "true" ),   // false = no flrig: Rig pages not installed
         'flrig_host' => '$FLRIG_HOST',
         'flrig_port' => $FLRIG_PORT,
+        'bpq_radio'  => 0,      // bpq32.cfg RADIO number for the Rig page scan list; 0 = the FLRIG block
+        'max_power'  => 0,      // highest TX power (W) the Rig page may set; 0 = the radio's maximum
     ],
 ];
 EOF
@@ -742,6 +854,7 @@ server {
         auth_basic "$ADMIN_REALM";
         auth_basic_user_file $ADMIN_HTPASSWD;
         location ~ \.php\$ {
+            fastcgi_param BPQ_WEB_LOGIN \$remote_user;   # tells the PHP the login was checked
             include snippets/fastcgi-php.conf;
             fastcgi_pass unix:$PHP_FPM_SOCK;
         }
@@ -762,22 +875,132 @@ server {
     location ^~ /sql/      { return 403; }
     location ^~ /tools/    { return 403; }
     location ~* \.(php\.example|example|bak|old|tmp|swp|orig|dist|md|sh|bat|yml|yaml|py|cfg|conf|service|timer|sudoers|sql)\$ { return 403; }
-    location ~* \.(bak|old|orig|save|tmp|swp)[-._][^/]*\$ { return 403; }
+    # 2026-10-10: also a digit straight after the suffix (.bak3, .old2) — a .json.bak3 was served
+    location ~* \.(bak|old|orig|save|tmp|swp)[-._0-9][^/]*\$ { return 403; }
+    # 2026-10-19: work/editor copies, archives, build files, download duplicates, QRZ lookup data
+    location ~* \.(ps1|pl|exp|jsx|ajd|wrk[0-9]*|html[0-9]+|save|docx?|xlsx?|zip|tar|gz|tgz|xz|o|ko|mod|c|h)\$ { return 403; }
+    location ~* \.before-[^/]*\$ { return 403; }
+    location ~* \([0-9]+\)\.[^/]*\$ { return 403; }
+    location ~* ^/(callsign-cache|manual-locations)\.json\$ { return 403; }
     location ~* /SESSION-JOURNAL[^/]*\$ { return 403; }
+    # App logs hold BBS session traces: never serve them (2026-10-03)
+    location = /logs/bbs-messages.log { return 403; }
+    location = /logs/dashboard.log    { return 403; }
 
     # BPQ logs: only log/text formats, never anything else in that folder
     location ^~ /logs/ {
+        # Pages only read ConnectLog_/CMSAccess_ .log files; Telnet, daemon and
+        # app logs record logins incl. passwords (2026-10-03)
+        location ~* /(?!(ConnectLog|CMSAccess)_)[^/]*\.log\$ { return 403; }
         location ~* \.(txt|log|csv|vara|js)\$ {
             add_header Cache-Control "no-cache, no-store, must-revalidate";
             try_files \$uri =404;
         }
         return 403;
     }
-    location = /install-check.php {
+    # YAPP files received by the Telnet Client (2026-10-04): sent by another
+    # station, so untrusted. Admin login, never run as PHP (^~ stops the
+    # .php regex), always a download, never rendered as a page here.
+    location ^~ /yapp-files/ {
         auth_basic "$ADMIN_REALM";
         auth_basic_user_file $ADMIN_HTPASSWD;
+        types { }
+        default_type application/octet-stream;
+        add_header Content-Disposition     "attachment" always;
+        add_header X-Content-Type-Options  "nosniff" always;
+        add_header Content-Security-Policy "sandbox; default-src 'none'" always;
+        add_header X-Frame-Options         "DENY" always;
+        add_header X-Robots-Tag            "noindex, nofollow" always;
+        add_header Cache-Control           "private, no-store" always;
+        try_files \$uri =404;
+    }
+    # Everything that reads your mail or acts as the station (2026-10-04):
+    # Email Client, NWS posting, Chat, APRS sending, map saves. Same login as
+    # /admin/; the PHP also refuses unless nginx passes BPQ_WEB_LOGIN.
+    location ~ ^/(bbs-messages|bpq-chat)\.html\$ {
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        try_files \$uri =404;
+    }
+    location = /bbs-messages.php {
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        fastcgi_read_timeout 120s;
+        fastcgi_send_timeout 120s;
+        fastcgi_buffering off;
+        fastcgi_param BPQ_WEB_LOGIN \$remote_user;   # tells the PHP the login was checked
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:$PHP_FPM_SOCK;
+    }
+    location ~ ^/(message-storage|nws-bbs-post|bpq-chat|nts-forwarding-report)\.php\$ {
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        fastcgi_read_timeout 90s;
+        fastcgi_send_timeout 90s;
+        fastcgi_param BPQ_WEB_LOGIN \$remote_user;   # tells the PHP the login was checked
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:$PHP_FPM_SOCK;
+    }
+    location ~ ^/(station-storage|bpq-aprs|callsign-lookup)\.php\$ {
+        limit_except GET {   # writes need the login; reads stay public for the maps
+            auth_basic "$ADMIN_REALM";
+            auth_basic_user_file $ADMIN_HTPASSWD;
+        }
+        fastcgi_read_timeout 60s;
+        fastcgi_send_timeout 60s;
+        fastcgi_param BPQ_WEB_LOGIN \$remote_user;   # tells the PHP the login was checked
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:$PHP_FPM_SOCK;
+    }
+    location ~ ^/(install-check|health-check)\.php\$ {   # health-check: 2026-10-20
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        fastcgi_param BPQ_WEB_LOGIN \$remote_user;   # tells the PHP the login was checked
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:$PHP_FPM_SOCK;
+    }
+
+    # Telnet Client and VARA HF Terminal (2026-10-25): the pages, their live
+    # connections and the NetROM list, behind the admin login. The VARA
+    # bridge has no login of its own — without this, anyone who could reach
+    # it could transmit as your station. Services listen on 127.0.0.1 only:
+    # bpq-telnet 8765, bpq-vara 8767.
+    location ~ ^/(bpq-telnet|bpq-vara)\.html\$ {
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        try_files \$uri =404;
+    }
+    location = /bpq-nodes-api.php {
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        fastcgi_read_timeout 30s;
+        fastcgi_send_timeout 30s;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:$PHP_FPM_SOCK;
+    }
+    location ^~ /ws/telnet {
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        proxy_pass         http://127.0.0.1:8765;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+    location ^~ /ws/vara {
+        auth_basic "$ADMIN_REALM";
+        auth_basic_user_file $ADMIN_HTPASSWD;
+        proxy_pass         http://127.0.0.1:8767;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host \$host;
+        proxy_set_header   X-Real-IP \$remote_addr;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
     }
 
     # Default: try files, then PHP, then 404
@@ -832,12 +1055,51 @@ elif [[ "$WEBSERVER" == "apache2" ]]; then
     # Step 7). These 5 pages expose firewall rules, live logs, and
     # audit results, so they're gated separately from the rest of the
     # site rather than relying on network placement alone.
-    <FilesMatch "^install-check\.php\$">
+    <FilesMatch "^(install-check|health-check)\.php\$">
         AuthType Basic
         AuthName "$ADMIN_REALM"
         AuthUserFile $ADMIN_HTPASSWD
         Require valid-user
     </FilesMatch>
+    # Everything that reads your mail or acts as the station (2026-10-04):
+    # Email Client, NWS posting, Chat, NTS report — whole file behind the login.
+    <FilesMatch "^(bbs-messages\.(php|html)|message-storage\.php|nws-bbs-post\.php|bpq-chat\.(php|html)|nts-forwarding-report\.php)\$">
+        AuthType Basic
+        AuthName "$ADMIN_REALM"
+        AuthUserFile $ADMIN_HTPASSWD
+        Require valid-user
+    </FilesMatch>
+    # APRS sending and map saves: writes behind the login, reads stay public.
+    <FilesMatch "^(station-storage|bpq-aprs|callsign-lookup)\.php\$">
+        AuthType Basic
+        AuthName "$ADMIN_REALM"
+        AuthUserFile $ADMIN_HTPASSWD
+        <LimitExcept GET HEAD>
+            Require valid-user
+        </LimitExcept>
+    </FilesMatch>
+    # Telnet Client and VARA HF Terminal (2026-10-25): pages, NetROM list and
+    # live connections behind the admin login. The VARA bridge has no login
+    # of its own. Services listen on 127.0.0.1 only (bpq-telnet 8765,
+    # bpq-vara 8767); mod_proxy_wstunnel carries the WebSocket.
+    <FilesMatch "^(bpq-telnet\.html|bpq-vara\.html|bpq-nodes-api\.php)\$">
+        AuthType Basic
+        AuthName "$ADMIN_REALM"
+        AuthUserFile $ADMIN_HTPASSWD
+        Require valid-user
+    </FilesMatch>
+    ProxyRequests  Off
+    ProxyTimeout   7200
+    ProxyPass        /ws/telnet ws://127.0.0.1:8765/ws/telnet
+    ProxyPassReverse /ws/telnet ws://127.0.0.1:8765/ws/telnet
+    ProxyPass        /ws/vara   ws://127.0.0.1:8767/ws/vara
+    ProxyPassReverse /ws/vara   ws://127.0.0.1:8767/ws/vara
+    <Location /ws/>
+        AuthType Basic
+        AuthName "$ADMIN_REALM"
+        AuthUserFile $ADMIN_HTPASSWD
+        Require valid-user
+    </Location>
     # (2026-09-26: admin pages live in /admin/ — protect the whole folder)
     <Directory $WEB_ROOT/admin>
         AuthType Basic
@@ -857,6 +1119,32 @@ elif [[ "$WEBSERVER" == "apache2" ]]; then
         <FilesMatch "\.(txt|log|csv|vara|js)\$">
             Require all granted
         </FilesMatch>
+        # App logs hold BBS session traces: never serve them (2026-10-03)
+        <FilesMatch "^(?!(ConnectLog|CMSAccess)_).*\.log\$">
+            Require all denied
+        </FilesMatch>
+    </Directory>
+
+    # YAPP files received by the Telnet Client (2026-10-04): sent by another
+    # station, so untrusted. Admin login, nothing in there is ever run
+    # (PHP/CGI refused outright), always a download.
+    <Directory $WEB_ROOT/yapp-files>
+        AllowOverride None
+        Options -ExecCGI -Includes -Indexes
+        AuthType Basic
+        AuthName "$ADMIN_REALM"
+        AuthUserFile $ADMIN_HTPASSWD
+        Require valid-user
+        RemoveHandler .php .phtml .phar .pht .cgi .pl .py .shtml
+        RemoveType .php .phtml .phar .pht
+        <FilesMatch "\.(php[0-9]?|phtml|phar|pht|phps|cgi|pl|py|sh|shtml)(\.|\$)">
+            Require all denied
+        </FilesMatch>
+        ForceType application/octet-stream
+        Header always set Content-Disposition "attachment"
+        Header always set X-Content-Type-Options "nosniff"
+        Header always set Content-Security-Policy "sandbox; default-src 'none'"
+        Header always set Cache-Control "private, no-store"
     </Directory>
 
     # Block hidden files
@@ -869,9 +1157,20 @@ elif [[ "$WEBSERVER" == "apache2" ]]; then
 </VirtualHost>
 APACHE
 
-    a2enmod php* >/dev/null 2>&1
+    a2enmod php* >/dev/null 2>&1   # only if mod_php happens to be installed
+    # PHP through PHP-FPM (installed in Step 5). 2026-10-25: nothing hooked
+    # FPM into Apache, so every .php page was sent as source and no API worked.
+    a2enmod proxy_fcgi setenvif >/dev/null 2>&1
+    PHP_FPM_CONF=$(ls /etc/apache2/conf-available/ 2>/dev/null | grep -m1 -E '^php[0-9.]+-fpm\.conf$')
+    if [[ -n "$PHP_FPM_CONF" ]]; then
+        a2enconf "${PHP_FPM_CONF%.conf}" >/dev/null 2>&1 && ok "Apache runs PHP through ${PHP_FPM_CONF%.conf}"
+    else
+        warn "No php*-fpm.conf in /etc/apache2/conf-available — PHP pages won't run."
+        warn "Fix: sudo apt-get install php-fpm && sudo a2enconf php*-fpm && sudo systemctl reload apache2"
+    fi
     a2enmod rewrite >/dev/null 2>&1
-    a2enmod auth_basic authn_file authz_user >/dev/null 2>&1
+    a2enmod auth_basic authn_file authz_user headers >/dev/null 2>&1
+    a2enmod proxy proxy_http proxy_wstunnel >/dev/null 2>&1   # /ws/telnet, /ws/vara (2026-10-25)
     a2dissite 000-default >/dev/null 2>&1 || true
     a2ensite bpq-dashboard >/dev/null 2>&1
 
@@ -920,7 +1219,9 @@ echo
 echo "  • bpq-telnet  — keeps a connection open to BPQ for live commands"
 echo "  • bpq-chat    — bridges the BPQ chat node to the web UI"
 echo "  • bpq-aprs    — feeds APRS data to the APRS page"
-echo "  • bpq-vara    — logs VARA modem activity"
+echo "  • bpq-vara    — VARA HF Terminal page: connects it to your VARA port"
+[[ "$FLRIG_MODE" != "skip" ]] && \
+echo "  • rig-history-poller — records TX power / SWR for the Rig and RF Power charts"
 echo
 echo "You can install them now (they only start if you run 'systemctl"
 echo "enable' on them) or skip and add them later by hand."
@@ -930,7 +1231,9 @@ if yesno "Install systemd unit files for the helper daemons?" Y; then
     # vara-logger.sh writes the VARA log the RF Connections parser reads
     sed -i "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|yourcall\.vara|$INPUT_CALL_LC.vara|g" \
         "$WEB_ROOT/vara-logger.sh" 2>/dev/null
-    for svc in bpq-telnet bpq-chat bpq-aprs bpq-vara vara-logger; do
+    DAEMONS="bpq-telnet bpq-chat bpq-aprs bpq-vara vara-logger"
+    [[ "$FLRIG_MODE" != "skip" ]] && DAEMONS="$DAEMONS rig-history-poller"
+    for svc in $DAEMONS; do
         UNIT="$WEB_ROOT/${svc}.service"
         if [[ -f "$UNIT" ]]; then
             # Fix up paths inside the unit file
@@ -953,7 +1256,8 @@ hdr "STEP 14 — Schedule the log parsers and bulletin clean-up"
 if [[ "$INSTALL_DB" == "y" ]]; then
     explain "Every 5 minutes, three small programs read the BPQ logs into the"
     explain "database so the RF Connections, Traffic and System Logs pages load"
-    explain "fast. Once a day, bulletins older than 14 days are cleaned up."
+    explain "fast. Once a day, bulletins older than 14 days are cleaned up. Every"
+    explain "5 minutes the text of new BBS messages is saved to the database."
     mkdir -p /var/log/bpq-dashboard && chown "$WEB_USER:$WEB_USER" /var/log/bpq-dashboard
     cat > /etc/cron.d/bpq-dashboard <<CRON
 # BPQ Dashboard log parsers — installed by install.sh on $(date +%F)
@@ -962,7 +1266,7 @@ if [[ "$INSTALL_DB" == "y" ]]; then
 */5 * * * * $WEB_USER /usr/bin/python3 $WEB_ROOT/scripts/parse-system-logs.py >> /var/log/bpq-dashboard/parse-system-logs.log 2>&1
 CRON
     chmod 644 /etc/cron.d/bpq-dashboard && ok "Log parsers scheduled (/etc/cron.d/bpq-dashboard)"
-    for unit in bulletin-retention.service bulletin-retention.timer; do
+    for unit in bulletin-retention.service bulletin-retention.timer message-bodies.service message-bodies.timer; do
         if [[ -f "$WEB_ROOT/$unit" ]]; then
             sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g" "$WEB_ROOT/$unit" > "/etc/systemd/system/$unit"
         fi
@@ -973,8 +1277,33 @@ CRON
     else
         warn "Could not enable bulletin-retention.timer — run: sudo systemctl enable --now bulletin-retention.timer"
     fi
+    if systemctl enable --now message-bodies.timer >/dev/null 2>&1; then
+        ok "Message text saved every 5 minutes (message-bodies.timer)"
+    else
+        warn "Could not enable message-bodies.timer — run: sudo systemctl enable --now message-bodies.timer"
+    fi
 else
     say "Skipping — the parsers and bulletin clean-up need the database."
+fi
+
+# NWS automatic bulletins (no database needed). The units are always
+# installed so the feature can be switched on later; the timer is only
+# enabled when it was chosen in Step 1.
+for unit in nws-auto-post.service nws-auto-post.timer; do
+    if [[ -f "$WEB_ROOT/$unit" ]]; then
+        sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g" "$WEB_ROOT/$unit" > "/etc/systemd/system/$unit"
+    fi
+done
+systemctl daemon-reload >/dev/null 2>&1
+if [[ "$NWS_AUTO" == "y" ]]; then
+    if systemctl enable --now nws-auto-post.timer >/dev/null 2>&1; then
+        ok "NWS Warnings/Watches for $NWS_STATE posted to $NWS_DEST every 5 minutes (nws-auto-post.timer)"
+    else
+        warn "Could not enable nws-auto-post.timer — run: sudo systemctl enable --now nws-auto-post.timer"
+    fi
+else
+    say "Automatic NWS bulletins off. To turn on later: set 'nws' => 'auto_post' in config.php"
+    say "('enabled' => true, 'area' => 'XX'), then: sudo systemctl enable --now nws-auto-post.timer"
 fi
 
 # ============================================================================
@@ -984,7 +1313,37 @@ hdr "STEP 15 — Final permissions sweep"
 chown -R "$WEB_USER:$WEB_USER" "$WEB_ROOT/cache" "$WEB_ROOT/data" 2>/dev/null
 chmod 750 "$WEB_ROOT/cache" "$WEB_ROOT/data" 2>/dev/null
 chmod 640 "$CFG"
+# 2026-10-05: older installs (upgrades) may still have per-feature config
+# files holding passwords; keep them out of reach of other local accounts.
+for f in db-config.php bbs-config.php nws-config.php tprfn-config.php bpqdash-config.php; do
+    if [[ -f "$WEB_ROOT/$f" ]]; then
+        chown "$WEB_USER:$WEB_USER" "$WEB_ROOT/$f"
+        chmod 640 "$WEB_ROOT/$f"
+    fi
+done
 ok "Permissions tightened"
+
+# 2026-10-25: read-only sudo rules for the Firewall Status and System Audit
+# pages (iptables/ip6tables -L, fail2ban-client status, ss -tlnp, nginx -t).
+# Without them those pages say which rows they couldn't check.
+if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
+    explain "The Firewall Status and System Audit admin pages read the firewall,"
+    explain "fail2ban and listening ports through a few read-only sudo rules"
+    explain "(listed in www-data-tools.sudoers). They can't change anything."
+    if yesno "Install those sudo rules (/etc/sudoers.d/www-data-tools)?" Y; then
+        TMP_SUDO=$(mktemp)
+        sed "s/^www-data /$WEB_USER /" "$WEB_ROOT/www-data-tools.sudoers" > "$TMP_SUDO"
+        if visudo -cf "$TMP_SUDO" >/dev/null 2>&1; then
+            install -m 440 -o root -g root "$TMP_SUDO" /etc/sudoers.d/www-data-tools \
+                && ok "Admin-page sudo rules installed (/etc/sudoers.d/www-data-tools)"
+        else
+            warn "www-data-tools.sudoers did not pass visudo -c — not installed"
+        fi
+        rm -f "$TMP_SUDO"
+    else
+        say "Skipped. Later: sudo cp $WEB_ROOT/www-data-tools.sudoers /etc/sudoers.d/www-data-tools && sudo chmod 440 /etc/sudoers.d/www-data-tools"
+    fi
+fi
 
 # ============================================================================
 hdr "DONE — Summary"
@@ -1019,7 +1378,7 @@ ${BOLD}Open your dashboard:${NC}
 
    ${CYN}http://$SERVER_IP/${NC}                           ← home (RF Connections page)
    ${CYN}http://$SERVER_IP/bpq-system-logs.html${NC}       ← live BPQ logs
-   ${CYN}http://$SERVER_IP/nws-dashboard.html${NC}         ← NWS weather alerts
+   ${CYN}http://$SERVER_IP/nws-dashboard.html${NC}         ← NWS weather alerts$( [[ "$NWS_AUTO" == "y" ]] && echo " (auto-posting $NWS_STATE to $NWS_DEST)" )
    ${CYN}http://$SERVER_IP/bbs-messages.html${NC}          ← BBS messages
    ${CYN}http://$SERVER_IP/admin/system-audit.html${NC}    ← server health check (admin login)
    ${CYN}http://$SERVER_IP/install-check.php${NC}          ← installation self-test (admin login)

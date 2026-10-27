@@ -6,6 +6,10 @@
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store');
 
+require_once __DIR__ . '/includes/web-login.php';
+// Talks on BPQ Chat as the station: admin login only (2026-10-04)
+bpq_require_web_login('Chat');
+
 // Load config
 $configFile = __DIR__ . '/config.php';
 $CONFIG     = file_exists($configFile) ? include($configFile) : [];
@@ -110,22 +114,11 @@ if ($action === 'status') {
 // CONNECT
 if ($action === 'connect') {
     $mode     = $input['mode'] ?? 'chat';
-    $bbsUser  = trim($input['bbs_user'] ?? '');
-    $bbsPass  = trim($input['bbs_pass'] ?? '');
+    // 2026-10-05: the old per-user path stored a visitor's BBS password in
+    // cache/chat-sessions/ but never used it — every message went through the
+    // station's daemon anyway. Removed; any bbs_user/bbs_pass sent is ignored.
 
-    // If user provided their own credentials, use them for a separate connection
-    // Otherwise use the sysop daemon (already connected)
-    if ($bbsUser && $bbsPass && strtoupper($bbsUser) !== strtoupper($BBS_USER)) {
-        // Per-user connection — store credentials for this session
-        // Save user credentials in seq file for use by send/poll
-        $seqData = ['seq'=>0,'bbs_user'=>$bbsUser,'bbs_pass'=>$bbsPass,'user_mode'=>true];
-        file_put_contents($seqFile, json_encode($seqData), LOCK_EX);
-        echo json_encode(['success'=>true,'mode'=>$mode,'user'=>$bbsUser,
-            'output'=>"Connected as $bbsUser\n*** Your messages will appear as $bbsUser on the network\n*** Type /H for help, /W for users online"]);
-        exit;
-    }
-
-    // Sysop daemon path — just wait for daemon to be connected
+    // Station daemon path — just wait for daemon to be connected
     $timeout = time() + 15;
     while (time() < $timeout) {
         $st = getDaemonState();
@@ -135,7 +128,7 @@ if ($action === 'connect') {
             saveLastSeq($maxSeq);
             echo json_encode(['success'=>true,'mode'=>$st['mode']??$mode,
                 'output'=>"Connected to BPQ Chat
-*** Type /H for help, /W for users online"]);
+*** Type /H for help, /U for users online"]);
             exit;
         }
         usleep(500000);
@@ -190,43 +183,56 @@ if ($action === 'who') {
         exit;
     }
 
-    // Advance seq to current end BEFORE sending /U
-    // so we only read messages that arrive AFTER this point
-    $all = getAllMessages();
-    $currentMaxSeq = empty($all) ? 0 : max(array_map(fn($m)=>intval($m['seq']??0),$all));
-    saveLastSeq($currentMaxSeq);
+    // 2026-10-24: this used to move the browser's own poll position (seq
+    // file) and then read through it. The page polls every 2 s on the same
+    // seq file, so a poll landing during the 1.5 s wait swallowed the /U
+    // reply: the poll hid it from the terminal, and this action found
+    // nothing — the Online panel stayed empty. Now we note where the buffer
+    // ends, send /U, and scan the shared buffer directly without touching
+    // the poll position. We also wait for the whole reply instead of a
+    // fixed 1.5 s.
+    $all      = getAllMessages();
+    $startSeq = empty($all) ? 0 : max(array_map(fn($m)=>intval($m['seq']??0),$all));
 
-    // Send /U command
-    $ok = sendCommand('/U');
-    if (!$ok) {
+    if (!sendCommand('/U')) {
         echo json_encode(['success'=>false,'error'=>'Cannot write to command pipe']);
         exit;
     }
 
-    // Wait for BPQ to respond
-    usleep(1500000); // 1.5 seconds
-
-    // Read ONLY messages that arrived after we sent /U
-    $newMsgs = getNewMessages(); // uses updated seq from saveLastSeq above
-
-    // Find the LAST complete /U block (Station(s) connected + user lines)
     $whoLines = [];
-    $inBlock  = false;
-    foreach ($newMsgs as $msg) {
-        $text = $msg['text'] ?? '';
-        if (preg_match('/\d+\s+Station\(s\)\s+connected/i', $text)) {
-            $whoLines = [$text]; // start fresh block
-            $inBlock  = true;
-        } elseif ($inBlock && preg_match('/\s+at\s+\S+\s+.+Idle for \d+/i', $text)) {
-            $whoLines[] = $text;
-        } elseif ($inBlock && !preg_match('/\s+at\s+/i', $text)) {
-            $inBlock = false; // end of block
+    $expected = -1;
+    $other    = [];
+    $deadline = microtime(true) + 5.0;
+    do {
+        usleep(250000);
+        $whoLines = []; $expected = -1; $other = [];
+        foreach (getAllMessages() as $msg) {
+            if (intval($msg['seq'] ?? 0) <= $startSeq) continue;
+            // Colour-mode lines start with ESC + one colour byte
+            $text = preg_replace('/^\x1b./s', '', (string)($msg['text'] ?? ''));
+            if (preg_match('/^(\d+)\s+Station\(s\)\s+connected/i', $text, $mm)) {
+                $whoLines = [$text];           // newest block wins
+                $expected = intval($mm[1]);
+            } elseif ($expected >= 0 && preg_match('/\s+at\s+\S+.*\[.*\]\s+Idle for \d+/i', $text)) {
+                $whoLines[] = $text;
+            } elseif (count($other) < 5) {
+                $other[] = $text;              // kept for troubleshooting
+            }
         }
+        if ($expected >= 0 && count($whoLines) - 1 >= $expected) break;
+    } while (microtime(true) < $deadline);
+
+    if ($expected < 0) {
+        // No /U reply at all — usually the daemon is no longer inside the
+        // chat server (e.g. BPQ's 2-hour idle disconnect left it at the
+        // node prompt). Return what did come back so the page can say so.
+        echo json_encode(['success'=>false,'error'=>'No reply to /U from the chat server',
+            'reply'=>implode("\n", $other)]);
+        exit;
     }
 
-    $output = implode("
-", $whoLines);
-    echo json_encode(['success'=>true,'output'=>$output]);
+    echo json_encode(['success'=>true,'output'=>implode("\n", $whoLines),
+        'expected'=>$expected,'complete'=>(count($whoLines) - 1 >= $expected)]);
     exit;
 }
 

@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rig Status — YOURCALL BPQ</title>
+<title>Rig Status - BPQ Dashboard</title>
 <style>
 :root {
     --bg:#080a0d;--surface:#0f1318;--surface2:#161b22;
@@ -107,7 +107,41 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--u
 .sf-band{font-size:9px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
 .sf.active{border-color:var(--amber);background:var(--amber-bg)}
 .sf.active .sf-mhz{color:var(--amber)}
-.sf.active .sf-band{color:var(--amber-dim)}
+.sf.active .sf-band{color:var(--amber);opacity:.75}   /* was --amber-dim: invisible in light mode */
+/* 2026-10-05: scan list read from bpq32.cfg — one row per time band */
+.scan-band{margin-bottom:10px}
+.scan-band:last-child{margin-bottom:0}
+.scan-band-label{
+    font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;
+    text-align:center;margin-bottom:6px;font-family:var(--mono);
+}
+.scan-band.current .scan-band-label{color:var(--amber)}
+.scan-band.other .sf{opacity:.55}
+.scan-note{font-size:11px;color:var(--muted);text-align:center;padding:6px 0}
+.scan-note.err{color:var(--red)}
+.scan-foot{font-size:9px;color:var(--muted);text-align:center;margin-top:12px;letter-spacing:.3px}
+.scan-foot.paused{color:#f59e0b;font-size:10px}
+
+/* 2026-10-05: TX power (flrig rig.get_power / rig.set_power) */
+.pwr-readout{text-align:center;margin-bottom:10px}
+.pwr-readout b{font-family:var(--mono);font-size:30px;color:var(--amber)}
+.pwr-readout .pwr-unit{font-size:12px;color:var(--muted);margin-left:3px}
+.pwr-readout .pwr-max{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.pwr-ctl input[type=range]{width:100%;accent-color:var(--amber);margin:2px 0 10px}
+.pwr-row{display:flex;gap:8px;align-items:center;justify-content:center}
+.pwr-row input[type=number]{
+    width:72px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);
+    border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;text-align:right;
+}
+.pwr-row input[type=number]:focus{outline:none;border-color:var(--amber)}
+.pwr-presets{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.pwr-preset{
+    background:transparent;border:1px solid var(--border2);color:var(--muted);
+    border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;
+    font-family:var(--mono);transition:all .2s;
+}
+.pwr-preset:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+.pwr-preset:disabled{opacity:.35;cursor:not-allowed}
 
 /* Error */
 .err{color:var(--red);font-size:11px;margin-top:10px;display:none}
@@ -255,12 +289,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--u
      Sits above the kiosk-style #app content. The min-height:100vh
      on #app means the centered content will need a tiny bit of scroll
      when the nav is visible, but the layout still works. -->
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 <div id="app">
 
   <!-- Version badge (top-right corner, discrete) -->
-  <span style="position:fixed; top:60px; right:14px; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700; z-index:10;">v1.5.13</span>
+  <span style="position:fixed; top:60px; right:14px; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700; z-index:10;">v1.5.14</span>
 
   <!-- Main layout: meters left, freq+scanner right -->
   <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%;max-width:900px">
@@ -273,6 +307,33 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--u
         <div class="card-title" style="margin-bottom:6px">📶 S-Meter</div>
         <canvas id="smeterGauge" width="260" height="150"></canvas>
         <div style="font-family:var(--mono);font-size:12px;color:var(--amber);margin-top:4px;text-align:center" id="smeterVal">–</div>
+      </div>
+
+      <!-- TX Power (2026-10-05) — read from flrig; adjustable once unlocked -->
+      <div class="meter-card" style="padding:14px 16px;min-width:0">
+        <div class="card-title" style="margin-bottom:8px">🔆 TX Power</div>
+        <div class="pwr-readout">
+          <b id="txPwrVal">–</b><span class="pwr-unit">W</span>
+          <span class="pwr-max" id="txPwrMax">Reading flrig…</span>
+        </div>
+        <div class="meter-bar-wrap" style="margin-bottom:12px">
+          <div class="meter-bar power" id="txPwrBar"></div>
+        </div>
+        <div class="pwr-ctl" id="txPwrCtl" style="display:none">
+          <input type="range" id="txPwrSlider" min="1" max="100" step="1" value="1"
+                 aria-label="TX power in watts"
+                 oninput="pwrEditing=true;document.getElementById('txPwrNum').value=this.value">
+          <div class="pwr-row">
+            <input type="number" id="txPwrNum" min="1" max="100" step="1"
+                   aria-label="TX power in watts"
+                   oninput="pwrEditing=true;document.getElementById('txPwrSlider').value=this.value"
+                   onkeydown="if(event.key==='Enter')applyTxPower()">
+            <span style="font-size:11px;color:var(--muted)">W</span>
+            <button class="power-btn on-btn" id="txPwrSet" onclick="applyTxPower()">Set</button>
+          </div>
+          <div class="pwr-presets" id="txPwrPresets"></div>
+        </div>
+        <div class="power-msg" id="txPwrMsg">🔒 Unlock in Radio Control to adjust</div>
       </div>
 
     </div>
@@ -300,23 +361,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--u
         <div class="err" id="err">⚠ flrig offline — start flrig on the configured host (see config.php → radio.flrig_host) to enable rig status</div>
       </div>
 
-      <!-- Scanner card -->
+      <!-- Scanner card — 2026-10-05: read from bpq32.cfg (the FLRIG RADIO
+           block) via vara-api.php action=get_scan_freqs, not hard-coded -->
       <div class="scanner-card">
-        <div class="card-title">📡 RADIO 2 Scan Frequencies</div>
-        <div class="scanner-freqs">
-          <div class="sf" data-freq="3.596000"><div class="sf-mhz">3.596</div><div class="sf-band">80m</div></div>
-          <div class="sf" data-freq="7.103200"><div class="sf-mhz">7.103</div><div class="sf-band">40m</div></div>
-          <div class="sf" data-freq="10.148200"><div class="sf-mhz">10.148</div><div class="sf-band">30m</div></div>
-          <div class="sf" data-freq="14.103000"><div class="sf-mhz">14.103</div><div class="sf-band">20m</div></div>
-          <div class="sf" data-freq="14.106500"><div class="sf-mhz">14.106</div><div class="sf-band">20m</div></div>
-        </div>
+        <div class="card-title" id="scanTitle">📡 Scan Frequencies</div>
+        <div id="scanBands"><div class="scan-note">Reading bpq32.cfg…</div></div>
+        <div class="scan-foot" id="scanFoot"></div>
       </div>
 
       <!-- PTT Indicator + Power Control -->
       <div class="power-card">
         <div class="power-header">
           <div class="card-title" style="margin-bottom:0">⚡ Radio Control</div>
-          <button class="lock-btn" id="lockBtn" onclick="toggleAuth()" title="Unlock power controls">🔒</button>
+          <button class="lock-btn" id="lockBtn" onclick="toggleAuth()" title="Unlock radio controls (outlet power and TX power)">🔒</button>
         </div>
 
         <!-- PTT Indicator -->
@@ -382,6 +439,101 @@ function highlightScanner(mhz){
     });
 }
 
+// ── Scan frequencies from bpq32.cfg (2026-10-05) ───────────────────
+// The FLRIG RADIO block's schedule, so this list follows bpq32.cfg
+// instead of being edited by hand. Refreshed every minute.
+let lastMhz = null;
+
+function fmtMhz(mhz){
+    // 3 decimals minimum, more only when the channel needs them: 3.596, 7.1032, 14.1065
+    let t = mhz.toFixed(6).replace(/0+$/,'');
+    const dec = (t.split('.')[1] || '');
+    if (dec.length < 3) t = mhz.toFixed(3);
+    return t;
+}
+
+function bandEnd(bands, i){
+    return bands.length > 1 ? bands[(i + 1) % bands.length].start : null;
+}
+
+function renderScan(d){
+    const wrap = document.getElementById('scanBands');
+    const foot = document.getElementById('scanFoot');
+    document.getElementById('scanTitle').textContent = '📡 RADIO ' + d.radio + ' Scan Frequencies';
+    wrap.textContent = '';
+    if (!d.bands || !d.bands.length) {
+        const n = document.createElement('div');
+        n.className = 'scan-note';
+        n.textContent = 'RADIO ' + d.radio + ' in bpq32.cfg has no scan channels';
+        wrap.appendChild(n);
+    }
+    (d.bands || []).forEach((b, i) => {
+        const row = document.createElement('div');
+        row.className = 'scan-band' + (d.bands.length > 1 ? (i === d.active ? ' current' : ' other') : '');
+        if (d.bands.length > 1) {
+            const lbl = document.createElement('div');
+            lbl.className = 'scan-band-label';
+            lbl.textContent = b.start + '–' + bandEnd(d.bands, i) + ' UTC' + (i === d.active ? '  ◂ now' : '');
+            row.appendChild(lbl);
+        }
+        const tiles = document.createElement('div');
+        tiles.className = 'scanner-freqs';
+        b.channels.forEach(c => {
+            const t = document.createElement('div');
+            t.className = 'sf';
+            t.dataset.freq = String(c.mhz);
+            t.title = c.mhz.toFixed(6) + ' MHz · ' + c.mode + ' · dwell ' + c.dwell + ' s';
+            const m = document.createElement('div');
+            m.className = 'sf-mhz';
+            m.textContent = fmtMhz(c.mhz);
+            const bl = document.createElement('div');
+            bl.className = 'sf-band';
+            bl.textContent = (c.band || bandForMhz(c.mhz)) + ' · ' + c.mode;
+            t.appendChild(m); t.appendChild(bl);
+            tiles.appendChild(t);
+        });
+        row.appendChild(tiles);
+        wrap.appendChild(row);
+    });
+    if (d.paused) {
+        foot.className = 'scan-foot paused';
+        foot.textContent = '⏸ Scan paused — a VARA keyboard session holds RADIO ' + d.radio
+            + (d.paused.mhz ? ' on ' + fmtMhz(d.paused.mhz) + ' MHz' : '')
+            + '. End Session restores this schedule.';
+    } else {
+        foot.className = 'scan-foot';
+        foot.textContent = 'From bpq32.cfg · RADIO ' + d.radio
+            + (d.bands && d.bands.length > 1 ? ' · time bands in UTC (now ' + d.utc_now + ')' : '');
+    }
+    if (lastMhz !== null) highlightScanner(lastMhz);
+}
+
+async function loadScan(){
+    try {
+        const r = await fetch(API, {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({action:'get_scan_freqs'})
+        });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+        renderScan(d);
+    } catch(e) {
+        const wrap = document.getElementById('scanBands');
+        // Keep the last good list on a transient failure; only show the
+        // error when nothing has been drawn yet.
+        if (!wrap.querySelector('.sf')) {
+            wrap.textContent = '';
+            const n = document.createElement('div');
+            n.className = 'scan-note err';
+            n.textContent = '⚠ ' + ((e && e.message) ? e.message : 'Could not read the scan list');
+            wrap.appendChild(n);
+        }
+    }
+}
+loadScan();
+setInterval(loadScan, 60000);
+
 function setDot(state){
     document.getElementById('dot').className='dot'+(state==='ok'?'':' '+state);
 }
@@ -424,6 +576,7 @@ async function poll(){
             document.getElementById('rigName').textContent = '📻 ' + d.rig_model;
         }
 
+        lastMhz = mhz;
         highlightScanner(mhz);
 
         // Update analog gauges
@@ -505,9 +658,10 @@ async function pollPlug() {
         const dot = document.getElementById('outletDot');
         const lbl = document.getElementById('outletStatus');
         if (dot && lbl) {
-            dot.className = 'outlet-dot ' + (d.power === 'on' ? 'on' : d.power === 'off' ? 'off' : 'unknown');
-            lbl.textContent = d.power === 'on' ? 'ON' : d.power === 'off' ? 'OFF' : 'Unknown';
-            lbl.style.color = d.power === 'on' ? '#22c55e' : d.power === 'off' ? '#ef4444' : '#f59e0b';
+            // 'none' = no smartplug section in config.php (2026-10-27)
+            dot.className = 'outlet-dot ' + (d.power === 'on' ? 'on' : (d.power === 'off' || d.power === 'none') ? 'off' : 'unknown');
+            lbl.textContent = d.power === 'on' ? 'ON' : d.power === 'off' ? 'OFF' : d.power === 'none' ? 'Not set up' : 'Unknown';
+            lbl.style.color = d.power === 'on' ? '#22c55e' : d.power === 'off' ? '#ef4444' : d.power === 'none' ? 'var(--muted)' : '#f59e0b';
         }
     } catch(e) {}
 }
@@ -531,12 +685,16 @@ function toggleAuth() {
         document.getElementById('powerBtns').style.display = 'none';
         document.getElementById('powerAuth').style.display = 'none';
         setMsg('', '');
+        setTxPowerUnlocked(false);
         return;
     }
     // Show password input
     const authDiv = document.getElementById('powerAuth');
-    authDiv.style.display = authDiv.style.display === 'none' ? 'block' : 'none';
-    if (authDiv.style.display === 'block') {
+    // 2026-10-05: read the computed style — the inline style starts empty
+    // (hidden by CSS), so the old check needed two clicks to open the box.
+    const hidden = getComputedStyle(authDiv).display === 'none';
+    authDiv.style.display = hidden ? 'block' : 'none';
+    if (hidden) {
         setTimeout(() => document.getElementById('powerPassInput').focus(), 50);
     }
 }
@@ -566,6 +724,7 @@ async function submitAuth() {
             document.getElementById('lockBtn').textContent = '🔓';
             document.getElementById('lockBtn').classList.add('unlocked');
             setMsg('Unlocked — controls active for 1 hour', 'ok');
+            setTxPowerUnlocked(true);
         } else {
             setMsg('Incorrect password', 'err');
         }
@@ -632,8 +791,133 @@ setInterval(() => {
         document.getElementById('lockBtn').classList.remove('unlocked');
         document.getElementById('powerBtns').style.display = 'none';
         setMsg('Session expired — click 🔒 to re-authenticate', 'warn');
+        setTxPowerUnlocked(false);
     }
 }, 60000);
+
+// ── TX power (2026-10-05) ─────────────────────────────────────────
+// Read: flrig rig.get_power (public). Set: rig.set_power, sysop login
+// (the same 🔒 unlock as the outlet buttons). The ceiling is the radio's
+// maximum from flrig, or config.php radio.max_power when that is lower.
+let txPwr = {power:null, max:100, min:1};
+let pwrEditing = false;   // don't overwrite the slider while it's being moved
+let pwrBusy = false;
+
+function setTxMsg(msg, type){
+    const el = document.getElementById('txPwrMsg');
+    el.textContent = msg;
+    el.className = 'power-msg' + (type ? ' ' + type : '');
+}
+
+function renderTxPower(){
+    const val = document.getElementById('txPwrVal');
+    const maxEl = document.getElementById('txPwrMax');
+    const bar = document.getElementById('txPwrBar');
+    if (txPwr.power === null) {
+        val.textContent = '–'; bar.style.width = '0%';
+        return;
+    }
+    val.textContent = txPwr.power;
+    const scale = Math.max(txPwr.rig_max || 0, txPwr.max || 0, txPwr.power) || 100;
+    bar.style.width = Math.min(100, txPwr.power / scale * 100).toFixed(1) + '%';
+    maxEl.textContent = 'setting · max ' + txPwr.max + ' W' + (txPwr.capped ? ' (station limit)' : '');
+
+    const sl = document.getElementById('txPwrSlider');
+    const nm = document.getElementById('txPwrNum');
+    [sl, nm].forEach(e => { e.min = txPwr.min; e.max = txPwr.max; });
+    if (!pwrEditing) { sl.value = txPwr.power; nm.value = txPwr.power; }
+
+    const pre = document.getElementById('txPwrPresets');
+    const want = [...new Set([0.1, 0.25, 0.5, 1].map(f => Math.max(txPwr.min, Math.round(txPwr.max * f))))];
+    if (pre.dataset.key !== want.join(',')) {
+        pre.dataset.key = want.join(',');
+        pre.textContent = '';
+        want.forEach(w => {
+            const b = document.createElement('button');
+            b.className = 'pwr-preset';
+            b.type = 'button';
+            b.textContent = w + ' W';
+            b.onclick = () => { document.getElementById('txPwrNum').value = w; applyTxPower(); };
+            pre.appendChild(b);
+        });
+    }
+}
+
+async function pollTxPower(){
+    if (pwrBusy) return;
+    try {
+        const r = await fetch(API, {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({action:'get_power'})
+        });
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'unavailable');
+        txPwr = d;
+        renderTxPower();
+        if (!isAuthed() && document.getElementById('txPwrMsg').className === 'power-msg err') {
+            setTxMsg('🔒 Unlock in Radio Control to adjust', '');
+        }
+    } catch(e) {
+        txPwr.power = null;
+        renderTxPower();
+        document.getElementById('txPwrMax').textContent = 'Not available from flrig';
+    }
+}
+
+function setTxPowerUnlocked(on){
+    document.getElementById('txPwrCtl').style.display = on ? 'block' : 'none';
+    pwrEditing = false;
+    renderTxPower();
+    setTxMsg(on ? '' : '🔒 Unlock in Radio Control to adjust', '');
+}
+
+async function applyTxPower(){
+    if (!isAuthed()) { setTxPowerUnlocked(false); setTxMsg('Session expired — click 🔒 in Radio Control', 'warn'); return; }
+    const w = Math.round(Number(document.getElementById('txPwrNum').value));
+    if (!Number.isFinite(w) || w < txPwr.min || w > txPwr.max) {
+        setTxMsg('Enter ' + txPwr.min + '–' + txPwr.max + ' W', 'err');
+        return;
+    }
+    pwrBusy = true;
+    document.getElementById('txPwrSet').disabled = true;
+    document.querySelectorAll('.pwr-preset').forEach(b => b.disabled = true);
+    setTxMsg('Setting ' + w + ' W…', '');
+    try {
+        const r = await fetch(API, {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+            body: JSON.stringify({action:'set_power', watts:w})
+        });
+        const d = await r.json();
+        if (r.status === 401) {
+            // Server-side login lapsed: lock everything, same as the 1-hour timer
+            _authed = false;
+            document.getElementById('lockBtn').textContent = '🔒';
+            document.getElementById('lockBtn').classList.remove('unlocked');
+            document.getElementById('powerBtns').style.display = 'none';
+            setTxPowerUnlocked(false);
+            setTxMsg('Session expired — click 🔒 in Radio Control', 'warn');
+            return;
+        }
+        if (!d.ok) { setTxMsg(d.error || 'Power change failed', 'err'); return; }
+        txPwr = d;
+        pwrEditing = false;
+        renderTxPower();
+        if (d.power === null) setTxMsg('Sent ' + w + ' W — could not read it back', 'warn');
+        else if (d.power !== w) setTxMsg('Radio set ' + d.power + ' W (asked ' + w + ' W)', 'warn');
+        else setTxMsg('TX power now ' + d.power + ' W', 'ok');
+    } catch(e) {
+        setTxMsg('Network error — try again', 'err');
+    } finally {
+        pwrBusy = false;
+        document.getElementById('txPwrSet').disabled = false;
+        document.querySelectorAll('.pwr-preset').forEach(b => b.disabled = false);
+    }
+}
+
+pollTxPower();
+setInterval(pollTxPower, 10000);
 </script>
 
 <script>

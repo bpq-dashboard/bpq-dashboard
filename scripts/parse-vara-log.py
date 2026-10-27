@@ -667,6 +667,15 @@ def _nearest_mode(times, modes, msg_time, tolerance_sec):
     within tolerance_sec. Returns the matching mode, or None."""
     if not times:
         return None
+    # Prefer the most recent connect at or just before the message (the
+    # session that carried it starts with that connect). A few seconds of
+    # slack covers ConnectLog/BBS-log clock rounding. Only if there is no
+    # preceding connect in the window do we fall back to the nearest one
+    # after (2026-10-06 — previously a later connect over a different
+    # medium could win just by being closer in time).
+    j = bisect.bisect_right(times, msg_time + dt.timedelta(seconds=5)) - 1
+    if j >= 0 and (msg_time - times[j]).total_seconds() <= tolerance_sec:
+        return modes[j]
     i = bisect.bisect_left(times, msg_time)
     best_mode, best_diff = None, None
     # The nearest entry is always immediately before or after the
@@ -728,8 +737,210 @@ def lookup_mode_for_message(connect_index, msg_time, partner_raw,
     return None
 
 
+# ─── Outbound-session medium (added 2026-10-06) ──────────────────────────
+# ConnectLog only records *incoming* connects ("Call from X ... Mode M"),
+# so messages exchanged during a session WE started (our BBS connecting
+# out to a partner) never matched anything there and were stored with
+# medium=NULL — which the RF page counts as RF. Real example: every
+# outbound session to KE0GB on 2026-10-06 ran the connect script
+# "C 2 COSCO" (port 2 → KE0GB's COSCO node → BBS), with no VARA session
+# at all, yet all of its messages showed '?' and were counted as RF.
+#
+# Fix: follow each outbound BBS session in the BBS log itself —
+#
+#   "261006 22:26:38 |KE0GB     Connecting to BBS KE0GB"     session start
+#   "261006 22:26:38 >KE0GB     C 2 COSCO"                   first hop: port 2
+#   "261006 22:26:40 |KE0GB     KE0GB Disconnected"          session end
+#
+# — and resolve the medium of every FA/FC line inside it from the first
+# connect-script hop: the port's driver in bpq32.cfg (VARA / BPQAXIP /
+# TELNET / KISS ...), "C <call>" with no port = NET/ROM routing, and an
+# overlapping outgoing VARA session in rf_connections as the fallback
+# when the port can't be classified.
+
+RE_BBS_LINE = re.compile(r'^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+([|<>])(\S+)\s+(.*?)\s*$')
+RE_SCRIPT_ATTACH = re.compile(r'^ATTACH\s+(\d+)\b', re.I)
+RE_SCRIPT_C_PORT = re.compile(r'^C(?:ONNECT)?\s+(\d+)\s+\S+', re.I)
+RE_SCRIPT_C_CALL = re.compile(r'^C(?:ONNECT)?\s+([A-Z0-9][A-Z0-9:-]*)\s*$', re.I)
+
+# Max time an outbound BBS session is held open waiting for its
+# "Disconnected" line before we stop attributing lines to it.
+OUTBOUND_SESSION_MAX_SEC = 2 * 60 * 60
+
+
+def driver_to_medium(driver, port_id=''):
+    """Map a bpq32.cfg PORT block's DRIVER/DLLNAME/TYPE to a medium tag."""
+    d = (driver or '').upper()
+    pid = (port_id or '').upper()
+    if 'VARA' in d or (not d and 'VARA' in pid):
+        return 'VARA'
+    if 'AXIP' in d or 'AXUDP' in d:
+        return 'AXIP'
+    if 'TELNET' in d:
+        return 'TELNET'
+    if 'ARDOP' in d:
+        return 'ARDOP'
+    if 'KISS' in d or 'UZ7HO' in d or 'AGW' in d or 'ASYNC' in d or 'SCS' in d:
+        return 'AX.25'
+    return None
+
+
+def parse_bpq_port_map(cfg_path, verbose=False):
+    """Read bpq32.cfg and return {port_number: medium} for every PORT
+    block whose driver we can classify. Missing/unreadable file → {}
+    (outbound messages then fall back to VARA-session overlap)."""
+    port_map = {}
+    if not cfg_path or not os.path.isfile(cfg_path):
+        if verbose:
+            sys.stderr.write(f"bpq32.cfg not found at {cfg_path!r} — outbound "
+                             f"port mediums will use VARA-session overlap only\n")
+        return port_map
+    try:
+        with open(cfg_path, 'r', encoding='utf-8', errors='replace') as f:
+            lines = f.readlines()
+    except OSError as e:
+        sys.stderr.write(f"WARNING: can't read {cfg_path}: {e} — outbound port "
+                         f"mediums will use VARA-session overlap only\n")
+        return port_map
+
+    in_port, seq = False, 0
+    cur = {}
+    in_comment = False
+    for raw in lines:
+        line = raw.split(';', 1)[0].strip()
+        if in_comment:
+            if '*/' in line:
+                in_comment = False
+            continue
+        if line.startswith('/*'):
+            in_comment = '*/' not in line
+            continue
+        if not line:
+            continue
+        up = line.upper()
+        if up == 'PORT':
+            in_port, cur = True, {}
+            seq += 1
+            continue
+        if up == 'ENDPORT':
+            if in_port:
+                num = cur.get('PORTNUM')
+                try:
+                    num = int(num) if num is not None else seq
+                except ValueError:
+                    num = seq
+                medium = driver_to_medium(
+                    cur.get('DRIVER') or cur.get('DLLNAME') or cur.get('TYPE'),
+                    cur.get('ID'))
+                # TYPE=ASYNC with PROTOCOL=KISS is a plain KISS TNC
+                if medium is None and (cur.get('PROTOCOL') or '').upper() == 'KISS':
+                    medium = 'AX.25'
+                if medium:
+                    port_map[num] = medium
+            in_port = False
+            continue
+        if in_port and '=' in line:
+            k, v = line.split('=', 1)
+            k = k.strip().upper()
+            if k not in cur:  # first occurrence wins (e.g. TYPE vs nested CONFIG lines)
+                cur[k] = v.strip()
+    if verbose:
+        sys.stderr.write(f"bpq32.cfg port map: {port_map}\n")
+    return port_map
+
+
+def load_outgoing_vara_sessions(conn, since=None):
+    """{base_call: [(start, end), ...]} of successful outgoing VARA
+    sessions from rf_connections, for the outbound-medium fallback."""
+    out = defaultdict(list)
+    if conn is None:
+        return out
+    sql = ("SELECT base_call, session_start, "
+           "COALESCE(session_end, session_start + INTERVAL 30 MINUTE) "
+           "FROM rf_connections WHERE direction = 'outgoing' AND status = 'success'")
+    params = ()
+    if since:
+        sql += " AND session_start >= %s"
+        params = (since - dt.timedelta(days=1),)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            for row in cur.fetchall():
+                if isinstance(row, dict):
+                    row = list(row.values())
+                b, s, e = row[0], row[1], row[2]
+                if b and s:
+                    out[str(b).upper()].append((s, e or s))
+    except Exception as e:  # never let enrichment break the parser run
+        sys.stderr.write(f"WARNING: couldn't load VARA sessions for outbound "
+                         f"medium fallback: {e}\n")
+    return out
+
+
+def resolve_outbound_medium(sess, partner_base, vara_sessions, port_map):
+    """Medium for a message exchanged inside an outbound BBS session."""
+    if 'medium' in sess:
+        return sess['medium']
+    port = sess.get('port')
+    medium = None
+    if port is not None and port in port_map:
+        medium = port_map[port]
+    elif sess.get('netrom'):
+        medium = 'NETROM'
+    if medium is None and vara_sessions:
+        slack = dt.timedelta(minutes=2)
+        b_start = sess['start']
+        b_end = sess.get('end') or (b_start + dt.timedelta(minutes=30))
+        for v_start, v_end in vara_sessions.get(partner_base, ()):
+            if v_start - slack <= b_end and b_start <= v_end + slack:
+                medium = 'VARA'
+                break
+    if medium is None and port is not None:
+        medium = f'PORT{port}'  # unclassified port, and no VARA session → not RF
+    # Only cache once the first hop is known; before that the script may
+    # still be arriving (cache would freeze a premature None).
+    if port is not None or sess.get('netrom') or medium is not None:
+        sess['medium'] = medium
+    return medium
+
+
+# ─── FBB exchange tracking (added 2026-10-06) ────────────────────────────
+# Any BBS-log line for a partner: "261005 06:49:00 <KE4QCM    FS ++".
+# Direction chars: '>' we sent, '<' partner sent, '|' status, '?' trace.
+RE_BBS_PROTO = re.compile(r'^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+([|<>?])(\S+)\s+(.*?)\s*$')
+# Reply to a batch of offers — one code per offer, in order:
+#   "FS ++"  "FS -Y"  "FS ---+"  "FS !1200+"   (FBB '+-=' and B2F 'YNL...')
+RE_FBB_FS = re.compile(r'^FS\s+(\S+)', re.I)
+# A transfer is only confirmed by a turn change within this long of the
+# acceptance; anything later is left as "accepted, delivery unconfirmed".
+DELIVERY_CONFIRM_MAX_SEC = 10 * 60
+FS_CODE_MAP = {
+    '+': 'A', 'Y': 'A',              # accepted
+    '-': 'R', 'N': 'R', 'R': 'R',    # rejected (already have it / refused)
+    '=': 'D', 'L': 'D', 'H': 'D',    # deferred (later / held)
+}
+
+
+def _apply_fs_codes(codes):
+    """'-+=' / 'YN!123' → ['R','A','D', ...] — one status per offer.
+    'A'/'!' followed by digits = accepted with a resume offset; the digits
+    belong to that one code. Unknown codes → 'E' (error/other)."""
+    out, i, codes = [], 0, codes.upper()
+    while i < len(codes):
+        c = codes[i]
+        i += 1
+        if c in '!A':
+            while i < len(codes) and codes[i].isdigit():
+                i += 1
+            out.append('A')
+        else:
+            out.append(FS_CODE_MAP.get(c, 'E'))
+    return out
+
+
 def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
-                             connect_events=None):
+                             connect_events=None, vara_sessions=None,
+                             port_map=None):
     """Walk BBS log files and extract FBB message-forwarding proposals.
 
     Populates the "Forwarded Messages" panel server-side instead of the
@@ -792,9 +1003,25 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
             f"Scanning {len(log_files)} BBS log files for message proposals...\n")
 
     messages = []
-    seen = set()  # (bid, direction) — matches JS seenBIDs
     files_scanned = 0
     lines_scanned = 0
+    port_map = port_map or {}
+    vara_sessions = vara_sessions or {}
+    # Open BBS sessions keyed by the exact partner token in column 3
+    # (e.g. 'KE0GB', 'KE0GB-1'). Persists across files so a session that
+    # straddles 00:00 UTC keeps its state.
+    #   {'type': 'out', 'start': dt, 'port': int|None, 'netrom': bool,
+    #    'hop_done': bool, ['medium': cached]}   or   {'type': 'in', 'start': dt}
+    sessions = {}
+    proto = {}    # per-partner-token FBB exchange state (offers awaiting FS, etc.)
+    by_key = {}   # (bid, direction, partner_base) -> message dict
+
+    def _line_ts(date, hh, mm, ss):
+        try:
+            return dt.datetime(2000 + int(date[0:2]), int(date[2:4]), int(date[4:6]),
+                               int(hh), int(mm), int(ss))
+        except ValueError:
+            return None
 
     for log_file in log_files:
         try:
@@ -802,9 +1029,124 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
                 files_scanned += 1
                 for line_no, line in enumerate(f, start=1):
                     lines_scanned += 1
-                    # Quick reject: message lines always contain " F" followed
-                    # by A/B/F/C — cheaper than running both regexes on every line
-                    if ' F' not in line:
+
+                    # ── Outbound/inbound BBS session tracking ────────────
+                    # Cheap pre-filter: status lines carry '|', and only
+                    # '>' lines can be connect-script commands.
+                    # Case-insensitive: some connect scripts are written
+                    # lowercase ("c 2 GYBBBS") — 2026-10-06 fix.
+                    line_up = line.upper()
+                    if '|' in line[:20] or ('>' in line[:20] and
+                                            (' C ' in line_up or ' ATTACH' in line_up
+                                             or ' CONNECT ' in line_up)):
+                        bl = RE_BBS_LINE.match(line)
+                        if bl:
+                            b_date, b_h, b_m, b_s, b_dir, b_key, b_rest = bl.groups()
+                            b_key = b_key.upper()
+                            if b_dir == '|':
+                                if b_rest.upper().startswith('CONNECTING TO BBS'):
+                                    ts = _line_ts(b_date, b_h, b_m, b_s)
+                                    if ts:
+                                        sessions[b_key] = {'type': 'out', 'start': ts,
+                                                           'port': None, 'netrom': False,
+                                                           'hop_done': False}
+                                elif 'INCOMING CONNECT FROM' in b_rest.upper():
+                                    ts = _line_ts(b_date, b_h, b_m, b_s)
+                                    if ts:
+                                        sessions[b_key] = {'type': 'in', 'start': ts}
+                                elif b_rest.upper().endswith('DISCONNECTED'):
+                                    sessions.pop(b_key, None)
+                            elif b_dir == '>':
+                                s = sessions.get(b_key)
+                                if s and s['type'] == 'out' and not s['hop_done']:
+                                    ma = RE_SCRIPT_ATTACH.match(b_rest)
+                                    mp = None if ma else RE_SCRIPT_C_PORT.match(b_rest)
+                                    mc = None if (ma or mp) else RE_SCRIPT_C_CALL.match(b_rest)
+                                    if ma:
+                                        s['port'] = int(ma.group(1))  # later "C <call>" uses it
+                                    elif mp:
+                                        s['port'] = int(mp.group(1))
+                                        s['hop_done'] = True
+                                    elif mc:
+                                        if s['port'] is None:
+                                            s['netrom'] = True
+                                        s['hop_done'] = True
+
+                    # ── FBB protocol tracking (2026-10-06) ───────────────
+                    # Follow each offer → reply → transfer so every message
+                    # gets an accept status and a delivered/received time.
+                    # See FS_CODE_MAP / _apply_fs_codes() above.
+                    pl = RE_BBS_PROTO.match(line)
+                    if not pl:
+                        continue
+                    p_date, p_h, p_m, p_s, p_dir, p_key, p_rest = pl.groups()
+                    p_key = p_key.upper()
+                    p_up = p_rest.upper()
+                    p_ts = None
+
+                    if p_dir == '|':
+                        if p_up.startswith('UNCOMPRESSING MESSAGE'):
+                            st = proto.get(p_key)
+                            if st and st['in_await']:
+                                p_ts = _line_ts(p_date, p_h, p_m, p_s)
+                                m_ = st['in_await'].pop(0)
+                                acc = m_.get('_accepted_at')
+                                if p_ts and acc and (p_ts - acc).total_seconds() <= DELIVERY_CONFIRM_MAX_SEC:
+                                    m_['delivered_time'] = p_ts
+                        elif p_up.endswith('DISCONNECTED'):
+                            # Offers still waiting for an FS reply will never
+                            # get one. Transfers already accepted are kept:
+                            # BPQ sometimes logs a *second*, failed connect
+                            # to the same partner ("Already Connected") whose
+                            # Disconnected line is not the end of the session
+                            # still carrying them (seen with VE3CGR 2026-10-05).
+                            st = proto.get(p_key)
+                            if st:
+                                st['out_pending'].clear()
+                                st['in_pending'].clear()
+                        continue
+                    if p_dir not in '<>' or not p_up.startswith('F'):
+                        continue
+
+                    p_ts = _line_ts(p_date, p_h, p_m, p_s)
+                    if p_ts is None:
+                        continue
+                    st = proto.setdefault(p_key, {'out_pending': [], 'in_pending': [],
+                                                  'out_await': [], 'in_await': []})
+                    # Turn change: a protocol line from the partner means it
+                    # has received everything we were sending; a protocol
+                    # line from us means we've finished receiving (fallback
+                    # for messages with no "Uncompressing" line).
+                    # Only within DELIVERY_CONFIRM_MAX_SEC of the acceptance —
+                    # a line from a much later session proves nothing.
+                    for side in (('out_await',) if p_dir == '<' else ('in_await',)):
+                        if st[side]:
+                            for m_ in st[side]:
+                                acc = m_.get('_accepted_at')
+                                if acc and (p_ts - acc).total_seconds() <= DELIVERY_CONFIRM_MAX_SEC:
+                                    m_['delivered_time'] = p_ts
+                            st[side] = []
+
+                    fs = RE_FBB_FS.match(p_rest)
+                    if fs:
+                        pending = st['out_pending'] if p_dir == '<' else st['in_pending']
+                        await_ = st['out_await'] if p_dir == '<' else st['in_await']
+                        for m_, status in zip(pending, _apply_fs_codes(fs.group(1))):
+                            if not m_:
+                                continue  # out-of-window placeholder
+                            if m_.get('accept_status') == 'A':
+                                # Accepted is final: a later '=' / '-' for the
+                                # same message means the partner is already
+                                # receiving it, or now has it.
+                                if status == 'A' and not m_.get('delivered_time'):
+                                    m_['_accepted_at'] = p_ts
+                                    await_.append(m_)
+                                continue
+                            m_['accept_status'] = status
+                            if status == 'A':
+                                m_['_accepted_at'] = p_ts
+                                await_.append(m_)
+                        pending.clear()
                         continue
 
                     fa = RE_BBS_MSG_FA.match(line)
@@ -822,40 +1164,50 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
                          msg_type) = fc.groups()
                         size_bytes = int(orig_size)
 
-                    try:
-                        yy = int(date[0:2]); mo = int(date[2:4]); dd = int(date[4:6])
-                        msg_time = dt.datetime(2000 + yy, mo, dd,
-                                               int(hh), int(mm), int(ss))
-                    except ValueError:
-                        continue
-
-                    if since and msg_time < since:
-                        continue
-                    if until and msg_time > until:
-                        continue
-
+                    msg_time = p_ts
                     direction = 'out' if direction_char == '>' else 'in'
-                    key = (bid, direction)
-                    if key in seen:
-                        continue
-                    seen.add(key)
-
-                    # `partner` here is the exact SSID as logged (e.g.
-                    # 'N3MEL-7') — used for the medium lookup below, which
-                    # needs the real SSID to match against ConnectLog.
-                    # The stored `partner` column stays base-call-only
-                    # (base_call(partner)) for backward compatibility with
-                    # the existing forwarding-partner tile matching, which
-                    # deliberately treats every SSID of a station as one
-                    # partner — see updateTPRFNHubStations() in
-                    # bpq-rf-connections.html.
                     partner_raw = partner.upper()
                     partner_base = base_call(partner_raw)
-                    medium = lookup_mode_for_message(
-                        connect_events, msg_time, partner_raw, partner_base
-                    ) if connect_events else None
+                    pending = st['out_pending'] if direction == 'out' else st['in_pending']
 
-                    messages.append({
+                    if (since and msg_time < since) or (until and msg_time > until):
+                        # Outside the window: still occupy its slot in the
+                        # batch so FS codes line up, but don't emit a row.
+                        pending.append({})
+                        continue
+
+                    # One row per (bid, direction, partner) — the same
+                    # bulletin offered to EI2GYB and N3HYM is two
+                    # deliveries. A re-offer of the same message to the same
+                    # partner (e.g. after '=' deferred) updates that row.
+                    key = (bid, direction, partner_base)
+                    existing = by_key.get(key)
+                    if existing is not None:
+                        pending.append(existing)
+                        continue
+
+                    # `partner_raw` is the exact SSID as logged (e.g.
+                    # 'N3MEL-7') — used for the medium lookup below, which
+                    # needs the real SSID to match against ConnectLog.
+                    # The stored `partner` column stays base-call-only for
+                    # the forwarding-partner tile matching, which treats
+                    # every SSID of a station as one partner.
+                    sess = sessions.get(partner_raw)
+                    if sess and sess['type'] == 'out' and \
+                            (msg_time - sess['start']).total_seconds() > OUTBOUND_SESSION_MAX_SEC:
+                        sessions.pop(partner_raw, None)  # never saw its Disconnected line
+                        sess = None
+                    if sess and sess['type'] == 'out':
+                        # We started this session — ConnectLog has no record
+                        # of it; use the connect script / VARA overlap.
+                        medium = resolve_outbound_medium(
+                            sess, partner_base, vara_sessions, port_map)
+                    else:
+                        medium = lookup_mode_for_message(
+                            connect_events, msg_time, partner_raw, partner_base
+                        ) if connect_events else None
+
+                    msg = {
                         'bid': bid,
                         'direction': direction,
                         'partner': partner_base,
@@ -867,53 +1219,106 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
                         'msg_time': msg_time,
                         'medium': medium,
                         'log_line_no': line_no,
-                    })
+                        'accept_status': None,
+                        'delivered_time': None,
+                    }
+                    by_key[key] = msg
+                    messages.append(msg)
+                    pending.append(msg)
         except (OSError, IOError):
             continue
 
     if verbose:
+        n_acc = sum(1 for m_ in messages if m_['accept_status'] == 'A')
+        n_rej = sum(1 for m_ in messages if m_['accept_status'] == 'R')
+        n_def = sum(1 for m_ in messages if m_['accept_status'] == 'D')
         sys.stderr.write(
             f"  scanned {files_scanned} files, {lines_scanned} lines, "
-            f"captured {len(messages)} message events\n")
+            f"captured {len(messages)} message events "
+            f"({n_acc} accepted, {n_rej} rejected, {n_def} deferred)\n")
 
     return messages
 
 
+_MSG_DELIVERY_COLS = None  # cached: does rf_messages have accept_status/delivered_time?
+
+
+def _has_delivery_columns(conn):
+    """True once sql/2026-10-06-rf-messages-delivery.sql has been applied.
+    Lets this parser be deployed before the migration without breaking
+    the cron job — it just keeps writing the old columns until then."""
+    global _MSG_DELIVERY_COLS
+    if _MSG_DELIVERY_COLS is None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rf_messages' "
+                    "AND COLUMN_NAME IN ('accept_status', 'delivered_time')")
+                row = cur.fetchone()
+                n = list(row.values())[0] if isinstance(row, dict) else row[0]
+            _MSG_DELIVERY_COLS = (int(n) == 2)
+        except Exception:
+            _MSG_DELIVERY_COLS = False
+        if not _MSG_DELIVERY_COLS:
+            sys.stderr.write(
+                "NOTE: rf_messages has no accept_status/delivered_time columns yet — "
+                "apply sql/2026-10-06-rf-messages-delivery.sql to record deliveries\n")
+    return _MSG_DELIVERY_COLS
+
+
 def upsert_message(conn, msg, dry_run=False):
-    """Insert one rf_messages row, or backfill its `medium` if the row
-    already exists (same bid, direction).
+    """Insert one rf_messages row, or update the existing one for the same
+    (bid, direction, partner).
 
-    Uses INSERT ... ON DUPLICATE KEY UPDATE rather than INSERT IGNORE
-    specifically so that re-running the parser over an already-seen
-    window (e.g. `--reset`, or just a wider `since` window than usual)
-    can populate `medium` on rows that were inserted before
-    build_connect_mode_lookup()/ConnectLog correlation existed, or on
-    any day ConnectLog wasn't available yet when the row was first
-    seen. Never overwrites an existing non-NULL medium with NULL —
-    a later pass with no ConnectLog coverage for that window shouldn't
-    erase a medium determined by an earlier pass that did have it.
+    INSERT ... ON DUPLICATE KEY UPDATE so re-scanning an already-seen window
+    (cron's rolling 2-day window, or --rescan-messages-days) refreshes
+    medium / accept_status / delivered_time on existing rows. Never
+    replaces a known value with NULL (a narrower re-scan that starts
+    mid-exchange can't see the reply), and never downgrades an accepted
+    message — a later '=' or '-' for the same message to the same partner
+    means it was already being / had been received.
 
-    Returns True if a row was inserted OR its medium was changed
-    (MySQL's rowcount is 2 for an actual UPDATE via this clause, 1 for
-    a plain INSERT, 0 if nothing changed) — used only for the
-    messages_emitted counter, so this is an approximation, not exact.
+    Returns True if a row was inserted or changed (approximate — only used
+    for the messages_emitted counter).
     """
     if dry_run:
         return True
-    sql = """
-    INSERT INTO rf_messages
-        (bid, direction, partner, msg_type, from_call, to_area, category,
-         size_bytes, msg_time, log_line_no, medium)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ON DUPLICATE KEY UPDATE
-        medium = COALESCE(VALUES(medium), medium)
-    """
-    params = (
-        msg['bid'], msg['direction'], msg['partner'], msg['msg_type'],
-        msg['from_call'], msg['to_area'], msg['category'],
-        msg['size_bytes'], msg['msg_time'], msg.get('log_line_no'),
-        msg.get('medium'),
-    )
+    if _has_delivery_columns(conn):
+        sql = """
+        INSERT INTO rf_messages
+            (bid, direction, partner, msg_type, from_call, to_area, category,
+             size_bytes, msg_time, log_line_no, medium, accept_status, delivered_time)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            medium = COALESCE(VALUES(medium), medium),
+            delivered_time = IF(accept_status = 'A' AND COALESCE(VALUES(accept_status), 'A') <> 'A',
+                                delivered_time,
+                                COALESCE(VALUES(delivered_time), delivered_time)),
+            accept_status = IF(accept_status = 'A', 'A',
+                               COALESCE(VALUES(accept_status), accept_status))
+        """
+        params = (
+            msg['bid'], msg['direction'], msg['partner'], msg['msg_type'],
+            msg['from_call'], msg['to_area'], msg['category'],
+            msg['size_bytes'], msg['msg_time'], msg.get('log_line_no'),
+            msg.get('medium'), msg.get('accept_status'), msg.get('delivered_time'),
+        )
+    else:
+        sql = """
+        INSERT INTO rf_messages
+            (bid, direction, partner, msg_type, from_call, to_area, category,
+             size_bytes, msg_time, log_line_no, medium)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            medium = COALESCE(VALUES(medium), medium)
+        """
+        params = (
+            msg['bid'], msg['direction'], msg['partner'], msg['msg_type'],
+            msg['from_call'], msg['to_area'], msg['category'],
+            msg['size_bytes'], msg['msg_time'], msg.get('log_line_no'),
+            msg.get('medium'),
+        )
     with conn.cursor() as cur:
         cur.execute(sql, params)
         return cur.rowcount > 0
@@ -1350,7 +1755,7 @@ def upsert_session(conn, session, log_line_no, dry_run=False,
 
 
 def parse_log(log_path, conn, dry_run=False, verbose=False, bbs_log_dir=None,
-              our_callsign=None):
+              our_callsign=None, messages_days=None, bpq_cfg=None):
     """Walk through new lines of the VARA log, emitting sessions.
 
     Resumes from the saved checkpoint (rf_parser_state). After parsing,
@@ -1392,6 +1797,9 @@ def parse_log(log_path, conn, dry_run=False, verbose=False, bbs_log_dir=None,
     cms_events = []
     channel_busy_events = []
     forwarded_messages = []
+    connect_mode_events = None
+    port_map = {}
+    msg_since = None
     if bbs_log_dir:
         # Determine date range: for full reset (last_offset=0), scan all.
         # For incremental, only scan logs from the last 2 days (to catch
@@ -1409,14 +1817,18 @@ def parse_log(log_path, conn, dry_run=False, verbose=False, bbs_log_dir=None,
         # read from ConnectLog_YYMMDD.log in the same directory. Used
         # only to tag forwarded messages below with their medium; not
         # consumed by session parsing itself.
-        connect_mode_events = build_connect_mode_lookup(bbs_log_dir, since=since,
+        # Messages window: normally the same `since`, but
+        # --rescan-messages-days widens it (re-tags medium on older rows
+        # without touching rf_connections / the VARA checkpoint).
+        msg_since = since
+        if messages_days:
+            msg_since = dt.datetime.utcnow() - dt.timedelta(days=messages_days)
+        connect_mode_events = build_connect_mode_lookup(bbs_log_dir, since=msg_since,
                                                          verbose=verbose)
-        # Messages are independent of VARA session parsing (pure BBS-log
-        # data), so they're built here and upserted once, right after the
-        # main session-parsing loop below — see "Upsert forwarded messages".
-        forwarded_messages = build_forwarded_messages(bbs_log_dir, since=since,
-                                                       verbose=verbose,
-                                                       connect_events=connect_mode_events)
+        port_map = parse_bpq_port_map(bpq_cfg, verbose=verbose)
+        # Forwarded messages are built AFTER the session loop below (see
+        # "Upsert forwarded messages") so the outbound VARA-overlap
+        # fallback can see sessions committed in this same run.
 
     parser = SessionParser()
     sessions_emitted = 0
@@ -1656,6 +2068,14 @@ def parse_log(log_path, conn, dry_run=False, verbose=False, bbs_log_dir=None,
     # tracking above; it just re-scans the same `since` window every run,
     # same as channel_busy_events. The UNIQUE KEY on (bid, direction) makes
     # this idempotent regardless of how much the window overlaps prior runs.
+    if bbs_log_dir:
+        vara_sessions = load_outgoing_vara_sessions(
+            conn, since=msg_since)
+        forwarded_messages = build_forwarded_messages(
+            bbs_log_dir, since=msg_since, verbose=verbose,
+            connect_events=connect_mode_events,
+            vara_sessions=vara_sessions, port_map=port_map)
+
     messages_emitted = 0
     for msg in forwarded_messages:
         if upsert_message(conn, msg, dry_run):
@@ -1706,8 +2126,19 @@ def main():
                          '(for frequency enrichment) and CMSAccess_*.log '
                          'files (for WL2K detection). Default: same dir as '
                          'the VARA log file. Pass empty string to disable.')
+    ap.add_argument('--bpq-cfg',
+                    help='Path to bpq32.cfg, used to tell which port an '
+                         'outbound forwarding connect script used (VARA / '
+                         'AXIP / TELNET / KISS). Default: <config.php '
+                         'paths.linbpq>/bpq32.cfg. Optional — without it, '
+                         'outbound messages fall back to VARA-session overlap.')
+    ap.add_argument('--rescan-messages-days', type=int, metavar='N',
+                    help='Re-scan the last N days of BBS logs for forwarded '
+                         'messages and re-tag their medium (delivery method). '
+                         'Does not touch rf_connections or the VARA log '
+                         'checkpoint — use once after upgrading.')
     ap.add_argument('--my-callsign',
-                    help='Your station base callsign (e.g. K1AJD). Used to '
+                    help='Your station base callsign (e.g. W1AW). Used to '
                          'skip your own outbound CMS connections in WL2K '
                          'detection. Default: derived from VARA log filename.')
     args = ap.parse_args()
@@ -1750,7 +2181,9 @@ def main():
 
         result = parse_log(log_path, conn, dry_run=args.dry_run,
                            verbose=args.verbose, bbs_log_dir=bbs_log_dir,
-                           our_callsign=args.my_callsign)
+                           our_callsign=args.my_callsign,
+                           messages_days=args.rescan_messages_days,
+                           bpq_cfg=args.bpq_cfg or bpq_db_config.default_linbpq_path('bpq32.cfg'))
 
         sys.stdout.write(
             f"Parsed {result['lines_read']} new lines from {log_path}\n"

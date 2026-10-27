@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Chat — YOURCALL BPQ</title>
+    <title>Chat - BPQ Dashboard</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -243,7 +243,7 @@
 <body data-nav-page="chat">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 
 <div id="app">
@@ -262,7 +262,7 @@
             <div class="sdot"></div>
             <span id="connStatusText">Disconnected</span>
         </div>
-        <span style="margin-left:auto; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.13</span>
+        <span style="margin-left:auto; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.14</span>
     </div>
 
     <!-- Guest banner -->
@@ -291,7 +291,7 @@
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);gap:8px;font-size:12px">
                     <span style="font-size:32px">🌐</span>
                     <span>Chat server output appears here</span>
-                    <span style="font-size:10px">Connect to start — use /W for users, /T for topics</span>
+                    <span style="font-size:10px">Connect to start — use /U for users, /T for topics</span>
                 </div>
             </div>
             <div class="input-bar">
@@ -351,7 +351,7 @@
         <div class="modal-body">
             <div class="form-row">
                 <label class="form-label">Your callsign / handle</label>
-                <input type="text" class="form-input" id="handleInput" placeholder="YOURCALL">
+                <input type="text" class="form-input" id="handleInput" placeholder="W1AW">
             </div>
             <div style="font-size:11px;color:var(--muted);line-height:1.6">
                 Connects to BPQ node chat server using credentials from <code style="color:var(--accent)">config.php</code>.
@@ -417,23 +417,19 @@
 <div id="authModal" class="modal-backdrop">
     <div class="modal-box" style="width:400px">
         <div class="modal-header">
-            <span class="modal-title">📡 BPQ Chat — YOURCALL Node</span>
+            <span class="modal-title">📡 BPQ Chat — <span class="st-call">this</span> node</span>
         </div>
         <div class="modal-body">
             <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">
-                Welcome to the <strong style="color:var(--accent)">YOURCALL BPQ Chat</strong> gateway.<br>
-                Authorized amateur radio operators may connect using their BPQ node credentials.<br>
+                Welcome to the <strong style="color:var(--accent)"><span class="st-call">station's</span> BPQ Chat</strong> gateway.<br>
+                Messages are sent through the station's own chat connection.<br>
                 Guests may view chat traffic in read-only mode.
             </p>
             <div class="form-row">
                 <label class="form-label">Your Callsign</label>
                 <input type="text" class="form-input" id="authCall" placeholder="W1AW"
-                       autocomplete="off" autocapitalize="characters" style="text-transform:uppercase">
-            </div>
-            <div class="form-row">
-                <label class="form-label">BPQ Password</label>
-                <input type="password" class="form-input" id="authPass" placeholder="Leave blank for guest access"
-                       autocomplete="off" onkeydown="if(event.key==='Enter') submitAuth()">
+                       autocomplete="off" autocapitalize="characters" style="text-transform:uppercase"
+                       onkeydown="if(event.key==='Enter') submitAuth()">
             </div>
             <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-top:-8px">
                 Don't have a BPQ account? Connect as guest to view chat,
@@ -456,7 +452,7 @@
         </div>
         <div class="modal-body">
             <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7">
-                To request a BPQ account on the YOURCALL node, email the sysop with your callsign and intended use.
+                To request a BPQ account on the <span class="st-call">station's</span> node, send the sysop your callsign and intended use. It goes by e-mail from this server.
             </p>
             <div class="form-row">
                 <label class="form-label">Your Callsign</label>
@@ -494,7 +490,16 @@
 const API = 'bpq-chat.php';
 let connected  = false;
 let soundOn    = true;
-let handle     = localStorage.getItem('bpq_chat_handle') || 'YOURCALL';
+let handle     = localStorage.getItem('bpq_chat_handle') || '';
+// Station call / node from station-info.php (2026-10-27; were placeholders)
+let STATION_CALL = '', STATION_NODE = '';
+fetch('station-info.php', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    STATION_CALL = (d.callsign || '').toUpperCase();
+    STATION_NODE = (d.node || STATION_CALL).toUpperCase();
+    if (STATION_CALL) document.querySelectorAll('.st-call').forEach(el => { el.textContent = STATION_CALL; });
+    if (connected) document.getElementById('serverNodeLabel').textContent = STATION_NODE ? STATION_NODE + ' Chat' : 'Chat';
+}).catch(() => {});
 let pollTimer  = null;
 let msgLog     = [];
 
@@ -509,7 +514,6 @@ if (!sessId) {
 // Auth state
 let authLevel = 'guest';   // 'guest' | 'user' | 'sysop'
 let authCall  = '';
-let authPass  = '';
 
 // ═══════════════════════════════════════════════════════
 //  ROOMS
@@ -694,44 +698,81 @@ function routeMessage(text, cls) {
     addServerLine(text, serverCls);
 }
 
+// /U reply lines (format from LinBPQ HanksRT.c show_users):
+//   "3 Station(s) connected:"
+//   "YOURCALL at AGCHAT    Name, QTH [General] Idle for 42 seconds"
+const WHO_COUNT_RE = /^(\d+)\s+Station\(s\)\s+connected/i;
+const WHO_USER_RE  = /^([A-Z0-9\-\/]+)\s+at\s+(\S+)\s+(.*?)\s*\[(.+?)\]\s+Idle for (\d+)/i;
+// Join/leave notices. BPQ may prefix "HH:MM " (/TIME on) and, with /NAMES on,
+// the sender's name before the colon (from HanksRT.c text_tellu/user_join):
+//   "YOURCALL : Name *** Joined Chat, Topic General"
+//   "YOURCALL : *** Joined Topic: Weather"    "YOURCALL : *** Left"
+const TS_PREFIX = '^(?:\\d\\d:\\d\\d\\s+)?';
+const JOIN_RE  = new RegExp(TS_PREFIX + '([A-Z0-9\\/\\-]+)\\s*(?:[^:]*)?:\\s*(.*?)\\s*\\*\\*\\*\\s+Joined Chat,\\s+Topic\\s+(.+)$', 'i');
+const TOPIC_RE = new RegExp(TS_PREFIX + '([A-Z0-9\\/\\-]+)\\s*(?:[^:]*)?:\\s*\\*\\*\\*\\s+Joined Topic:?\\s+(.+)$', 'i');
+const LEFT_RE  = new RegExp(TS_PREFIX + '([A-Z0-9\\/\\-]+)\\s*(?:[^:]*)?:\\s*\\*\\*\\*\\s+Left\\s*$', 'i');
+
+let whoPending   = null;  // /U reply being collected across polls
+let whoAskedAt   = 0;     // when the operator asked for /U themselves
+
+function stripColour(s) { return s.replace(/^\x1b./, ''); }
+
+function whoCommit() {
+    if (!whoPending) return;
+    whoData = whoPending.data;
+    renderWho();
+    whoPending = null;
+}
+
 function processOutput(raw) {
     if (!raw || !raw.trim()) return;
 
-    // Check if this is /U output — only trigger on the unique station count line
-    // Filter out /U output from terminal — handled by who panel only
-    if (/\d+\s+Station\(s\)\s+connected/i.test(raw) ||
-        /Idle for \d+ seconds/i.test(raw)) {
-        return; // suppress from terminal
-    }
+    // 2026-10-24: /U reply lines are now picked out one by one. Before,
+    // any poll chunk containing a /U reply was dropped whole — chat lines
+    // that arrived in the same chunk were lost, and pressing "👥 Users"
+    // showed nothing anywhere because the reply never reached the panel.
+    const panel = document.getElementById('whoPanel');
+    const panelShown = panel && panel.offsetParent !== null;
+    const showInTerminal = !panelShown || (Date.now() - whoAskedAt < 10000);
 
     raw.split('\n').forEach(line => {
-        const t = line.trim();
+        const t = stripColour(line.trim());
         if (!t) return;
         if (/^:\s*\//.test(t)) return; // skip command echo
 
-        // Real-time who panel updates from join/leave events
-        // Actual BPQ format: "CALLSIGN : Name *** Joined Chat, Topic TOPICNAME"
-        // Actual BPQ format: "CALLSIGN Name : *** Left"
-        const joinMatch = t.match(/^([A-Z0-9\/\-]+)\s*:\s*.+?\*+\s+Joined Chat,\s+Topic\s+(.+)/i);
-        const leftMatch = t.match(/^([A-Z0-9\/\-]+)(?:\s+\S+)?\s*:\s*\*+\s+Left/i);
-        const topicMatch = t.match(/^([A-Z0-9\/\-]+)\s*:\s*.+?\*+\s+Joined Topic\s+(.+)/i);
+        const cm = t.match(WHO_COUNT_RE);
+        if (cm) {
+            whoPending = { expected: parseInt(cm[1]), got: 0, data: {} };
+            if (whoPending.expected === 0) whoCommit();
+            if (showInTerminal) addServerLine(t, 't-info');
+            return;
+        }
+        const um = t.match(WHO_USER_RE);
+        if (um) {
+            if (!whoPending) whoPending = { expected: Infinity, got: 0, data: {} };
+            const topic = um[4].trim();
+            (whoPending.data[topic] = whoPending.data[topic] || []).push({
+                call: um[1].toUpperCase(), node: um[2].toUpperCase(),
+                name: um[3].trim().replace(/^,\s*$/, ''), idle: parseInt(um[5]) });
+            if (++whoPending.got >= whoPending.expected) whoCommit();
+            if (showInTerminal) addServerLine(t, 't-raw');
+            return;
+        }
+        if (whoPending) whoCommit();   // reply ended early — keep what we got
 
-        if (joinMatch) {
-            const call  = joinMatch[1].toUpperCase();
-            const topic = joinMatch[2].trim();
-            whoAddUser(call, '', '', topic, 0);
-        } else if (topicMatch) {
-            const call  = topicMatch[1].toUpperCase();
-            const topic = topicMatch[2].trim();
-            whoRemoveUser(call);
-            whoAddUser(call, '', '', topic, 0);
-        } else if (leftMatch) {
-            const call = leftMatch[1].toUpperCase();
-            whoRemoveUser(call);
+        // Real-time who panel updates from join/leave notices
+        let m;
+        if ((m = t.match(JOIN_RE))) {
+            whoAddUser(m[1].toUpperCase(), m[2].trim(), '', m[3].trim(), 0);
+        } else if ((m = t.match(TOPIC_RE))) {
+            whoAddUser(m[1].toUpperCase(), '', '', m[2].trim(), 0);
+        } else if ((m = t.match(LEFT_RE))) {
+            whoRemoveUser(m[1].toUpperCase());
         }
 
         routeMessage(t, 't-raw');
     });
+    if (whoPending && whoPending.expected === Infinity) whoCommit();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -756,6 +797,7 @@ async function sendServerCmd() {
         createRoom(tMatch[1].trim());
         return;
     }
+    if (/^\/U$/i.test(text)) whoAskedAt = Date.now();
     // Don't echo locally — BPQ echoes back
     await apiSend(text);
 }
@@ -802,9 +844,9 @@ async function apiSend(text) {
 // ═══════════════════════════════════════════════════════
 //  QUICK ACTIONS
 // ═══════════════════════════════════════════════════════
-function sendWho()    { apiSend('/U'); }
+function sendWho()    { whoAskedAt = Date.now(); apiSend('/U'); }
 function sendTopics() { apiSend('/T'); }
-function qCmd(cmd)    { closeModal('quickModal'); apiSend(cmd); }
+function qCmd(cmd)    { closeModal('quickModal'); if (/^\/U$/i.test(cmd)) whoAskedAt = Date.now(); apiSend(cmd); }
 function openJoinModal() {
     document.getElementById('roomNameInput').value = '';
     document.getElementById('joinModal').classList.remove('hidden');
@@ -827,7 +869,7 @@ function setConnected(v) {
     const cs = document.getElementById('connStatus');
     cs.className = v ? 's-connected' : 's-disconnected';
     document.getElementById('connStatusText').textContent = v ? 'Connected' : 'Disconnected';
-    document.getElementById('serverNodeLabel').textContent = v ? 'YOURCALL-4 Chat' : '';
+    document.getElementById('serverNodeLabel').textContent = v ? (STATION_NODE ? STATION_NODE + ' Chat' : 'Chat') : '';
 }
 
 function openConnectModal() {
@@ -835,9 +877,9 @@ function openConnectModal() {
     document.getElementById('connectModal').classList.remove('hidden');
 }
 
-async function startConnect(callOverride, passOverride) {
+async function startConnect(callOverride) {
     if (!callOverride) {
-        handle = document.getElementById('handleInput').value.trim().toUpperCase() || 'YOURCALL';
+        handle = document.getElementById('handleInput').value.trim().toUpperCase() || STATION_CALL || 'GUEST';
         localStorage.setItem('bpq_chat_handle', handle);
         closeModal('connectModal');
     }
@@ -848,10 +890,6 @@ async function startConnect(callOverride, passOverride) {
     addServerLine('Connecting to BPQ Chat Server…', 't-system');
 
     const payload = {action:'connect', mode:'chat', sess_id: sessId};
-    if (callOverride && passOverride) {
-        payload.bbs_user = callOverride;
-        payload.bbs_pass = passOverride;
-    }
 
     try {
         const r = await fetch(API, {
@@ -1024,6 +1062,10 @@ let whoTimer   = null;
 let whoLastParsed = 0; // timestamp of last /U parse
 
 function whoAddUser(call, name, node, topic, idle) {
+    // Keep what /U told us about this station when it only changes topic
+    Object.values(whoData).forEach(list => list.forEach(u => {
+        if (u.call === call) { name = name || u.name; node = node || u.node; }
+    }));
     // Remove from any existing topic first
     whoRemoveUser(call);
     if (!whoData[topic]) whoData[topic] = [];
@@ -1106,9 +1148,9 @@ function renderWho() {
             div.className = 'who-entry';
             const isMe = u.call === handle.toUpperCase();
             div.innerHTML =
-                `<div><span class="who-call${isMe?' me':''}">${u.call}</span></div>` +
-                `<div class="who-name">${escHtml(u.name)}</div>` +
-                `<div class="who-node">${u.node}</div>` +
+                `<div><span class="who-call${isMe?' me':''}">${escHtml(u.call)}</span></div>` +
+                (u.name && u.name !== u.call && !/^,?\s*$/.test(u.name) ? `<div class="who-name">${escHtml(u.name)}</div>` : '') +
+                `<div class="who-node">${escHtml(u.node)}</div>` +
                 `<div class="who-idle">Idle: ${idleStr(u.idle)}</div>`;
             list.appendChild(div);
         });
@@ -1129,17 +1171,38 @@ async function refreshWho() {
         });
         const d = await r.json();
         if (d.success && d.output) {
-            const parsed = parseWhoOutput(d.output);
+            // Colour-mode lines start with ESC + a colour byte; strip it first
+            const parsed = parseWhoOutput(d.output.split('\n').map(stripColour).join('\n'));
             if (Object.keys(parsed).length > 0) {
                 whoData = parsed;
                 renderWho();
             }
+        } else if (!d.success) {
+            // Say why instead of leaving "Connect to see who's online"
+            whoShowProblem(d.error || 'No answer', d.reply || '');
         }
-    } catch(e) { console.log('Who refresh error:', e); }
+    } catch(e) {
+        console.log('Who refresh error:', e);
+        whoShowProblem('Who refresh error: ' + e.message, '');
+    }
     document.getElementById('whoRefreshBtn').style.color = '';
 }
 
+function whoShowProblem(msg, reply) {
+    const upd = document.getElementById('whoLastUpdate');
+    if (upd) upd.textContent = msg + ' (' + new Date().toTimeString().split(' ')[0] + ')';
+    if (Object.keys(whoData).length === 0) {
+        const list = document.getElementById('whoList');
+        if (list) list.innerHTML =
+            '<div id="whoEmpty" style="padding:20px 10px;text-align:center;color:var(--muted);font-size:11px">' +
+            escHtml(msg) + '<br><br>' +
+            (reply ? 'Chat server said:<br><code>' + escHtml(reply).replace(/\n/g,'<br>') + '</code><br><br>' : '') +
+            'If this persists: sudo systemctl restart bpq-chat</div>';
+    }
+}
+
 function startWhoRefresh() {
+    stopWhoRefresh();   // never stack a second 30 s timer
     refreshWho();
     whoTimer = setInterval(refreshWho, 30000); // refresh every 30s
 }
@@ -1230,17 +1293,14 @@ function startReadOnlyPoll() {
 
 function submitAuth() {
     const call = document.getElementById('authCall').value.trim().toUpperCase();
-    const pass = document.getElementById('authPass').value.trim();
     if (!call) { showToast('Enter your callsign', 'error'); return; }
-    if (!pass)  { submitGuest(); return; }
 
     handle    = call;
     authCall  = call;
-    authPass  = pass;
-    authLevel = call === 'YOURCALL' ? 'sysop' : 'user';
+    authLevel = (STATION_CALL && call.replace(/-\d+$/, '') === STATION_CALL) ? 'sysop' : 'user';
     localStorage.setItem('bpq_chat_handle', handle);
     closeModal('authModal');
-    startConnect(call, pass);
+    startConnect(call);
 }
 
 async function sendAccessRequest() {
@@ -1249,34 +1309,33 @@ async function sendAccessRequest() {
     const note = document.getElementById('reqNote').value.trim();
     if (!call) { showToast('Enter your callsign', 'error'); return; }
 
-    // Build mailto link
-    const subject = encodeURIComponent(`BPQ Chat Access Request — ${call}`);
-    const body    = encodeURIComponent(
-        `Hello YOURNAME YOURCALL,\n\nI would like to request a BPQ account on your node.\n\n` +
-        `Callsign: ${call}\n` +
-        (name ? `Name: ${name}\n` : '') +
-        (note ? `Note: ${note}\n` : '') +
-        `\nThank you 73`
-    );
-    window.location.href = `mailto:YOUR_EMAIL@example.com?subject=${subject}&body=${body}`;
-    closeModal('guestRequestModal');
-    showToast('Opening email client…', 'ok');
+    // 2026-10-27: sent by the server to config.php station.email (vara-api.php
+    // action=request), instead of a mailto: link with a placeholder address.
+    try {
+        const r = await fetch('vara-api.php', { method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'request', service: 'chat', callsign: call, name: name, message: note }) });
+        const d = await r.json();
+        if (d.sent) { closeModal('guestRequestModal'); showToast('Request sent to the sysop', 'ok'); }
+        else showToast(d.error || 'Could not send the e-mail from this server — contact the sysop directly', 'error');
+    } catch (e) {
+        showToast('Could not reach the server — contact the sysop directly', 'error');
+    }
 }
 
 // ═══════════════════════════════════════════════════════
 //  Init
 (async()=>{
-    handle = localStorage.getItem('bpq_chat_handle') || 'YOURCALL';
+    handle = localStorage.getItem('bpq_chat_handle') || '';
     if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
     // Check if daemon already connected — auto-resume
     try {
         const r = await fetch(API + '?action=status');
         const d = await r.json();
-        if (d.connected) {
-            // Daemon running — show auth modal to identify user
-            // but start who refresh immediately
-            startWhoRefresh();
-        }
+        // (2026-10-24: no longer starts the who timer here — the page isn't
+        // connected yet, so it did nothing except leave a second, stray
+        // 30 s timer running after Connect.)
+        if (!d.connected) addServerLine('Chat daemon is not connected to BPQ yet — check: sudo systemctl status bpq-chat', 't-error');
     } catch {}
     // Show auth modal on load
     document.getElementById('authModal').classList.remove('hidden');

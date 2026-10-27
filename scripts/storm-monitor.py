@@ -12,7 +12,7 @@ Usage:
     python3 storm-monitor.py --restore    # Force restore optimized schedules
 
 Cron (every hour):
-    0 * * * * /usr/bin/python3 /var/www/html/bpq/scripts/storm-monitor.py >> /var/www/html/bpq/logs/storm-monitor.log 2>&1
+    0 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/storm-monitor.py >> /var/www/bpq-dashboard/logs/storm-monitor.log 2>&1
 
 Works alongside prop-scheduler.py — this handles fast reactions,
 prop-scheduler handles slow optimization every 48 hours.
@@ -42,22 +42,34 @@ import platform
 
 IS_WINDOWS = platform.system() == 'Windows'
 
+# Linux paths (2026-10-25): from where this script is installed (<web root>/
+# scripts/) and config.php 'paths' (logs, linbpq), as prop-scheduler.py has
+# done since 2026-10-19. They were hard-coded to /var/www/html/bpq and
+# /home/SYSOP/linbpq, so on a standard install the log and state went to a
+# folder that doesn't exist. data/settings.json 'paths' still override them.
+if not IS_WINDOWS:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import bpq_db_config  # noqa: E402
+    _WEB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _LOGS_DIR = bpq_db_config.default_logs_dir()
+    _LINBPQ_DIR = (bpq_db_config.load_config_section('paths').get('linbpq') or '/home/linbpq').rstrip('/')
+
 CONFIG = {
     'linmail_cfg': (
         os.path.join(os.environ.get('APPDATA', 'C:\\'), 'BPQ32', 'linmail.cfg')
-        if IS_WINDOWS else '/home/SYSOP/linbpq/linmail.cfg'
+        if IS_WINDOWS else os.path.join(_LINBPQ_DIR, 'linmail.cfg')
     ),
     'state_file': (
         'C:\\UniServerZ\\www\\bpq\\cache\\storm-state.json'
-        if IS_WINDOWS else '/var/www/html/bpq/cache/storm-state.json'
+        if IS_WINDOWS else os.path.join(_WEB_ROOT, 'cache', 'storm-state.json')
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\storm-monitor.log'
-        if IS_WINDOWS else '/var/www/html/bpq/logs/storm-monitor.log'
+        if IS_WINDOWS else os.path.join(_LOGS_DIR, 'storm-monitor.log')
     ),
     'backup_dir': (
         'C:\\UniServerZ\\www\\bpq\\scripts\\prop-backups'
-        if IS_WINDOWS else '/var/www/html/bpq/scripts/prop-backups'
+        if IS_WINDOWS else os.path.join(_WEB_ROOT, 'scripts', 'prop-backups')
     ),
 
     # BPQ control — platform-specific

@@ -39,7 +39,8 @@ if (!isset($sources[$data])) {
 
 $src = $sources[$data];
 header('Content-Type: ' . $src['type']);
-header('Access-Control-Allow-Origin: *');
+require_once __DIR__ . '/includes/station-config.php';
+bpq_cors_headers('GET');   // config.php 'cors' (2026-10-20: was "*")
 header('Cache-Control: max-age=' . CACHE_TTL . ', public');
 
 // ── Try cache first ────────────────────────────────────────────────

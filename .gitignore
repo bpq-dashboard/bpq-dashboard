@@ -18,6 +18,8 @@
 # security incidents, deploy history) — kept in the working copy/zip,
 # never published.
 /docs/SESSION-JOURNAL.md
+# Session instructions for Claude (station workflow) — private like the journal
+/CLAUDE.md
 
 # Message forms: third-party (TPRFN HTML Forms by N3MEL), downloaded at install
 # time by scripts/fetch-forms.sh rather than published here.

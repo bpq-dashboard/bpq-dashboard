@@ -18,12 +18,11 @@ This is a **new table, new parser, new API file** — not an extension of
 `rf_connections`/`rf_parser_state`/`rf-connections-api.php`. Those are
 scoped to VARA HF connections only; `Traffic_YYMMDD.txt` covers every
 connection type BPQ handles (VARA HF, packet/AX.25, Telnet) plus
-rejected-message counts nothing else in this project tracks. See the
-2026-09-20 (2) entry in `docs/SESSION-JOURNAL.md` for the full reasoning.
+rejected-message counts nothing else in this project tracks.
 
 ## Prerequisites
 
-- MariaDB/MySQL already running, `tprfn` database already exists
+- MariaDB/MySQL already running, the dashboard's database already exists (`bpqdash` on a standard install)
 - Database credentials configured in `db-config.php` (or `config.php`'s
   `db` section). The parser reads the same file via
   `scripts/bpq_db_config.py`; `BPQ_DB_*` env vars / `--db-*` flags override it.
@@ -40,10 +39,10 @@ rejected-message counts nothing else in this project tracks. See the
 
 ### MySQL access
 
-This server uses socket auth for the root/admin connection (see
-`docs/SESSION-JOURNAL.md`, 2026-09-19 entry: `sudo mysql tprfn`, no
-`-p`, no root password needed) — every command below uses that form.
-Adjust if your server differs.
+A standard Debian/Ubuntu MariaDB uses socket auth for root (`sudo mysql
+bpqdash`, no `-p`, no root password needed) — every command below uses
+that form, with the installer's database name `bpqdash`. Adjust if your
+server differs.
 
 The parser only needs standard CRUD privileges (SELECT, INSERT, UPDATE,
 DELETE) against `traffic_stats`/`traffic_parser_state` — same as
@@ -55,12 +54,11 @@ the parser.
 
 ### 1. Diff the incoming files against what's live
 
-Standard practice for this project (see `docs/SESSION-JOURNAL.md`
-throughout) — before copying anything, diff each new/changed file
+Standard practice for this project — before copying anything, diff each new/changed file
 against the current production copy so nothing gets silently clobbered:
 
 ```bash
-diff /var/www/tprfn/bpq-traffic.html            /path/to/new/bpq-traffic.html
+diff /var/www/bpq-dashboard/bpq-traffic.html            /path/to/new/bpq-traffic.html
 # traffic-api.php, scripts/parse-traffic-report.py, data/traffic-schema.sql
 # are all new files — no live copy to diff against.
 ```
@@ -68,10 +66,10 @@ diff /var/www/tprfn/bpq-traffic.html            /path/to/new/bpq-traffic.html
 ### 2. Apply the schema
 
 ```bash
-sudo mysql tprfn < /var/www/tprfn/data/traffic-schema.sql
+sudo mysql bpqdash < /var/www/bpq-dashboard/data/traffic-schema.sql
 
 # Verify the tables exist
-sudo mysql tprfn -e "SHOW TABLES LIKE 'traffic_%'"
+sudo mysql bpqdash -e "SHOW TABLES LIKE 'traffic_%'"
 # Expected output:
 #   traffic_stats
 #   traffic_parser_state
@@ -80,20 +78,20 @@ sudo mysql tprfn -e "SHOW TABLES LIKE 'traffic_%'"
 ### 3. Deploy the files
 
 ```bash
-sudo cp traffic-api.php bpq-traffic.html /var/www/tprfn/
-sudo cp scripts/parse-traffic-report.py /var/www/tprfn/scripts/
+sudo cp traffic-api.php bpq-traffic.html /var/www/bpq-dashboard/
+sudo cp scripts/parse-traffic-report.py /var/www/bpq-dashboard/scripts/
 
-sudo chown www-data:www-data /var/www/tprfn/traffic-api.php \
-    /var/www/tprfn/bpq-traffic.html \
-    /var/www/tprfn/scripts/parse-traffic-report.py
+sudo chown www-data:www-data /var/www/bpq-dashboard/traffic-api.php \
+    /var/www/bpq-dashboard/bpq-traffic.html \
+    /var/www/bpq-dashboard/scripts/parse-traffic-report.py
 
-sudo chmod +x /var/www/tprfn/scripts/parse-traffic-report.py
+sudo chmod +x /var/www/bpq-dashboard/scripts/parse-traffic-report.py
 ```
 
 ### 4. Test parsing in dry-run mode first
 
 ```bash
-sudo -u www-data python3 /var/www/tprfn/scripts/parse-traffic-report.py \
+sudo -u www-data python3 /var/www/bpq-dashboard/scripts/parse-traffic-report.py \
     --dry-run --verbose --backfill
 ```
 
@@ -105,7 +103,7 @@ writing anything for real.
 ```bash
 # Reads every Traffic_*.txt file present in logs/ and writes all rows.
 # Idempotent — safe to re-run; each run fully replaces that day's rows.
-sudo -u www-data python3 /var/www/tprfn/scripts/parse-traffic-report.py \
+sudo -u www-data python3 /var/www/bpq-dashboard/scripts/parse-traffic-report.py \
     --backfill --verbose
 
 # Expected output ends with:
@@ -115,7 +113,7 @@ sudo -u www-data python3 /var/www/tprfn/scripts/parse-traffic-report.py \
 Verify the table got populated:
 
 ```bash
-sudo mysql tprfn -e "
+sudo mysql bpqdash -e "
     SELECT COUNT(*) AS total_rows,
            COUNT(DISTINCT callsign) AS stations,
            MIN(station_date) AS earliest,
@@ -135,7 +133,7 @@ Add this line:
 
 ```cron
 # Traffic Report — Traffic_YYMMDD.txt → MySQL every 5 minutes
-*/5 * * * * /usr/bin/python3 /var/www/tprfn/scripts/parse-traffic-report.py --days 8 >> /var/log/parse-traffic-report.log 2>&1
+*/5 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/parse-traffic-report.py --days 8 >> /var/log/parse-traffic-report.log 2>&1
 ```
 
 **Use `--days 8`** (corrected 2026-09-26). The parser's default window is
@@ -218,7 +216,7 @@ sudo crontab -u www-data -e
 ```bash
 tail -50 /var/log/parse-traffic-report.log
 
-sudo mysql tprfn -e "
+sudo mysql bpqdash -e "
     SELECT last_parsed_at,
            files_processed,
            files_total,
@@ -232,7 +230,7 @@ sudo mysql tprfn -e "
 ### Table growth
 
 ```bash
-sudo mysql tprfn -e "
+sudo mysql bpqdash -e "
     SELECT station_date, COUNT(*) AS stations
     FROM traffic_stats
     WHERE station_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
@@ -247,13 +245,13 @@ per day, not per connection. Expect low single-digit MB/year even with
 dozens of active stations.
 
 ```bash
-sudo mysql tprfn -e "
+sudo mysql bpqdash -e "
     SELECT table_name,
            ROUND(data_length/1024/1024, 2) AS data_mb,
            ROUND(index_length/1024/1024, 2) AS index_mb,
            table_rows
     FROM information_schema.tables
-    WHERE table_schema = 'tprfn' AND table_name LIKE 'traffic_%'"
+    WHERE table_schema = 'bpqdash' AND table_name LIKE 'traffic_%'"
 ```
 
 ## Troubleshooting
@@ -279,8 +277,7 @@ sudo crontab -u www-data -l   # confirm the line is actually present
 ### Numbers look different from what the page used to show
 
 Two known, deliberate carry-overs from the legacy behavior — not bugs
-in the migration (see `docs/SESSION-JOURNAL.md`, 2026-09-20 (2) entry
-for full detail):
+in the migration:
 
 - The top "Messages" card and Message Distribution chart only ever
   summed Personal + Bulletin messages, excluding the Traffic/NTS (T)
@@ -297,7 +294,7 @@ for full detail):
 `Traffic_YYMMDD.txt` files may go back much further than expected if
 they've never been rotated/archived (the VARA log backfill on
 2026-09-19 covered data back to 2025-12-27 for reference). Check the
-actual count first: `ls /var/www/tprfn/logs/Traffic_*.txt | wc -l`.
+actual count first: `ls /var/www/bpq-dashboard/logs/Traffic_*.txt | wc -l`.
 Each file is small (a handful of station lines), so even a year's
 worth should complete quickly — if it doesn't, check for a stray very
 large file with `ls -la`.

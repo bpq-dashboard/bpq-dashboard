@@ -8,8 +8,14 @@
  * Checks: PHP version, extensions, file permissions, directories,
  *         config file, API endpoints, log files, BBS connectivity.
  * 
- * Safe to leave in place — does not expose passwords or sensitive data.
+ * 2026-10-20: behind the dashboard admin login, like install-check.php.
+ * It lists paths, file permissions and versions and tries a BBS login,
+ * which helps an attacker as much as a sysop. From the server's command
+ * line it runs without the login.
  */
+
+require_once __DIR__ . '/includes/web-login.php';
+bpq_require_web_login('The Health Check page');
 
 // Suppress errors in output — we'll catch them ourselves
 error_reporting(E_ALL);
@@ -188,11 +194,17 @@ $keyFiles = [
     'bbs-messages.html'     => 'BBS messages dashboard',
     'bpq-rf-connections.html' => 'RF connections dashboard',
     'bpq-system-logs.html'  => 'System logs dashboard',
-    'rf-power-monitor.html' => 'RF Power Monitor dashboard',
     'includes/bootstrap.php'=> 'Security and config loader',
     'shared/config.js'      => 'Client-side configuration',
     'message-storage.php'   => 'Server-side message storage',
 ];
+
+// 2026-10-05: RF Power Monitor needs flrig; install.sh leaves it out without
+// flrig (config.php radio.enabled = false), so only expect it when flrig is on.
+$cfgArr = (isset($config) && is_array($config)) ? $config : [];
+if (($cfgArr['radio']['enabled'] ?? true) !== false) {   // only an explicit false means no flrig
+    $keyFiles['rf-power-monitor.html'] = 'RF Power Monitor dashboard';
+}
 
 foreach ($keyFiles as $file => $desc) {
     $path = $baseDir . '/' . $file;

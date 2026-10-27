@@ -2,13 +2,18 @@
  * BPQ Dashboard Settings Modal
  * Version: 1.0.0
  *
- * Tabbed settings UI loaded on every dashboard page.
+ * Tabbed settings UI for the admin pages (2026-10-25: loaded only by
+ * admin/*.html, which sit behind the admin login).
  * Injects a ⚙ gear icon into the nav bar, renders a full-screen modal
  * with 5 tabs: Station Info, Forwarding Partners, Prop Scheduler,
  * Storm Monitor, Paths & System.
  *
- * Usage: <script src="shared/settings-modal.js"></script>
- * Requires: settings-api.php at the same web root.
+ * Usage: <script src="/shared/settings-modal.js"></script>
+ * Requires: /settings-api.php in the web root.
+ *
+ * NOTE: what this saves goes to data/settings.json, which OVERRIDES
+ * data/partners.json (the Maintenance page's partners editor) and the
+ * CONFIG of prop-scheduler.py / storm-monitor.py.
  */
 
 (function () {
@@ -22,14 +27,20 @@
     let _dirtyTabs  = new Set();
     let _editingPartnerIdx = null; // index into _settings.partners or null for new
 
-    const API = 'settings-api.php';
+    const API = '/settings-api.php';   // absolute: the admin pages live in /admin/
 
     // =========================================================================
     // INIT — inject gear icon after DOM ready
     // =========================================================================
     function init() {
         injectStyles();
-        injectGearButton();
+        // 2026-10-25: the menu (_nav.html) is injected by bpq-nav-loader.js
+        // after this runs, so wait for its clock row to appear.
+        if (!injectGearButton()) {
+            const obs = new MutationObserver(() => { if (injectGearButton()) obs.disconnect(); });
+            obs.observe(document.body, { childList: true, subtree: true });
+            setTimeout(() => obs.disconnect(), 15000);
+        }
         loadCallsign();  // Only loads callsign (public) — full settings require auth
     }
 
@@ -43,9 +54,11 @@
     // GEAR BUTTON — appended to nav dark-mode toggle area
     // =========================================================================
     function injectGearButton() {
-        // Try to find the clock/button row in nav
-        const clocks = document.getElementById('navClocks');
-        if (!clocks) return;
+        if (document.getElementById('settingsGearBtn')) return true;
+        // The menu's clock/theme row (2026-10-25: was #navClocks, which the
+        // current _nav.html doesn't have — the gear never appeared)
+        const clocks = document.getElementById('navClocks') || document.querySelector('.bpq-nav-clocks');
+        if (!clocks) return false;
 
         const btn = document.createElement('button');
         btn.id        = 'settingsGearBtn';
@@ -62,6 +75,7 @@
         btn.addEventListener('mouseleave', () => { btn.style.transform = '';              btn.style.color = '';       });
         btn.addEventListener('click', openModal);
         clocks.appendChild(btn);
+        return true;
     }
 
     // =========================================================================

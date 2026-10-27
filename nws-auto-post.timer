@@ -1,0 +1,12 @@
+[Unit]
+Description=Post new NWS Warnings/Watches to the BBS every 5 minutes
+
+[Timer]
+# A warning can last 30-45 minutes, so check often. A run still going when
+# the next one is due is skipped by systemd.
+OnBootSec=4min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=20
+
+[Install]
+WantedBy=timers.target

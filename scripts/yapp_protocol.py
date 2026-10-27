@@ -109,6 +109,34 @@ NAK = 0x15
 CAN = 0x18
 NUL = 0x00
 
+# Data block size for sending. 2026-10-24: was 256, sent with length byte 0
+# ("0 means 256" in the YAPP spec). LinBPQ's BBS reads the length byte
+# literally (BBSUtilities.c, case STX: pktLen = Msg[1]), so a 0 meant an
+# empty block and every upload over 255 bytes was garbled. BPQ itself sends
+# paclen-2 bytes; 254 + 2-byte header = 256, one node packet per block.
+DT_BLOCK = 254
+
+
+# Extensions a web server might run or render as a page. The file arrives
+# from another station, so on disk such names get their dots turned into
+# '_' plus '.bin' (evil.php -> evil_php.bin, page.html.jpg -> page_html_jpg.bin);
+# the Telnet Client still offers the original name when you download it.
+# (2026-10-04)
+RISKY_EXTENSIONS = {
+    'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'pht',
+    'phps', 'cgi', 'pl', 'py', 'sh', 'asp', 'aspx', 'jsp', 'shtml', 'shtm',
+    'htm', 'html', 'xhtml', 'xht', 'svg', 'svgz', 'js', 'mjs', 'xml', 'xsl',
+    'hta', 'htaccess', 'htpasswd', 'swf',
+}
+
+
+def disk_name(name):
+    """Name to store a received file under in the (web-served) YAPP folder."""
+    parts = name.lower().split('.')
+    if any(p in RISKY_EXTENSIONS for p in parts[1:]):
+        return name.replace('.', '_') + '.bin'
+    return name
+
 
 class YappState(Enum):
     IDLE       = 'idle'
@@ -218,11 +246,21 @@ class YappTransfer:
         return out
 
     def abort(self, reason='User cancelled'):
-        """Send a CN (Cancel) packet and transition to ABORT."""
-        reason_b = reason.encode('ascii', errors='replace')[:200]
-        self._send_packet(CAN, reason_b)
+        """Send a CN (Cancel) packet and transition to ABORT.
+
+        2026-10-24: not while still waiting for the sender to start
+        (WAIT_SI/IDLE) — the other end isn't in YAPP mode yet, so the CN
+        bytes would land in the BBS's command line as junk.
+        """
+        if self.state not in (YappState.IDLE, YappState.WAIT_SI):
+            reason_b = reason.encode('ascii', errors='replace')[:200]
+            self._send_packet(CAN, reason_b)
         self.state = YappState.ABORT
         self.error_message = reason
+
+    def started(self):
+        """True once the other end has entered YAPP mode."""
+        return self.state not in (YappState.IDLE, YappState.WAIT_SI)
 
     def progress(self):
         """Return (bytes_done, total_bytes, percent)."""
@@ -268,12 +306,12 @@ class YappTransfer:
         self._out_buf.extend(body)
 
     def _send_dt_block(self):
-        """DT (Send_Data): STX len data ... up to 256 bytes per block.
+        """DT (Send_Data): STX len data ... up to DT_BLOCK (254) bytes per block.
         Updates checksum if YAPP-C is active. Advances _send_pos.
         """
         if self._send_pos >= len(self.payload):
             return False  # nothing left
-        block = self.payload[self._send_pos:self._send_pos + 256]
+        block = self.payload[self._send_pos:self._send_pos + DT_BLOCK]
         self._send_pos += len(block)
         self.bytes_done = self._send_pos
         # Update checksum
@@ -281,8 +319,7 @@ class YappTransfer:
             for b in block:
                 self.checksum = (self.checksum + b) & 0xFF
         self._out_buf.append(STX)
-        # Length: 0 means 256 bytes
-        self._out_buf.append(0 if len(block) == 256 else len(block))
+        self._out_buf.append(len(block))      # 1..254, never 0
         self._out_buf.extend(block)
         return True
 
@@ -571,8 +608,20 @@ class YappTransfer:
 
     def _handle_nak(self, data):
         log.warning(f"YAPP: NAK received with data {data!r}")
-        # NR (Not_Rdy) or RE (Resume) — for simplicity we just abort
-        self.abort("Peer not ready")
+        # NR (Not_Rdy) or RE (Resume) — we don't resume, so we stop.
+        # 2026-10-24: keep the peer's reason. LinBPQ's BBS puts it right
+        # here, e.g. "YAPP File x already exists" or "... larger than limit".
+        if data[:2] == b'R\x00':
+            reason = ('The other station asked to resume a partial file, which '
+                      'this dashboard does not support. Delete the partial copy '
+                      'there and try again.')
+        else:
+            reason = data.decode('ascii', errors='replace').strip()
+            reason = f"Refused by the other station: {reason}" if reason \
+                else "Refused by the other station (not ready)"
+        # NR is final: no CN needed, just stop.
+        self.state = YappState.ABORT
+        self.error_message = reason
 
     def _handle_cn(self, reason):
         log.info(f"YAPP: peer cancelled: {reason}")
@@ -645,8 +694,11 @@ class YappTransfer:
             # Sanitize real filename — strip path, limit length
             safe_name = self.filename.replace('/', '_').replace('\\', '_')
             safe_name = ''.join(c for c in safe_name
-                                if c.isalnum() or c in '._-')[:80]
-            self.out_path = os.path.join(dir_, f'{prefix}-{safe_name}')
+                                if c.isascii() and (c.isalnum() or c in '._-'))[:80]
+            safe_name = safe_name.lstrip('.') or 'file'
+            # Name the browser saves it as (the link's download= attribute)
+            self.safe_filename = safe_name
+            self.out_path = os.path.join(dir_, f'{prefix}-{disk_name(safe_name)}')
         try:
             with open(self.out_path, 'wb') as f:
                 f.write(bytes(self.bytes_received))

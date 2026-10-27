@@ -80,10 +80,22 @@ def inline_format(text):
     # as black boxes. We swap them for readable text that conveys the
     # same meaning. The source markdown keeps the emojis (GitHub renders
     # them fine); this substitution happens only at PDF generation time.
+    # 2026-10-25: the audience markers become [Visitors]/[Sysops]/[Admins]
+    # only in the "For visitors/sysops/admins" callouts. Elsewhere the same
+    # emoji is a page icon (📡 RF, 📡 Beacon …) and is simply dropped.
+    text = re.sub(r'👤(\s*(?:\*\*)?For visitors)', r'[Visitors]\1', text)
+    text = re.sub(r'📡(\s*(?:\*\*)?For sysops)', r'[Sysops]\1', text)
+    text = re.sub(r'🔧(\s*(?:\*\*)?For admins)', r'[Admins]\1', text)
+    text = re.sub(r'🔧(\s*(?:\*\*)?Everything in Part)', r'[Admins]\1', text)
     emoji_subs = {
-        '👤': '[Visitors]',
-        '📡': '[Sysops]',
-        '🔧': '[Admins]',
+        '👤 ': '', '📡 ': '', '🔧 ': '',
+        '👤': '', '📡': '', '🔧': '',
+        # Symbols the built-in fonts lack (2026-10-25)
+        '☰': '(menu)', '⌘': 'Cmd', '▼': 'v', '▾': 'v', '▲': '^',
+        '⟳': '(refresh)', '↻': '(refresh)', '⤢': '(full size)',
+        '🔒': '(lock)', '⊡ ': '', '↩ ': '', 'ℹ️ ': '', 'ℹ ': '', 'ℹ️': '', 'ℹ': '',
+        '▶️ ': '', '▶️': '', '▶': '>',
+        '⏹ ': '', '⏻ ': '', '⏮️': '', '⏭️': '', '▣ ': '', '⧉ ': '',
         '🌙': '(moon)',
         '☀️': '(sun)',
         '🟢': '[OK]',
@@ -95,8 +107,8 @@ def inline_format(text):
         '⚠': '[!]',
         '✓': '[OK]',
         '✗': '[X]',
-        '📂': '[Folder]',
-        '📁': '[YAPP]',
+        '📂 ': '', '📂': '',
+        '📁 ': '', '📁': '',   # 2026-10-25: was [YAPP] — the button is labelled "Files"
         '🛰': '[Antenna]',
         '🛰️': '[Antenna]',
         '🚗': '(car)',
@@ -111,6 +123,9 @@ def inline_format(text):
         '⚙️': '(gear)',
         '🔄': '[Refresh]',
         '×': 'x',
+        # Button icons from the APRS Map (2026-10-16): arrows outside the
+        # built-in fonts' glyph set render as boxes, so drop them.
+        '↺ ': '', '↧ ': '', '↺': '', '↧': '',
         '—': '—',  # em-dash, already supported
         '–': '–',  # en-dash, already supported
         '•': '•',  # bullet, already supported
@@ -142,6 +157,9 @@ def inline_format(text):
         # Letterlike symbols
         if 0x2100 <= cp <= 0x214F:
             return ch
+        # Miscellaneous Technical (⏹ ⏻ ⌛ …): not in the built-in fonts
+        if 0x2300 <= cp <= 0x23FF:
+            return ''
         # Arrows — many ARE in basic Helvetica/Times fonts
         if 0x2190 <= cp <= 0x21FF:
             return ch
@@ -161,6 +179,8 @@ def inline_format(text):
             return ''
         return ch
     text = ''.join(_safe_char(c) for c in text)
+    # A **bold** that held only a stripped icon would print as "****"
+    text = re.sub(r'\*\*\s*\*\*', '', text)
 
     # First escape & < > for ReportLab's mini-XML parser. ReportLab uses
     # XML-like markup so any literal < or > in user text must be escaped.

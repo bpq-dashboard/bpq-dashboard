@@ -3,6 +3,13 @@
 bpq-aprs-daemon.py — Persistent APRS-IS connection daemon for BPQ Dashboard
 Stays connected to APRS-IS 24/7, parses packets, writes cache files.
 Managed by systemd as bpq-aprs.service
+
+Beacon (2026-10-16): when the sysop switches it on in the APRS Map's
+BBS Info editor (data/stations/bbs-info.json), the daemon also sends the
+BBS's position to APRS-IS every N minutes — as an object ("TPRFN BBS") or
+as the login callsign's own position — so it shows on aprs.fi. Off by
+default; needs a verified login (real passcode, not -1) and a marker
+position. Status goes into cache/aprs/aprs-daemon.json ('beacon').
 """
 
 import socket
@@ -20,6 +27,10 @@ from datetime import datetime
 # ── Config ─────────────────────────────────────────────────────────
 APRS_HOST    = 'rotate.aprs2.net'
 APRS_PORT    = 14580
+# Test hook only: BPQ_APRS_SERVER=host:port points the daemon elsewhere.
+if os.environ.get('BPQ_APRS_SERVER', '').count(':') == 1:
+    APRS_HOST, _p = os.environ['BPQ_APRS_SERVER'].split(':')
+    APRS_PORT = int(_p)
 # Login + filter come from config.php 'aprs' (and 'station') — nothing
 # station-specific is hard-coded here any more (2026-09-26).
 #   'aprs' => ['callsign' => 'YOURCALL-1', 'passcode' => 'YOUR_PASSCODE', 'filter' => '']
@@ -41,7 +52,11 @@ STATIONS_FILE= os.path.join(CACHE_DIR, 'stations.json')
 HISTORY_FILE = os.path.join(CACHE_DIR, 'history.json')
 MESSAGES_FILE= os.path.join(CACHE_DIR, 'messages.json')
 DAEMON_FILE  = os.path.join(CACHE_DIR, 'aprs-daemon.json')
-LOCK_FILE    = '/tmp/bpq-aprs-daemon.lock'
+LOCK_FILE    = os.environ.get('BPQ_APRS_LOCK') or '/tmp/bpq-aprs-daemon.lock'
+# Beacon settings, written by station-storage.php (saveBbsInfo)
+BBS_INFO_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             'data', 'stations', 'bbs-info.json')
+BEACON_STATE  = os.path.join(CACHE_DIR, 'beacon-state.json')
 
 MAX_STATIONS  = 1000
 MAX_MESSAGES  = 200
@@ -50,6 +65,9 @@ TRACK_MAX_PTS = 500         # max track points per station
 SAVE_INTERVAL = 15          # write cache every N seconds
 KEEPALIVE_INT = 180         # send keepalive every 3 minutes
 RECONNECT_WAIT= 30          # seconds before reconnect attempt
+BEACON_CHECK  = 30          # look at bbs-info.json every N seconds
+BEACON_MIN_INT= 10          # minutes; never beacon more often than this
+BEACON_CHANGE_GAP = 120     # seconds; an edited beacon goes out after this gap
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,7 +82,10 @@ history   = {}   # call -> [position points]
 messages  = []   # list of message dicts
 lock      = threading.Lock()
 connected = False
+verified  = False   # APRS-IS said "verified" (a real passcode) — beacons need it
 sock      = None
+send_lock = threading.Lock()   # keepalive + beacon share the socket
+beacon_status = {'enabled': False}
 stats     = {'packets': 0, 'positions': 0, 'messages': 0, 'start': time.time()}
 
 # ── Ensure cache dir ────────────────────────────────────────────────
@@ -277,6 +298,9 @@ def save_cache():
                 'positions': stats['positions'],
                 'messages':  stats['messages'],
                 'uptime':    int(time.time() - stats['start']),
+                'call':      APRS_CALL,
+                'verified':  verified,
+                'beacon':    dict(beacon_status),
             }
             tmp = DAEMON_FILE + '.tmp'
             with open(tmp, 'w') as f:
@@ -312,7 +336,7 @@ def load_cache():
 
 # ── APRS-IS connection ──────────────────────────────────────────────
 def connect_aprs():
-    global sock, connected
+    global sock, connected, verified
     while True:
         try:
             log.info(f'Connecting to {APRS_HOST}:{APRS_PORT}')
@@ -332,9 +356,10 @@ def connect_aprs():
             resp = s.recv(512).decode('utf-8', errors='replace').strip()
             log.info(f'Login: {resp}')
 
-            if 'unverified' in resp.lower():
-                log.warning('Login unverified — check passcode')
-            
+            verified = bool(re.search(r'\bverified\b', resp, re.I)) and 'unverified' not in resp.lower()
+            if not verified:
+                log.warning('Login unverified — check passcode (receive-only; no beacons)')
+
             s.settimeout(60)
             sock = s
             connected = True
@@ -354,7 +379,8 @@ def keepalive_thread():
         time.sleep(KEEPALIVE_INT)
         if connected and sock:
             try:
-                sock.sendall(b'#keepalive\r\n')
+                with send_lock:
+                    sock.sendall(b'#keepalive\r\n')
                 log.debug('Keepalive sent')
             except:
                 pass
@@ -389,7 +415,8 @@ def reader_thread():
             # Normal — just no data, send keepalive
             if connected and sock:
                 try:
-                    sock.sendall(b'#keepalive\r\n')
+                    with send_lock:
+                        sock.sendall(b'#keepalive\r\n')
                 except:
                     connected = False
         except Exception as e:
@@ -401,6 +428,174 @@ def reader_thread():
             time.sleep(2)
             connect_aprs()
             buf = ''
+
+# ── Beacon (2026-10-16) ─────────────────────────────────────────────
+BEACON_TOCALL = 'APRS'
+_OBJ_NAME_RE  = re.compile(r'^[A-Za-z0-9 .\-/]{1,9}$')
+
+def aprs_lat(lat):
+    """41.729167 -> '4143.75N' (APRS ddmm.mm, 0.01' ~ 18 m)."""
+    h = 'N' if lat >= 0 else 'S'
+    lat = abs(lat)
+    d = int(lat)
+    m = round((lat - d) * 60, 2)
+    if m >= 60:
+        d, m = d + 1, 0.0
+    return f'{d:02d}{m:05.2f}{h}'
+
+def aprs_lon(lon):
+    """-72.708333 -> '07242.50W'."""
+    h = 'E' if lon >= 0 else 'W'
+    lon = abs(lon)
+    d = int(lon)
+    m = round((lon - d) * 60, 2)
+    if m >= 60:
+        d, m = d + 1, 0.0
+    return f'{d:03d}{m:05.2f}{h}'
+
+def clean_comment(text):
+    """Printable ASCII only, none of | ~ (APRS-IS reserved), 43 chars max."""
+    t = ''.join(ch for ch in str(text or '') if 32 <= ord(ch) < 127 and ch not in '|~')
+    return ' '.join(t.split())[:43]
+
+def read_beacon_config():
+    """Beacon settings from bbs-info.json -> dict, or (None, reason)."""
+    try:
+        with open(BBS_INFO_FILE) as f:
+            info = json.load(f)
+    except FileNotFoundError:
+        return None, 'off'
+    except Exception as e:
+        return None, f'bbs-info.json unreadable: {e}'
+    if not isinstance(info, dict) or not info.get('beacon_enabled'):
+        return None, 'off'
+    try:
+        lat = float(info.get('lat')); lon = float(info.get('lon'))
+    except (TypeError, ValueError):
+        return None, 'no marker position set (BBS Info → Marker position)'
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
+        return None, 'marker position out of range'
+    btype = 'position' if info.get('beacon_type') == 'position' else 'object'
+    name  = str(info.get('beacon_name') or '').rstrip()
+    if btype == 'object' and not _OBJ_NAME_RE.match(name or ''):
+        return None, 'object name must be 1-9 letters, digits, space . - /'
+    try:
+        interval = int(info.get('beacon_interval') or 30)
+    except (TypeError, ValueError):
+        interval = 30
+    interval = max(BEACON_MIN_INT, min(120, interval))
+    return {
+        'type': btype, 'name': name, 'lat': lat, 'lon': lon,
+        'comment': clean_comment(info.get('beacon_comment')),
+        'interval': interval,
+    }, None
+
+def build_beacon(cfg, kill=False):
+    """APRS-IS line for the beacon (without CRLF)."""
+    pos = aprs_lat(cfg['lat']) + '/' + aprs_lon(cfg['lon']) + 'B'   # '/B' = BBS symbol
+    if cfg['type'] == 'object':
+        ts = time.strftime('%d%H%Mz', time.gmtime())
+        body = ';' + cfg['name'].ljust(9)[:9] + ('_' if kill else '*') + ts + pos + cfg['comment']
+    else:
+        body = '=' + pos + cfg['comment']        # '=' = position, messaging capable
+    return f'{APRS_CALL}>{BEACON_TOCALL},TCPIP*:{body}'
+
+def _load_beacon_state():
+    try:
+        with open(BEACON_STATE) as f:
+            d = json.load(f)
+            return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+def _save_beacon_state(st):
+    try:
+        tmp = BEACON_STATE + '.tmp'
+        with open(tmp, 'w') as f:
+            json.dump(st, f)
+        os.replace(tmp, BEACON_STATE)
+    except Exception as e:
+        log.warning(f'Beacon state not saved: {e}')
+
+def _send_line(line):
+    if not (connected and sock):
+        raise ConnectionError('not connected to APRS-IS')
+    with send_lock:
+        sock.sendall((line + '\r\n').encode('ascii'))
+
+def beacon_tick(state, now=None):
+    """One beacon check. Returns the (possibly updated) state."""
+    now = now or time.time()
+    cfg, why = read_beacon_config()
+    last = state.get('last') or {}          # what we last sent: {type,name,lat,lon,comment,ts,packet}
+
+    # An object that is no longer beaconed (switched off, renamed, or
+    # changed to position mode): kill it once so aprs.fi drops it.
+    if last.get('type') == 'object' and not last.get('killed'):
+        gone = cfg is None or cfg['type'] != 'object' or cfg['name'] != last.get('name')
+        if gone and connected and verified:
+            try:
+                line = build_beacon(dict(last), kill=True)
+                _send_line(line)
+                log.info(f'Beacon: object killed: {line}')
+                last['killed'] = True
+                state['last'] = last
+                _save_beacon_state(state)
+            except Exception as e:
+                log.warning(f'Beacon: kill not sent: {e}')
+
+    if cfg is None:
+        beacon_status.clear()
+        beacon_status.update({'enabled': False, 'state': why if why != 'off' else 'off',
+                              'last_sent': last.get('ts'), 'last_packet': last.get('packet')})
+        return state
+
+    beacon_status.clear()
+    beacon_status.update({'enabled': True, 'type': cfg['type'], 'name': cfg['name'],
+                          'interval': cfg['interval'], 'last_sent': last.get('ts'),
+                          'last_packet': last.get('packet')})
+    if APRS_PASS in ('', '-1'):
+        beacon_status['state'] = "receive-only login (config.php 'aprs' passcode is -1)"
+        return state
+    if not connected:
+        beacon_status['state'] = 'waiting for APRS-IS connection'
+        return state
+    if not verified:
+        beacon_status['state'] = 'APRS-IS login not verified (check the passcode)'
+        return state
+
+    same = (last.get('type') == cfg['type'] and last.get('name') == cfg['name']
+            and last.get('lat') == cfg['lat'] and last.get('lon') == cfg['lon']
+            and last.get('comment') == cfg['comment'] and not last.get('killed'))
+    since = now - float(last.get('ts') or 0)
+    due = since >= cfg['interval'] * 60 if same else since >= BEACON_CHANGE_GAP
+    if not due:
+        nxt = (cfg['interval'] * 60 if same else BEACON_CHANGE_GAP) - since
+        beacon_status['state'] = 'ok'
+        beacon_status['next_in'] = int(max(0, nxt))
+        return state
+    try:
+        line = build_beacon(cfg)
+        _send_line(line)
+        log.info(f'Beacon sent: {line}')
+        state['last'] = dict(cfg, ts=int(now), packet=line, killed=False)
+        _save_beacon_state(state)
+        beacon_status.update({'state': 'ok', 'last_sent': int(now), 'last_packet': line,
+                              'next_in': cfg['interval'] * 60})
+    except Exception as e:
+        beacon_status['state'] = f'send failed: {e}'
+        log.warning(f'Beacon not sent: {e}')
+    return state
+
+def beacon_thread():
+    state = _load_beacon_state()
+    time.sleep(10)   # let the login settle
+    while True:
+        try:
+            state = beacon_tick(state)
+        except Exception as e:
+            log.error(f'Beacon error: {e}')
+        time.sleep(BEACON_CHECK)
 
 # ── Main ────────────────────────────────────────────────────────────
 if __name__ == '__main__':
@@ -417,6 +612,10 @@ if __name__ == '__main__':
     # Start keepalive thread
     t_ka = threading.Thread(target=keepalive_thread, daemon=True)
     t_ka.start()
+
+    # Beacon (off unless switched on in BBS Info)
+    t_bc = threading.Thread(target=beacon_thread, daemon=True)
+    t_bc.start()
 
     # Start reader (blocks forever)
     log.info('Reader starting')

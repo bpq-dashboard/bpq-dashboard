@@ -22,15 +22,9 @@ header('Content-Type: application/xml; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: max-age=3600, public'); // Cache for 1 hour
 
-// CORS
-if ($config['cors']['allow_all'] ?? true) {
-    header('Access-Control-Allow-Origin: *');
-} else {
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if (in_array($origin, $config['cors']['allowed_origins'] ?? [])) {
-        header('Access-Control-Allow-Origin: ' . $origin);
-    }
-}
+// CORS: config.php 'cors' (2026-10-20: same-origin only unless configured)
+require_once __DIR__ . '/includes/station-config.php';
+bpq_cors_headers('GET');
 
 $url = 'https://www.hamqsl.com/solarxml.php';
 

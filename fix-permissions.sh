@@ -3,8 +3,8 @@
 #  BPQ Dashboard — Permissions Fixer
 #  ────────────────────────────────────────────────────────────────────────
 #  Re-applies the same ownership/permission scheme install.sh sets up on
-#  first install (Step 7 + Step 8's config.php lockdown + Step 12's final
-#  sweep) — safe to run any time you want to confirm nothing has drifted,
+#  first install (Step 7 + Step 8's config.php lockdown + the final
+#  permissions sweep) — safe to run any time you want to confirm nothing has drifted,
 #  e.g. after manually deploying files with `sudo cp` instead of rsync.
 #
 #  HOW TO RUN:
@@ -108,17 +108,25 @@ run find "$WEB_ROOT" -name "*.sh" -exec chmod 755 {} \; && ok "Shell scripts exe
 run find "$WEB_ROOT" -name "*.py" -exec chmod 755 {} \; && ok "Python scripts executable"
 
 # ────────────────────────────────────────────────────────────────────────────
-# Step 4 — Lock down config.php (holds the DB password in plaintext)
+# Step 4 — Lock down the config files that hold passwords
+#   config.php     DB, BBS, QRZ, APRS passcode …
+#   db-config.php  DB password (older installs / hand-made setups)
+#   bbs-config.php, nws-config.php, tprfn-config.php, bpqdash-config.php
+#                  older per-feature configs, if present
+#   (2026-10-05: before, only config.php was tightened; the others stayed
+#   644 = readable by every local account.)
 # ────────────────────────────────────────────────────────────────────────────
-hdr "Step 4 — config.php lockdown"
-CFG="$WEB_ROOT/config.php"
-if [[ -f "$CFG" ]]; then
-    run chmod 640 "$CFG"
-    run chown "$WEB_USER:$WEB_USER" "$CFG"
-    ok "config.php set to 640 (owner+group only — not world-readable)"
-else
-    warn "config.php not found at $CFG — skipping (nothing to tighten)"
-fi
+hdr "Step 4 — Config files with passwords → 640"
+for name in config.php db-config.php bbs-config.php nws-config.php tprfn-config.php bpqdash-config.php; do
+    CFG="$WEB_ROOT/$name"
+    if [[ -f "$CFG" ]]; then
+        run chmod 640 "$CFG"
+        run chown "$WEB_USER:$WEB_USER" "$CFG"
+        ok "$name set to 640 (owner+group only — not world-readable)"
+    elif [[ "$name" == "config.php" ]]; then
+        warn "config.php not found at $CFG — skipping (nothing to tighten)"
+    fi
+done
 
 # ────────────────────────────────────────────────────────────────────────────
 # Step 5 — Writable runtime directories (cache, data, YAPP downloads, logs)

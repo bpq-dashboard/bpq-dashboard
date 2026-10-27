@@ -13,6 +13,7 @@
  * action=archive (GET) — see message-db.php for what they do.
  * 2026-09-26: action=saveBodies, action=setFolderKeep (POST); action=folders
  * now also returns keepFolders.
+ * 2026-10-04: action=fileMessages (POST), bulk filing in one request.
  */
 
 // Set required server vars if missing (CLI/direct access)
@@ -32,6 +33,10 @@ if (file_exists(__DIR__ . '/includes/bootstrap.php')) {
     function isFeatureEnabled($f) { return true; }
     function dashboardLog($level, $msg, $ctx = []) {}
 }
+
+require_once __DIR__ . '/includes/web-login.php';
+// Your stored mail, folders and address book: admin login only (2026-10-04)
+bpq_require_web_login('The Email Client');
 
 require_once __DIR__ . '/message-db.php';
 
@@ -126,6 +131,12 @@ try {
 
             case 'saveMessages':
                 echo json_encode(msgdb_save_messages($input['messages'] ?? [], $input['folder'] ?? 'Saved'));
+                break;
+
+            case 'fileMessages':
+                // 2026-10-04: bulk filing, [{message, folder}, ...] in one
+                // request (replaces one saveMessage POST per message).
+                echo json_encode(msgdb_file_messages($input['items'] ?? []));
                 break;
 
             case 'archiveMessages':

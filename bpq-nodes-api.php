@@ -1,25 +1,45 @@
 <?php
 /**
  * bpq-nodes-api.php - Live BPQ NetROM nodes and routes via telnet scrape
- * BPQ Dashboard v1.5.13
+ * BPQ Dashboard v1.5.14
  *
  * BPQ login sequence (confirmed from nc trace on the server):
- *   IAC negotiation -> user: -> YOURCALL -> password: -> YOURPASS
- *   -> "de YOURCALL>" (BBS prompt)
- *   -> NODE -> "Returned to Node AGNODE:YOURCALL-4" -> node list -> "AGNODE:YOURCALL-4}"
- *   -> ROUTES -> route table -> "AGNODE:YOURCALL-4}"
+ *   IAC negotiation -> user: -> <bbs.user> -> password: -> <bbs.pass>
+ *   -> "de <bbs.user>>" (BBS prompt)  — or straight to the node prompt for
+ *      a user whose default application is the node
+ *   -> NODE -> "Returned to Node ALIAS:<station.node>" -> "ALIAS:<station.node>}"
+ *   -> NODES / ROUTES, each ending at the node prompt "...:<station.node>}"
  *   -> BYE
+ *
+ * 2026-10-25: login, port and node call come from config.php ('bbs' and
+ * 'station.node') — they were placeholders here, so the Telnet page's
+ * NetROM list was empty on every install. The prompt is matched by the node
+ * call instead of one station's node alias.
  */
 
 header('Content-Type: application/json');
 header('Cache-Control: no-cache');
 
-$BPQ_HOST  = '127.0.0.1';
-$BPQ_PORT  = 8010;
-$BPQ_USER  = 'YOURCALL';
-$BPQ_PASS  = 'YOUR_BPQ_PASSWORD';
-$NODE_CALL = 'YOURCALL-4';   // your node callsign - excluded from node list
+require_once __DIR__ . '/includes/station-config.php';
+$_bbs = bpq_config_section('bbs');
+$_stn = bpq_station();
+
+$BPQ_HOST  = (string)($_bbs['host'] ?? '127.0.0.1');
+if ($BPQ_HOST === '' || $BPQ_HOST === 'localhost') $BPQ_HOST = '127.0.0.1';
+$BPQ_PORT  = (int)($_bbs['port'] ?? 8010);
+$BPQ_USER  = (string)($_bbs['user'] ?? '');
+$BPQ_PASS  = (string)($_bbs['pass'] ?? '');
+$NODE_CALL = strtoupper(trim((string)($_stn['node'] ?? '')));   // excluded from the node list
 $TIMEOUT   = 12;
+
+if ($BPQ_USER === '' || $BPQ_PASS === '' || $NODE_CALL === ''
+    || in_array($BPQ_USER, ['SYSOPUSER', 'YOURCALL'], true)
+    || $BPQ_PASS === 'CHANGE_THIS_PASSWORD' || str_starts_with($NODE_CALL, 'YOURCALL')) {
+    http_response_code(503);
+    echo json_encode(['error' => "Set bbs.user, bbs.pass and station.node in config.php"]);
+    exit;
+}
+
 
 function read_until($sock, string $needle, float $timeout = 5.0): string {
     $buf      = '';
@@ -35,6 +55,23 @@ function read_until($sock, string $needle, float $timeout = 5.0): string {
             // Also check IAC-stripped version
             $clean = preg_replace('/\xff[\xfb\xfc\xfd\xfe]./s', '', $buf);
             if (strpos($clean, $needle) !== false) return $buf;
+        }
+    }
+    return $buf;
+}
+
+// Read until the output goes quiet ($idle s with no data after some arrived),
+// or $max s in all — the node's replies don't end with a fixed marker.
+function read_quiet($sock, float $max = 8.0, float $idle = 1.2): string {
+    $buf = ''; $deadline = microtime(true) + $max; $last = microtime(true);
+    while (microtime(true) < $deadline) {
+        $r = [$sock]; $w = []; $e = [];
+        if (@stream_select($r, $w, $e, 0, 100000)) {
+            $chunk = @fread($sock, 4096);
+            if ($chunk === false || $chunk === '') break;
+            $buf .= $chunk; $last = microtime(true);
+        } elseif ($buf !== '' && microtime(true) - $last >= $idle) {
+            break;
         }
     }
     return $buf;
@@ -117,46 +154,63 @@ fwrite($sock, $BPQ_USER . "\r\n");
 $buf = read_until($sock, 'password:', 5.0);
 fwrite($sock, $BPQ_PASS . "\r\n");
 
-// Step 3 - wait for BBS prompt "de YOURCALL>"
-$buf = read_until($sock, 'de ' . $BPQ_USER . '>', 8.0);
-$clean = clean_buf($buf);
-if (strpos($clean, 'de ' . $BPQ_USER) === false) {
+// Step 3 - BBS prompt "de <user>>", or (default application NODE) the node
+$bbsPrompt = 'de ' . $BPQ_USER . '>';
+$buf = '';
+$deadline = microtime(true) + 8.0;
+while (microtime(true) < $deadline) {
+    $chunk = read_quiet($sock, 1.5, 0.8);
+    $buf  .= $chunk;
+    if (stripos(clean_buf($buf), $bbsPrompt) !== false) break;
+    if ($chunk === '' && $buf !== '') break;   // greeting finished, no BBS prompt: at the node
+}
+$clean  = clean_buf($buf);
+// 2026-10-27: BPQ Mail's prompt is configurable (not always "de <user>>"),
+// and its greeting can follow "Connected to BBS" + the SID after a pause.
+$in_bbs = stripos($clean, $bbsPrompt) !== false
+       || stripos($clean, 'Connected to BBS') !== false
+       || preg_match('/\[[A-Za-z0-9.\-]+\$\]/', $clean)
+       || preg_match('/\bde [A-Za-z0-9\/\-]+>\s*$/', $clean);
+if ($in_bbs && !preg_match('/>\s*$/', $clean)) {      // wait for the BBS prompt
+    $deadline = microtime(true) + 10.0;
+    while (microtime(true) < $deadline && !preg_match('/>\s*$/', $clean)) {
+        $buf  .= read_quiet($sock, 1.5, 0.8);
+        $clean = clean_buf($buf);
+    }
+}
+if (!$in_bbs && ($clean === '' || preg_match('/sorry|invalid|password:|user:/i', $clean))) {
     fclose($sock);
     http_response_code(503);
-    echo json_encode(['error' => 'Login failed. Got: ' . substr($clean, -80)]);
+    echo json_encode(['error' => 'Login failed (check bbs.user / bbs.pass in config.php). Got: '
+                     . substr(trim(preg_replace('/[^\x20-\x7e]+/', ' ', $clean)), -80)]);
     exit;
 }
 
-// Step 4 - NODE: return to node prompt
-fwrite($sock, "NODE\r\n");
-$ret = clean_buf(read_until($sock, 'Returned to Node', 6.0));
-if (strpos($ret, 'Returned to Node') === false) {
-    fclose($sock);
-    http_response_code(503);
-    echo json_encode(['error' => 'NODE failed. Got: ' . substr($ret, -120)]);
-    exit;
+// Step 4 - NODE: from the BBS back to the node prompt
+if ($in_bbs) {
+    fwrite($sock, "NODE\r\n");
+    $ret = clean_buf(read_until($sock, 'Returned to Node', 6.0));
+    if (strpos($ret, 'Returned to Node') === false) {
+        fclose($sock);
+        http_response_code(503);
+        echo json_encode(['error' => 'NODE failed. Got: ' . substr($ret, -120)]);
+        exit;
+    }
+    // Drain the rest of the node prompt line
+    read_quiet($sock, 0.6, 0.3);
 }
-// Drain node prompt line
-read_until($sock, '}', 3.0);
 
 // Disable paging so BPQ sends full output without waiting for keypress
 fwrite($sock, "PAGE 0\r\n");
-read_until($sock, '}', 3.0);
+read_quiet($sock, 3.0, 0.8);
 
-// Step 5 - NODES
-// PAGE 0 sends full list. List ends with \r\n then prompt arrives shortly after.
-// Read with generous timeout — proceed even if prompt not captured.
+// Step 5 - NODES (PAGE 0: the whole list, no keypress)
 fwrite($sock, "NODES\r\n");
-$nodes_raw = clean_buf(read_until($sock, "\r\nAGNODE", 8.0));
-if (strpos($nodes_raw, "AGNODE") === false) {
-    // Full list received but prompt not yet — drain briefly and continue
-    $extra = @fread($sock, 512);
-    $nodes_raw .= clean_buf($extra ?: '');
-}
+$nodes_raw = clean_buf(read_quiet($sock, 8.0, 1.2));
 
 // Step 6 - ROUTES
 fwrite($sock, "ROUTES\r\n");
-$routes_raw = clean_buf(read_until($sock, "\r\nAGNODE", 8.0));
+$routes_raw = clean_buf(read_quiet($sock, 8.0, 1.2));
 
 // Step 7 - disconnect
 fwrite($sock, "BYE\r\n");

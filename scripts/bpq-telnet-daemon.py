@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 bpq-telnet-daemon.py — WebSocket to TCP Telnet proxy daemon
-BPQ Dashboard v1.5.6
+BPQ Dashboard v1.5.6 (redacting log filter 2026-10-05)
 
 Bridges browser WebSocket connections to TCP telnet targets.
 Supports multiple simultaneous sessions.
@@ -32,7 +32,12 @@ from yapp_protocol import YappTransfer, YappState
 # ── Configuration ──────────────────────────────────────────────────
 # Auto-detect web root — works across installs
 import os as _os
-_candidates = ['/var/www/html/bpq', '/var/www/html/bpq', '/var/www/bpq']
+# (2026-10-04: the installer's /var/www/bpq-dashboard added; the folder this
+#  script sits in, <web root>/scripts/, is tried first)
+_here = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+_fallback   = ['/var/www/bpq-dashboard', '/var/www/html/bpq', '/var/www/bpq']
+_candidates = [p for p in [_here] + _fallback
+               if _os.path.isfile(_os.path.join(p, 'bpq-telnet.html'))] + _fallback
 WEB_ROOT = next((p for p in _candidates if _os.path.isdir(p)), '/var/www/html/bpq')
 
 STATE_DIR  = WEB_ROOT + '/cache/telnet-sessions'
@@ -44,6 +49,15 @@ WS_PORT    = 8765          # WebSocket port — nginx proxies /ws/telnet here
 MAX_SESSIONS = 10          # Max simultaneous telnet sessions
 SESSION_TIMEOUT = 3600     # 1 hour idle timeout
 YAPP_MAX_SIZE = 10 * 1024 * 1024   # 10 MB cap on file transfers
+# 2026-10-24: YAPP timeouts are about *no progress*, not total time.
+# The old check measured from the start of the transfer, so anything that
+# took over 2 minutes on air (≈10–15 KB at 1200 bd) was killed half-way.
+YAPP_IDLE_TIMEOUT = 120            # s with no bytes from the other end
+# While sending, YAPP has no per-block ACK: after the data is handed to
+# the node, nothing comes back until the far end has it all (AF). Allow
+# for that at a slow 25 bytes/s (≈300 bd HF) on top of the idle timeout.
+YAPP_SEND_AIR_RATE = 25            # bytes/s assumed when waiting for AF
+YAPP_WRITE_CHUNK = 2048            # hand data to the node in pieces → real progress
 
 # Allowed telnet targets — prevents open relay abuse
 ALLOWED_HOSTS = [
@@ -69,6 +83,78 @@ logging.basicConfig(
     ]
 )
 log = logging.getLogger('bpq-telnet')
+
+
+class RedactSecrets(logging.Filter):
+    """Blank every password this daemon has been given, in every log line.
+
+    2026-10-05: a live copy of this daemon wrote a BBS password into
+    logs/bpq-telnet-daemon.log. Rather than trust every log call (or the
+    websockets library) never to print one, the handlers run this filter:
+    each password the daemon receives is registered with add(), and any
+    occurrence in a formatted message or traceback becomes [redacted].
+    Escaped forms (repr of bytes, JSON) are matched too, because the debug
+    lines log repr(buffer). Passwords shorter than 3 characters are not
+    registered (they would blank ordinary text). Kept in memory only.
+    """
+    MAX = 200
+
+    def __init__(self):
+        super().__init__()
+        self._forms = []          # longest first
+
+    def add(self, secret):
+        if not isinstance(secret, str):
+            return
+        secret = secret.strip('\r\n')
+        if len(secret) < 3:
+            return
+        forms = {secret,
+                 json.dumps(secret)[1:-1],                         # JSON-escaped
+                 repr(secret.encode('utf-8', 'replace'))[2:-1],    # inside b'...'
+                 repr(secret)[1:-1]}                               # inside '...'
+        for f in forms:
+            if f and f not in self._forms:
+                self._forms.append(f)
+        self._forms.sort(key=len, reverse=True)
+        del self._forms[self.MAX:]
+
+    def _clean(self, text):
+        for f in self._forms:
+            if f in text:
+                text = text.replace(f, '[redacted]')
+        return text
+
+    def filter(self, record):
+        if not self._forms:
+            return True
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        clean = self._clean(msg)
+        if clean != msg:
+            record.msg, record.args = clean, None
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            record.exc_text = self._clean(record.exc_text)
+        return True
+
+
+REDACT = RedactSecrets()
+# At DEBUG the websockets library logs every frame ("< TEXT '{...}'"),
+# i.e. the connect message and every line typed, passwords included, and
+# before this daemon has seen them (tested 2026-10-05: the typed password
+# and a fragment of the connect password reached the log). Keep it at INFO
+# whatever level the daemon runs at.
+logging.getLogger('websockets').setLevel(logging.INFO)
+for _h in logging.getLogger().handlers:      # root handlers: covers every logger
+    _h.addFilter(REDACT)
+try:
+    os.chmod(LOG_FILE, 0o640)                # not world-readable
+except OSError:
+    pass
 
 # ── Active sessions registry ───────────────────────────────────────
 sessions = {}   # session_id → TelnetSession
@@ -122,6 +208,8 @@ class TelnetSession:
         self.fbb_mode   = fbb_mode      # True for transparent FBB-mode connection
         self.username   = username
         self.password   = password
+        REDACT.add(password)
+        self._expect_password = False   # BPQ just asked "password:"
         self.reader     = None
         self.writer     = None
         self.connected  = False
@@ -142,6 +230,14 @@ class TelnetSession:
         # forwarding to the browser.
         self._files_capture = None
         self._files_capture_active = False
+        # ── YAPP abort (2026-10-24) ──
+        self._yapp_writing = False        # _yapp_write() is handing data over
+        self._yapp_abort_req = None       # abort asked for while writing
+        self._yapp_draining = 0.0         # after a cancel: discard the far end's
+        self._yapp_drain_last = 0.0       #   already-queued blocks until it ACKs
+        self._yapp_drain_quiet_ok = True  # receive: 5 s of silence also ends it
+        self._yapp_drain_cap = 180.0      # never longer than this (s)
+        self._yapp_pre_text = ''
 
     async def connect(self):
         """Open TCP connection to telnet target.
@@ -205,7 +301,15 @@ class TelnetSession:
                     self.bytes_rx += len(data)
                     self.last_activity = time.time()
 
-                    if self.yapp is not None:
+                    if self._yapp_draining:
+                        # Cancelled transfer: the other end may still send what
+                        # it had queued. Drop it until it acknowledges (CA =
+                        # ACK 05), then show whatever text follows.
+                        self._yapp_drain_last = time.time()
+                        ca = data.find(b'\x06\x05')
+                        if ca >= 0:
+                            await self._yapp_end_drain(data[ca + 2:])
+                    elif self.yapp is not None:
                         # YAPP mode — route bytes through protocol
                         await self._yapp_consume(data)
                     elif getattr(self, '_files_capture_active', False):
@@ -222,6 +326,9 @@ class TelnetSession:
                         else:
                             clean = self.strip_telnet_iac(data)
                         if clean:
+                            # Remember a password prompt, so the next line
+                            # the user types is registered with REDACT.
+                            self._expect_password = clean.rstrip().lower().endswith(b'password:')
                             msg = json.dumps({
                                 'type': 'data',
                                 'data': clean.decode('utf-8', errors='replace')
@@ -232,22 +339,161 @@ class TelnetSession:
                     if time.time() - self.last_activity > SESSION_TIMEOUT:
                         log.info(f"Session {self.session_id}: idle timeout")
                         break
-                    # Also check YAPP transfer timeout (30s of no progress)
-                    if self.yapp is not None:
-                        elapsed = time.time() - self.yapp_start_at
-                        if elapsed > 120 and \
-                           self.yapp.state not in (YappState.DONE, YappState.ABORT):
-                            log.warning(f"Session {self.session_id}: YAPP timeout")
-                            await self._yapp_finish(success=False,
-                                                     error='Transfer timed out')
+                    if self._yapp_draining and (
+                            (self._yapp_drain_quiet_ok and
+                             time.time() - self._yapp_drain_last > 5) or
+                            time.time() - self._yapp_draining > self._yapp_drain_cap):
+                        await self._yapp_end_drain(b'')
+                    # YAPP no-progress timeout (2026-10-24: measured from
+                    # the last byte in either direction, not the start)
+                    if self.yapp is not None and \
+                       self.yapp.state not in (YappState.DONE, YappState.ABORT):
+                        idle = time.time() - self.yapp_start_at
+                        limit = YAPP_IDLE_TIMEOUT
+                        if self.yapp.direction == 'send' and \
+                           self.yapp.state in (YappState.WAIT_AF, YappState.WAIT_AT):
+                            limit += len(self.yapp.payload) / YAPP_SEND_AIR_RATE
+                        if idle > limit:
+                            log.warning(f"Session {self.session_id}: YAPP timeout "
+                                        f"({idle:.0f}s without progress, limit {limit:.0f}s)")
+                            if self.yapp.state == YappState.WAIT_SI:
+                                err = ('No file arrived within 2 minutes. Check the '
+                                       'file name, and that you are at the BBS prompt.')
+                            else:
+                                mins, secs = divmod(int(idle), 60)
+                                took = f'{mins} min {secs} s' if mins else f'{secs} s'
+                                err = (f'Nothing received for {took} — '
+                                       'the link may have dropped')
+                            await self._yapp_finish(success=False, error=err)
                     continue
         except Exception as e:
             log.info(f"Session {self.session_id}: tcp_to_ws ended: {e}")
         finally:
             await self.disconnect()
 
+    @staticmethod
+    def _yapp_packet_ends(out):
+        """Offsets where each YAPP packet in `out` ends (sending side).
+
+        What we send is: ENQ 01 | SOH len hdr | STX len data… | ETX 01 |
+        EOT x | CAN len reason. With DT_BLOCK=254 a length byte is never 0.
+        Anything unrecognised ends the walk (treated as one piece).
+        """
+        ends, i = [], 0
+        while i + 1 < len(out):
+            c, n = out[i], out[i + 1]
+            if c in (0x01, 0x02, 0x18, 0x15, 0x10):      # SOH STX CAN NAK DLE: ctrl len data
+                i += 2 + n
+            elif c in (0x03, 0x04, 0x05, 0x06):          # ETX EOT ENQ ACK: 2 bytes
+                i += 2
+            else:
+                break
+            ends.append(min(i, len(out)))
+        if not ends or ends[-1] != len(out):
+            ends.append(len(out))
+        return ends
+
+    async def _yapp_write(self, out):
+        """Write YAPP bytes to the node in pieces (2026-10-24).
+
+        Sending used to hand the whole file over in one write, so the
+        progress bar hit 100 % at once and an abort could only follow the
+        whole file. Now data goes out in ~2 KB pieces cut on YAPP packet
+        boundaries, with drain() so TCP back-pressure from the node shows
+        as progress. An abort asked for meanwhile is acted on between
+        packets, so the Cancel never lands in the middle of a data block
+        (which left BPQ waiting for the rest of it).
+        """
+        y = self.yapp
+        sending_data = (y is not None and y.direction == 'send'
+                        and len(out) > YAPP_WRITE_CHUNK)
+        total_payload = len(y.payload) if sending_data else 0
+        ends = self._yapp_packet_ends(out)
+        self._yapp_writing = True
+        try:
+            start, k = 0, 0
+            while start < len(out):
+                # next piece: whole packets, at least ~YAPP_WRITE_CHUNK bytes
+                while k < len(ends) - 1 and ends[k] - start < YAPP_WRITE_CHUNK:
+                    k += 1
+                stop = ends[k]
+                k += 1
+                chunk = out[start:stop]
+                self.writer.write(chunk)
+                await self.writer.drain()
+                self.bytes_tx += len(chunk)
+                self.yapp_start_at = time.time()
+                start = stop
+                if sending_data and self.yapp is y:
+                    handed = min(total_payload, int(total_payload * start / len(out)))
+                    await self._ws_send({
+                        'type': 'yapp_progress', 'phase': 'handing',
+                        'bytes': handed, 'total': total_payload,
+                        'percent': handed * 100 // total_payload if total_payload else 100,
+                    })
+                if self._yapp_abort_req is not None:
+                    break
+        finally:
+            self._yapp_writing = False
+        if self._yapp_abort_req is not None:
+            reason, self._yapp_abort_req = self._yapp_abort_req, None
+            await self._yapp_cancel(reason, mid_write=start < len(out))
+            return True
+        return False
+
     async def _yapp_consume(self, data):
         """Feed incoming TCP bytes to the active YAPP transfer."""
+        self.yapp_start_at = time.time()   # any byte from the far end = progress
+
+        # 2026-10-24: while waiting for the BBS to start sending, anything
+        # that isn't the YAPP start (ENQ 01) is ordinary text — usually the
+        # BBS saying "File x not found". Show it in the terminal and stop
+        # waiting, instead of silently dropping it and timing out.
+        if self.yapp.state == YappState.WAIT_SI:
+            si = data.find(b'\x05\x01')
+            text = data if si < 0 else data[:si]
+            if text:
+                shown = text.decode('utf-8', errors='replace')
+                await self._ws_send({'type': 'data', 'data': shown})
+                self._yapp_pre_text = (getattr(self, '_yapp_pre_text', '') + shown)[-500:]
+                m = re.search(r'(File .* not found|Invalid filename|Filename missing|'
+                              r'Invalid command[^\r\n]*)', self._yapp_pre_text, re.I)
+                if m:
+                    await self._yapp_finish(success=False,
+                                            error=f'BBS says: {m.group(1).strip()}')
+                    return
+            if si < 0:
+                return
+            data = data[si:]
+
+        # 2026-10-24: while an upload waits for the BBS (RR/RF/AF/AT), YAPP
+        # replies always start with ACK, NAK or CAN. Anything else is the
+        # BBS talking plain text — typically it has dropped out of YAPP and
+        # printed an error and its prompt ("… BBS>"). Show it and stop,
+        # instead of discarding it byte by byte and waiting for a reply
+        # that will never come.
+        if self.yapp.direction == 'send' and self.yapp.state in (
+                YappState.WAIT_RR, YappState.WAIT_RF,
+                YappState.WAIT_AF, YappState.WAIT_AT) and \
+                not self.yapp._in_buf and data[:1] not in (b'\x06', b'\x15', b'\x18'):
+            cut = min([i for i in (data.find(b'\x06'), data.find(b'\x15'), data.find(b'\x18'))
+                       if i > 0] or [len(data)])
+            text, data = data[:cut], data[cut:]
+            shown = text.decode('utf-8', errors='replace')
+            await self._ws_send({'type': 'data', 'data': shown})
+            self._yapp_pre_text = (self._yapp_pre_text + shown)[-400:]
+            log.info(f"YAPP[{self.session_id}] text from BBS while in "
+                     f"{self.yapp.state.value}: {shown!r}")
+            if re.search(r'[\r\n]|>\s*$', self._yapp_pre_text):
+                lines = [l.strip() for l in re.split(r'[\r\n]+', self._yapp_pre_text) if l.strip()]
+                said = ' / '.join(lines[-3:])[:160] or self._yapp_pre_text.strip()[:160]
+                await self._yapp_finish(success=False,
+                    error=f'The BBS answered with text instead of confirming: "{said}". '
+                          'It has left YAPP mode, so the upload did not complete.')
+                return
+            if not data:
+                return
+
         # DEBUG: log raw bytes flowing through YAPP — first 64 bytes
         # of each chunk, hex-encoded, plus state transitions. Disable
         # via log level INFO; this only fires when DEBUG is enabled.
@@ -265,20 +511,19 @@ class TelnetSession:
             log.info(f"YAPP[{self.session_id}] TX {len(out)}B "
                      f"state={self.yapp.state.value} hex={hex_out}"
                      + ('...' if len(out) > 64 else ''))
-            self.writer.write(out)
-            await self.writer.drain()
-            self.bytes_tx += len(out)
+            if await self._yapp_write(out):
+                return                      # aborted while handing data over
         else:
             log.info(f"YAPP[{self.session_id}] no response, "
                      f"state={self.yapp.state.value}")
-        # Progress update for the browser
+        # Progress update for the browser. For a send, once everything is
+        # with the node we're waiting for the far end to confirm (AF).
         done, total, pct = self.yapp.progress()
-        await self.ws.send(json.dumps({
-            'type': 'yapp_progress',
-            'bytes': done,
-            'total': total,
-            'percent': pct,
-        }))
+        prog = {'type': 'yapp_progress', 'bytes': done, 'total': total, 'percent': pct}
+        if self.yapp.direction == 'send' and \
+           self.yapp.state in (YappState.WAIT_AF, YappState.WAIT_AT):
+            prog['phase'] = 'confirming'
+        await self._ws_send(prog)
         # Completion check
         if self.yapp.state == YappState.DONE:
             await self._yapp_finish(success=True)
@@ -291,11 +536,18 @@ class TelnetSession:
         if self.yapp is None:
             return
         # Note: receive side already wrote the file in _finalize_receive()
+        # A bare NAK can be followed by the reason as plain text (LinBPQ:
+        # "YAPP File Name x invalid") — use it.
+        if not success and error and error.endswith('(not ready)'):
+            first = bytes(self.yapp._in_buf).decode('utf-8', errors='replace').strip().splitlines()
+            if first:
+                error = f"Refused by the other station: {first[0].strip()}"
         payload = {
             'type': 'yapp_complete' if success else 'yapp_error',
         }
         if success:
-            payload['filename'] = self.yapp.filename or '(unknown)'
+            payload['filename'] = (getattr(self.yapp, 'safe_filename', None)
+                                   or self.yapp.filename or '(unknown)')
             payload['bytes']    = self.yapp.bytes_done
             payload['yappc']    = self.yapp.yappc
             payload['direction'] = self.yapp.direction
@@ -315,10 +567,22 @@ class TelnetSession:
                  f"state={self.yapp.state.value}, "
                  f"in_buf={len(self.yapp._in_buf)}B, "
                  f"reason={error or 'normal'})")
+        # 2026-10-24: bytes after the last YAPP packet are BBS text (e.g.
+        # "YAPP file x received" and the prompt) — show them instead of
+        # dropping them.
+        leftover = b'' if self._yapp_draining else bytes(self.yapp._in_buf)
         self.yapp = None
+        self._yapp_pre_text = ''
+        if leftover:
+            await self._ws_send({'type': 'data',
+                                 'data': leftover.decode('utf-8', errors='replace')})
 
     async def yapp_start_send(self, filename, data_b64):
         """Begin sending a file via YAPP. data_b64 is base64-encoded payload."""
+        if self._yapp_draining:
+            await self._ws_send({'type': 'yapp_error',
+                'message': 'Still stopping the previous transfer — try again in a moment'})
+            return
         if self.yapp is not None:
             await self.ws.send(json.dumps({
                 'type': 'yapp_error',
@@ -346,11 +610,10 @@ class TelnetSession:
                                   max_size=YAPP_MAX_SIZE)
         self.yapp.start()
         self.yapp_start_at = time.time()
+        self._yapp_pre_text = ''
         out = self.yapp.take_out()
         if out:
-            self.writer.write(out)
-            await self.writer.drain()
-            self.bytes_tx += len(out)
+            await self._yapp_write(out)
         await self.ws.send(json.dumps({
             'type': 'yapp_started',
             'direction': 'send',
@@ -368,6 +631,10 @@ class TelnetSession:
         the next SI packet from the peer triggers the receive state
         machine.
         """
+        if self._yapp_draining:
+            await self._ws_send({'type': 'yapp_error',
+                'message': 'Still stopping the previous transfer — try again in a moment'})
+            return
         if self.yapp is not None:
             await self.ws.send(json.dumps({
                 'type': 'yapp_error',
@@ -383,6 +650,7 @@ class TelnetSession:
                                   allow_yappc=True, max_size=YAPP_MAX_SIZE)
         self.yapp.start()
         self.yapp_start_at = time.time()
+        self._yapp_pre_text = ''
         await self.ws.send(json.dumps({
             'type': 'yapp_started',
             'direction': 'recv',
@@ -393,7 +661,31 @@ class TelnetSession:
     async def yapp_abort(self):
         if self.yapp is None:
             return
-        self.yapp.abort('User cancelled')
+        if self._yapp_writing:
+            # _yapp_write() stops at the next packet boundary and cancels
+            self._yapp_abort_req = 'Cancelled by operator'
+            return
+        await self._yapp_cancel('Cancelled by operator')
+
+    async def _yapp_cancel(self, reason, mid_write=False):
+        """Stop the transfer cleanly (2026-10-24).
+
+        Before the other end has started (receiver armed, nothing arrived)
+        nothing is sent — a Cancel there used to land in the BBS command
+        line as junk. Once started, send CN and then ignore what the other
+        end had already queued until it acknowledges, so it doesn't spill
+        into the terminal as binary garbage.
+        """
+        if self.yapp is None:
+            return
+        started = self.yapp.started()
+        # An upload whose data is all with the node already: the node still
+        # sends it, and the BBS answers only after that — so wait for its ACK
+        # (no "quiet" cut-off) for up to the file's air time.
+        handed_all = (self.yapp.direction == 'send' and not mid_write and
+                      self.yapp.state in (YappState.WAIT_AF, YappState.WAIT_AT))
+        payload_len = len(self.yapp.payload)
+        self.yapp.abort(reason)
         out = self.yapp.take_out()
         if out and self.writer:
             try:
@@ -401,7 +693,27 @@ class TelnetSession:
                 await self.writer.drain()
             except Exception:
                 pass
-        await self._yapp_finish(success=False, error='User cancelled')
+        if started:
+            self._yapp_draining = self._yapp_drain_last = time.time()
+            self._yapp_drain_quiet_ok = not handed_all
+            self._yapp_drain_cap = (YAPP_IDLE_TIMEOUT + payload_len / YAPP_SEND_AIR_RATE
+                                    if handed_all else 180.0)
+            await self._ws_send({'type': 'yapp_stopping', 'handed_all': handed_all})
+            if handed_all:
+                msg = ('Cancelled — but the whole file was already with the node, '
+                       'so the BBS may still save it. Waiting for the BBS to answer…')
+            else:
+                msg = 'Cancelled. Waiting for the other station to stop sending…'
+        else:
+            msg = 'Cancelled before the transfer started'
+        await self._yapp_finish(success=False, error=msg)
+
+    async def _yapp_end_drain(self, rest):
+        self._yapp_draining = 0.0
+        await self._ws_send({'type': 'yapp_stopped'})
+        if rest:
+            await self._ws_send({'type': 'data',
+                                 'data': rest.decode('utf-8', errors='replace')})
 
     async def yapp_list_files(self):
         """Issue `Files\\r` to BBS and capture/parse the response.
@@ -436,6 +748,10 @@ class TelnetSession:
                 'ok': False,
                 'error': 'YAPP transfer in progress'
             })
+            return
+        if self._yapp_draining:
+            await self._ws_send({'type': 'yapp_files_list', 'ok': False,
+                                 'error': 'Still stopping the previous transfer — try again in a moment'})
             return
 
         # Suspend normal RX → text decoding while we capture the listing.
@@ -592,7 +908,8 @@ class TelnetSession:
         return bytes(result)
 
     async def bpq_login(self, username, password):
-        """Handle BPQ telnet login.
+        """Handle BPQ telnet login. (Not called: the browser logs in itself.
+        Raw-buffer dumps below are DEBUG only since 2026-10-05.)
         BPQ sends IAC WILL SGA (ff fb 03) + IAC WILL ECHO (ff fb 01) before user: prompt.
         Must respond with DO SGA + DO ECHO before BPQ will accept username.
         """
@@ -608,7 +925,7 @@ class TelnetSession:
                             break
                         buf += chunk
                         clean = self.strip_telnet_iac(buf)
-                        log.info(f"Session {self.session_id}: "
+                        log.debug(f"Session {self.session_id}: "
                                  f"read_until({pattern}) buf={repr(clean[-30:])}")
                         if pattern in clean.lower():
                             break
@@ -618,7 +935,7 @@ class TelnetSession:
 
             # Step 1: read initial prompt (contains IAC negotiations + user:)
             user_buf = await read_until(b'user:')
-            log.info(f"Session {self.session_id}: user_buf raw={repr(user_buf[:80])}")
+            log.debug(f"Session {self.session_id}: user_buf raw={repr(user_buf[:80])}")
 
             # Respond to each IAC WILL with DO — required before BPQ accepts input
             iac_resp = b''
@@ -644,7 +961,7 @@ class TelnetSession:
                         extra = await asyncio.wait_for(self.reader.read(64), timeout=0.3)
                         if not extra:
                             break
-                        log.info(f"Session {self.session_id}: post-IAC drain={repr(extra)}")
+                        log.debug(f"Session {self.session_id}: post-IAC drain={repr(extra)}")
                     except asyncio.TimeoutError:
                         break  # nothing more coming — safe to proceed
 
@@ -655,7 +972,7 @@ class TelnetSession:
 
             # Step 3: wait for password: prompt
             pass_buf = await read_until(b'password:')
-            log.info(f"Session {self.session_id}: pass_buf raw={repr(pass_buf[:80])}")
+            log.debug(f"Session {self.session_id}: pass_buf raw={repr(pass_buf[:80])}")
 
             # Step 4: send password with CRLF
             self.writer.write((password + '\r\n').encode())
@@ -685,6 +1002,9 @@ class TelnetSession:
         """
         if not self.connected or not self.writer:
             return
+        if self._expect_password:
+            REDACT.add(text)
+            self._expect_password = False
         try:
             line_ending = '\r' if self.fbb_mode else '\r\n'
             self.writer.write((text + line_ending).encode('utf-8', errors='replace'))
@@ -742,6 +1062,7 @@ async def handle_websocket(websocket, path=None):
                 port = int(msg.get('port', 8010))
                 username = msg.get('username', '')
                 password = msg.get('password', '')
+                REDACT.add(password)
                 fbb_mode = bool(msg.get('fbb', False))
 
                 if not is_allowed(host, port):
@@ -862,10 +1183,16 @@ async def main():
     ws_ver = tuple(int(x) for x in websockets.__version__.split('.')[:2])
     log.info(f"websockets version: {websockets.__version__}")
 
+    # 2026-10-24: an upload arrives as one base64 message (4/3 of the file).
+    # The library's default 1 MiB message limit closed the connection for
+    # anything over ~750 KB, below the 10 MB the page allows.
+    max_msg = YAPP_MAX_SIZE * 4 // 3 + 64 * 1024
+
     if ws_ver >= (11, 0):
         # New API — serve() returns an async context manager
         async with websockets.serve(handle_websocket, WS_HOST, WS_PORT,
-                                    ping_interval=30, ping_timeout=10):
+                                    ping_interval=30, ping_timeout=10,
+                                    max_size=max_msg):
             log.info(f"Telnet daemon ready — ws://{WS_HOST}:{WS_PORT}")
             await asyncio.gather(
                 asyncio.Future(),
@@ -873,7 +1200,8 @@ async def main():
             )
     else:
         # Old API
-        async with websockets.serve(handle_websocket, WS_HOST, WS_PORT):
+        async with websockets.serve(handle_websocket, WS_HOST, WS_PORT,
+                                    max_size=max_msg):
             log.info(f"Telnet daemon ready — ws://{WS_HOST}:{WS_PORT}")
             await asyncio.gather(
                 asyncio.Future(),

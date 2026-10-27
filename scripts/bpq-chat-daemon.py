@@ -13,7 +13,7 @@ from pathlib import Path
 
 # ── Self-locate relative to this file, not a hardcoded deployment path ──
 # The previous version hardcoded '/var/www/bpq-dashboard/...' — the
-# generic template's path, not this server's actual '/var/www/tprfn'.
+# generic template's path, not every server's actual web folder.
 # That mismatch made the daemon crash on startup here (PermissionError
 # trying to create '/var/www/bpq-dashboard', which doesn't exist and
 # www-data can't create at that level). Deriving it from the script's
@@ -75,6 +75,8 @@ MIN_STABLE_SECONDS   = 30   # a connection must last this long to reset backoff
 # conservative guess — tighten if BPQ's real idle timeout turns out to be
 # shorter, there's no harm in keeping alive more often than necessary.
 KEEPALIVE_INTERVAL = 240
+# NOTE (2026-10-24): this keeps the TCP/telnet link alive only. The chat
+# server's own 2-hour idle disconnect ignores it — see rejoin_chat() below.
 
 Path(STATE_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -199,33 +201,44 @@ def connect_bpq(target_mode):
         add_message(f"Connection failed: {e}", 'error')
         return None
 
-    # Login
-    print('Waiting for user prompt...', flush=True)
-    bpq_recv(sock, 'user:', 8)
-    print('Sending username...', flush=True)
-    bpq_send(sock, BPQ_USER)
-    print('Waiting for password...', flush=True)
-    bpq_recv(sock, 'password:', 8)
-    print('Sending password...', flush=True)
-    bpq_send(sock, BPQ_PASS)
-    r = bpq_recv(sock, BPQ_USER+'>', 10)
+    # Login. 2026-10-05: a send can fail when LinBPQ is restarting at the
+    # same moment (e.g. after a password rotation); that used to raise out
+    # of here and kill the daemon (exit 1). Treat it as a failed attempt so
+    # main() backs off and retries.
+    try:
+        print('Waiting for user prompt...', flush=True)
+        bpq_recv(sock, 'user:', 8)
+        print('Sending username...', flush=True)
+        bpq_send(sock, BPQ_USER)
+        print('Waiting for password...', flush=True)
+        bpq_recv(sock, 'password:', 8)
+        print('Sending password...', flush=True)
+        bpq_send(sock, BPQ_PASS)
+        r = bpq_recv(sock, BPQ_USER+'>', 10)
 
-    if 'invalid' in r.lower() or 'failed' in r.lower():
-        add_message("Login failed", 'error')
-        sock.close()
-        return None
-
-    if target_mode == 'chat':
-        bpq_send(sock, 'NODE')
-        bpq_recv(sock, 'Returned to Node', 6)
-        time.sleep(0.3)
-        bpq_send(sock, 'CHAT')
-        r = bpq_recv(sock, 'BPQChatServer', 8)
-        if 'BPQChatServer' not in r:
-            add_message("Failed to enter chat", 'error')
+        if 'invalid' in r.lower() or 'failed' in r.lower():
+            print('Login failed — check config.php bbs.user / bbs.pass', flush=True)
+            add_message("Login failed", 'error')
             sock.close()
             return None
-        add_message("─── Connected to BPQ Chat ───", 'system')
+
+        if target_mode == 'chat':
+            bpq_send(sock, 'NODE')
+            bpq_recv(sock, 'Returned to Node', 6)
+            time.sleep(0.3)
+            bpq_send(sock, 'CHAT')
+            r = bpq_recv(sock, 'BPQChatServer', 8)
+            if 'BPQChatServer' not in r:
+                add_message("Failed to enter chat", 'error')
+                sock.close()
+                return None
+            add_message("─── Connected to BPQ Chat ───", 'system')
+    except OSError as e:
+        print(f"Connection lost during login: {e.__class__.__name__}: {e}", flush=True)
+        add_message(f"Connection lost during login — will retry", 'error')
+        try: sock.close()
+        except Exception: pass
+        return None
 
     connected = True
     mode = target_mode
@@ -266,6 +279,38 @@ def keepalive_thread(sock):
                 print(f"Keepalive send failed: {e}", flush=True)
                 break
 
+# ── Rejoin chat after BPQ's idle disconnect ───────────────────────
+# 2026-10-24: LinBPQ's chat server drops any local chat user who hasn't
+# sent a real chat line for 2 hours (HanksRT.c: "*** Disconnected - Idle
+# time exceeded", Idle > 7200). Commands like /U don't count, and the
+# telnet NOP keepalive above never reaches the chat server. The telnet
+# socket stays up, so this daemon used to sit at the *node* prompt still
+# reporting "connected": /U got no answer (Online panel empty), and
+# station messages went to the node instead of the chat. "Returned to
+# Node" is in NOISE, so nothing showed on the page. Now we spot it and
+# type CHAT again.
+KICK_RE = re.compile(r'^(?:\*\*\*\s*Disconnected - Idle time exceeded'
+                     r'|(?:[A-Z0-9\-]+\}\s*)?Returned to Node\b)', re.I)
+REJOIN_MIN_INTERVAL = 60   # never retry more often than this
+_last_rejoin = 0.0
+
+def rejoin_chat(sock):
+    global _last_rejoin
+    if time.time() - _last_rejoin < REJOIN_MIN_INTERVAL:
+        return
+    _last_rejoin = time.time()
+    def _go():
+        time.sleep(2)
+        if not connected:
+            return
+        try:
+            print('Dropped out of chat (idle timeout / returned to node) - re-entering', flush=True)
+            bpq_send(sock, 'CHAT')
+            add_message("─── Re-entered chat after BPQ idle disconnect ───", 'system')
+        except Exception as e:
+            print(f'Rejoin send failed: {e}', flush=True)
+    threading.Thread(target=_go, daemon=True).start()
+
 def reader_thread(sock):
     """Continuously read from BPQ socket and store messages."""
     global connected, running
@@ -285,6 +330,8 @@ def reader_thread(sock):
                 line, buf = buf.split('\n', 1)
                 line = line.replace('\r','').strip()
                 if line:
+                    if mode == 'chat' and KICK_RE.match(line):
+                        rejoin_chat(sock)
                     add_message(line, 'other')
         except Exception as e:
             print(f'Reader error: {e}', flush=True)
@@ -359,7 +406,11 @@ def main():
 
     while running:
         connect_started = time.time()
-        sock = connect_bpq(target_mode)
+        try:
+            sock = connect_bpq(target_mode)
+        except Exception as e:   # 2026-10-05: never let one bad attempt kill the daemon
+            print(f"Connect attempt failed: {e.__class__.__name__}: {e}", flush=True)
+            sock = None
         if sock:
             # Start reader, command, heartbeat, and keepalive threads
             rt = threading.Thread(target=reader_thread,   args=(sock,), daemon=True)

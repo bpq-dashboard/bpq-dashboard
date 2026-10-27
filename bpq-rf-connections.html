@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RF Connections — BPQ Dashboard</title>
+    <title>RF Connections - BPQ Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Preconnect to CDNs for faster loading -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -93,6 +93,18 @@
     [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
     [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
     [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
+    /* Forwarded Messages "Via"/"Status" badges + non-RF card (2026-10-06) */
+    [data-theme="dark"] [class~="text-red-700"] { color: #fca5a5 !important; }
+    [data-theme="dark"] [class~="text-green-700"], [data-theme="dark"] [class~="text-green-800"] { color: #86efac !important; }
+    [data-theme="dark"] [class~="border-red-200"] { border-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="hover:bg-red-100"]:hover { background-color: #7f1d1d !important; }
+    [data-theme="dark"] [class~="bg-indigo-100"] { background-color: #312e81 !important; }
+    [data-theme="dark"] [class~="bg-teal-100"] { background-color: #134e4a !important; }
+    [data-theme="dark"] [class~="text-indigo-800"], [data-theme="dark"] [class~="text-indigo-700"] { color: #c7d2fe !important; }
+    [data-theme="dark"] [class~="text-teal-800"] { color: #99f6e4 !important; }
+    [data-theme="dark"] [class~="text-emerald-800"] { color: #a7f3d0 !important; }
+    [data-theme="dark"] [class~="border-indigo-200"], [data-theme="dark"] [class~="border-indigo-300"] { border-color: #4338ca !important; }
+    [data-theme="dark"] [class~="hover:bg-indigo-50"]:hover { background-color: #1e1b4b !important; }
     [data-theme="dark"] [class~="bg-sky-200"] { background-color: #0369a1 !important; }
     [data-theme="dark"] [class~="bg-cyan-50"] { background-color: #083344 !important; }
     /* Stat card gradients */
@@ -186,7 +198,7 @@
     <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
          Replaces the previously-duplicated <nav> block. The active link is
          driven by the data-nav-page attribute on <body>. -->
-    <script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+    <script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
     <!-- ═══ GITHUB RIBBON — compact open-source notice ═════════════════════ -->
     <div id="githubBanner" style="
@@ -252,7 +264,7 @@
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">RF Connections</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.13</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.14</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">VARA HF Analytics with Frequency Tracking</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -294,6 +306,9 @@
                         <div class="flex justify-between"><span>Timeout (no prop):</span><span id="failedTimeout" class="font-semibold text-red-600">0</span></div>
                         <div class="flex justify-between"><span>Channel Busy:</span><span id="failedChannelBusy" class="font-semibold text-orange-600">0</span></div>
                         <div class="flex justify-between"><span>No Data:</span><span id="failedNoData" class="font-semibold text-gray-500">0</span></div>
+                        <div class="flex justify-between" title="Port already attached to another session (&quot;Error - Port in use&quot;). Same event the System Logs page shows as Port in Use, counted per failed session here."><span>Port in Use:</span><span id="failedPortSession" class="font-semibold text-yellow-700">0</span></div>
+                        <div class="flex justify-between"><span>Incoming Failed:</span><span id="failedIncoming" class="font-semibold text-purple-600">0</span></div>
+                        <div id="failedOtherRow" class="flex justify-between hidden"><span>Other:</span><span id="failedOther" class="font-semibold text-gray-500">0</span></div>
                     </div>
                     <div id="failedByBand" class="text-xs text-gray-600 mt-2 pt-2 border-t border-red-200"></div>
                 </div>
@@ -316,7 +331,7 @@
             <div class="mb-6 sm:mb-10">
                 <div class="stat-card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
-                        <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase">🌐 TPRFN Hub Station Forwarding Partners</div>
+                        <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase">🌐 RF Forwarding Partners</div>
                         <div class="flex gap-2">
                             <button onclick="loadFwdQueue()" class="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-colors">🔄 Refresh Queue</button>
                             <button onclick="showAddPartnerModal()" class="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold rounded transition-colors">+ Add</button>
@@ -351,6 +366,21 @@
                                 <option value="P">Personal</option>
                                 <option value="T">Traffic</option>
                             </select>
+                            <select id="messagesMediumFilter" onchange="saveMessagesMediumFilter(); updateMessagesPanel()" class="px-2 py-1 text-xs border border-amber-300 rounded bg-white" title="Delivery method (from BPQ ConnectLog)">
+                                <option value="rf">📡 RF only</option>
+                                <option value="all">All methods</option>
+                                <option value="nonrf">🚫 Non-RF only</option>
+                                <option value="NETROM">🔗 NET/ROM</option>
+                                <option value="AXIP">🛰 AXIP</option>
+                                <option value="TELNET">🌐 Telnet</option>
+                                <option value="AX.25">📻 AX.25</option>
+                            </select>
+                            <select id="messagesStatusFilter" onchange="updateMessagesPanel()" class="px-2 py-1 text-xs border border-amber-300 rounded bg-white" title="Partner's reply to each offer">
+                                <option value="delivered">✅ Delivered</option>
+                                <option value="all">All offers</option>
+                                <option value="rejected">⛔ Rejected (dup)</option>
+                                <option value="deferred">⏸ Deferred</option>
+                            </select>
                         </div>
                     </div>
                     <div id="messagesPanelBody" class="hidden">
@@ -360,9 +390,12 @@
                             <table class="w-full text-xs sm:text-sm">
                                 <thead class="bg-amber-100 sticky top-0">
                                     <tr>
-                                        <th class="px-2 sm:px-3 py-2 text-left">Time</th>
+                                        <th class="px-2 sm:px-3 py-2 text-left" title="When the message was offered (UTC)">Offered</th>
                                         <th class="px-2 sm:px-3 py-2 text-center">Dir</th>
                                         <th class="px-2 sm:px-3 py-2 text-left">Partner</th>
+                                        <th class="px-2 sm:px-3 py-2 text-center" title="Delivery method">Via</th>
+                                        <th class="px-2 sm:px-3 py-2 text-center" title="Partner's reply to the offer">Status</th>
+                                        <th class="px-2 sm:px-3 py-2 text-left" title="When the transfer finished (UTC) and how long after the offer">Received</th>
                                         <th class="px-2 sm:px-3 py-2 text-center">Type</th>
                                         <th class="px-2 sm:px-3 py-2 text-left">From</th>
                                         <th class="px-2 sm:px-3 py-2 text-left">To</th>
@@ -384,7 +417,7 @@
                 <div class="stat-card bg-gradient-to-br from-indigo-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200">
                     <div class="flex flex-col sm:flex-row justify-between items-center gap-3">
                         <div>
-                            <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase mb-1">📊 TPRFN Hub Station Propagation Report</div>
+                            <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase mb-1">📊 HUB Station Propagation Report</div>
                             <p class="text-xs text-gray-600">7-day connection analysis for forwarding partners</p>
                         </div>
                         <button onclick="showPropagationReport()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg">
@@ -827,7 +860,7 @@
                 <button onclick="closeManagePartnersModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
             <div class="mt-4">
-                <p class="text-sm text-gray-600 mb-3" id="partnerStorageStatus">These are the TPRFN hub stations you connect to for message forwarding.</p>
+                <p class="text-sm text-gray-600 mb-3" id="partnerStorageStatus">These are the stations you connect to for RF message forwarding.</p>
                 <div class="overflow-auto max-h-72 custom-scrollbar">
                     <div id="partnersListContainer" class="space-y-2"></div>
                 </div>
@@ -846,7 +879,7 @@
                 <div class="flex items-center gap-3">
                     <span class="text-3xl">📊</span>
                     <div>
-                        <h3 class="text-xl font-bold gradient-text">TPRFN Hub Station Propagation Report</h3>
+                        <h3 class="text-xl font-bold gradient-text">HUB Station Propagation Report</h3>
                         <p class="text-sm text-gray-500" id="reportDateRange">7-Day Connection Analysis</p>
                     </div>
                 </div>
@@ -1107,7 +1140,7 @@
             populatePartnersListModal();
             // Show storage status
             const statusEl = document.getElementById('partnerStorageStatus');
-            const baseText = 'TPRFN hub stations you connect to for message forwarding.';
+            const baseText = 'Stations you connect to for RF message forwarding.';
             if (_serverStorageAvailable) {
                 statusEl.innerHTML = baseText + ' <span class="inline-flex items-center gap-1 text-green-700"><span class="inline-block w-2 h-2 rounded-full bg-green-500"></span> Saved to server</span>';
             } else {
@@ -1177,7 +1210,15 @@
         let filteredConnections = [];  // Filtered connections for pagination
         const PAGE_SIZE = 50;     // Connections per page
         let bbsFailures = [];  // Track BBS-reported failures with timestamps
-        let forwardedMessages = [];  // Track actual FBB message transfers with BID, from, to, partner, direction
+        let forwardedMessages = [];
+        // Delivery tracking (2026-10-06) — see fetchMessagesFromApi()
+        const MSG_MIN_DAYS = 7;          // Propagation Report always needs 7 days
+        let msgDaysLoaded = 0;           // days of delivered rows in forwardedMessages
+        let msgApiHasDelivery = false;   // DB migration applied (accept_status present)
+        let messageStatusCounts = null;  // [{partner,direction,msg_type,medium,accept_status,day,n}]
+        let rejectedMessages = [];       // rejected-offer rows, loaded on demand
+        let rejectedDaysLoaded = 0;
+        let rejectedLoading = false;  // Track actual FBB message transfers with BID, from, to, partner, direction
         
         // ===== PERFORMANCE OPTIMIZATIONS =====
         const LOG_CACHE_KEY = 'bpq_parsed_logs_cache';
@@ -1560,7 +1601,7 @@
 
             // Clear server-side callsign-cache.json so the new location
             // takes effect immediately for all browsers and devices
-            fetch('callsign-lookup.php?action=clear_cache')
+            fetch('callsign-lookup.php?action=clear_cache', { method: 'POST', credentials: 'same-origin' })
                 .then(r => r.json())
                 .then(() => {
                     closeAddLocationModal();
@@ -2473,10 +2514,8 @@
                 // Re-parse BBS logs to populate radioCommandsByCall with new RADIO
                 // commands. parseBBSLog() is idempotent for everything except
                 // forwardedMessages — that's left untouched here when
-                // usedMsgApiData is true, since the message API already
-                // returned the full MAX_DAYS_RANGE up front (see loadLogs()),
-                // so there's nothing new to pick up from these extra BBS days
-                // for messages specifically.
+                // usedMsgApiData is true; the message API's own window is
+                // widened separately by ensureMessagesLoadedForDays().
                 updateStatus('loading', 'Parsing additional BBS logs...');
                 parseBBSLog();
                 
@@ -2665,12 +2704,19 @@
                 // isRfMedium() — null/undefined is treated as "unknown",
                 // never as "non-RF".
                 medium: row.medium || null,
+                // Partner's FS reply ('A' accepted / 'R' rejected / 'D'
+                // deferred / 'E' other) and when the transfer finished —
+                // added 2026-10-06; null on rows from before that, which
+                // isDelivered() treats as delivered (same as before).
+                acceptStatus: row.accept_status || null,
+                deliveredMs: row.delivered_time ? Date.parse(row.delivered_time) : null,
                 msgType: row.msg_type,
                 fromCall: row.from_call,
                 toArea: row.to_area,
                 category: row.category,
                 bid: row.bid,
                 size: parseInt(row.size_bytes) || 0,
+                _ms: ms,
                 _sort: date + hh + mi + ss,
             };
         }
@@ -2686,8 +2732,13 @@
                 // same reasoning: request the API's max limit explicitly so
                 // the 90-day range doesn't silently truncate to the newest
                 // 1000 messages.
-                const url = RF_API_URL + '?action=messages&days=' + encodeURIComponent(days)
-                            + '&limit=5000&t=' + Date.now();
+                // 2026-10-06: one row per partner now, and ~70% of offers are
+                // rejected duplicates — so the page loads delivered (and
+                // deferred) rows for the selected range only, plus server-side
+                // status_counts for the rejected totals. Rejected rows are
+                // fetched on demand by fetchRejectedMessages().
+                const url = RF_API_URL + '?action=messages&status=delivered&counts=1&days='
+                            + encodeURIComponent(days) + '&limit=50000&t=' + Date.now();
                 const resp = await fetch(url, { cache: 'no-store' });
                 if (!resp.ok) {
                     console.warn('[Msg API] HTTP ' + resp.status + ' — falling back to BBS log parsing');
@@ -2700,7 +2751,10 @@
                 }
                 const rows = json.data.messages;
                 const msgs = rows.map(apiRowToMessage).filter(m => m !== null);
-                console.log('[Msg API] Loaded ' + msgs.length + ' messages from DB');
+                msgApiHasDelivery = !!json.data.has_delivery;
+                messageStatusCounts = Array.isArray(json.data.status_counts) ? json.data.status_counts : null;
+                if (json.data.truncated) console.warn('[Msg API] Result truncated at limit — oldest rows in range missing');
+                console.log('[Msg API] Loaded ' + msgs.length + ' delivered/deferred messages from DB (' + days + 'd)');
                 return msgs;
             } catch (e) {
                 console.warn('[Msg API] Fetch failed: ' + e.message + ' — falling back to BBS log parsing');
@@ -2807,7 +2861,7 @@
                 updateStatus('loading', 'Fetching connection data...');
                 const [apiConns, apiMsgs] = await Promise.all([
                     fetchConnectionsFromApi(MAX_DAYS_RANGE),
-                    fetchMessagesFromApi(MAX_DAYS_RANGE),
+                    fetchMessagesFromApi(Math.max(selectedDays, MSG_MIN_DAYS)),
                 ]);
                 if (apiConns !== null) {
                     // API path succeeded — adopt these as our connections
@@ -2829,7 +2883,9 @@
                     // leaving this array untouched.
                     forwardedMessages = apiMsgs;
                     usedMsgApiData = true;
+                    msgDaysLoaded = Math.max(selectedDays, MSG_MIN_DAYS);
                 }
+                rejectedMessages = []; rejectedDaysLoaded = 0;
                 
                 // Load multiple BBS log files using UTC dates
                 // BPQ32 rotates logs at 00:00 UTC
@@ -2894,11 +2950,11 @@
                         '<span class="text-gray-500 font-semibold">Required file:</span> <span class="font-mono font-semibold text-purple-600">YOURCALL.vara</span><br>' +
                         '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br><br>' +
                         '<span class="text-gray-500 font-semibold">Where does this file come from?</span><br>' +
-                        'If you are part of the TPRFN network, your VARA log is available at:<br>' +
-                        '<span class="font-mono text-purple-600">https://YOUR-TPRFN-HUB/YOURCALL.vara</span><br><br>' +
-                        'Use the included <span class="font-mono font-semibold">fetch-vara-tprfn</span> script to download and<br>' +
-                        'append new entries every 15 minutes. See INSTALL documentation for setup.<br><br>' +
-                        '<span class="text-gray-500 font-semibold">Not part of TPRFN?</span> The dashboard will still show BBS forwarding data<br>' +
+                        'The included <span class="font-mono font-semibold">vara-logger</span> service collects your station\'s VARA<br>' +
+                        'connections into this file (check it with <span class="font-mono">sudo systemctl status vara-logger</span>).<br>' +
+                        'If your hub station publishes your VARA log, you can download it from there instead,<br>' +
+                        'e.g. <span class="font-mono text-purple-600">https://YOUR-HUB/YOURCALL.vara</span>. See the install guide for setup.<br><br>' +
+                        '<span class="text-gray-500 font-semibold">No VARA log?</span> The dashboard will still show BBS forwarding data<br>' +
                         'if <span class="font-mono font-semibold text-purple-600">log_' + yy + mm + dd + '_BBS.txt</span> files are available.' +
                         '</div>';
                     warningDiv.classList.remove('hidden');
@@ -3143,14 +3199,201 @@
             return !m.medium || m.medium === 'VARA';
         }
 
-        function getFilteredForwardedMessages() {
-            const now = new Date();
-            const cutoffDate = new Date(now);
+        // Was this offer actually delivered? (2026-10-06) Only 'A' (partner
+        // accepted it) counts. Rejected ('R' — usually "already have it"),
+        // deferred ('D') and error ('E') offers moved no message. A null
+        // status — rows from before delivery tracking, or the legacy
+        // in-browser BBS-log parse — is treated as delivered, matching
+        // how every offer was counted before.
+        function isDelivered(m) {
+            return !m.acceptStatus || m.acceptStatus === 'A';
+        }
+
+        // YYMMDD of the first UTC day in the selected range.
+        function selectedCutoffYYMMDD() {
+            const cutoffDate = new Date();
             cutoffDate.setUTCDate(cutoffDate.getUTCDate() - (selectedDays - 1));
-            const cutoffYYMMDD = String(cutoffDate.getUTCFullYear()).slice(-2) +
+            return String(cutoffDate.getUTCFullYear()).slice(-2) +
                 String(cutoffDate.getUTCMonth() + 1).padStart(2, '0') +
                 String(cutoffDate.getUTCDate()).padStart(2, '0');
-            return forwardedMessages.filter(m => m.date >= cutoffYYMMDD && isRfMedium(m));
+        }
+
+        // RF-only, DELIVERED messages in the selected range — the single
+        // source for every message count on the page outside the panel
+        // (hub tiles, summary card, hourly chart, station modals). As of
+        // 2026-10-06 rejected/deferred offers no longer count as traffic.
+        function getFilteredForwardedMessages() {
+            const cutoffYYMMDD = selectedCutoffYYMMDD();
+            return forwardedMessages.filter(m => m.date >= cutoffYYMMDD && isRfMedium(m) && isDelivered(m));
+        }
+
+        // ── Delivery-method view for the Forwarded Messages panel ─────────
+        // (added 2026-10-06). The panel defaults to RF only, same as every
+        // other count on this page. The "Via" dropdown lets the operator
+        // also see messages that arrived over NET/ROM / Telnet / AX.25 —
+        // e.g. a hub partner that normally forwards on VARA HF but
+        // delivered over NET/ROM instead. This is a display filter on the
+        // panel ONLY: hub tiles, summary card, hourly chart, station
+        // modals and the Propagation Report keep using the RF-only
+        // getFilteredForwardedMessages() above, so their numbers don't move.
+        const MESSAGES_MEDIUM_KEY = 'bpq_rf_msg_medium_filter';
+
+        function saveMessagesMediumFilter() {
+            try {
+                localStorage.setItem(MESSAGES_MEDIUM_KEY,
+                    document.getElementById('messagesMediumFilter').value);
+            } catch (e) { /* storage unavailable — filter just won't persist */ }
+        }
+
+        function restoreMessagesMediumFilter() {
+            try {
+                const v = localStorage.getItem(MESSAGES_MEDIUM_KEY);
+                const sel = document.getElementById('messagesMediumFilter');
+                if (v && sel && [...sel.options].some(o => o.value === v)) sel.value = v;
+            } catch (e) { /* ignore */ }
+        }
+        // The panel markup is above this script, so restore right away —
+        // before the first loadLogs() → updateMessagesPanel() runs.
+        restoreMessagesMediumFilter();
+
+        function mediumMatches(medium, mode) {
+            if (mode === 'all') return true;
+            if (mode === 'rf') return !medium || medium === 'VARA';
+            if (mode === 'nonrf') return !!medium && medium !== 'VARA';
+            return medium === mode;
+        }
+
+        function statusMatches(acceptStatus, mode) {
+            if (mode === 'all') return true;
+            if (mode === 'delivered') return !acceptStatus || acceptStatus === 'A';
+            if (mode === 'rejected') return acceptStatus === 'R';
+            if (mode === 'deferred') return acceptStatus === 'D' || acceptStatus === 'E';
+            return true;
+        }
+
+        // Time-filtered messages for the panel, honoring the Via and Status
+        // dropdowns. Rejected rows live in rejectedMessages (loaded on demand).
+        function getPanelForwardedMessages(modeOverride, statusOverride) {
+            const mSel = document.getElementById('messagesMediumFilter');
+            const sSel = document.getElementById('messagesStatusFilter');
+            const mode = modeOverride || (mSel ? mSel.value : 'rf');
+            const status = statusOverride || (sSel ? sSel.value : 'delivered');
+            const cutoffYYMMDD = selectedCutoffYYMMDD();
+            const src = (status === 'all' || status === 'rejected')
+                ? forwardedMessages.concat(rejectedMessages) : forwardedMessages;
+            return src.filter(m => m.date >= cutoffYYMMDD &&
+                mediumMatches(m.medium, mode) && statusMatches(m.acceptStatus, status));
+        }
+
+        // Server-side totals per status for the panel's current filters —
+        // lets the panel show how many offers were rejected without
+        // downloading those rows. Returns null if the API didn't send counts.
+        function panelStatusTotals(partnerFilter, typeFilter, mediumMode) {
+            if (!messageStatusCounts) return null;
+            const cutoffYYMMDD = selectedCutoffYYMMDD();
+            const t = { A: 0, R: 0, D: 0, E: 0, none: 0 };
+            for (const r of messageStatusCounts) {
+                if (r.day < cutoffYYMMDD) continue;
+                if (partnerFilter !== 'all' && r.partner !== partnerFilter) continue;
+                if (typeFilter !== 'all' && r.msg_type !== typeFilter) continue;
+                if (!mediumMatches(r.medium, mediumMode)) continue;
+                t[r.accept_status || 'none'] += parseInt(r.n) || 0;
+            }
+            return t;
+        }
+
+        // Rejected-offer rows are only fetched when the Status filter asks
+        // for them (they're ~70% of all offers). Cached per range.
+        async function fetchRejectedMessages(days) {
+            if (!usedMsgApiData || !msgApiHasDelivery || rejectedLoading) return;
+            if (days <= rejectedDaysLoaded) return;
+            rejectedLoading = true;
+            try {
+                const url = RF_API_URL + '?action=messages&status=rejected&days=' +
+                            encodeURIComponent(days) + '&limit=50000&t=' + Date.now();
+                const resp = await fetch(url, { cache: 'no-store' });
+                const json = resp.ok ? await resp.json() : null;
+                if (json && json.ok && json.data && Array.isArray(json.data.messages)) {
+                    rejectedMessages = json.data.messages.map(apiRowToMessage).filter(m => m !== null);
+                    rejectedDaysLoaded = days;
+                    console.log('[Msg API] Loaded ' + rejectedMessages.length + ' rejected offers (' + days + 'd)');
+                }
+            } catch (e) {
+                console.warn('[Msg API] Rejected-offer fetch failed: ' + e.message);
+            } finally {
+                rejectedLoading = false;
+                updateMessagesPanel();
+            }
+        }
+
+        // Widen the delivered-message window when a longer time range is
+        // picked (setTimeRange). Rejected cache is dropped — refetched on
+        // demand for the new range.
+        async function ensureMessagesLoadedForDays(days) {
+            if (!usedMsgApiData || days <= msgDaysLoaded) return;
+            updateStatus('loading', 'Loading messages for ' + days + ' days...');
+            const msgs = await fetchMessagesFromApi(days);
+            if (msgs !== null) {
+                forwardedMessages = msgs;
+                msgDaysLoaded = days;
+                rejectedMessages = []; rejectedDaysLoaded = 0;
+            }
+        }
+
+        // ── Status / Received cells ──────────────────────────────────────
+        function statusBadge(m) {
+            const b = (cls, label, title) =>
+                '<span class="px-1.5 py-0.5 rounded border text-xs font-semibold whitespace-nowrap ' + cls + '" title="' + title + '">' + label + '</span>';
+            switch (m.acceptStatus) {
+                case 'A': return m.deliveredMs
+                    ? b('bg-green-100 text-green-800 border-green-200', '✅', 'Accepted and delivered')
+                    : b('bg-green-50 text-green-700 border-green-200', '✅?', 'Accepted — transfer completion not seen in the log');
+                case 'R': return b('bg-red-50 text-red-700 border-red-200', '⛔ Dup', 'Rejected — partner already had it');
+                case 'D': return b('bg-amber-100 text-amber-800 border-amber-200', '⏸ Later', 'Deferred — partner asked for it to be offered again later');
+                case 'E': return b('bg-gray-100 text-gray-700 border-gray-200', '⚠', 'Other/error reply code');
+                default:  return '<span class="text-gray-400" title="No reply recorded — before delivery tracking (6 Oct 2026) or the session dropped">—</span>';
+            }
+        }
+
+        function receivedCell(m) {
+            if (!m.deliveredMs) return '<span class="text-gray-400">—</span>';
+            const d = new Date(m.deliveredMs);
+            const hhmmss = String(d.getUTCHours()).padStart(2, '0') + ':' +
+                           String(d.getUTCMinutes()).padStart(2, '0') + ':' +
+                           String(d.getUTCSeconds()).padStart(2, '0');
+            const sec = m._ms ? Math.max(0, Math.round((m.deliveredMs - m._ms) / 1000)) : null;
+            const delay = sec === null ? '' : sec < 60 ? sec + 's' : Math.floor(sec / 60) + 'm ' + String(sec % 60).padStart(2, '0') + 's';
+            const sameDay = !m._ms || new Date(m._ms).getUTCDate() === d.getUTCDate();
+            const prefix = sameDay ? '' : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()] + ' ' + d.getUTCDate() + ' ';
+            return '<span title="' + d.toISOString().replace('T', ' ').replace('.000Z', ' UTC') + '">' + prefix + hhmmss +
+                   (delay ? ' <span class="text-gray-400">+' + delay + '</span>' : '') + '</span>';
+        }
+
+        // Badge for the "Via" column. null/undefined medium = no ConnectLog
+        // match; it's treated as RF everywhere else (see isRfMedium()), so
+        // say so in the tooltip rather than implying it's non-RF.
+        const MEDIUM_BADGES = {
+            'VARA':   { label: '📡 RF',     cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', title: 'VARA HF (RF)' },
+            'NETROM': { label: '🔗 NET/ROM', cls: 'bg-indigo-100 text-indigo-800 border-indigo-200',  title: 'NET/ROM — not counted as RF' },
+            'TELNET': { label: '🌐 Telnet',  cls: 'bg-sky-100 text-sky-800 border-sky-200',           title: 'Telnet / Internet — not counted as RF' },
+            'AX.25':  { label: '📻 AX.25',   cls: 'bg-teal-100 text-teal-800 border-teal-200',        title: 'AX.25 packet — not counted as RF' },
+            'AXIP':   { label: '🛰 AXIP',    cls: 'bg-sky-100 text-sky-800 border-sky-200',           title: 'AX.25 over IP (BPQAXIP port) — not counted as RF' },
+            'ARDOP':  { label: '📶 ARDOP',   cls: 'bg-teal-100 text-teal-800 border-teal-200',        title: 'ARDOP — not counted as VARA HF' },
+        };
+        function mediumBadge(medium) {
+            const b = MEDIUM_BADGES[medium];
+            if (b) {
+                return '<span class="px-1.5 py-0.5 rounded border text-xs font-semibold whitespace-nowrap ' + b.cls + '" title="' + b.title + '">' + b.label + '</span>';
+            }
+            const portM = /^PORT(\d+)$/.exec(medium || '');
+            if (portM) {
+                return '<span class="px-1.5 py-0.5 rounded border text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-700 border-gray-200" title="Outbound connect on BPQ port ' + portM[1] + ' (type not found in bpq32.cfg) with no VARA session — not counted as RF">Port ' + portM[1] + '</span>';
+            }
+            if (medium) {
+                const safe = String(medium).replace(/[^A-Za-z0-9.\-_]/g, '');
+                return '<span class="px-1.5 py-0.5 rounded border text-xs font-semibold whitespace-nowrap bg-gray-100 text-gray-700 border-gray-200" title="' + safe + ' — not counted as RF">' + safe + '</span>';
+            }
+            return '<span class="px-1.5 py-0.5 rounded border text-xs font-semibold bg-gray-50 text-gray-400 border-gray-200" title="Unknown — no matching ConnectLog entry; counted as RF">?</span>';
         }
 
         // Real per-base-callsign (`m.partner` is already SSID-stripped)
@@ -3185,6 +3428,7 @@
             let sent = 0, recv = 0;
             for (const m of forwardedMessages) {
                 if (!isRfMedium(m)) continue;  // RF-only, same as getFilteredForwardedMessages()
+                if (!isDelivered(m)) continue; // deliveries only (2026-10-06)
                 const yy = 2000 + parseInt(m.date.substring(0, 2));
                 const mo = parseInt(m.date.substring(2, 4)) - 1;
                 const dd = parseInt(m.date.substring(4, 6));
@@ -3205,47 +3449,97 @@
         function updateMessagesPanel() {
             const partnerFilter = document.getElementById('messagesPartnerFilter').value;
             const typeFilter = document.getElementById('messagesTypeFilter').value;
-            
-            // Time-filtered totals for badge and dropdown counts (same
-            // window as connections; base for the partner/type filters below)
-            const timeFiltered = getFilteredForwardedMessages();
-            
+            const mediumMode = (document.getElementById('messagesMediumFilter') || {}).value || 'rf';
+            const statusSel = document.getElementById('messagesStatusFilter');
+            const statusMode = statusSel ? statusSel.value : 'delivered';
+
+            // Rejected rows are fetched on demand; re-renders when they land.
+            if ((statusMode === 'all' || statusMode === 'rejected') && rejectedDaysLoaded < selectedDays) {
+                fetchRejectedMessages(Math.max(selectedDays, msgDaysLoaded || selectedDays));
+            }
+
+            // Time + Via + Status filtered rows (base for partner/type below)
+            const timeFiltered = getPanelForwardedMessages();
+
             let filtered = timeFiltered;
             if (partnerFilter !== 'all') filtered = filtered.filter(m => m.partner === partnerFilter);
             if (typeFilter !== 'all') filtered = filtered.filter(m => m.msgType === typeFilter);
-            
+
             // Sort newest first
             filtered.sort((a, b) => b._sort.localeCompare(a._sort));
-            
-            // Update count badge
-            document.getElementById('messagesCount').textContent = timeFiltered.length;
-            
-            // Summary cards
-            const inCount = filtered.filter(m => m.direction === 'in').length;
-            const outCount = filtered.filter(m => m.direction === 'out').length;
-            const bulletins = filtered.filter(m => m.msgType === 'B').length;
-            const personal = filtered.filter(m => m.msgType === 'P').length;
-            const traffic = filtered.filter(m => m.msgType === 'T').length;
-            const totalSize = filtered.reduce((sum, m) => sum + m.size, 0);
-            
+
+            // Summary cards always describe DELIVERED traffic for the current
+            // Via/partner/type filters, whatever the Status dropdown shows;
+            // rejected/deferred totals get their own cards.
+            let delivered = getPanelForwardedMessages(mediumMode, 'delivered');
+            if (partnerFilter !== 'all') delivered = delivered.filter(m => m.partner === partnerFilter);
+            if (typeFilter !== 'all') delivered = delivered.filter(m => m.msgType === typeFilter);
+
+            // Count badge: delivered messages in range for the Via filter
+            document.getElementById('messagesCount').textContent =
+                getPanelForwardedMessages(mediumMode, 'delivered').length;
+
+            const inCount = delivered.filter(m => m.direction === 'in').length;
+            const outCount = delivered.filter(m => m.direction === 'out').length;
+            const bulletins = delivered.filter(m => m.msgType === 'B').length;
+            const personal = delivered.filter(m => m.msgType === 'P').length;
+            const traffic = delivered.filter(m => m.msgType === 'T').length;
+            const totalSize = delivered.reduce((sum, m) => sum + m.size, 0);
+
+            const totals = panelStatusTotals(partnerFilter, typeFilter, mediumMode);
+            const rejectedTotal = totals ? totals.R
+                : getPanelForwardedMessages(mediumMode, 'rejected').filter(m =>
+                    (partnerFilter === 'all' || m.partner === partnerFilter) &&
+                    (typeFilter === 'all' || m.msgType === typeFilter)).length;
+            const deferredTotal = totals ? totals.D + totals.E
+                : getPanelForwardedMessages(mediumMode, 'deferred').filter(m =>
+                    (partnerFilter === 'all' || m.partner === partnerFilter) &&
+                    (typeFilter === 'all' || m.msgType === typeFilter)).length;
+            const withTimes = delivered.filter(m => m.deliveredMs && m._ms);
+            let medianDelay = null;
+            if (withTimes.length) {
+                const ds = withTimes.map(m => (m.deliveredMs - m._ms) / 1000).sort((x, y) => x - y);
+                medianDelay = Math.round(ds[Math.floor(ds.length / 2)]);
+            }
+            const setStatus = v => "document.getElementById('messagesStatusFilter').value='" + v + "'; updateMessagesPanel()";
+
+            // Non-RF breakdown: shown as a card when non-RF rows are visible,
+            // or as a "+N hidden" hint while the panel is on RF only, so a
+            // partner delivering over NET/ROM/Telnet is never invisible.
+            const nonRfCount = delivered.filter(m => !isRfMedium(m)).length;
+            let hiddenNonRf = 0;
+            if (mediumMode === 'rf') {
+                let allMsgs = getPanelForwardedMessages('all', 'delivered');
+                if (partnerFilter !== 'all') allMsgs = allMsgs.filter(m => m.partner === partnerFilter);
+                if (typeFilter !== 'all') allMsgs = allMsgs.filter(m => m.msgType === typeFilter);
+                hiddenNonRf = allMsgs.filter(m => !isRfMedium(m)).length;
+            }
+
             // Unique partners in filtered messages
             const partnerSet = new Set(filtered.map(m => m.partner));
-            
+
             document.getElementById('messagesSummaryCards').innerHTML =
-                '<div class="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-xs font-semibold border border-green-200">⬇ Received: ' + inCount + '</div>' +
-                '<div class="px-3 py-1.5 bg-orange-100 text-orange-800 rounded-lg text-xs font-semibold border border-orange-200">⬆ Forwarded: ' + outCount + '</div>' +
+                '<div class="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-xs font-semibold border border-green-200" title="Messages delivered to this station">⬇ Received: ' + inCount + '</div>' +
+                '<div class="px-3 py-1.5 bg-orange-100 text-orange-800 rounded-lg text-xs font-semibold border border-orange-200" title="Messages delivered to partners">⬆ Forwarded: ' + outCount + '</div>' +
                 '<div class="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-xs font-semibold border border-blue-200">📋 Bulletins: ' + bulletins + '</div>' +
                 (personal > 0 ? '<div class="px-3 py-1.5 bg-purple-100 text-purple-800 rounded-lg text-xs font-semibold border border-purple-200">✉ Personal: ' + personal + '</div>' : '') +
                 (traffic > 0 ? '<div class="px-3 py-1.5 bg-cyan-100 text-cyan-800 rounded-lg text-xs font-semibold border border-cyan-200">📮 Traffic: ' + traffic + '</div>' : '') +
-                '<div class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold border border-gray-200">📦 ' + (totalSize > 1024 ? (totalSize / 1024).toFixed(1) + ' KB' : totalSize + ' B') + '</div>';
-            
+                '<div class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold border border-gray-200">📦 ' + (totalSize > 1024 ? (totalSize / 1024).toFixed(1) + ' KB' : totalSize + ' B') + '</div>' +
+                (medianDelay !== null ? '<div class="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold border border-gray-200" title="Median time from offer to transfer complete">⏱ Median ' + (medianDelay < 60 ? medianDelay + 's' : Math.round(medianDelay / 60) + 'm') + '</div>' : '') +
+                (rejectedTotal > 0 ? '<button type="button" onclick="' + setStatus('rejected') + '" class="px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-semibold border border-red-200 hover:bg-red-100" title="Offers the partner turned down because it already had the message — click to list them">⛔ Rejected: ' + rejectedTotal + '</button>' : '') +
+                (deferredTotal > 0 ? '<button type="button" onclick="' + setStatus('deferred') + '" class="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg text-xs font-semibold border border-amber-200" title="Offers the partner asked to receive later — click to list them">⏸ Deferred: ' + deferredTotal + '</button>' : '') +
+                (nonRfCount > 0 ? '<div class="px-3 py-1.5 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-semibold border border-indigo-200" title="Delivered over NET/ROM, Telnet, AXIP or AX.25 — not included in RF counts elsewhere on this page">🔗 Non-RF: ' + nonRfCount + '</div>' : '') +
+                (hiddenNonRf > 0 ? '<button type="button" onclick="document.getElementById(\'messagesMediumFilter\').value=\'all\'; saveMessagesMediumFilter(); updateMessagesPanel()" class="px-3 py-1.5 bg-white text-indigo-700 rounded-lg text-xs font-semibold border border-dashed border-indigo-300 hover:bg-indigo-50" title="These arrived over NET/ROM, Telnet, AXIP or AX.25">+' + hiddenNonRf + ' non-RF hidden — show</button>' : '');
+
             // Partner filter dropdown (based on time-filtered messages)
             const partnerSelect = document.getElementById('messagesPartnerFilter');
             const currentVal = partnerSelect.value;
-            const allPartners = [...new Set(timeFiltered.map(m => m.partner))].sort();
+            const partnerBase = getPanelForwardedMessages(mediumMode, 'delivered');
+            const allPartners = [...new Set(partnerBase.map(m => m.partner).concat(
+                partnerFilter !== 'all' ? [partnerFilter] : []))].sort();
             partnerSelect.innerHTML = '<option value="all">All Partners (' + allPartners.length + ')</option>' +
                 allPartners.map(p => {
-                    const cnt = timeFiltered.filter(m => m.partner === p).length;
+                    const cnt = partnerBase.filter(m => m.partner === p).length;
                     return '<option value="' + p + '"' + (p === currentVal ? ' selected' : '') + '>' + p + ' (' + cnt + ')</option>';
                 }).join('');
             
@@ -3255,7 +3549,7 @@
             const dirLabels = { 'in': '<span class="text-green-600 font-bold" title="Received">⬇</span>', 'out': '<span class="text-orange-600 font-bold" title="Forwarded">⬆</span>' };
             
             document.getElementById('messagesTableBody').innerHTML = display.length === 0 ?
-                '<tr><td colspan="8" class="text-center py-4 text-gray-400">No messages found for selected filters</td></tr>' :
+                '<tr><td colspan="11" class="text-center py-4 text-gray-400">' + (rejectedLoading ? 'Loading rejected offers…' : 'No messages found for selected filters') + '</td></tr>' :
                 display.map(m => {
                     const monNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
                     const monIdx = parseInt(m.date.substring(2, 4)) - 1;
@@ -3265,6 +3559,9 @@
                         '<td class="px-2 sm:px-3 py-1.5 font-mono text-xs">' + dateFormatted + ' ' + m.time.substring(0, 5) + '</td>' +
                         '<td class="px-2 sm:px-3 py-1.5 text-center">' + dirLabels[m.direction] + '</td>' +
                         '<td class="px-2 sm:px-3 py-1.5 font-semibold">' + m.partner + '</td>' +
+                        '<td class="px-2 sm:px-3 py-1.5 text-center">' + mediumBadge(m.medium) + '</td>' +
+                        '<td class="px-2 sm:px-3 py-1.5 text-center">' + statusBadge(m) + '</td>' +
+                        '<td class="px-2 sm:px-3 py-1.5 font-mono text-xs whitespace-nowrap">' + receivedCell(m) + '</td>' +
                         '<td class="px-2 sm:px-3 py-1.5 text-center">' + (typeLabels[m.msgType] || m.msgType) + '</td>' +
                         '<td class="px-2 sm:px-3 py-1.5">' + m.fromCall + '</td>' +
                         '<td class="px-2 sm:px-3 py-1.5">' + m.category + '@' + m.toArea + '</td>' +
@@ -3273,9 +3570,11 @@
                     '</tr>';
                 }).join('');
             
-            document.getElementById('messagesFooter').textContent = filtered.length > 200 ? 
-                'Showing 200 of ' + filtered.length + ' messages' : 
-                filtered.length + ' message' + (filtered.length !== 1 ? 's' : '') + ' from ' + partnerSet.size + ' partner' + (partnerSet.size !== 1 ? 's' : '');
+            const noun = statusMode === 'delivered' ? 'delivered message' : 'offer';
+            document.getElementById('messagesFooter').textContent = filtered.length > 200 ?
+                'Showing newest 200 of ' + filtered.length + ' ' + noun + 's' :
+                filtered.length + ' ' + noun + (filtered.length !== 1 ? 's' : '') + ' from ' + partnerSet.size + ' partner' + (partnerSet.size !== 1 ? 's' : '') +
+                (rejectedLoading ? ' — loading rejected offers…' : '');
         }
 
         function findFrequency(callsign, h, m, s, type, dateStr) {
@@ -3712,7 +4011,7 @@
                             if (conn.failureType === 'channelBusy') stats.failureTypesByBand[conn.band].channelBusy++;
                             else if (conn.failureType === 'portInSession') stats.failureTypesByBand[conn.band].portInSession++;
                             else if (conn.failureType === 'timeout') stats.failureTypesByBand[conn.band].timeout++;
-                            else if (conn.failureType === 'incomingFailed') stats.failureTypesByBand[conn.band].incomingFailed++;
+                            else if (conn.failureType === 'incoming' || conn.failureType === 'incomingFailed') stats.failureTypesByBand[conn.band].incomingFailed++;
                             else if (conn.failureType === 'nodata') stats.failureTypesByBand[conn.band].nodata++;
                         }
                     }
@@ -3906,7 +4205,7 @@
                         if (conn.failureType === 'channelBusy') stats.failureTypesByBand[conn.band].channelBusy++;
                         else if (conn.failureType === 'portInSession') stats.failureTypesByBand[conn.band].portInSession++;
                         else if (conn.failureType === 'timeout') stats.failureTypesByBand[conn.band].timeout++;
-                        else if (conn.failureType === 'incomingFailed') stats.failureTypesByBand[conn.band].incomingFailed++;
+                        else if (conn.failureType === 'incoming' || conn.failureType === 'incomingFailed') stats.failureTypesByBand[conn.band].incomingFailed++;
                         else if (conn.failureType === 'nodata') stats.failureTypesByBand[conn.band].nodata++;
                     }
                 }
@@ -4107,6 +4406,7 @@
             // Lazy-load additional BBS+CMS logs if needed.
             // No-op if days already loaded — instant return.
             await ensureBbsLogsLoadedForDays(days);
+            await ensureMessagesLoadedForDays(days);
             
             // Refilter and update
             if (allConnections.length > 0) {
@@ -4143,6 +4443,10 @@
                     failedTimeout: document.getElementById('failedTimeout'),
                     failedChannelBusy: document.getElementById('failedChannelBusy'),
                     failedNoData: document.getElementById('failedNoData'),
+                    failedPortSession: document.getElementById('failedPortSession'),
+                    failedIncoming: document.getElementById('failedIncoming'),
+                    failedOther: document.getElementById('failedOther'),
+                    failedOtherRow: document.getElementById('failedOtherRow'),
                     uniqueStations: document.getElementById('uniqueStations'),
                     successRate: document.getElementById('successRate'),
                     avgBitrate: document.getElementById('avgBitrate'),
@@ -4163,6 +4467,14 @@
             el.failedTimeout.textContent = stats.failedTimeout;
             el.failedChannelBusy.textContent = stats.failedChannelBusy;
             el.failedNoData.textContent = stats.failedNoData;
+            el.failedPortSession.textContent = stats.failedPortSession;
+            el.failedIncoming.textContent = stats.failedIncoming;
+            // Failures with no recognised reason still count toward the total;
+            // show them so the breakdown always adds up to it.
+            const failedOther = Math.max(0, stats.failed - stats.failedTimeout - stats.failedChannelBusy -
+                                stats.failedNoData - stats.failedPortSession - stats.failedIncoming);
+            el.failedOther.textContent = failedOther;
+            el.failedOtherRow.classList.toggle('hidden', failedOther <= 0);
             el.uniqueStations.textContent = Object.keys(stats.stations).length;
             // Success rate based on connections array length for consistency with refresh display
             const total = connections.length;
@@ -5892,7 +6204,7 @@
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>TPRFN Hub Station HF Efficiency Report</title>
+                    <title>HUB Station HF Efficiency Report</title>
                     <style>
                         body { font-family: Arial, sans-serif; margin: 20px; color: #333; font-size: 11px; }
                         h1 { color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; font-size: 18px; }
@@ -6198,7 +6510,7 @@
             // BUILD HTML REPORT
             let html = `
                 <h1 style="font-size: 1.5rem; font-weight: bold; color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 20px;">
-                    📊 TPRFN Hub Station HF Efficiency Report
+                    📊 HUB Station HF Efficiency Report
                 </h1>
                 <p style="color: #666; margin-bottom: 5px;">
                     <strong>Data Period:</strong> ${dateRangeStr} (7 days) | 
@@ -6452,7 +6764,7 @@
             html += `
                 <h2 style="font-size: 1.25rem; font-weight: bold; color: #764ba2; margin-top: 25px; margin-bottom: 5px;">📅 Daily Performance</h2>
                 <p style="font-size: 0.8rem; color: #888; margin-bottom: 10px; line-height: 1.5;">
-                    Day-by-day breakdown of forwarding partner connections. Msgs = messages detected (TX+RX &gt;= ${MSG_THRESHOLD} total bytes, aligned with TPRFN Network Map threshold).
+                    Day-by-day breakdown of forwarding partner connections. Msgs = messages detected (TX+RX &gt;= ${MSG_THRESHOLD} total bytes, aligned with the Network Map threshold).
                 </p>
                 <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 0.8rem;">
@@ -6749,7 +7061,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.13 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.14 | HF Efficiency Report
                 </p>
             `;
             
@@ -7377,6 +7689,5 @@
     <script>
     (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
     </script>
-<script src="shared/settings-modal.js"></script>
 </body>
 </html>

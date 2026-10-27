@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>System Audit — YOURCALL BPQ</title>
+<title>System Audit - BPQ Dashboard</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
@@ -78,6 +78,8 @@
   .finding.ok   {border-left:3px solid var(--green);}
   .finding.warn {border-left:3px solid var(--amber);}
   .finding.crit {border-left:3px solid var(--red);}
+  .finding.info {border-left:3px solid var(--muted);opacity:0.85;}
+  .score-count.info .n{color:var(--muted);}
   .finding-header{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;user-select:none;}
   .finding-header:hover{background:rgba(255,255,255,0.02);}
   .finding-icon{font-size:1rem;flex-shrink:0;width:20px;text-align:center;}
@@ -109,22 +111,19 @@
 <body data-nav-page="audit">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="/bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 
 <a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
 
 <header>
-  <h1>🔍 BPQ Dashboard <span>//</span> System Audit <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.13</span></h1>
-  <div class="meta">YOURCALL · YOURNODE · Live health check<br>Security · Resources · Services · Database · Logs</div>
+  <h1>🔍 BPQ Dashboard <span>//</span> System Audit <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.14</span></h1>
+  <div class="meta"><span id="station-line">Live health check</span><br>Security · Resources · Web server · Database · Logs · Services</div>
 </header>
 
 <div id="auth-gate" class="auth-gate" style="display:none;">
-  <h2>🔒 Authentication Required</h2>
-  <p>Enter your BBS password to run a system audit</p>
-  <input type="password" id="auth-input" class="auth-input" placeholder="BBS Password">
-  <button class="auth-btn" onclick="attemptAuth()">Run Audit</button>
-  <div id="auth-error" class="auth-error" style="display:none;"></div>
+  <h2>🔒 Admin login needed</h2>
+  <p id="auth-msg"></p>
 </div>
 
 <div id="main-content" style="display:none;">
@@ -141,48 +140,40 @@
 
 <script>
 const API = 'system-audit-api.php';
-let savedPw = sessionStorage.getItem('bbs_pw') || '';
+// 2026-10-05: no BBS password any more. /admin/ is behind the admin login
+// and the API checks it; the password used to go in the URL (web-server logs).
+try { sessionStorage.removeItem('bbs_pw'); } catch (e) {}
 let auditData = null;
 let activeFilter = 'all';
 
 const CAT_META = {
   security:    { label: 'Security',    icon: '🔒', color: '#f85149', sectionColor: 'red'    },
   resources:   { label: 'Resources',   icon: '⚡', color: '#d29922', sectionColor: 'amber'  },
-  nginx:       { label: 'NGINX & PHP', icon: '🌐', color: '#58a6ff', sectionColor: 'blue'   },
+  nginx:       { label: 'Web server & PHP', icon: '🌐', color: '#58a6ff', sectionColor: 'blue'   },
   database:    { label: 'Database',    icon: '🗄️', color: '#bc8cff', sectionColor: 'purple' },
   logs:        { label: 'Logs',        icon: '📋', color: '#39d0d8', sectionColor: 'cyan'   },
   application: { label: 'Application', icon: '📡', color: '#3fb950', sectionColor: 'green'  },
 };
 
-const STATUS_ICON = { ok: '✅', warn: '⚠️', crit: '🔴' };
+const STATUS_ICON = { ok: '✅', warn: '⚠️', crit: '🔴', info: 'ℹ️' };
 
-function init() {
-  if (savedPw) { loadData(savedPw); }
-  else {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('auth-gate').style.display = 'block';
-    document.getElementById('auth-input').addEventListener('keydown', e => { if(e.key==='Enter') attemptAuth(); });
-  }
-}
+function init() { loadData(); }
 
-function attemptAuth() {
-  const pw = document.getElementById('auth-input').value.trim();
-  if (!pw) return;
-  loadData(pw);
-}
 
-function loadData(pw) {
+function loadData() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('loading').textContent = 'Running system audit…';
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('main-content').style.display = 'none';
 
-  fetch(API + '?password=' + encodeURIComponent(pw))
-    .then(r => { if(r.status===401) throw new Error('auth'); return r.json(); })
+  fetch(API)
+    .then(r => r.text().then(t => {
+      let d = null; try { d = JSON.parse(t); } catch (e) {}
+      if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.detail = (d && d.error) || ''; throw e; }
+      if (d === null) throw new Error('HTTP ' + r.status + ' (not JSON)');
+      return d;
+    }))
     .then(data => {
-      if (data.error === 'Unauthorized') throw new Error('auth');
-      savedPw = pw;
-      sessionStorage.setItem('bbs_pw', pw);
       auditData = data;
       document.getElementById('loading').style.display = 'none';
       document.getElementById('main-content').style.display = 'block';
@@ -192,14 +183,13 @@ function loadData(pw) {
       document.getElementById('loading').style.display = 'none';
       if (err.message === 'auth') {
         document.getElementById('auth-gate').style.display = 'block';
-        document.getElementById('auth-error').textContent = '✗ Invalid password';
-        document.getElementById('auth-error').style.display = 'block';
-        sessionStorage.removeItem('bbs_pw'); savedPw = '';
+        document.getElementById('auth-msg').textContent = err.detail ||
+          'The admin login did not reach this page. Reload the page and log in.';
       } else {
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('main-content').innerHTML =
-          '<div class="error-msg">⚠ Audit failed: ' + err.message +
-          '<br><small>Ensure system-audit-api.php is deployed to /var/www/<dashboard>/</small></div>';
+          '<div class="error-msg">⚠ Audit failed: ' + escHtml(err.message) +
+          '<br><small>admin/system-audit-api.php did not return a result. Its PHP error is in the web server error log (Maintenance → Web server &amp; PHP).</small></div>';
       }
     });
 }
@@ -207,8 +197,11 @@ function loadData(pw) {
 function render(data) {
   const f = data.findings;
   const s = data.summary;
-  const total = f.length;
-  const score = total > 0 ? Math.round((s.ok / total) * 100) : 100;
+  // info rows (not checked / not installed) don't count towards the score
+  const total = (s.ok||0) + (s.warn||0) + (s.crit||0);
+  const score = total > 0 ? Math.round(((s.ok||0) / total) * 100) : 100;
+  if (data.callsign || data.node) document.getElementById('station-line').textContent =
+    [data.callsign, data.node].filter(Boolean).join(' · ') + ' · Live health check';
   const scoreColor = score >= 80 ? '#3fb950' : score >= 60 ? '#d29922' : '#f85149';
 
   // Score banner
@@ -224,12 +217,13 @@ function render(data) {
     </div>
     <div class="score-info">
       <h2 style="color:${scoreColor}">${score}% Healthy</h2>
-      <p>${s.ok} checks passed · ${s.warn||0} warnings · ${s.crit||0} critical</p>
+      <p>${s.ok} checks passed · ${s.warn||0} warnings · ${s.crit||0} critical${s.info?` · ${s.info} not checked / not installed`:''}</p>
     </div>
     <div class="score-counts">
       <div class="score-count ok"><div class="n">${s.ok}</div><div class="l">OK</div></div>
       <div class="score-count warn"><div class="n">${s.warn||0}</div><div class="l">Warn</div></div>
       <div class="score-count crit"><div class="n">${s.crit||0}</div><div class="l">Critical</div></div>
+      ${s.info?`<div class="score-count info"><div class="n">${s.info}</div><div class="l">Info</div></div>`:''}
     </div>
     <div class="sysinfo">
       Host: ${data.hostname||'localhost'}<br>
@@ -247,7 +241,7 @@ function render(data) {
   // Timestamp
   document.getElementById('ts').innerHTML =
     `<span>Generated: ${data.generated_at}</span>
-     <button class="refresh-btn" onclick="loadData(savedPw)">⟳ Re-run Audit</button>`;
+     <button class="refresh-btn" onclick="loadData()">⟳ Re-run Audit</button>`;
 
   // Category tabs — count warnings/crits per category
   const catCounts = {};
@@ -294,7 +288,7 @@ function setFilter(filter, btn) {
 
 function renderFindings(findings, filter) {
   let filtered = findings;
-  if (filter === 'issues') filtered = findings.filter(f=>f.status!=='ok');
+  if (filter === 'issues') filtered = findings.filter(f=>f.status==='warn'||f.status==='crit');
   else if (filter !== 'all') filtered = findings.filter(f=>f.category===filter);
 
   // Group by category
@@ -326,8 +320,8 @@ function renderFindings(findings, filter) {
     const items = groups[cat];
     // Sort: crit → warn → ok
     items.sort((a,b) => {
-      const o = {crit:0,warn:1,ok:2};
-      return (o[a.status]||3) - (o[b.status]||3);
+      const o = {crit:0,warn:1,ok:2,info:3};
+      return (o[a.status] ?? 4) - (o[b.status] ?? 4);
     });
 
     html += `<div style="margin-bottom:24px;">
@@ -351,7 +345,7 @@ function renderFinding(f, id) {
     <div class="finding-header" onclick="${hasBody?`toggleFinding('${id}')`:''}">
       <span class="finding-icon">${icon}</span>
       <span class="finding-title">${escHtml(f.title)}</span>
-      <span class="finding-cat">${f.category}</span>
+      <span class="finding-cat">${escHtml((CAT_META[f.category]||{}).label||f.category)}</span>
       ${hasBody?`<span class="finding-chevron" id="chev-${id}">▼</span>`:''}
     </div>
     ${hasBody?`<div class="finding-body" id="body-${id}">
@@ -380,5 +374,6 @@ function escHtml(str) {
 
 init();
 </script>
+<script src="/shared/settings-modal.js"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
 </body>
 </html>

@@ -1,0 +1,15 @@
+[Unit]
+Description=BPQ Dashboard — save BBS message text to the database
+After=network.target mysql.service mariadb.service
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+# Lists the newest Personal/NTS/Bulletins on the BBS, archives them and
+# saves the text of any message that has none yet (header-checked).
+# See scripts/fetch-message-bodies.php. Never longer than 20 minutes.
+ExecStart=/usr/bin/php /var/www/bpq-dashboard/scripts/fetch-message-bodies.php
+TimeoutStartSec=20min
+StandardOutput=journal
+StandardError=journal

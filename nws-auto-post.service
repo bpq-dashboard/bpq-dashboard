@@ -1,0 +1,16 @@
+[Unit]
+Description=BPQ Dashboard — post new NWS Warnings/Watches to the BBS as bulletins
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+# Reads api.weather.gov for config.php nws.auto_post.area (first issues of
+# Warnings/Watches only), posts new ones with SB to nws.auto_post.destination.
+# See scripts/nws-auto-post.php. Does nothing unless nws.auto_post.enabled.
+ExecStart=/usr/bin/php /var/www/bpq-dashboard/scripts/nws-auto-post.php
+TimeoutStartSec=10min
+StandardOutput=journal
+StandardError=journal

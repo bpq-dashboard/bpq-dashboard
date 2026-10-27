@@ -1,0 +1,13 @@
+[Unit]
+Description=Save BBS message text to the database every 5 minutes
+
+[Timer]
+# BPQ can remove bulletins within days of arrival (K1AJD, 2026-10), so
+# text is captured soon after a message is listed. A run that is still
+# going when the next one is due is simply skipped by systemd.
+OnBootSec=3min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

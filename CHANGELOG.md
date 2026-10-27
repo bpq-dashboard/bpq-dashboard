@@ -4,7 +4,949 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
-_Nothing yet._
+## [1.5.14] - 2026-10-27
+
+Everything since 1.5.13 (2026-09-26). Highlights: the admin login now
+guards everything that acts as the station, checked by the PHP as well as
+the web server; Kill/Forward as POST, same-origin CORS and rate limits;
+message text saved on the server and the message pop-up in the Email
+Client; Forwarded Messages delivery method and status; the APRS BBS beacon;
+rig pages for non-Yaesu radios; NWS Post to BBS fixed; the APRS map's CARTO
+key in config.php; `CREDITS.md`. Since the first 1.5.14 freeze (2026-10-20):
+YAPP file transfer reworked; automatic NWS Warning/Watch bulletins
+(optional); fresh installs get working Telnet Client, VARA HF Terminal,
+NetROM list and Apache PHP; the VARA terminal and NetROM list read their
+login from config.php and cope with a custom BBS prompt; admin pages report
+the install accurately; NWS page posts bulletins (`SB`); the station's own
+callsign on every page instead of placeholders; NTS Report behind the
+login; `smartplug` in `config.php.example`; User Guide and Manual checked
+against the code. Upgrading: re-run `install.sh` (see USER-MANUAL
+"Updating to a newer version", including the one-time history steps for
+older installs).
+
+### Fixed (2026-10-27, later) — new-user fixes before the release
+- **NWS page posting** (`nws-bbs-post.php` 1.4.0): an address like `WX@GA`
+  is sent as a bulletin (`SB`), one starting with a callsign as a private
+  message (`SP`); before, everything went as `SP`, so a hand-posted alert
+  never flooded. The page's destination now starts as the server default
+  (`nws.post_destination`; empty = `WX@<nws.auto_post.area>`, else `WX@ALLUS`,
+  via `GET nws-bbs-post.php?action=config`) and shows how it will be sent.
+- **Placeholder text replaced by the station's own** (`station-info.php`):
+  Chat (opening box, status bar node, sysop view = station callsign; handle
+  no longer defaults to `YOURCALL`), VARA HF Terminal (login box node; no
+  "BPQ Port 3"), Email Client ("Forwarded by <callsign>"), NWS (*Your
+  Callsign* starts as `station.callsign`). Chat and VARA access requests are
+  e-mailed by the server (`vara-api.php action=request`, `service=chat`) to
+  `station.email`; the address is no longer shown or returned, the page says
+  when the server couldn't send, one request per address per 10 minutes
+  (`cache/access-requests.json`).
+- **NTS Report behind the admin login**: `nts-forwarding-report.php` checks
+  the web-server login; `install.sh` (nginx + Apache), `nginx-bpq-dashboard.conf`
+  and `bpq-dashboard.conf` protect it; Install Check expects it in the login
+  locations.
+- **Power switch** (`smartplug`): in `config.php.example` (host empty); the
+  built-in `192.168.1.100` / `admin` / `admin` default is gone — with no host
+  nothing is contacted, Rig Status shows *Not set up*, the power buttons
+  answer "No power switch is set up".
+- Docs: Guide §1 login table, §5 Chat, §7 VARA, §9 NTS Report, §16 Rig
+  Status, §18 NWS Configuration / Post to BBS, §26 two new messages, §27
+  three items removed, §29 NTS Report URL (admin login); Manual What's New,
+  Part B config table (`nws.post_destination`, `smartplug`), §9 VARA access
+  requests, §10.4, §10.7, URL table, *Updating* (NTS login, power switch).
+  Maintenance page: NTS report needs the login. PDFs regenerated.
+
+### Fixed (2026-10-27) — VARA HF Terminal / NetROM list with a custom BBS prompt
+- `scripts/bpq-vara-daemon.py`, `bpq-nodes-api.php`: after login, the BBS
+  was only recognised by the prompt `de <user>>`. BPQ Mail's prompt is
+  configurable (e.g. `CALL: hello de BBSCALL>`) and can follow
+  `Connected to BBS` and the SID after a pause; the node prompt in that line
+  (`ALIAS:CALL-N}`) made the daemon think it was at the node, so `ATT` went
+  to the BBS ("Output aborted") and the terminal never attached. Now
+  `Connected to BBS`, a SID or any `de …>` prompt counts as the BBS; both wait
+  up to 10 s for the prompt, then `NODE`. Users landing at the node are
+  unchanged.
+
+### Changed (2026-10-27) — Menu cache version
+- `NAV_VERSION` in `bpq-nav-loader.js` and the `?v=` on all 17 pages'
+  loader tags raised `2026-10-25-1` → `2026-10-27-1`, so browsers that cached
+  an older menu (📖 Guide link to an older PDF) fetch the current `_nav.html`.
+  No menu content change; User Guide / Manual / admin pages unaffected
+  (System Audit's nav-version check reads the value from the loader).
+
+### Added (2026-10-26) — Automatic NWS Warning/Watch bulletins
+- **`scripts/nws-auto-post.php`** + `nws-auto-post.service` / `.timer` (every
+  5 min): posts the first issue of each new NWS Warning or Watch for one state
+  (`config.php` `nws.auto_post`, e.g. `GA` → `WX@GA`) as a bulletin with `SB`,
+  through the Email Client's `sendMessage()` and the shared BBS lock. No
+  updates, extensions or cancellations; already-ended alerts skipped; never
+  posts the same alert twice (`cache/nws-auto-post-state.json`). A watch issued
+  by several NWS offices (same watch number) becomes one bulletin listing that
+  state's counties, after a `watch_hold_minutes` wait for the other pieces.
+  Retries an unreachable BBS every run; a post the BBS may have taken is
+  retried at most 3 times. `--dry-run`, `--seed`, `--verbose`, `--file=`.
+  Off until `nws.auto_post.enabled` is `true`.
+- Log Viewer: *NWS auto-post* (`logs/nws-auto-post.log`).
+- `config.php.example` gets an `nws` section (`post_destination`, `auto_post`).
+- **install.sh** asks (Step 1, default No) whether to turn it on, then for the
+  2-letter state code (checked against the US state/territory list), the
+  bulletin address (default `WX@<state>`) and Warnings + Watches or Warnings
+  only. It writes the `nws` section to `config.php` (bulletin times in the
+  state's main time zone, since servers usually run on UTC), always installs
+  the two unit files, and enables the timer only on Yes.
+- `area` no longer defaults to `GA`: with no state set the script says so
+  (enabled runs) and does nothing; `destination` empty = `WX@<area>`.
+- **Maintenance page:** new section *NWS automatic bulletins* (status,
+  dry run, seed, enable, "posted but no other BBS gets it"); timers line.
+- **Docs:** Guide §18, §24 timers, §25 settings, §26 four messages, §27 two
+  known limitations (the NWS page's Post buttons send `SP`, a private
+  message; the page doesn't know about automatic posts). Manual §2, §4
+  (installer questions, after-install, Part B config table), §10.4,
+  services/timers tables. README. Guide and Manual PDFs regenerated.
+- **System Audit:** row for `nws-auto-post.timer` when it is switched on
+  (not installed / stopped / last run failed / no state set); its log is in
+  the log-rotation check.
+
+### Fixed (2026-10-25) — Fresh installs: Telnet Client, VARA HF Terminal, NetROM list, Apache
+- **The installer's site file now connects the Telnet and VARA pages** (nginx
+  and Apache): `/ws/telnet` → `bpq-telnet` (8765), `/ws/vara` → `bpq-vara`
+  (8767). Both pages, both connections and `bpq-nodes-api.php` are behind the
+  admin login. The VARA bridge has no login of its own, so this is what stops
+  others transmitting as the station. Same blocks in `nginx-bpq-dashboard.conf`.
+- **Apache: PHP now runs.** The installer installed PHP-FPM but never hooked
+  it into Apache (`a2enmod php*` found no module), so every PHP page and API
+  was sent as text. It now enables `proxy_fcgi` + `a2enconf php*-fpm`, plus
+  `proxy_wstunnel` for the two WebSockets.
+- **`bpq-telnet.html`** always connects through `/ws/telnet` (over HTTP it went
+  straight to port 8765, which only works on the server itself).
+- **`scripts/bpq-vara-daemon.py` reads `config.php`** (via
+  `scripts/print-bbs-config.php`): `bbs` login, optional `vara.user`/`vara.pass`,
+  and the VARA port from new `vara.bpq_port` — `0` (default) finds the first
+  `DRIVER=VARA` port in `bpq32.cfg` that isn't VARA FM. Stops at start-up with
+  a clear `FATAL:` line when the login isn't set or no port is found; logs the
+  login and port it uses. Web root from its own location.
+- **`bpq-nodes-api.php` reads `config.php`** (`bbs` login, `station.node`):
+  the NetROM list was empty on every install. Works for users that land in the
+  BBS or straight at the node; no longer waits for one station's node alias.
+- `config.php.example` and the installer's `config.php` get a `vara` section.
+- **Install Check:** new rows *Telnet / VARA connections* (nginx: fails if
+  `/ws/vara` has no login; Apache: ProxyPass + `proxy_wstunnel`) and *VARA HF
+  port*. **Maintenance** VARA section: config and NetROM-list check commands.
+- Docs: Guide §1, §6, §7, §26, §29; §27 three limitations removed. Manual
+  Part A Step 9 (replaces "three things the installer doesn't do yet"),
+  Step 11, Part B, §6, §9, troubleshooting, *Updating* (two new items).
+  PDFs: guide `e1a689d0…`, manual `e4b9903b…`.
+- Tested: installer nginx and Apache site files rendered and run (nginx
+  1.24, Apache 2.4.58, PHP-FPM 8.3) with a fake LinBPQ telnet port and the
+  real VARA daemon as www-data — 401 without login on pages/APIs/WebSockets,
+  login → Telnet page WebSocket echo in Chromium over HTTP, VARA attach on the
+  right port, NetROM list for BBS- and node-default users; `nginx -t` on the
+  template.
+
+### Fixed (2026-10-25) — ⚙ Dashboard Settings
+- The ⚙ button never appeared: `shared/settings-modal.js` looked for a
+  `#navClocks` element the shared menu doesn't have, and ran before the menu
+  was loaded. It now attaches to the menu's clock row once it appears, and
+  is loaded by the four admin pages only (it was on seven public pages).
+  It edits `data/settings.json`, which overrides `data/partners.json` (when
+  it lists partners) and the propagation scheduler's / storm monitor's own
+  settings; the User Guide §19 and the Maintenance page say so, and the
+  Maintenance page has a command that shows what it overrides.
+
+### Security (2026-10-25) — VARA HF Terminal behind the admin login
+- The VARA service (`bpq-vara-daemon.py`) has no login of its own, so anyone
+  who could reach `/ws/vara` got a VARA session as the station; the
+  templates only limited it by address. `bpq-dashboard.conf` now puts
+  `bpq-vara.html` and `/ws/vara` behind the admin login as well (address AND
+  login). The installer's site has no `/ws/vara` yet: USER-MANUAL Part A,
+  Step 9 gives the blocks, with the login.
+
+### Docs (2026-10-25) — User Manual checked against the code
+- **`USER-MANUAL.md` (and its PDF) corrected throughout:** installer
+  questions and defaults, services and timers, a new Part A Step 9 section
+  for the Telnet and VARA pages (web-server WebSocket blocks behind the admin
+  login, the VARA service login, the NetROM nodes list), page reference as a
+  table of login and requirements, YAPP, VARA, and the optional tools as they
+  really work: the connect watchdog pauses failing partners, the propagation
+  scheduler and storm monitor rewrite `linmail.cfg` (the storm monitor reacts
+  to the K-index, it doesn't post weather), NWS posting needs only
+  `config.php`, archive, power switch, callsign validator, VARA log
+  collection from syslog, NetROM RTT. Quick reference: paths, services,
+  timers, cron lines and URLs.
+- **`install.sh` loads `sql/2026-10-06-rf-messages-delivery.sql`** with the
+  other schemas. It was missing, so fresh installs never got Forwarded
+  Messages' Via/Status/Received columns. Earlier installs: load it once
+  (USER-MANUAL, "Updating to a newer version").
+- User Guide §7/§18/§27: the VARA connection needs web-server protection;
+  NWS alerts are posted only by the Post buttons; the forwarding tools'
+  settings live in the scripts / `data/settings.json`.
+
+### Docs (2026-10-25) — User Guide checked against the code
+- **`USER-GUIDE.md` (and its PDF) rewritten where it no longer matched the
+  pages:** the navigation bar (flat links + Admin menu, not dropdowns; real
+  screenshot `docs/screenshots/nav-bar.png`), Chat (layout, callsign box,
+  guest mode, no back-scroll, one tab per browser), Telnet (sidebar targets,
+  allowed hosts), VARA (actual quick frequencies, no GO button, D vs End
+  Session, real status messages), APRS (Heard filter, popup contents),
+  Email Client (no page password, auto-fetch every 5 minutes by default,
+  Trash is a folder you create, search is per folder, Compose type and
+  SMTP, Archive, BBSes Seen, Forwarding Activity, Rules, Preferences), and
+  full rewrites of Message Monitor, RF Connections, Traffic Report, System
+  Logs, Connect Log (incoming only), Rig Status, RF Power Monitor and NWS.
+- New sysop chapters: Health Check, what runs behind each page (services,
+  timers, parsers), where settings are kept, common messages, known
+  limitations in v1.5.14, and a URL table with the login each page needs.
+- Two screenshot mock-ups that showed features the pages don't have were
+  removed from the guide (`rf-connections.svg`, `vara-terminal.svg`), and
+  `telnet-yapp.svg` (it showed a "YAPP" button; the page has **📁 Files** next
+  to **Send ↵**).
+- `scripts/generate-user-manual-pdf.py`: the 📡/👤/🔧 audience markers
+  become [Sysops]/[Visitors]/[Admins] only in the "For …" callouts; 📁 no
+  longer prints as "[YAPP]"; plain
+  fallbacks for symbols the PDF fonts lack.
+
+### Fixed (2026-10-25) — Admin pages report this install accurately
+Every check and list on the four admin pages was compared with the code as
+it is now; what no longer applied was removed and what was missing added.
+**Upgrading:** copy the `admin/` folder, `includes/admin-firewall.php`,
+`bpq-nav-loader.js` and every page (the menu `?v=` changed), then install the
+new sudo rules: `sudo cp www-data-tools.sudoers /etc/sudoers.d/www-data-tools
+&& sudo chmod 440 /etc/sudoers.d/www-data-tools && sudo visudo -c`.
+
+- **System Audit (`admin/system-audit-api.php`, rewritten):**
+  - 19 paths were the literal text `/var/www/<dashboard>`, so on every install
+    "Cache directory missing", "Shared nav files missing" and "WaveNode live
+    JSON missing" showed as critical, chat and APRS heartbeats as warnings, and
+    the web-root, YAPP and nav-version checks never ran. Paths now come from
+    the folder the audit runs in.
+  - Its sudo commands didn't match `www-data-tools.sudoers` (`iptables -L
+    INPUT -n`, `/usr/bin` vs `/usr/sbin/fail2ban-client`, Webmin `grep`), so
+    "Firewall policy is not DROP" and "Fail2ban not running" (critical) showed
+    on correctly set-up servers. Commands now match the sudoers file and run
+    with `sudo -n`; a missing rule is reported as "not checked", not as a fault.
+    MariaDB checks used `mysql -u root`, which never worked as www-data; they
+    now use the dashboard's own database login.
+  - Removed: WaveNode data and sync (hardware retired), PAT Winlink, nws-monitor,
+    Webmin (twice), Conky, fwupd, xinetd, the PHP "end-of-life" list (Debian and
+    Ubuntu patch their own PHP) and the "restart Firefox" swap advice.
+  - Added: admin pages and private files tested without a login (via the
+    server itself), config file modes, CORS, IPv6 firewall when the server has
+    a public IPv6 address, BPQ / MariaDB / flrig / WebSocket ports open to the
+    internet (follows ufw and fail2ban chains), database tables and the
+    2026-09/10 migrations, data size vs buffer pool, the three log parsers
+    (scheduled, recent, error-free), LinBPQ by process, every dashboard daemon
+    including vara-logger and rig-history-poller (installed / running / status
+    file fresh), APRS-IS login and BBS beacon state, message-bodies and
+    bulletin-retention timers and their last result, flrig, callsign-lookup
+    failures, writable cache/data folders, and every page's menu `?v=` against
+    the loader's `NAV_VERSION`.
+  - New **info** status for "not installed / not checkable": shown grey, not
+    counted in the score. The page header shows the station callsign.
+- **Firewall Status (`admin/firewall-api.php`, `admin/firewall-status.html`):**
+  - Port list = what actually listens (with the program name) plus what the
+    rules open. **Localhost** now means bound to 127.0.0.1 (the status was never
+    set; that filter listed IP-restricted ports). Reachability follows jumps
+    into ufw, fail2ban and custom chains; ufw's allow rules are shown.
+  - LAN = every private range (10/8, 172.16/12, 192.168/16, 100.64/10, IPv6
+    ULA / link-local), not only `10.0.0.x` and `192.168.x`.
+  - IPv6 policy and the ports open over IPv6 (the page was IPv4-only).
+  - Port labels from config.php / bpq32.cfg; the one-station list (Wine, PAT,
+    XRDP, CUPS, GPSD …) is gone. Port ranges shown in full (only the first port
+    was shown). fail2ban: banned-now total and addresses across all jails.
+    Notices say exactly what couldn't be read and how to fix it. Raw iptables
+    output no longer sent to the browser.
+  - New `includes/admin-firewall.php`: rule parser shared with the audit; finds
+    columns by content, so iptables-legacy and nft layouts both work.
+- **Log Viewer (`admin/log-viewer-api.php`, `admin/log-viewer.html`):**
+  removed NWS Monitor (not in the package); added bpq-telnet and bpq-vara
+  daemon logs, the message-text job, the Email Client's BBS log, the NWS
+  posting log, the three parser logs (found from `/etc/cron.d/bpq-dashboard`),
+  storm monitor, and today's BPQ TCP, Connect and CMS logs. The VARA log comes
+  from config.php `logs.vara_file`; the web-server log prefers the installer's
+  own file. Optional logs say "not used here" and why; a missing log says where
+  it was looked for.
+- **Maintenance page:** new sections for the Firewall/Audit sudo rules, Chat,
+  APRS map & beacon (CARTO key) and callsign lookups (QRZ test); CORS check;
+  the BBS-session lock ("the BBS is busy"); `tools/reconcile-production.py`;
+  `health-check.php` in the login tests and the status box; both timers in the
+  health check. Corrected: the RF Forwarding Partners list is saved on the
+  server (`data/stations/partners.json`), separate from `data/partners.json`;
+  fix-permissions.sh does set db-config.php to 640; rate limits answer 429; the
+  NTS report's log folder; the menu `?v=` must equal `NAV_VERSION`.
+- **Partners API:** checks the admin login itself like the other admin APIs,
+  and 5 wrong BBS passwords from one address in 15 minutes get 429 (the
+  status-box probe, which sends none, isn't counted).
+- **`www-data-tools.sudoers`:** exactly the six commands the pages run
+  (`iptables`/`ip6tables -L -n --line-numbers -v`, `fail2ban-client status`
+  and `status *`, `ss -tlnp`, `nginx -t`). **`install.sh`** offers to install
+  it (checked with `visudo -c` first).
+- **Log folders that pointed at old paths:** `nts-forwarding-report.php` and
+  `bbs-forwards.php` fell back to `/var/www/html/logs` (every NTS message
+  showed "Not Yet Forwarded" on a standard install); they now use config.php
+  `paths.logs`, else `<web root>/logs` (`BPQ_LOG_DIR` still overrides).
+  `scripts/storm-monitor.py` used `/var/www/html/bpq` and
+  `/home/SYSOP/linbpq`, and `scripts/connect-watchdog.py` fixed
+  `/var/www/bpq-dashboard` paths; both now follow the install folder and
+  config.php `paths`, like prop-scheduler.py.
+- **Menu cache-bust:** every page's `bpq-nav-loader.js?v=` raised from
+  `2026-04-29-3` to `2026-10-25-1`, equal to the loader's `NAV_VERSION`, so
+  browsers pick up menu changes made since April.
+- After the first live run (K1AJD): the certificate check asks nginx on the
+  server itself (127.0.0.1 with the name) before the public address, which
+  most home routers don't loop back to; parsers run from any crontab are
+  found by their log file; "Database listens on the network" is info when the
+  firewall keeps 3306 off the internet; `du` permission noise suppressed.
+  `private/tprfn.conf` also refuses `db-config.php` / `bpqdash-config.php`.
+- Install Check lists `includes/admin-firewall.php`. User Guide §19–22 and the
+  manual's admin-page, sudoers and troubleshooting text rewritten to match.
+
+### Fixed (2026-10-24) — Chat "Online" panel
+- **The Online side panel on the Chat page never listed anyone.** The `who`
+  request in `bpq-chat.php` shared the page's poll position, so a poll landing
+  during its 1.5 s wait took the `/U` reply: the page hid it and `who` found
+  nothing. It now scans the message buffer without touching the poll position
+  and waits for the whole reply (up to 5 s).
+- **`bpq-chat-daemon.py` re-enters chat after BPQ's 2-hour idle disconnect.**
+  LinBPQ drops a chat user that sends no real chat line for 2 hours; the
+  daemon was left at the node prompt still reporting "connected".
+- `bpq-chat.html`: 👥 Users updates the panel (and prints the list); chat
+  lines arriving with a `/U` reply are no longer dropped; live join/topic/leave
+  tracking matches BPQ's timestamped formats; the panel explains when `/U`
+  gets no answer; `/W` hints corrected to `/U`.
+
+### Changed (2026-10-24) — RF Connections wording
+- "TPRFN Hub Station Forwarding Partners" → **RF Forwarding Partners**;
+  "TPRFN Hub Station Propagation Report" → **HUB Station Propagation Report**
+  (card and pop-up); "TPRFN Hub Station HF Efficiency Report" → **HUB Station
+  HF Efficiency Report**; the Manage Forwarding Partners text and the Network
+  Map note no longer say TPRFN.
+- The "No VARA Log File Found" message pointed to a `fetch-vara-tprfn` script
+  that isn't in the package; it now names the included `vara-logger` service.
+
+### Changed (2026-10-24, afternoon) — YAPP upload feedback
+- If the BBS answers an upload with plain text instead of a YAPP reply (it
+  has dropped out of YAPP and printed an error/prompt), the daemon now shows
+  that text and stops with "The BBS answered with text instead of confirming"
+  — it used to drop it byte by byte and wait for the timeout.
+- While the node sends an upload on, the panel shows a moving bar and
+  "Sending to the BBS…" with the time waited, instead of a finished-looking
+  100 % and a 1200-baud estimate.
+
+### Fixed (2026-10-24, later) — YAPP uploads and Abort
+- **Uploads to a BPQ BBS failed for files over 255 bytes.** Full 256-byte
+  blocks were sent with length byte 0 ("0 = 256" in the YAPP spec); LinBPQ
+  reads the byte literally, so the upload went out of step. Blocks are now
+  254 bytes (as BPQ itself does: paclen − 2).
+- **Uploads over ~750 KB closed the connection** (WebSocket 1 MiB message
+  limit); the daemon now accepts the full 10 MB.
+- **Abort Transfer:** no longer types junk into the BBS command line when
+  nothing has started; after cancelling a download, blocks the BBS had queued
+  are discarded instead of filling the terminal with binary; an upload is
+  stopped on a block boundary (a Cancel inside a block left BPQ waiting); the
+  page shows Stopping…/Stopped and says when the BBS may still keep a file
+  the node already had in full.
+
+### Changed (2026-10-24) — YAPP file transfer (Telnet Client)
+- **Fixed: transfers longer than ~2 minutes were cut off.** The timeout was
+  measured from the start of the transfer, not the last progress, and fired
+  on the first 1-second gap after that — routine on RF. It's now 2 minutes
+  with nothing received, plus the file's time on air while an upload waits for
+  the BBS to confirm.
+- **One-click file-transfer mode.** The 📁 Files panel reconnects on the FBB
+  port with the login typed in that tab (memory only), enters the BBS and
+  lists its files. A refused login is reported.
+- **Uploads:** drag and drop; no `YUPLOAD` step (a BPQ BBS detects YAPP
+  uploads itself — the old instructions were wrong); duplicate names are
+  caught before sending; BPQ's refusal text ("already exists", "larger than
+  limit") is shown. Data is handed to the node in chunks so progress is real.
+- **Downloads:** speed and time left; filter for long lists; "File … not
+  found" / node-prompt mistakes reported at once instead of after a timeout;
+  a "Received recently" list; BBS text after a transfer is shown.
+- Telnet terminal: the password typed at BPQ's prompt is masked; the BPQ BBS /
+  BPQ Chat quick-connect buttons now send `BBS`/`CHAT` (after login) — they
+  sent an empty line before.
+
+### Added (2026-10-20) — Credits
+- **`CREDITS.md`**: John Wiseman G8BPQ (BPQ32 / LinBPQ), Dave Freese W1HKJ
+  (flrig and the fldigi suite), Glenn Allison N3MEL (PKTNET / TPRFN HTML
+  Forms), plus the other projects and services the dashboard uses. Linked
+  from the README and the User Guide (§26).
+
+### Security (2026-10-20) — public-code backlog (task t07)
+- **Email Client Kill and Forward are POST requests.** They were GETs
+  (`bbs-messages.php?action=kill&msg=N`), which a link, an `<img>` tag or a
+  browser prefetch could trigger for a logged-in sysop. `bbs-messages.html`
+  sends them as JSON POSTs like Send; the PHP answers a GET with 405.
+  **Update both files together.**
+- **`features.bbs_write` is honoured.** Send, delete, Forward and Kill are
+  refused (403) when it is `false`, and so in public mode, which forces it
+  off. Reading mail is unaffected.
+- **CORS is same-origin by default.** `includes/bootstrap.php`,
+  `callsign-lookup.php`, `network-api.php`, `geomag-proxy.php` and
+  `solar-proxy.php` sent `Access-Control-Allow-Origin: *`, so any web site
+  could call them from its visitors' browsers (QRZ lookups, proxies, BBS
+  logins). Now they send it only for origins listed in
+  `config.php` `'cors' => ['allowed_origins' => [...]]`; `'allow_all' => true`
+  restores the old behaviour. New helper `bpq_cors_headers()` in
+  `includes/station-config.php`. `config.php.example` and `install.sh` write
+  `'allow_all' => false`; Install Check warns when it is `true`.
+- **`bpq-fwd-queue.php` rate limit.** This public endpoint logged in to the
+  BBS as SYSOP on every request. The answer is now cached for 60 s
+  (`cache/fwd-queue.json`) and only one request at a time logs in, so the
+  home page's forwarding card costs at most one BBS login a minute however
+  many visitors there are. Responses gain `cached: true|false`.
+- **`settings-api.php` wrong-password throttle.** 5 wrong BBS passwords
+  from one address within 15 minutes now get 429 for the rest of the 15
+  minutes (`cache/settings-auth/`). The password comparison uses
+  `hash_equals()`.
+- **`migrate-json-to-db.php`** refuses web requests (403); it runs from the
+  command line only, as documented.
+- **`health-check.php`** is behind the admin login, like Install Check (it
+  lists paths, permissions and versions and tries a BBS login). The nginx
+  and Apache sections of `install.sh` and both nginx templates protect
+  `install-check.php` and `health-check.php` with one rule. From the
+  command line it runs without the login.
+
+### Fixed (2026-10-20) — APRS map "API KEY REQUIRED"; NWS Post to BBS
+- **APRS map key from config.php.** CARTO now requires an API key on its
+  map tiles and stamps "API KEY REQUIRED" across them without one. The
+  package page had no key (the 2026-09-26 comment said none was needed),
+  so every install showed the stamp. `bpq-aprs.html` now reads the key
+  from **`config.php` `'map' => ['carto_key' => '...']`** through
+  `station-info.php` (which returns it as `carto_key`) and adds it to the
+  dark and light tile URLs. With no key the map still loads, and its
+  attribution line says how to fix it. `install.sh` asks for the key
+  (optional), `config.php.example` has the new `'map'` section, and
+  Install Check has a **CARTO map key (APRS map)** row. How to get a key:
+  USER-MANUAL.md, Section 4, Step 10.
+- **NWS Alerts → Post to BBS / Post All** failed every time with
+  "Missing required fields: subject, message": `nws-dashboard.html` sent
+  no subject. It now sends a title built from the alert (event and first
+  area, up to BPQ's 60 characters). `nws-bbs-post.php` now posts to the
+  page's **Destination** box (it always used `nws.post_destination`
+  before; that stays the default when the box is empty), rejects
+  addresses with anything other than BBS address characters, strips line
+  breaks from the title so they can't reach the BBS as commands, and
+  answers `action: status` without needing a subject. The page shows the
+  BBS's own error message on failure, and Post All logs each failure.
+
+### Fixed (2026-10-19) — Callsign lookups, propagation scheduler, message forms (merged from the live server)
+- **`callsign-lookup.php`** — brings in the fixes made on the live server
+  on 2026-10-06 and 10-10: a failed lookup (QRZ or callook.info down,
+  timeout, login problem) no longer replaces a known station location with
+  "not found" or a country guess — the location is kept, marked stale and
+  re-checked after an hour; "not found" is only cached when every source
+  says so; failures go to the PHP log and `cache/lookup-health.json`; a
+  rejected QRZ login waits 30 minutes instead of retrying on every request;
+  an account without the XML data subscription is reported as such; new
+  check `php callsign-lookup.php --qrz-test [CALL]` (never prints the
+  password). The QRZ login now comes from **`config.php` `'qrz'`**
+  (`username`, `password` — added to `config.php.example`); older
+  `bpqdash-config.php` / `tprfn-config.php` files are still read when
+  config.php has none. Saving/deleting manual locations still needs the
+  dashboard admin login.
+- **`scripts/prop-scheduler.py`** — the database login now comes from
+  `scripts/bpq_db_config.py` (db-config.php, config.php `'db'`, `BPQ_DB_*`)
+  like the log parsers, instead of a placeholder that made every history
+  query fail on a fresh install; the password goes to `mysql` in a private
+  0600 option file instead of on the command line (visible in the process
+  list). Its Linux paths (logs, state, backups, `linmail.cfg`) now follow
+  the install location and config.php `paths` instead of a hard-coded
+  `/var/www/html/bpq`, where the script stopped at start-up on a standard
+  install. `data/settings.json` paths still override them.
+- **Message forms** — `pktnet-forms/` is the authors' current suite
+  (TPRFN HTML Forms, 2026-09-25: General, ICS and Weather forms).
+  **`scripts/fetch-forms.sh`** now renames the downloaded `General/ ICS/
+  Weather/` folders to the lower-case names the suite's index links to;
+  before, every form link on the index page was a 404 on Linux.
+
+### Added (2026-10-19) — `tools/reconcile-production.py`: live server ↔ package check
+- Compares a running install against a release package (the .zip or an
+  unpacked folder) and reports, file by file: identical, an expected
+  station-specific copy (matches `private/live-*/`), still on a recorded
+  pre-deploy version (`*.live-before`), **differs**, or missing. Also lists
+  live-only pages/code (to add to the package or retire), checks credential
+  files aren't world-readable without ever reading them, and compares
+  installed systemd units (install path rewritten as `install.sh` does) plus
+  any pairs in `private/system-files.txt` (e.g. the live nginx site config).
+- Writes `report.txt`, a package → live diff per differing file, and
+  `production-changes.tgz` with the live copies to merge back (credential
+  files never included; files that look like they hold a password are
+  flagged). Read-only on the live system. Exit 0 = in sync, 1 = drift.
+- Usage: `sudo python3 tools/reconcile-production.py PACKAGE.zip /var/www/bpq-dashboard`
+- Optional `private/reconcile-ignore.txt` ("<glob>  # reason"): live-only
+  files that belong to something else in the same web folder (another site,
+  generated data, logs) are counted per reason instead of listed, and kept
+  out of the bundle.
+
+### Fixed (2026-10-19) — Rig pages: radio model detection and meter readings on non-Yaesu radios
+- **Model detection (`vara-api.php`):** matching against the radio list was
+  partial and tested in table order, so an FTdx101D was identified as an
+  "FTdx10" (same DATA-U mode, wrong name on the Rig page), and short names
+  like K3/K4 could match inside other model names. Matching now ignores case,
+  dashes and spaces, only matches where the model name starts, never when
+  another digit follows (FTdx10 ≠ FTdx101D, but K3 = K3S and IC-7300 =
+  IC-7300MK2), and tries the longest names first. The same rule applies to a
+  `radio.model` override in config.php.
+- **Meter readings (`vara-api.php`):** frequency, power, SWR, S-meter and PTT
+  are now read with one parser that accepts every reply type flrig uses
+  (`<i4>`, `<i8>`, `<int>`, `<double>`, `<string>` or a bare `<value>`).
+  Before, power/SWR/S-meter only understood the bare form the FTdx3000 uses,
+  so on radios whose flrig replies are typed the RF Power gauge and history
+  stayed blank. The smart-plug "don't cut power while transmitting" check reads
+  power the same way, so it now works on those radios too.
+
+### Changed (2026-10-19) — Browser tab titles: "Page - BPQ Dashboard" on every page
+- Every dashboard page (including the four admin pages) now shows
+  `<Page> - BPQ Dashboard` in the browser tab, e.g. `RF Connections - BPQ
+  Dashboard`. Previously most read `<Page> — YOURCALL BPQ` or `— BPQ BBS`, and
+  APRS Map, Maintenance, Email Client and Traffic Report replaced the title
+  with the station callsign after loading; those rewrites are removed so the
+  title stays the same. The callsign still shows on the pages themselves.
+- The packet forms in `pktnet-forms/` keep their own titles, because those
+  titles appear on printed forms.
+
+### Fixed (2026-10-19) — System Logs "RF Fail" didn't match RF Connections "Failures"
+- **What it was:** the two pages count different things. System Logs' Errors
+  card showed "RF Fail" for BBS log lines containing "Error - Port in use"
+  only, which is one kind of RF failure. RF Connections counts every failed
+  VARA session: timeouts, no data, channel busy, port in use and incoming
+  failed. The pages also default to different ranges (System Logs 7 days,
+  rolling; RF Connections "Today", UTC calendar days), and the RF card's
+  breakdown left out Port in Use and Incoming Failed, so its rows didn't add up
+  to its own total.
+- **`bpq-system-logs.html`:** the counter is now labelled **Port in Use**, with
+  a tooltip saying what it counts and where the full RF failure total lives.
+- **`bpq-rf-connections.html`:** the failures card now also lists **Port in
+  Use** and **Incoming Failed**, plus an **Other** row (shown only when non-zero)
+  for failures with no recognised reason, so the rows always sum to the total.
+  Per-band "incoming failed" counts were always 0 on the database path (it
+  checked for `incomingFailed` but the type is `incoming`); fixed.
+
+### Security (2026-10-19) — nginx: block config, source and work files in the web root
+- **Found on a live install:** nginx configs, a sudoers file, systemd units,
+  an old copy of a daemon with its APRS-IS login typed in, editor/work
+  copies, a driver build tree and the QRZ lookup cache were all downloadable
+  from the web root, and browser-download duplicates such as
+  `something(1).php` would run as PHP.
+- **`bpq-dashboard.conf`** (both vhosts) and **`nginx-bpq-dashboard.conf`**:
+  403 for `.conf .service .sudoers .ps1 .py .pl .exp .jsx .ajd .wrk* .htmlN
+  .save .doc(x) .xls(x) .zip .tar .gz .tgz .xz .o .ko .mod .c .h`,
+  `.before-*` copies, `name(N).ext` duplicates, and `/callsign-cache.json` +
+  `/manual-locations.json` (written next to `callsign-lookup.php`, which is
+  the only thing that reads them). **`install.sh`** already blocked
+  py/cfg/conf/service/timer/sudoers/sql and now adds the rest. Pages,
+  scripts, styles, logs, `.vara`, PDFs and every PHP endpoint are unaffected;
+  `/yapp-files/` keeps its own rule.
+- **Upgrading:** merge the new `location` lines into your site config next to
+  the other `return 403` rules, then `sudo nginx -t && sudo systemctl reload nginx`.
+  Also worth a look: anything in your web root that isn't part of the
+  dashboard (old copies, backups) is better moved out of it entirely.
+
+### Fixed (2026-10-19) — Email Client: "Could not save messages — local storage may be full"
+- **What it was:** `bbs-messages.html` keeps an offline copy of all three
+  inboxes in the browser's localStorage, every message body included ('eager'
+  mode fetches them all; the database load brings up to 200 per type).
+  Browsers allow about 5 MB per site, shared by every page on it — iPhone
+  Safari is the strictest — and the copy outgrew it. The save failed with an
+  error toast. Nothing was lost: the messages and their text are in the
+  database, and the next page load refilled everything from there.
+- **Now:** when the full copy doesn't fit, the page saves a smaller one —
+  first without bulletin text, then without any message text — and logs one
+  console line instead of showing an error. Text of messages already gone
+  from the BBS is always kept. On the next load the database fills the text
+  back in (`mergeArchiveIntoInbox`), and an opened message still finds its
+  text in the database first. The page in memory is never trimmed.
+- If even the text-free copy doesn't fit (something else on the site is
+  using the space), the out-of-date copy is removed so the next load comes
+  straight from the database, and one calmer notice appears at most every 10
+  minutes. `persistSettings()` / `persistReadSet()` no longer throw when
+  storage is full.
+
+### Fixed (2026-10-19) — Random "503 Service Temporarily Unavailable" on both sites
+- **Cause: nginx's rate limiter, not PHP.** `limit_req` answers with 503 by
+  default. In the two-site config (`bpq-dashboard.conf`) both vhosts shared
+  one PHP bucket per client (`dashboard_api`, 5 r/s), and each site's home
+  page (`/` → `index-log.php` / `rf-log.php`) is PHP too, so it competed
+  with the page's own API calls. A burst from one page — in practice the
+  Email Client (`bbs-messages.html`) running a per-message loop — filled the
+  bucket and every page on **both** sites got 503 until it drained.
+- **`bbs-messages.html`:** every request to `message-storage.php` now goes
+  through one pacer (4 requests/second, under nginx's 5): `postToStorageApi()`,
+  `safeFetchJson()` for message-storage URLs, and the Get Mail archive call.
+  Covers Mark Read on a selection, Empty folder, bulk Kill, folder renames and
+  migrations, rule filing. A 503/429 slows the whole queue instead of each
+  call retrying on its own. Bulk actions on large selections take a little
+  longer in the background but no longer trip the limit.
+- **`bpq-dashboard.conf`:** new zone `bpq_dashboard_api` for the BPQ vhost
+  (the sites no longer share a bucket); the home-page PHP files use the page
+  bucket (`dashboard_limit`) instead of the API bucket; catch-all PHP burst
+  10 → 30, page burst 20 → 40 (rates unchanged); `limit_req_status 429` and
+  `limit_req_log_level warn` so a rate limit shows as "429 Too Many Requests"
+  rather than looking like an outage.
+- **`nginx-bpq-dashboard.conf`:** `limit_req_status 429`, `limit_req_log_level warn`.
+- **Also (security, from a 2026-10-10 live fix):** the backup-file block now
+  matches a digit right after the suffix (`.bak3`, `.old2`) in
+  `bpq-dashboard.conf`, `nginx-bpq-dashboard.conf` and the config `install.sh`
+  writes — a `.json.bak3` had been downloadable.
+- **Upgrading:** copy `bbs-messages.html` (hard-refresh the browser). If you
+  use the two-site template, merge the `limit_req` changes into your site
+  config, then `sudo nginx -t && sudo systemctl reload nginx`.
+- **Docs:** USER-MANUAL §12 Troubleshooting "503 / 429"; Manual PDF regenerated.
+
+### Added (2026-10-16) — APRS Map: BBS beacon to APRS-IS (aprs.fi)
+- **The dashboard can put the BBS on aprs.fi.** New section in the BBS Info
+  editor: **📡 Beacon this BBS to APRS-IS**, off by default. Send as an
+  **object** with its own name (e.g. `TPRFN BBS`) or as the station's own
+  position; BBS symbol (`/B`) at the marker position; comment up to 43
+  ASCII characters (**↧ From info** builds one from the first
+  port/frequency, BBS callsign and hours); every 10/15/20/30/60 minutes.
+  The editor shows the exact packet and whether the service is beaconing
+  (last sent, next in N min, or why not), and the BBS panel links to the
+  object on aprs.fi.
+- **Sent by `bpq-aprs-daemon.py`** over its existing APRS-IS login (the
+  config.php `aprs` callsign) — BPQ32's APRSDIGI is not involved. It reads
+  `data/stations/bbs-info.json` every 30 s, beacons at the set interval, an
+  edited beacon goes out within ~2 minutes (never more often), and a
+  restart doesn't resend early (`cache/aprs/beacon-state.json`). Switching
+  the beacon off, renaming the object or changing to position mode sends
+  one **kill** packet for the old object so aprs.fi drops it. Nothing is
+  sent unless APRS-IS answers "verified" (passcode `-1` = receive-only =
+  no beacon). `aprs-daemon.json` gains `call`, `verified` and `beacon`
+  (shown through `bpq-aprs.php?action=status`).
+- `station-storage.php` `saveBbsInfo` validates the beacon fields (object
+  name 1–9 of `A-Z a-z 0-9 space . - /`, comment printable ASCII without
+  `| ~` and ≤ 43, interval 10–120, a marker position required when on).
+- **Upgrading:** restart `bpq-aprs` after copying the daemon.
+- **Docs:** User Guide §8 ("Your BBS on the map", "Putting your BBS on
+  aprs.fi"), USER-MANUAL (APRS Map page, Step 10 APRS note), README
+  feature list, config.php.example; both PDFs regenerated.
+
+### Added (2026-10-16) — APRS Map: BBS station info, version badge
+- **BBS station info.** The orange BBS marker used to show only
+  "<call> BBS" (the live page even showed "YOURCALL BBS"), with no way to
+  change it. New **🏠 BBS Info** toolbar button; clicking the marker shows a
+  short popup and the full info in the detail panel, with **✏ Edit**. The
+  editor holds name, BBS callsign, location, sysop, ports/frequencies (one
+  per line), services, hours, website, notes and an optional marker
+  position (type it, or **📍 Pick on map**; **↺ Grid centre** goes back to
+  the config.php grid square). A position set here also centres the map,
+  the 50-mile circle and the distances. Everything is public (the APRS map
+  is a public page) and the editor says so.
+- **Storage:** `station-storage.php` `GET ?action=bbsinfo` (public) and
+  `POST {action:"saveBbsInfo", info:{…}}` (admin login, like every other
+  write there), file `data/stations/bbs-info.json`. Text is cleaned and
+  length-limited server-side, the callsign must look like CALL[-SSID], the
+  website must be http(s), the position must be in range; the page escapes
+  everything it shows. No web-server change: existing configs already put
+  the login on `station-storage.php` writes and deny them on the public site
+  (the editor then says to use the sysop site).
+- **Version badge visible.** The badge sat at the far end of a one-line
+  toolbar and was pushed off-screen on most windows. It is now next to a
+  "📍 APRS Map" title at the start of the toolbar, and the toolbar wraps to
+  a second row instead of overflowing.
+- **Fixed:** weather-station markers failed to draw (`bearingTo()` still
+  used the `HOME_LAT`/`HOME_LON` globals removed on 2026-09-26, a
+  ReferenceError for every WX station). Page title now uses the station
+  callsign instead of "YOURCALL".
+
+### Added (2026-10-12) — Message text saved server-side every 5 minutes
+- **`scripts/fetch-message-bodies.php` + `message-bodies.timer`.** Lists the
+  newest Personal, NTS and Bulletins on the BBS (one login), archives them
+  and saves the text of every message that has none yet. It no longer depends
+  on an Email Client tab being open, on *Body fetching*, or on the page's saves
+  getting past the rate limit. On K1AJD only about 1% of bulletins had their
+  text saved, and BPQ removed them within days. A reply is stored only when
+  BPQ's From:/Title: header matches the saved row (BPQ reuses numbers); "not
+  found" replies are never stored. Bulletins: config.php
+  `'messages' => ['bulletin_text' => 'all'|'pinned'|'none']` (default all).
+  `--backfill` fetches text for everything already in the database once;
+  `--dry-run`, `--days=N`, `--limit=N`, `--verbose`.
+- **One BBS session at a time.** `bbs-messages.php` and the script share a
+  lock (`cache/bpq-telnet.lock`), and a new login waits until 2 s after the
+  last one ended. This fixes the occasional "No password prompt" when two
+  sessions came back to back. The script's sessions are short (20 reads /
+  25 s), so the page waits only seconds; if it has to wait more than 40 s it
+  says the BBS is busy.
+- **Text that isn't UTF-8 is converted, not refused.** 7plus-encoded files
+  (CP437) and Latin-1 bulletins were rejected by the database, and one
+  rejection used to end the whole read session.
+- **No more "Message N not found" saved as text.** `message-db.php` refuses
+  it, the page's download checks the header, and the script clears rows
+  saved that way earlier.
+- Opening a message without text looks in the database first, then asks the
+  BBS (header-checked).
+- Installer installs and enables the timer; USER-MANUAL, config.php.example
+  and the Maintenance page document it.
+
+### Fixed (2026-10-12) — Email Client: "This message was removed from the BBS" on messages that weren't
+- **Older messages were wrongly marked "⚠ killed on BBS".** Get Mail lists
+  only the newest *Max messages per list* (default 50) per type, and every
+  message outside that window was flagged as killed. Flagged messages were
+  never downloaded, so a bulletin that scrolled out of the window before its
+  text was fetched (lazy mode, or an eager download cut short) opened as
+  "removed from the BBS" for good, with nothing saved to the database. Now
+  only a number missing from *inside* the listed window counts as gone, and
+  eager download fetches the messages in the current listing.
+- **A folder view hid the database's copy.** In a folder such as
+  *Bulletins - SITREP*, a local copy without text took the place of the
+  database copy that had it. The text is now taken from the database copy.
+- **Opening a message with no text** now looks in the database, then asks
+  the BBS. The BBS reply is used only if its From:/Title: header matches the
+  listing (BPQ reuses message numbers), and is then saved to the database.
+  When the text really is lost the message now says so plainly.
+- Maintenance page: the "⚠ killed on BBS" note is updated, and a new query
+  shows which messages in a folder have their text saved.
+
+### Added (2026-10-12) — Email Client: message pop-up window, resizable columns
+- **Messages open in a pop-up window.** Clicking a message opens it in a
+  window that carries **Compose, NTS Report, PKTNET Forms and Quick
+  Check-In** along with the message's own Reply / Forward / Unread /
+  Archive / Move / Properties / Kill buttons and the forwarding panel.
+  ‹ Prev / Next › (and `←` / `→`) step through the list; A− / A+ change the
+  text size; ⤢ fills the browser window; the window can be resized from its
+  corner. Size, text size and maximize are remembered per browser
+  (localStorage `bbs_v2_layout`). Closes with ✕, `Esc` or a click outside.
+- **Preferences → Open messages in:** *Pop-up window* (default) or *Reading
+  pane on the right* (the old layout). ▣ Dock / ⧉ Pop out switch between
+  them from the message itself.
+- **Resizable columns.** Drag the dividers between the folder list, the
+  message list (Personal / NTS / Bulletins …) and the reading pane;
+  double-click resets. Widths are remembered and kept inside the window.
+- **Fixed:** Ctrl-click and Shift-click in the message list only opened the
+  message, although the User Guide described them as add-to-selection and
+  range select. They now select (Ctrl/⌘ toggles one row, Shift selects a
+  range) without opening the message.
+
+### Added (2026-10-06) — Forwarded Messages: delivery method, status and received time
+- **Via column + filter.** Each message shows how it travelled — 📡 RF (VARA),
+  🔗 NET/ROM, 🛰 AXIP, 🌐 Telnet, 📻 AX.25 or "Port N". Outbound sessions are
+  now tagged from the BBS connect script (`C 2 COSCO` → port 2's driver in
+  `bpq32.cfg`; `C <call>` → NET/ROM; VARA-session overlap as fallback) —
+  ConnectLog only records incoming connects, so every outbound message was
+  previously untagged and counted as RF. Connect scripts match
+  case-insensitively (`c 2 GYBBBS`). Incoming ConnectLog matching now prefers
+  the connect *before* the message. New `--bpq-cfg` and
+  `--rescan-messages-days N` parser options.
+- **Status + Received columns.** The parser follows each FBB exchange (offer →
+  `FS` reply → transfer): ✅ accepted/delivered, ⛔ rejected (already held),
+  ⏸ deferred, plus the UTC time the transfer finished and the delay after the
+  offer. Status filter (Delivered / All offers / Rejected / Deferred); rejected
+  rows load on demand, with totals from the API's new `status_counts`.
+- **One row per partner.** `rf_messages` is keyed on (bid, direction, partner)
+  so a bulletin sent to several hubs counts for each of them.
+- **Counts are deliveries.** Hub tiles, summary card, hourly chart, station
+  modals and the Propagation Report now count delivered messages only —
+  previously every offer counted, including the ~70% rejected as duplicates.
+- Migration: `sql/2026-10-06-rf-messages-delivery.sql`. API
+  `?action=messages` gains `status=delivered|rejected`, `counts=1`, and a
+  50,000-row limit; old calls behave as before.
+
+### Changed (2026-10-05) — Rig Status, RF Power Monitor
+- **Rig pages only with flrig.** `install.sh` leaves out Rig Status, RF Power
+  Monitor, their nav links and the history poller when flrig is skipped, and
+  writes `radio.enabled => false`. With flrig it now also installs
+  `rig-history-poller.service`. Install Check and health-check follow suit.
+- **Scan frequencies from bpq32.cfg.** The Rig page's scan card was a
+  hard-coded list. It now reads the FLRIG `RADIO` block (new
+  `includes/bpq-radio.php`, `vara-api.php` action `get_scan_freqs`): one row
+  per time band, the current band (UTC) highlighted, mode and dwell per
+  channel, and a "scan paused" note during a VARA keyboard session. Only
+  frequencies/modes are returned, never other config lines. `radio.bpq_radio`
+  picks a specific RADIO block. Install Check reports the block it finds.
+- **TX power from the Rig page.** New TX Power card (flrig `rig.get_power` /
+  `rig.set_power` / `rig.get_maxpwr`); changing it needs the sysop unlock,
+  is limited by the radio's maximum or `radio.max_power`, read back and logged.
+  `flrigCall()` now sends integers as `<i4>`.
+- **Fixed:** the Rig page's 🔒 needed two clicks to open the password box;
+  the active scan tile's band label was invisible in light mode. USER-MANUAL
+  §10.7 named a non-existent `radio.power_switch` (it is `smartplug`).
+
+### Security (2026-10-05) — Telnet daemon log
+- **`bpq-telnet-daemon.py` no longer writes passwords to its log.** At DEBUG
+  level the websockets library logged every WebSocket frame, so the
+  password typed after BPQ's `password:` prompt (and part of an FBB-mode
+  login) reached `logs/bpq-telnet-daemon.log`. The websockets logger now
+  stays at INFO whatever the daemon's level, and a filter on the log
+  handlers blanks every password the daemon receives (connect message,
+  FBB login, the line typed after a `password:` prompt) as `[redacted]`,
+  including escaped forms and tracebacks. The log file is created 640.
+  The unused `bpq_login()` helper's raw-buffer dumps are DEBUG only.
+
+### Security (2026-10-05) — Install Check and the admin pages
+- **Install Check no longer has its own password.** `?pass=bpqcheck` was
+  published in the docs, so it protected nothing. The page now runs only when
+  the web server checked the admin login (the same rule as the Email Client
+  APIs), and otherwise explains which config line is missing. The old
+  `?pass=` is ignored.
+- **Log Viewer, Firewall Status and System Audit asked for the BBS password
+  and sent it in the URL** (`?password=…`), where it ends up in web-server
+  logs. The check behind it never ran anyway: the three APIs looked for their
+  config in `admin/` (`config.php` / `dashboard-config.php`), which never
+  exists there. The prompt is gone; the APIs use the admin login check
+  (`includes/web-login.php`), and the pages drop any password saved in the
+  browser session.
+- **Log Viewer read from the wrong folders.** Because it never found
+  `config.php`, the web root and log folder resolved to `admin/` and most logs
+  showed "File not found". It now reads `config.php` `paths` (default: the
+  web root's `logs/`). System Audit now reads optional `ssl_domains` from
+  `config.php` too.
+- `fix-permissions.sh` and the installer's final sweep also set
+  `db-config.php`, `bbs-config.php`, `nws-config.php`, `tprfn-config.php` and
+  `bpqdash-config.php` to 640 when present (before: only `config.php`).
+- New `SECURITY.md`: how to report a problem privately, and how to run the
+  dashboard safely (HTTPS + admin login, IPv6 firewall, secrets and backups
+  out of the web root). Linked from the README.
+
+### Security (2026-10-04) — secure by default
+- **Fresh installs now protect everything that acts as the station.** The
+  installer (nginx and Apache) and both nginx templates put the admin login
+  on the Email Client (page + `bbs-messages.php` + `message-storage.php`),
+  NWS posting, Chat (page + API), and on writes to `station-storage.php`,
+  `bpq-aprs.php` and `callsign-lookup.php` (reads stay public). Before,
+  only `/admin/` and `install-check.php` had a login. The two-site template
+  refuses these on the public site, as the live setup does.
+- **The PHP checks too.** New `includes/web-login.php`: those endpoints
+  refuse (403, `login_required`) unless the web server says it checked the
+  login. On nginx that is `fastcgi_param BPQ_WEB_LOGIN $remote_user;` in
+  the protected locations; nginx's own `REMOTE_USER` is not trusted,
+  because nginx fills it from any `Authorization` header a visitor sends,
+  even where nothing is checked. On Apache, `REMOTE_USER`. Never
+  `PHP_AUTH_USER`. Behind `limit_except GET` only writes are accepted.
+  CLI is exempt; `'require_web_login' => false` in config.php opts out.
+- **Upgrading with your own web-server config:** add the login and the
+  `BPQ_WEB_LOGIN` line (see the LOGIN section of `nginx-bpq-dashboard.conf`),
+  or re-run `install.sh`, or those pages will refuse. Install Check has two
+  new rows, *Login reaches PHP* and *Station-acting pages behind the login*.
+
+### Security (2026-10-04)
+- **APRS: the "sending needs the login" rule could be bypassed.** The web
+  server only asks for the login on non-GET requests to `bpq-aprs.php`, but
+  `sendmsg` read its JSON body whatever the method, so a GET with a body sent
+  an APRS message as the station without a login. `sendmsg` is now POST-only
+  (405 otherwise).
+- `bpq-aprs.php` `sendmsg` no longer hard-codes a callsign and passcode: it
+  uses `config.php` `aprs` `callsign` / `passcode` (optional `server`,
+  default `rotate.aprs2.net:14580`), refuses to send when they're missing,
+  `-1`, or the passcode doesn't match the callsign, rejects control
+  characters and `| ~ {` in the text (a newline could inject a second
+  packet), checks the recipient, and only sends after APRS-IS says
+  "verified". The APRS page shows and filters by that callsign and greys
+  out Send when sending isn't set up.
+- **YAPP: received files were served to anyone, and could run.** Files the
+  Telnet Client receives land in `yapp-files/` in the web root; every
+  config served them with no login, a received `*.php` would have been run
+  by PHP, and a received `.html`/`.svg` opened as a page on the dashboard's
+  site. Now `/yapp-files/` needs the admin login (installer nginx + Apache,
+  `nginx-bpq-dashboard.conf`) or the same access as `/ws/telnet`
+  (`bpq-dashboard.conf`), never runs as PHP/CGI, and is always sent as a
+  download (`Content-Disposition: attachment`, nosniff, sandbox CSP).
+  `yapp_protocol.py` stores risky names as `name_ext.bin`; the Telnet page
+  escapes the sender-supplied filename (it was inserted into the page as
+  HTML). `bpq-telnet-daemon.py` also finds `/var/www/bpq-dashboard`.
+  Apache installs now enable `mod_headers`.
+
+### Fixed (2026-10-04)
+- **Email Client: new mail hidden as "previously killed".** The killed list
+  remembered message numbers only, for 90 days, but BPQ reuses numbers once
+  its counter wraps (this station went past ~9999 back to 1 inside that
+  window). New mail on a reused number was dropped on every Get Mail
+  (e.g. #3453 from N4VAD). Kills now also record sender + subject, and an
+  entry is ignored (and removed) when the message now using that number is
+  a different one or is dated after the kill. Existing entries need no reset.
+- **Email Client: "Invalid Command" on every message opened.** Opening a
+  message sent `Y <n>` (Mark unread: `N <n>`) to set the BBS read flag; BPQ
+  has no such command and refused it each time. Removed from the page and
+  the `mark` action from `bbs-messages.php`, along with the Settings option
+  "Mark read on BBS when opened". BPQ sets the read flag itself when the
+  addressee reads a message (`R <n>`, which the body fetch does); read/unread
+  in the Email Client stays local.
+- **Email Client: bulletins in 📌 pinned groups were not saved and got
+  purged.** Filing a bulletin into its `Bulletins - GROUP` folder was one
+  `saveMessage` POST per message; `runWithConcurrency()` capped requests in
+  flight, not per second, so a large Get Mail ran past nginx's `tprfn_api`
+  limit and got 503s. The page never retried, the rows stayed unfiled, and
+  the 14-day purge deleted them. Now `message-db.php` files bulletins into
+  their existing group folder when they are archived; new bulk action
+  `fileMessages` (`message-storage.php`) replaces per-message filing and
+  "Move to folder"; `postToStorageApi()` retries 503/429; filings the server
+  didn't confirm are retried on the next sweep; and the purge keeps an
+  unfiled bulletin whose group is pinned.
+  **Upgrading:** the first Get Mail after the update files any bulletins the
+  server never confirmed. Bulletins already stored unfiled in a pinned group
+  can be filed once (back up the two tables first; safe to repeat):
+  ```sql
+  UPDATE bpq_messages m
+    JOIN bpq_msg_folders f ON f.name = CONCAT('Bulletins - ', UPPER(TRIM(m.to_call)))
+                          AND f.keep_on_kill = 1
+     SET m.folder_id = f.id
+   WHERE m.msg_type = 'B' AND m.folder_id IS NULL;
+  ```
+
+### Security (2026-10-03)
+- `bbs-messages.php` no longer writes the BBS password to `logs/bbs-messages.log`.
+- Web-server configs (installer nginx + Apache, both templates) refuse BPQ Telnet/daemon/app logs, `*.cfg`, and stray `*.txt` in the web root; only `ConnectLog_*`/`CMSAccess_*` `.log` files stay readable.
+- `vara-api.php`: changing or restoring the frequency requires the VARA login (sliding 1-hour session).
+- `callsign-lookup.php`: `clear_cache` is POST-only.
+
+### Docs
+- User Guide: new "Which pages ask for a login" table; Chat, APRS sending, NWS posting, map saves documented as login-protected; corrected Chat commands, Telnet/FBB login, VARA restore, admin page paths, Install Check, keyboard shortcuts; dropped v1.5.12 "what's new" notes and other outdated items. PDF regenerated.
+
+### Security
+- **Admin pages could open without a login on some setups.** The pages and
+  their APIs moved to `/admin/` in 1.5.12, but `bpq-dashboard.conf` still
+  protected the old top-level names one by one, `nginx-bpq-dashboard.conf`
+  (installed by `set-permissions.sh`) had no admin login at all, and
+  `nginx-maintenance-block.conf` didn't match `/admin/`. All three now
+  protect the whole `/admin/` folder and `install-check.php`; the
+  two-site template also redirects them away from the site that has no
+  login. Installs made with `install.sh` were already protected.
+- **`admin/partners-api.php`** looked for `admin/data/partners.json` and
+  `admin/bpqdash-config.php` after the move, so the Partners editor
+  couldn't load and its password check never ran. It now uses the web
+  root's `data/partners.json` and the BBS password from `config.php`
+  (`bbs.pass`), sent in an `X-BBS-Password` header instead of the URL,
+  refuses to open if that password isn't set, and saves atomically after
+  the backup.
+
+### Changed
+- **`install-check.php`** finds the nginx site file by its `root` line
+  instead of fixed names (the installer's `sites-enabled/bpq-dashboard`
+  and custom names like `tprfn.conf` were reported as "No site config"),
+  and adds a **"Admin folder behind the login"** check that fails when any
+  server block serving the dashboard folder doesn't guard `/admin/` —
+  exactly the second-vhost gap found on 2026-10-03.
+  LINMAIL / LINCHAT now also pass when LinBPQ is started with `mail` /
+  `chat` on its command line (and tolerate leading spaces / comments);
+  TCPPORT and the optional LAN-only check show PASS instead of a warning
+  with a stray "1"; fix commands show the real paths instead of
+  `/var/www/<dashboard>`.
+- **Maintenance page rebuilt** (`admin/bpq-maintenance.html`):
+  - A box at the top checks every time the page opens whether the page,
+    the Partners API and `install-check.php` can be opened without the
+    admin login, and turns red if they can.
+  - "Your install" fields (web root, LinBPQ folder, database name/user,
+    site address) rewrite every command; Copy copies what's shown.
+  - New sections: admin login and private-file tests, database &
+    credentials (`db-config.php`), the three log parsers, the 📌
+    keep-after-kill and message-text checks, rig-history-poller,
+    vara-logger, updates/backups, install check, forms download,
+    publishing check.
+  - Removed what no longer applies: the four WaveNode sections and
+    warnings (hardware retired; RF Power uses flrig), the NOAA format
+    note, `restore-radio2.sh`, Windows-machine steps, the per-page nginx
+    auth instructions, references to files that don't exist.
+  - Fixed: 69 paths written as `/var/www/<dashboard>/…`, which the
+    browser swallowed as an HTML tag (commands copied as `/var/www//…`);
+    Copy buttons missing from the second half of the page; the copy
+    fallback that never copied.
+- `nginx-bpq-dashboard.conf`: removed a second `try_files` in the PHP block
+  that made `nginx -t` fail with Debian's `fastcgi-php.conf` snippet.
+- User Guide §19 and Manual §6/§11 describe the page and the `/admin/`
+  login as they are now.
+
+### Removed
+- `admin_deploy__nav.html`, `admin_deploy_bpq-nav-loader.js` — byte-identical
+  leftovers of `_nav.html` / `bpq-nav-loader.js`, referenced by nothing.
 
 ## [1.5.13] - 2026-09-26
 
@@ -71,7 +1013,7 @@ on 2026-09-16 together with everything since.
   `config.php`'s `db` section. `tprfn-db.php` (`tprfn_db_settings()`),
   `generate-report.php`, and the three parsers (via the new shared
   `scripts/bpq_db_config.py`) all read it. The live password is no longer
-  hard-coded anywhere in the package. See `CREDENTIALS-DEPLOY.md`.
+  hard-coded anywhere in the package. (Station deploy notes kept privately.)
 - **`.gitignore`** — local config/credential files, `private/`, runtime
   data (logs, cache, data/stations, data/backups, archives), `*.bak*`.
 - **`private/`** — station-specific files kept out of Git; `tprfn.conf`
@@ -114,7 +1056,7 @@ on 2026-09-16 together with everything since.
   back to the old unfiled-only rule. The page prunes its localStorage
   copies on the same rule. Emptying Trash is now database-only for
   anything not in the last Get Mail listing (no BBS kill by a possibly
-  reused message number). See `RETENTION-14-DAY-DEPLOY.md`.
+  reused message number). (Station deploy notes kept privately.)
 - **Email Client: 📌 "keep after kill" folders** (`bbs-messages.html`,
   `message-db.php`, `message-storage.php`) — per-folder opt-in
   (`bpq_msg_folders.keep_on_kill`, toggled from a 📌 icon on each folder
@@ -126,7 +1068,7 @@ on 2026-09-16 together with everything since.
   an already-kept copy, because BPQ reuses message numbers; Empty Trash
   removes kept copies database-only. New migration
   `sql/2026-09-26-message-keep-and-bodies.sql`; see
-  `MESSAGE-KEEP-MIGRATION.md`.
+  the station's private deploy notes.
 - **Email Client: message bodies persisted to the database** — new
   `saveBodies` action / `msgdb_save_bodies()`. Bodies fetched on preview
   or eager prefetch are now written to `bpq_messages.body`; previously
@@ -159,8 +1101,8 @@ on 2026-09-16 together with everything since.
   now get real per-station byte/duration attribution via Connect/
   Disconnect pairing, an improvement over the original (which summed
   bytes globally since the log's Disconnect line carries no callsign).
-  See `SYSTEM-LOGS-DB-MIGRATION.md` for deploy steps, the two inherited
-  parsing quirks kept for parity, and the verify checklist.
+  To load older history once, see USER-MANUAL.md, "Updating to a newer
+  version" (`parse-system-logs.py --backfill`).
 
 - **`bpq-traffic.html` migrated to DB-backed data** — Previously fetched
   and parsed every `Traffic_YYMMDD.txt` file client-side on every page
@@ -243,8 +1185,7 @@ on 2026-09-16 together with everything since.
   of these tables now rolls back cleanly instead of leaving it empty
   (TRUNCATE's implicit-commit behavior meant a rollback couldn't undo
   it). No schema, API, or HTML changes needed — reproduced against a
-  real least-privilege DB user before and after the fix. See
-  `SYSTEM-LOGS-DB-MIGRATION.md`.
+  real least-privilege DB user before and after the fix.
 
 - **`bpq-rf-connections.html` — Forwarded Messages panel (and TPRFN Hub
   Station tile counts) included messages carried over NET/ROM/AX.25 and
@@ -266,7 +1207,7 @@ on 2026-09-16 together with everything since.
   messages). Fixes every consumer of that shared function at once — the
   message table, hub station tiles, summary card, hourly chart, station
   modals, and Propagation Report. See
-  `RF-MESSAGES-MEDIUM-MIGRATION.md` for deploy + backfill steps.
+  USER-MANUAL.md, "Updating to a newer version", for the one-time backfill.
 
 - **`bpq-rf-connections.html` — Hourly RF Connections & Messages chart
   overcounted messages from non-RF-forwarding-partner stations** — The

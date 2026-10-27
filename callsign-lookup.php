@@ -10,28 +10,77 @@
  *   - Parallel HTTP requests via curl_multi for batch lookups
  *   - Negative cache for callsigns not found (avoids repeated failed API calls)
  *   - QRZ.com session key caching to minimize login requests
- * 
- * Usage: callsign-lookup.php?call=YOURCALL
- *        callsign-lookup.php?calls=YOURCALL,N3MEL,KP3FT  (batch lookup)
+ *   - 2026-10-06: a failed lookup (timeout/HTTP/QRZ error) never replaces a known
+ *     location; only a definite "not found" from every source is cached for 7 days
+ *   - 2026-10-10: a rejected QRZ login waits 30 min instead of retrying on every
+ *     request; the real QRZ login error is logged; a non-subscriber account is an
+ *     error, not "not found"; CLI check: php callsign-lookup.php --qrz-test [CALL]
+ *   - 2026-10-19: QRZ login read from config.php ('qrz' => username/password);
+ *     older bpqdash-config.php / tprfn-config.php files still work as a fallback
+ *
+ * Usage: callsign-lookup.php?call=W1AW
+ *        callsign-lookup.php?calls=W1AW,K1ABC,VE3XYZ  (batch lookup)
  */
 
-header('Access-Control-Allow-Origin: *');
+// CORS: config.php 'cors' (2026-10-20: was "*", which let any web site
+// spend this station's QRZ lookups from its visitors' browsers)
+require_once __DIR__ . '/includes/station-config.php';
+bpq_cors_headers('GET');
 header('Content-Type: application/json');
 
 // Cache file for storing lookups (reduces API calls)
 $CACHE_FILE = __DIR__ . '/callsign-cache.json';
 $CACHE_EXPIRY = 86400 * 30; // 30 days
 $NEGATIVE_CACHE_EXPIRY = 86400 * 7; // 7 days for "not found" entries
+$FAILURE_RETRY = 3600; // 2026-10-06: retry after a failed lookup (timeout/error) in 1 hour, never 7 days
+$PREFIX_FALLBACK_EXPIRY = 86400 * 7; // 2026-10-06: re-check country-level prefix guesses weekly
+$LOOKUP_HEALTH_FILE = __DIR__ . '/cache/lookup-health.json'; // 2026-10-06: last lookup failures (read by daily check)
 
 // QRZ.com session key cache
 $QRZ_SESSION_FILE = __DIR__ . '/cache/qrz-session.json';
 
 // ========== QRZ.COM CONFIGURATION ==========
-// Load QRZ credentials from bpqdash-config.php
-$config = file_exists(__DIR__ . '/bpqdash-config.php') ? include(__DIR__ . '/bpqdash-config.php') : [];
-$QRZ_USERNAME = $config['qrz_username'] ?? '';
-$QRZ_PASSWORD = $config['qrz_password'] ?? '';
+// QRZ login (2026-10-19): config.php  'qrz' => ['username' => ..., 'password' => ...].
+// Older installs kept qrz_username / qrz_password in a separate file; those are
+// still read, outside the web root first, when config.php has no QRZ username.
+// The first source with a username supplies both values. QRZ is optional:
+// without it, US calls are still found through callook.info.
+$QRZ_CONFIG_SOURCE = '';
+$QRZ_USERNAME = '';
+$QRZ_PASSWORD = '';
+$QRZ_CONFIG_FILES = [__DIR__ . '/config.php'];
+foreach (['bpqdash-config.php', 'tprfn-config.php'] as $legacy) {
+    $QRZ_CONFIG_FILES[] = dirname(__DIR__) . '/' . $legacy;
+    $QRZ_CONFIG_FILES[] = __DIR__ . '/' . $legacy;
+}
+unset($legacy);
+
+/** QRZ username/password from one config file's array, or null. */
+function qrzCredsFrom($cfg) {
+    if (!is_array($cfg)) return null;
+    if (isset($cfg['qrz']) && is_array($cfg['qrz']) && trim($cfg['qrz']['username'] ?? '') !== '') {
+        return [trim($cfg['qrz']['username']), (string)($cfg['qrz']['password'] ?? '')];
+    }
+    if (trim($cfg['qrz_username'] ?? '') !== '') {
+        return [trim($cfg['qrz_username']), (string)($cfg['qrz_password'] ?? '')];
+    }
+    return null;
+}
+
+foreach ($QRZ_CONFIG_FILES as $cfgFile) {
+    if (!is_readable($cfgFile)) continue;
+    $creds = qrzCredsFrom(include $cfgFile);
+    if ($creds) {
+        [$QRZ_USERNAME, $QRZ_PASSWORD] = $creds;   // password not trimmed; --qrz-test reports stray spaces
+        $QRZ_CONFIG_SOURCE = $cfgFile;
+        break;
+    }
+}
+unset($cfgFile, $creds);
 $QRZ_API_URL = 'https://xmldata.qrz.com/xml/current/';
+$QRZ_AGENT = 'BPQ-Dashboard-1.5';
+$QRZ_LOGIN_BACKOFF = 1800;   // 2026-10-10: after QRZ rejects the login, wait 30 min before trying again
+$QRZ_LAST_LOGIN_ERROR = '';
 
 // ========== MANUAL LOCATIONS ==========
 // Known stations not found in public databases (nodes, repeaters, special calls)
@@ -146,74 +195,118 @@ register_shutdown_function('saveCache');
  * Get a valid QRZ.com session key (cached or fresh login)
  */
 function getQRZSessionKey() {
-    global $QRZ_USERNAME, $QRZ_PASSWORD, $QRZ_API_URL, $QRZ_SESSION_FILE;
-    
+    global $QRZ_USERNAME, $QRZ_PASSWORD, $QRZ_API_URL, $QRZ_SESSION_FILE, $QRZ_AGENT,
+           $QRZ_LOGIN_BACKOFF, $QRZ_LAST_LOGIN_ERROR;
+
+    $QRZ_LAST_LOGIN_ERROR = '';
     if (empty($QRZ_USERNAME) || empty($QRZ_PASSWORD)) {
+        $QRZ_LAST_LOGIN_ERROR = 'no QRZ credentials configured';
         return null;
     }
-    
-    // Check for cached session key
-    if (file_exists($QRZ_SESSION_FILE)) {
-        $session = json_decode(file_get_contents($QRZ_SESSION_FILE), true);
-        if ($session && !empty($session['key']) && (time() - ($session['time'] ?? 0)) < 7200) {
-            // Session keys typically last ~24hrs, refresh every 2 hours to be safe
-            return $session['key'];
-        }
+
+    // Check for cached session key — or a recent rejected login
+    $session = file_exists($QRZ_SESSION_FILE) ? json_decode(file_get_contents($QRZ_SESSION_FILE), true) : null;
+    if ($session && !empty($session['key']) && (time() - ($session['time'] ?? 0)) < 7200) {
+        // Session keys typically last ~24hrs, refresh every 2 hours to be safe
+        return $session['key'];
     }
-    
-    // Login to QRZ.com
-    $loginUrl = $QRZ_API_URL . '?username=' . urlencode($QRZ_USERNAME) . '&password=' . urlencode($QRZ_PASSWORD);
-    $ctx = stream_context_create(['http' => ['timeout' => 10, 'user_agent' => 'BPQDASH-Network-Map/1.0']]);
-    $response = @file_get_contents($loginUrl, false, $ctx);
-    
-    if (!$response) return null;
-    
-    // Parse XML response for session key
-    $key = parseQRZSessionKey($response);
-    if ($key) {
-        // Cache the session key
-        $dir = dirname($QRZ_SESSION_FILE);
-        if (!is_dir($dir)) @mkdir($dir, 0755, true);
-        file_put_contents($QRZ_SESSION_FILE, json_encode(['key' => $key, 'time' => time()]), LOCK_EX);
-        return $key;
+    // 2026-10-10: before, a rejected login was retried on every page load / batch,
+    // which keeps sending a wrong password to QRZ. Now it waits $QRZ_LOGIN_BACKOFF.
+    // Deleting cache/qrz-session.json (or fixing the password) clears this.
+    if ($session && !empty($session['login_failed_at'])
+            && (time() - $session['login_failed_at']) < $QRZ_LOGIN_BACKOFF
+            && ($session['user'] ?? '') === $QRZ_USERNAME
+            && ($session['pw_hash'] ?? '') === md5($QRZ_PASSWORD)) {
+        $QRZ_LAST_LOGIN_ERROR = ($session['login_error'] ?? 'login failed') . ' (waiting before retry)';
+        return null;
     }
-    
+
+    // Login to QRZ.com (2026-10-10: curl, like the lookups, so HTTP/network failures are reported)
+    $login = qrzLogin();
+    $dir = dirname($QRZ_SESSION_FILE);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+
+    if ($login['key']) {
+        file_put_contents($QRZ_SESSION_FILE, json_encode([
+            'key' => $login['key'], 'time' => time(), 'subexp' => $login['subexp'],
+        ]), LOCK_EX);
+        return $login['key'];
+    }
+
+    $QRZ_LAST_LOGIN_ERROR = $login['error'];
+    error_log('QRZ login error: ' . $login['error']);
+    // Only back off when QRZ itself answered (wrong password, account problem).
+    // A network hiccup is retried normally.
+    if ($login['qrz_answered']) {
+        file_put_contents($QRZ_SESSION_FILE, json_encode([
+            'login_failed_at' => time(), 'login_error' => $login['error'],
+            'user' => $QRZ_USERNAME, 'pw_hash' => md5($QRZ_PASSWORD),
+        ]), LOCK_EX);
+    }
     return null;
 }
 
 /**
- * Extract session key from QRZ XML response
+ * One QRZ login request. Returns key (or null), error text, subscription
+ * expiry text, and whether QRZ itself answered (vs a network/HTTP failure).
  */
-function parseQRZSessionKey($xml) {
-    // Suppress XML warnings
+function qrzLogin() {
+    global $QRZ_USERNAME, $QRZ_PASSWORD, $QRZ_API_URL, $QRZ_AGENT;
+
+    $loginUrl = $QRZ_API_URL . '?username=' . rawurlencode($QRZ_USERNAME)
+              . '&password=' . rawurlencode($QRZ_PASSWORD) . '&agent=' . rawurlencode($QRZ_AGENT);
+    $r = curlMultiFetch(['login' => $loginUrl], 10, 5)['login'];
+
+    $out = ['key' => null, 'error' => '', 'subexp' => '', 'qrz_answered' => false, 'raw' => $r['body']];
+    if ($r['code'] !== 200 || $r['body'] === null) {
+        $out['error'] = trim("HTTP {$r['code']} {$r['err']}");
+        return $out;
+    }
+    $s = parseQRZSession($r['body']);
+    if ($s === null) {
+        $out['error'] = 'unreadable login response';
+        return $out;
+    }
+    $out['qrz_answered'] = true;
+    $out['subexp'] = $s['subexp'];
+    if ($s['key'] !== '') {
+        $out['key'] = $s['key'];             // a key is usable even if QRZ adds an Error/Message
+        if ($s['error'] !== '') error_log('QRZ login note: ' . $s['error']);
+        return $out;
+    }
+    $out['error'] = $s['error'] !== '' ? $s['error'] : 'no session key in login response';
+    return $out;
+}
+
+/**
+ * Read the <Session> block of any QRZ XML response.
+ * Returns ['key','error','subexp','message'] (empty strings when absent) or null if not XML.
+ */
+function parseQRZSession($xml) {
     libxml_use_internal_errors(true);
     $doc = simplexml_load_string($xml);
     libxml_clear_errors();
-    
     if (!$doc) return null;
-    
-    // Handle namespace
+
     $namespaces = $doc->getNamespaces(true);
+    $p = '';
     if (!empty($namespaces)) {
-        $ns = reset($namespaces);
-        $doc->registerXPathNamespace('qrz', $ns);
-        $keys = $doc->xpath('//qrz:Session/qrz:Key');
-        $errors = $doc->xpath('//qrz:Session/qrz:Error');
-    } else {
-        $keys = $doc->xpath('//Session/Key');
-        $errors = $doc->xpath('//Session/Error');
+        $doc->registerXPathNamespace('qrz', reset($namespaces));
+        $p = 'qrz:';
     }
-    
-    if (!empty($errors)) {
-        error_log('QRZ login error: ' . (string)$errors[0]);
-        return null;
-    }
-    
-    if (!empty($keys)) {
-        return (string)$keys[0];
-    }
-    
-    return null;
+    $get = function ($field) use ($doc, $p) {
+        $n = $doc->xpath("//{$p}Session/{$p}{$field}");
+        return !empty($n) ? trim((string)$n[0]) : '';
+    };
+    return ['key' => $get('Key'), 'error' => $get('Error'), 'subexp' => $get('SubExp'), 'message' => $get('Message')];
+}
+
+/**
+ * Extract session key from QRZ XML response (kept for compatibility)
+ */
+function parseQRZSessionKey($xml) {
+    $s = parseQRZSession($xml);
+    return ($s && $s['key'] !== '') ? $s['key'] : null;
 }
 
 /**
@@ -226,18 +319,80 @@ function invalidateQRZSession() {
     }
 }
 
+// ========== LOOKUP OUTCOMES (2026-10-06) ==========
+//
+// Every source reports one of these per callsign:
+//   ['status' => 'found', 'record' => [...]]  — a real location
+//   ['status' => 'not_found']                 — the source answered: no such call, or no location on file
+//   ['status' => 'error', 'reason' => '...']  — timeout, HTTP error, QRZ login/rate-limit, bad response
+//   ['status' => 'skipped']                   — source not configured (no QRZ credentials)
+//
+// Before 2026-10-06 an 'error' was treated exactly like 'not_found', so a single
+// failed batch (QRZ or network down) replaced expired-but-good locations with
+// 7-day "not_found" entries, or with a country-level prefix guess. Now:
+//   - a lookup error NEVER replaces a known real location (it is kept, marked
+//     stale, and re-tried after $FAILURE_RETRY);
+//   - "not found" is only cached for 7 days when every source answered not_found;
+//   - a prefix guess never replaces a real location;
+//   - failures are written to the PHP error log and cache/lookup-health.json.
+
+/**
+ * Fetch several URLs in parallel (at most $maxConcurrent at a time).
+ * Returns key => ['code' => int, 'body' => string|null, 'err' => string]
+ */
+function curlMultiFetch(array $urls, $timeout, $connectTimeout, $maxConcurrent = 8) {
+    $out = [];
+    foreach (array_chunk($urls, $maxConcurrent, true) as $chunk) {
+        $mh = curl_multi_init();
+        $handles = [];
+        foreach ($chunk as $key => $url) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => $timeout,
+                CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+                CURLOPT_USERAGENT => 'BPQDASH-Network-Map/1.0',
+                CURLOPT_FOLLOWLOCATION => true,
+            ]);
+            curl_multi_add_handle($mh, $ch);
+            $handles[$key] = $ch;
+        }
+
+        $running = null;
+        do {
+            curl_multi_exec($mh, $running);
+            if ($running > 0) {
+                curl_multi_select($mh, 0.5);
+            }
+        } while ($running > 0);
+
+        foreach ($handles as $key => $ch) {
+            $body = curl_multi_getcontent($ch);
+            $out[$key] = [
+                'code' => (int)curl_getinfo($ch, CURLINFO_HTTP_CODE),
+                'body' => ($body === '' ? null : $body),
+                'err'  => curl_error($ch),
+            ];
+            curl_multi_remove_handle($mh, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($mh);
+    }
+    return $out;
+}
+
 // ========== QRZ.COM LOOKUP FUNCTIONS ==========
 
 /**
- * Parse a QRZ.com XML callsign response
+ * Parse a QRZ.com XML callsign response into an outcome (see top of section)
  */
 function parseQRZResponse($callsign, $xml) {
     libxml_use_internal_errors(true);
     $doc = simplexml_load_string($xml);
     libxml_clear_errors();
-    
-    if (!$doc) return null;
-    
+
+    if (!$doc) return ['status' => 'error', 'reason' => 'qrz: unreadable response'];
+
     // Handle namespace
     $namespaces = $doc->getNamespaces(true);
     if (!empty($namespaces)) {
@@ -249,25 +404,36 @@ function parseQRZResponse($callsign, $xml) {
         $callNodes = $doc->xpath('//Callsign');
         $errors = $doc->xpath('//Session/Error');
     }
-    
-    // Check for errors (session timeout, not found, etc.)
+
     if (!empty($errors)) {
-        $errMsg = (string)$errors[0];
+        $errMsg = trim((string)$errors[0]);
         if (stripos($errMsg, 'Session Timeout') !== false || stripos($errMsg, 'Invalid session') !== false) {
             invalidateQRZSession();
-            return ['error' => 'session_expired'];
+            return ['status' => 'error', 'reason' => 'session_expired'];
         }
-        return null; // Not found or other error
+        if (stripos($errMsg, 'not found') !== false) {
+            return ['status' => 'not_found'];          // QRZ answered: no such callsign
+        }
+        return ['status' => 'error', 'reason' => 'qrz: ' . $errMsg];   // rate limit, account problem, etc.
     }
-    
-    if (empty($callNodes)) return null;
-    
+
+    if (empty($callNodes)) return ['status' => 'error', 'reason' => 'qrz: no callsign record in response'];
+
     $record = $callNodes[0];
-    
+
     $lat = floatval((string)($record->lat ?? 0));
     $lon = floatval((string)($record->lon ?? 0));
-    if ($lat == 0 && $lon == 0) return null;
-    
+    if ($lat == 0 && $lon == 0) {
+        // 2026-10-10: without an XML Logbook Data subscription QRZ still answers,
+        // but leaves out lat/lon for EVERY call. That is an account problem, not
+        // "no location on file" — before, it put each call in the 7-day not-found cache.
+        $s = parseQRZSession($xml);
+        if ($s && stripos($s['subexp'], 'non-subscriber') !== false) {
+            return ['status' => 'error', 'reason' => 'qrz: account has no XML data subscription (SubExp: non-subscriber)'];
+        }
+        return ['status' => 'not_found'];   // QRZ has the call but no location
+    }
+
     $country = (string)($record->country ?? '');
     $state = (string)($record->state ?? '');
     $city = (string)($record->addr2 ?? '');
@@ -275,8 +441,8 @@ function parseQRZResponse($callsign, $xml) {
     $fname = trim((string)($record->fname ?? ''));
     $lname = trim((string)($record->name ?? ''));
     $name = trim($fname . ' ' . $lname);
-    
-    return [
+
+    return ['status' => 'found', 'record' => [
         'callsign' => $callsign,
         'name' => $name,
         'lat' => $lat,
@@ -286,213 +452,112 @@ function parseQRZResponse($callsign, $xml) {
         'state' => $state,
         'country' => $country,
         'source' => 'qrz.com'
-    ];
+    ]];
 }
 
 /**
- * Single QRZ.com lookup (used by single-callsign endpoint)
- */
-function lookupQRZ($callsign) {
-    global $QRZ_API_URL;
-    
-    $sessionKey = getQRZSessionKey();
-    if (!$sessionKey) return null;
-    
-    $url = $QRZ_API_URL . '?s=' . urlencode($sessionKey) . '&callsign=' . urlencode($callsign);
-    $ctx = stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'BPQDASH-Network-Map/1.0']]);
-    $response = @file_get_contents($url, false, $ctx);
-    if (!$response) return null;
-    
-    $result = parseQRZResponse($callsign, $response);
-    
-    // If session expired, try once more with a fresh login
-    if (is_array($result) && isset($result['error']) && $result['error'] === 'session_expired') {
-        invalidateQRZSession();
-        $sessionKey = getQRZSessionKey();
-        if (!$sessionKey) return null;
-        
-        $url = $QRZ_API_URL . '?s=' . urlencode($sessionKey) . '&callsign=' . urlencode($callsign);
-        $response = @file_get_contents($url, false, $ctx);
-        if (!$response) return null;
-        
-        $result = parseQRZResponse($callsign, $response);
-        if (is_array($result) && isset($result['error'])) return null;
-    }
-    
-    return $result;
-}
-
-/**
- * Parallel QRZ.com lookups using curl_multi
- * QRZ.com API is sequential per session but we can still batch efficiently
+ * QRZ.com lookups for several callsigns. Returns callsign => outcome.
+ * Retries once with a fresh login if QRZ reports the session expired.
  */
 function parallelQRZ($callsigns) {
-    global $QRZ_API_URL;
-    
-    if (empty($callsigns)) return [];
-    
-    $sessionKey = getQRZSessionKey();
-    if (!$sessionKey) return [];
-    
-    $mh = curl_multi_init();
-    $handles = [];
-    
-    foreach ($callsigns as $call) {
-        $url = $QRZ_API_URL . '?s=' . urlencode($sessionKey) . '&callsign=' . urlencode($call);
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_USERAGENT => 'BPQDASH-Network-Map/1.0',
-            CURLOPT_FOLLOWLOCATION => true,
-        ]);
-        curl_multi_add_handle($mh, $ch);
-        $handles[$call] = $ch;
+    global $QRZ_API_URL, $QRZ_USERNAME, $QRZ_PASSWORD, $QRZ_LAST_LOGIN_ERROR, $QRZ_AGENT;
+
+    $out = [];
+    if (empty($callsigns)) return $out;
+
+    if (empty($QRZ_USERNAME) || empty($QRZ_PASSWORD)) {
+        foreach ($callsigns as $call) $out[$call] = ['status' => 'skipped'];
+        return $out;
     }
-    
-    // Execute all requests in parallel
-    $running = null;
-    do {
-        curl_multi_exec($mh, $running);
-        if ($running > 0) {
-            curl_multi_select($mh, 0.5);
+
+    $pending = array_values($callsigns);
+    for ($attempt = 1; $attempt <= 2 && !empty($pending); $attempt++) {
+        $sessionKey = getQRZSessionKey();
+        if (!$sessionKey) {
+            $why = $QRZ_LAST_LOGIN_ERROR !== '' ? " ($QRZ_LAST_LOGIN_ERROR)" : '';
+            foreach ($pending as $call) $out[$call] = ['status' => 'error', 'reason' => "qrz: login failed$why"];
+            return $out;
         }
-    } while ($running > 0);
-    
-    // Collect results
-    $results = [];
-    $sessionExpired = false;
-    foreach ($handles as $call => $ch) {
-        $response = curl_multi_getcontent($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_multi_remove_handle($mh, $ch);
-        curl_close($ch);
-        
-        if ($httpCode === 200 && $response) {
-            $parsed = parseQRZResponse($call, $response);
-            if (is_array($parsed) && isset($parsed['error']) && $parsed['error'] === 'session_expired') {
-                $sessionExpired = true;
-            } elseif ($parsed) {
-                $results[$call] = $parsed;
+
+        $urls = [];
+        foreach ($pending as $call) {
+            $urls[$call] = $QRZ_API_URL . '?s=' . urlencode($sessionKey) . '&callsign=' . urlencode($call)
+                         . '&agent=' . rawurlencode($QRZ_AGENT);
+        }
+        $responses = curlMultiFetch($urls, 10, 5);
+
+        $retry = [];
+        foreach ($pending as $call) {
+            $r = $responses[$call];
+            if ($r['code'] !== 200 || $r['body'] === null) {
+                $out[$call] = ['status' => 'error', 'reason' => trim("qrz: HTTP {$r['code']} {$r['err']}")];
+                continue;
+            }
+            $outcome = parseQRZResponse($call, $r['body']);
+            $out[$call] = $outcome;
+            if ($outcome['status'] === 'error' && $outcome['reason'] === 'session_expired') {
+                $retry[] = $call;
             }
         }
+
+        if (!empty($retry)) invalidateQRZSession();
+        $pending = $retry;
     }
-    
-    curl_multi_close($mh);
-    
-    // If session expired, invalidate and retry all failed callsigns
-    if ($sessionExpired) {
-        invalidateQRZSession();
-        $retryList = array_diff($callsigns, array_keys($results));
-        if (!empty($retryList)) {
-            $sessionKey = getQRZSessionKey();
-            if ($sessionKey) {
-                $mh = curl_multi_init();
-                $handles = [];
-                
-                foreach ($retryList as $call) {
-                    $url = $QRZ_API_URL . '?s=' . urlencode($sessionKey) . '&callsign=' . urlencode($call);
-                    $ch = curl_init($url);
-                    curl_setopt_array($ch, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT => 10,
-                        CURLOPT_CONNECTTIMEOUT => 5,
-                        CURLOPT_USERAGENT => 'BPQDASH-Network-Map/1.0',
-                        CURLOPT_FOLLOWLOCATION => true,
-                    ]);
-                    curl_multi_add_handle($mh, $ch);
-                    $handles[$call] = $ch;
-                }
-                
-                $running = null;
-                do {
-                    curl_multi_exec($mh, $running);
-                    if ($running > 0) {
-                        curl_multi_select($mh, 0.5);
-                    }
-                } while ($running > 0);
-                
-                foreach ($handles as $call => $ch) {
-                    $response = curl_multi_getcontent($ch);
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    curl_multi_remove_handle($mh, $ch);
-                    curl_close($ch);
-                    
-                    if ($httpCode === 200 && $response) {
-                        $parsed = parseQRZResponse($call, $response);
-                        if ($parsed && !isset($parsed['error'])) {
-                            $results[$call] = $parsed;
-                        }
-                    }
-                }
-                
-                curl_multi_close($mh);
-            }
-        }
-    }
-    
-    return $results;
+
+    return $out;
 }
 
 // ========== CALLOOK.INFO FUNCTIONS (FALLBACK) ==========
 
 /**
- * Parallel callook.info lookups using curl_multi (fallback for QRZ failures)
+ * callook.info lookups (US callsigns). Returns callsign => outcome.
+ * callook answers status INVALID for calls it doesn't know (incl. all non-US calls);
+ * anything other than VALID/INVALID (e.g. UPDATING) is treated as a temporary error.
  */
 function parallelCallook($callsigns) {
-    if (empty($callsigns)) return [];
-    
-    $mh = curl_multi_init();
-    $handles = [];
-    
+    $out = [];
+    if (empty($callsigns)) return $out;
+
+    $urls = [];
     foreach ($callsigns as $call) {
-        $ch = curl_init("https://callook.info/{$call}/json");
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 5,
-            CURLOPT_CONNECTTIMEOUT => 3,
-            CURLOPT_USERAGENT => 'BPQDASH-Network-Map/1.0',
-            CURLOPT_FOLLOWLOCATION => true,
-        ]);
-        curl_multi_add_handle($mh, $ch);
-        $handles[$call] = $ch;
+        $urls[$call] = 'https://callook.info/' . rawurlencode($call) . '/json';
     }
-    
-    // Execute all requests in parallel
-    $running = null;
-    do {
-        curl_multi_exec($mh, $running);
-        if ($running > 0) {
-            curl_multi_select($mh, 0.5);
+    $responses = curlMultiFetch($urls, 5, 3);
+
+    foreach ($callsigns as $call) {
+        $r = $responses[$call];
+        if ($r['code'] !== 200 || $r['body'] === null) {
+            $out[$call] = ['status' => 'error', 'reason' => trim("callook: HTTP {$r['code']} {$r['err']}")];
+            continue;
         }
-    } while ($running > 0);
-    
-    // Collect results
-    $results = [];
-    foreach ($handles as $call => $ch) {
-        $response = curl_multi_getcontent($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_multi_remove_handle($mh, $ch);
-        curl_close($ch);
-        
-        if ($httpCode === 200 && $response) {
-            $parsed = parseCallookResponse($call, $response);
-            if ($parsed) $results[$call] = $parsed;
+        $data = json_decode($r['body'], true);
+        if (!is_array($data)) {
+            $out[$call] = ['status' => 'error', 'reason' => 'callook: unreadable response'];
+            continue;
         }
+        $status = strtoupper($data['status'] ?? '');
+        if ($status === 'INVALID') {
+            $out[$call] = ['status' => 'not_found'];
+            continue;
+        }
+        if ($status !== 'VALID') {
+            $out[$call] = ['status' => 'error', 'reason' => 'callook: status ' . ($status ?: 'missing')];
+            continue;
+        }
+        $record = parseCallookResponse($call, $r['body']);
+        $out[$call] = $record ? ['status' => 'found', 'record' => $record] : ['status' => 'not_found'];
     }
-    
-    curl_multi_close($mh);
-    return $results;
+
+    return $out;
 }
 
 function parseCallookResponse($callsign, $response) {
     $data = json_decode($response, true);
     if (!$data || ($data['status'] ?? '') !== 'VALID') return null;
-    
+
     $location = $data['location'] ?? [];
     $address = $data['address'] ?? [];
-    
+
     $city = '';
     $state = '';
     $line2 = trim($address['line2'] ?? '');
@@ -504,11 +569,11 @@ function parseCallookResponse($callsign, $response) {
             $city = $line2;
         }
     }
-    
+
     $lat = floatval($location['latitude'] ?? 0);
     $lon = floatval($location['longitude'] ?? 0);
     if ($lat == 0 && $lon == 0) return null;
-    
+
     return [
         'callsign' => $callsign,
         'name' => $data['name'] ?? '',
@@ -522,177 +587,267 @@ function parseCallookResponse($callsign, $response) {
     ];
 }
 
-// Legacy single-call functions (used by single-callsign endpoint)
-function lookupCallook($callsign) {
-    $ctx = stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'BPQDASH-Network-Map/1.0']]);
-    $response = @file_get_contents("https://callook.info/{$callsign}/json", false, $ctx);
-    if (!$response) return null;
-    return parseCallookResponse($callsign, $response);
+// ========== CACHE RULES ==========
+
+function entryHasLocation($entry) {
+    return is_array($entry) && isset($entry['lat'], $entry['lon'])
+        && ($entry['lat'] != 0 || $entry['lon'] != 0);
 }
+
+/**
+ * Decide what a cache entry means right now.
+ * Returns ['hit', entry] (use it), ['skip', null] (known nothing — don't look up yet)
+ * or ['miss', null] (look it up).
+ */
+function cacheState($entry) {
+    global $CACHE_EXPIRY, $NEGATIVE_CACHE_EXPIRY, $PREFIX_FALLBACK_EXPIRY;
+
+    if (!is_array($entry)) return ['miss', null];
+    $now = time();
+    $hasLoc = entryHasLocation($entry);
+
+    // Entries written since 2026-10-06 carry an explicit retry time
+    if (!empty($entry['retry_after'])) {
+        if ($entry['retry_after'] > $now) return $hasLoc ? ['hit', $entry] : ['skip', null];
+        return ['miss', null];
+    }
+
+    // Older entries: age-based
+    $age = $now - ($entry['cached_at'] ?? 0);
+    if ($hasLoc) {
+        $ttl = (($entry['source'] ?? '') === 'prefix-fallback') ? $PREFIX_FALLBACK_EXPIRY : $CACHE_EXPIRY;
+        return ($age < $ttl) ? ['hit', $entry] : ['miss', null];
+    }
+    if (!empty($entry['not_found']) && $age < $NEGATIVE_CACHE_EXPIRY) return ['skip', null];
+    return ['miss', null];
+}
+
+/**
+ * Turn the per-source outcomes for one callsign into a cache entry + result.
+ */
+function resolveLookup($baseCall, array $outcomes) {
+    global $cache, $cacheModified, $FAILURE_RETRY, $NEGATIVE_CACHE_EXPIRY;
+
+    $now = time();
+
+    foreach ($outcomes as $outcome) {
+        if (($outcome['status'] ?? '') === 'found') {
+            $record = $outcome['record'];
+            $record['cached_at'] = $now;
+            $cache[$baseCall] = $record;
+            $cacheModified = true;
+            return $record;
+        }
+    }
+
+    $errors = [];
+    foreach ($outcomes as $src => $outcome) {
+        if (($outcome['status'] ?? '') === 'error') $errors[] = $outcome['reason'] ?? "$src error";
+    }
+    $definite = empty($errors);   // every source asked answered "not found"
+    $retryAfter = $now + ($definite ? $NEGATIVE_CACHE_EXPIRY : $FAILURE_RETRY);
+    if (!$definite) noteLookupFailure($baseCall, $errors);
+
+    // 1. Keep the last real location we had — a failed or empty lookup never removes it
+    $prior = $cache[$baseCall] ?? null;
+    if (entryHasLocation($prior) && ($prior['source'] ?? '') !== 'prefix-fallback') {
+        $prior['stale'] = true;
+        $prior['retry_after'] = $retryAfter;
+        $prior['last_check'] = $now;
+        $prior['last_check_result'] = $definite ? 'not_found' : 'lookup_error';
+        $cache[$baseCall] = $prior;
+        $cacheModified = true;
+        return $prior;
+    }
+
+    // 2. Country-level guess from the callsign prefix, if there is one
+    $guess = prefixFallback($baseCall);
+    if ($guess) {
+        $guess['cached_at'] = $now;
+        $guess['retry_after'] = $retryAfter;
+        $cache[$baseCall] = $guess;
+        $cacheModified = true;
+        return $guess;
+    }
+
+    // 3. Nothing known
+    $entry = ['callsign' => $baseCall, 'not_found' => true, 'cached_at' => $now, 'retry_after' => $retryAfter];
+    if (!$definite) $entry['lookup_error'] = true;
+    $cache[$baseCall] = $entry;
+    $cacheModified = true;
+    return null;
+}
+
+// ========== LOOKUP FAILURE LOG ==========
+
+$lookupFailures = [];
+
+function noteLookupFailure($callsign, array $reasons) {
+    global $lookupFailures;
+    $lookupFailures[$callsign] = implode('; ', array_unique($reasons));
+}
+
+function saveLookupHealth() {
+    global $lookupFailures, $LOOKUP_HEALTH_FILE;
+    if (empty($lookupFailures)) return;
+
+    $summary = [];
+    foreach ($lookupFailures as $call => $why) $summary[] = "$call ($why)";
+    error_log('callsign-lookup: lookup failed, last known location kept / retry in 1h: ' . implode(', ', $summary));
+
+    $health = [];
+    if (file_exists($LOOKUP_HEALTH_FILE)) {
+        $health = json_decode(file_get_contents($LOOKUP_HEALTH_FILE), true) ?: [];
+    }
+    $health['last_failure_at'] = time();
+    $health['last_failure'] = $lookupFailures;
+    $health['failure_count'] = ($health['failure_count'] ?? 0) + count($lookupFailures);
+    $dir = dirname($LOOKUP_HEALTH_FILE);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    @file_put_contents($LOOKUP_HEALTH_FILE, json_encode($health, JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+register_shutdown_function('saveLookupHealth');
 
 // ========== LOOKUP FUNCTIONS ==========
 
 /**
- * Lookup a single callsign (checks cache first)
+ * Lookup a single callsign (same rules as the batch lookup)
  */
 function lookupCallsign($callsign) {
-    global $cache, $CACHE_EXPIRY, $NEGATIVE_CACHE_EXPIRY, $cacheModified, $MANUAL_LOCATIONS;
-    
     $baseCall = preg_replace('/-\d+$/', '', strtoupper($callsign));
-    
-    // Check manual locations first (always takes priority)
-    if (isset($MANUAL_LOCATIONS[$baseCall])) {
-        return $MANUAL_LOCATIONS[$baseCall];
-    }
-    
-    // Check cache
-    if (isset($cache[$baseCall])) {
-        $entry = $cache[$baseCall];
-        $age = time() - ($entry['cached_at'] ?? 0);
-        
-        // Valid positive cache hit
-        if (isset($entry['lat']) && isset($entry['lon']) 
-            && ($entry['lat'] != 0 || $entry['lon'] != 0) 
-            && $age < $CACHE_EXPIRY) {
-            return $entry;
-        }
-        
-        // Valid negative cache hit (not found)
-        if (!empty($entry['not_found']) && $age < $NEGATIVE_CACHE_EXPIRY) {
-            return null;
-        }
-    }
-    
-    // Try QRZ.com first (primary — international callsigns)
-    $result = lookupQRZ($baseCall);
-    
-    // Try callook.info if QRZ fails (fallback — US callsigns)
-    if (!$result || !isset($result['lat']) || ($result['lat'] == 0 && $result['lon'] == 0)) {
-        $callookResult = lookupCallook($baseCall);
-        if ($callookResult && isset($callookResult['lat']) && ($callookResult['lat'] != 0 || $callookResult['lon'] != 0)) {
-            $result = $callookResult;
-        }
-    }
-    
-    // Try prefix-based fallback as last resort
-    if (!$result || !isset($result['lat']) || ($result['lat'] == 0 && $result['lon'] == 0)) {
-        $prefixResult = prefixFallback($baseCall);
-        if ($prefixResult) {
-            $result = $prefixResult;
-        }
-    }
-    
-    // Cache the result
-    if ($result && isset($result['lat']) && ($result['lat'] != 0 || $result['lon'] != 0)) {
-        $result['cached_at'] = time();
-        $cache[$baseCall] = $result;
-        $cacheModified = true;
-    } else {
-        // Negative cache
-        $cache[$baseCall] = ['callsign' => $baseCall, 'not_found' => true, 'cached_at' => time()];
-        $cacheModified = true;
-    }
-    
-    return $result;
+    $results = batchLookupCallsigns([$baseCall]);
+    return $results[$baseCall] ?? null;
 }
 
 /**
  * Batch lookup with parallel HTTP requests
  */
 function batchLookupCallsigns($callsigns) {
-    global $cache, $CACHE_EXPIRY, $NEGATIVE_CACHE_EXPIRY, $cacheModified, $MANUAL_LOCATIONS;
-    
+    global $cache, $MANUAL_LOCATIONS;
+
     $results = [];
     $needLookup = [];
-    
-    // First pass: check manual locations, then cache
+
+    // First pass: manual locations, then cache
     foreach ($callsigns as $call) {
         $baseCall = preg_replace('/-\d+$/', '', strtoupper($call));
-        
+
         // Manual locations always win
         if (isset($MANUAL_LOCATIONS[$baseCall])) {
             $results[$baseCall] = $MANUAL_LOCATIONS[$baseCall];
             continue;
         }
-        
-        if (isset($cache[$baseCall])) {
-            $entry = $cache[$baseCall];
-            $age = time() - ($entry['cached_at'] ?? 0);
-            
-            if (isset($entry['lat']) && isset($entry['lon']) 
-                && ($entry['lat'] != 0 || $entry['lon'] != 0)
-                && $age < $CACHE_EXPIRY) {
-                $results[$baseCall] = $entry;
-                continue;
-            }
-            
-            if (!empty($entry['not_found']) && $age < $NEGATIVE_CACHE_EXPIRY) {
-                continue; // Skip — known not-found
-            }
+
+        [$state, $entry] = cacheState($cache[$baseCall] ?? null);
+        if ($state === 'hit') {
+            $results[$baseCall] = $entry;
+            continue;
         }
-        
+        if ($state === 'skip') continue;
+
         $needLookup[$baseCall] = true;
     }
-    
-    // Second pass: parallel lookups for uncached callsigns
-    if (!empty($needLookup)) {
-        $callsToLookup = array_keys($needLookup);
-        
-        // Try QRZ.com first (primary — handles international callsigns)
-        $qrzResults = parallelQRZ($callsToLookup);
-        
-        // Identify which ones still need callook.info fallback
-        $needCallook = [];
-        foreach ($callsToLookup as $baseCall) {
-            if (isset($qrzResults[$baseCall]) && $qrzResults[$baseCall]['lat'] != 0) {
-                $qrzResults[$baseCall]['cached_at'] = time();
-                $cache[$baseCall] = $qrzResults[$baseCall];
-                $results[$baseCall] = $qrzResults[$baseCall];
-                $cacheModified = true;
-            } else {
-                $needCallook[] = $baseCall;
-            }
-        }
-        
-        // Try callook.info for remaining (fallback — parallel)
-        if (!empty($needCallook)) {
-            $callookResults = parallelCallook($needCallook);
-            
-            $stillMissing = [];
-            foreach ($needCallook as $baseCall) {
-                if (isset($callookResults[$baseCall]) && $callookResults[$baseCall]['lat'] != 0) {
-                    $callookResults[$baseCall]['cached_at'] = time();
-                    $cache[$baseCall] = $callookResults[$baseCall];
-                    $results[$baseCall] = $callookResults[$baseCall];
-                    $cacheModified = true;
-                } else {
-                    $stillMissing[] = $baseCall;
-                }
-            }
-            
-            // Try prefix fallback for anything still missing
-            foreach ($stillMissing as $baseCall) {
-                $prefixResult = prefixFallback($baseCall);
-                if ($prefixResult) {
-                    $prefixResult['cached_at'] = time();
-                    $cache[$baseCall] = $prefixResult;
-                    $results[$baseCall] = $prefixResult;
-                    $cacheModified = true;
-                } else {
-                    // Negative cache
-                    $cache[$baseCall] = ['callsign' => $baseCall, 'not_found' => true, 'cached_at' => time()];
-                    $cacheModified = true;
-                }
-            }
-        }
+
+    if (empty($needLookup)) return $results;
+    $callsToLookup = array_keys($needLookup);
+
+    // QRZ.com first (primary — handles international callsigns)
+    $qrz = parallelQRZ($callsToLookup);
+
+    // callook.info for anything QRZ didn't locate (fallback — US callsigns)
+    $needCallook = [];
+    foreach ($callsToLookup as $baseCall) {
+        if (($qrz[$baseCall]['status'] ?? '') !== 'found') $needCallook[] = $baseCall;
     }
-    
+    $callook = parallelCallook($needCallook);
+
+    foreach ($callsToLookup as $baseCall) {
+        $outcomes = [];
+        if (isset($qrz[$baseCall]) && $qrz[$baseCall]['status'] !== 'skipped') $outcomes['qrz'] = $qrz[$baseCall];
+        if (isset($callook[$baseCall])) $outcomes['callook'] = $callook[$baseCall];
+        $record = resolveLookup($baseCall, $outcomes);
+        if ($record) $results[$baseCall] = $record;
+    }
+
     return $results;
+}
+
+// ========== QRZ DIAGNOSTIC (CLI only, 2026-10-10) ==========
+// Run as the web user so it reads the same files the site does:
+//   sudo -u www-data php /var/www/bpq-dashboard/callsign-lookup.php --qrz-test [CALLSIGN]
+// Never prints the password; always does a fresh login (ignores the cached key
+// and the 30-min wait) and does not change the callsign cache.
+if (PHP_SAPI === 'cli' && in_array('--qrz-test', $argv ?? [], true)) {
+    $testCall = 'W1AW';
+    foreach (array_slice($argv, 1) as $a) if ($a !== '--qrz-test') $testCall = strtoupper($a);
+
+    echo "QRZ diagnostic\n";
+    foreach ($QRZ_CONFIG_FILES as $f) {
+        $has = '';
+        if (is_readable($f)) {
+            $has = qrzCredsFrom(include $f) ? 'has a QRZ username' : 'no QRZ username';
+        } elseif (file_exists($f)) {
+            $has = 'not readable by this user';
+        }
+        printf("  config  %-40s %s%s\n", $f, file_exists($f) ? 'exists, ' . $has : 'missing',
+               $f === $QRZ_CONFIG_SOURCE ? '  <-- used' : '');
+    }
+    if ($QRZ_USERNAME === '') { echo "  RESULT  no QRZ username configured (config.php 'qrz' => username) — QRZ lookups are skipped\n"; exit(1); }
+    echo "  user    $QRZ_USERNAME\n";
+    $pw = $QRZ_PASSWORD;
+    $notes = [];
+    if ($pw !== trim($pw)) $notes[] = 'HAS LEADING/TRAILING WHITESPACE';
+    if (preg_match('/[^\x20-\x7E]/', $pw)) $notes[] = 'contains non-ASCII / control characters';
+    printf("  password %d characters%s\n", strlen($pw), $notes ? ' — ' . implode(', ', $notes) : '');
+
+    $sess = file_exists($QRZ_SESSION_FILE) ? json_decode(file_get_contents($QRZ_SESSION_FILE), true) : null;
+    if (!empty($sess['login_failed_at'])) {
+        echo '  cache   last login REJECTED at ' . date('Y-m-d H:i:s T', $sess['login_failed_at']) . ': ' . ($sess['login_error'] ?? '') . "\n";
+    } elseif (!empty($sess['key'])) {
+        echo '  cache   session key from ' . date('Y-m-d H:i:s T', $sess['time'] ?? 0) . "\n";
+    }
+
+    $login = qrzLogin();
+    if (!$login['key']) {
+        echo "  LOGIN   FAILED: {$login['error']}\n";
+        if (stripos($login['error'], 'password') !== false || stripos($login['error'], 'username') !== false) {
+            echo "          QRZ rejected the credentials. Check the password still matches qrz.com\n";
+            echo "          (it changes if the QRZ account password was changed) and that it is in\n";
+            echo "          SINGLE quotes in the config — in double quotes PHP rewrites any \$ in it.\n";
+        }
+        exit(1);
+    }
+    echo "  LOGIN   OK, subscription: " . ($login['subexp'] ?: '(not stated)') . "\n";
+    if (stripos($login['subexp'], 'non-subscriber') !== false) {
+        echo "          No XML Logbook Data subscription — QRZ will not return coordinates.\n";
+    }
+    $dir = dirname($QRZ_SESSION_FILE);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    @file_put_contents($QRZ_SESSION_FILE, json_encode(['key' => $login['key'], 'time' => time(), 'subexp' => $login['subexp']]), LOCK_EX);
+
+    $res = parallelQRZ([$testCall])[$testCall];
+    echo "  LOOKUP  $testCall: {$res['status']}";
+    if ($res['status'] === 'found') printf(" — %.4f, %.4f %s %s", $res['record']['lat'], $res['record']['lon'], $res['record']['grid'], $res['record']['country']);
+    if (!empty($res['reason'])) echo " — {$res['reason']}";
+    echo "\n";
+    $cacheModified = false;   // diagnostic never writes the callsign cache
+    $lookupFailures = [];
+    exit($res['status'] === 'found' ? 0 : 1);
 }
 
 // ========== REQUEST HANDLING ==========
 
+// 2026-10-03: POST only, so nginx can require the admin login for it
+// (GET lookups stay public for the maps).
 if (isset($_GET['action']) && $_GET['action'] === 'clear_cache') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        header('Allow: POST');
+        die(json_encode(['success' => false, 'error' => 'clear_cache requires POST']));
+    }
+    require_once __DIR__ . '/includes/web-login.php';   // 2026-10-04
+    bpq_require_web_login('Clearing the callsign cache', true);
     if (file_exists($CACHE_FILE)) {
         unlink($CACHE_FILE);
         echo json_encode(['success' => true, 'message' => 'Cache cleared']);
@@ -704,9 +859,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'clear_cache') {
 
 // ========== MANUAL LOCATION MANAGEMENT ==========
 
+/**
+ * Manual-location edits need the dashboard admin login (includes/web-login.php).
+ * Answers JSON on refusal, so the Add Station dialog can show the reason.
+ */
+function require_location_admin($what) {
+    require_once __DIR__ . '/includes/web-login.php';   // 2026-10-04
+    bpq_require_web_login($what, true);
+}
+
 // Save a manual location (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save_location') {
     header('Content-Type: application/json');
+    require_location_admin('Saving manual station locations');
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input || empty($input['callsign'])) {
         echo json_encode(['success' => false, 'error' => 'Callsign required']);
@@ -779,6 +944,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
 // Delete a manual location (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete_location') {
     header('Content-Type: application/json');
+    require_location_admin('Deleting manual station locations');
     $input = json_decode(file_get_contents('php://input'), true);
     if (!$input || empty($input['callsign'])) {
         echo json_encode(['success' => false, 'error' => 'Callsign required']);

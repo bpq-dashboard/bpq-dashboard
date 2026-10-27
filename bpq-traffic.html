@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Traffic Report — BPQ BBS</title>
+    <title>Traffic Report - BPQ Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Preconnect for faster CDN loading -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -154,11 +154,10 @@
     [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
     </style>
 <script>
-// Station callsign in the title from station-info.php (2026-09-26) — no hard-coded call.
+// Station callsign from station-info.php (2026-09-26) — no hard-coded call. The tab title stays "Page - BPQ Dashboard" (2026-10-19).
 document.addEventListener('DOMContentLoaded', function () {
   fetch('station-info.php', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
     if (!d || !d.callsign) return;
-    document.title = document.title.replace('BPQ BBS', d.callsign + ' BBS');
     var i = document.getElementById('ciCallsign'); if (i) i.placeholder = d.callsign;
   }).catch(function () {});
 });
@@ -167,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <body class="min-h-screen" data-nav-page="traffic">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
     
     <div class="p-2 sm:p-4 lg:p-8">
@@ -177,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">Traffic Report</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.13</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.14</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">BBS Station Traffic Analytics</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -986,6 +985,5 @@ document.addEventListener('DOMContentLoaded', function () {
     <script>
     (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
     </script>
-<script src="shared/settings-modal.js"></script>
 </body>
 </html>

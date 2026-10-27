@@ -234,30 +234,49 @@ function action_parser_status(PDO $pdo): array {
  * GET ?action=messages — forwarded FBB message events (added 2026-09-16)
  *
  * Serves the "Forwarded Messages" panel from the DB-backed rf_messages
- * table (populated by parse-vara-log.py's build_forwarded_messages())
- * instead of the page re-parsing the raw BBS logs client-side.
+ * table (populated by parse-vara-log.py's build_forwarded_messages()).
  *
  * Optional filters:
  *   days      how many days back (1-365, default 30)
  *   partner   filter to one forwarding partner base call (default no filter)
  *   msg_type  B | P | T (default no filter)
- *   limit     max rows (1-5000, default 1000)
+ *   status    all (default) | delivered | rejected          (added 2026-10-06)
+ *               delivered = everything except rejected offers (accepted,
+ *               deferred, and rows with no recorded reply)
+ *   counts    1 = also return `status_counts` — per partner/direction/
+ *               type/medium/status totals for the same window, so the page
+ *               can show rejected-offer totals without loading those rows
+ *   limit     max rows (1-50000, default 1000)
  *
- * Returns rows sorted newest-first, with timestamps as ISO strings for JS.
- * As of 2026-09-21 each row also carries `medium` (VARA/NETROM/AX.25/
- * TELNET/... or null if uncorrelated — see rf-connections-schema.sql).
- * Filtering to RF-only is left to the client (bpq-rf-connections.html's
- * getFilteredForwardedMessages()), same as its existing days/partner-list
- * filtering, rather than baked in here — other consumers of this
- * endpoint may legitimately want every medium.
+ * Rows are newest-first with ISO timestamps. Each row carries `medium`
+ * (2026-09-21) and, once sql/2026-10-06-rf-messages-delivery.sql is
+ * applied, `accept_status` (A/R/D/E/null) and `delivered_time`. As of
+ * that migration there is one row per (bid, direction, partner).
+ * Filtering to RF-only is left to the client.
  */
+function rf_messages_has_delivery(PDO $pdo): bool {
+    static $has = null;
+    if ($has === null) {
+        $row = tprfn_query_one($pdo,
+            "SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rf_messages'
+                AND COLUMN_NAME IN ('accept_status', 'delivered_time')");
+        $has = $row !== null && (int)$row['n'] === 2;
+    }
+    return $has;
+}
+
 function action_messages(PDO $pdo): array {
     $days = intparam('days', 30, 1, 365);
     $partner = $_GET['partner'] ?? null;
     $msg_type = strparam('msg_type', '', ['', 'B', 'P', 'T']);
-    $limit = intparam('limit', 1000, 1, 5000);
+    $status = strparam('status', 'all', ['all', 'delivered', 'rejected']);
+    $want_counts = ($_GET['counts'] ?? '') === '1';
+    $limit = intparam('limit', 1000, 1, 50000);
+    $has_delivery = rf_messages_has_delivery($pdo);
 
-    $where = ['msg_time >= DATE_SUB(NOW(), INTERVAL ? DAY)'];
+    // msg_time is stored in UTC, so compare against UTC_TIMESTAMP()
+    $where = ['msg_time >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY)'];
     $params = [$days];
 
     if (!empty($partner)) {
@@ -268,12 +287,24 @@ function action_messages(PDO $pdo): array {
         $where[] = 'msg_type = ?';
         $params[] = $msg_type;
     }
+    $count_where_sql = implode(' AND ', $where);
+    $count_params = $params;
+
+    if ($has_delivery && $status === 'delivered') {
+        $where[] = "(accept_status IS NULL OR accept_status <> 'R')";
+    } elseif ($has_delivery && $status === 'rejected') {
+        $where[] = "accept_status = 'R'";
+    }
 
     $where_sql = implode(' AND ', $where);
     $params[] = $limit;
 
+    $delivery_cols = $has_delivery
+        ? "accept_status, DATE_FORMAT(delivered_time, '%Y-%m-%dT%H:%i:%sZ') AS delivered_time,"
+        : '';
+
     $sql = "SELECT
-                id, bid, direction, partner, medium, msg_type,
+                id, bid, direction, partner, medium, $delivery_cols msg_type,
                 from_call, to_area, category, size_bytes,
                 DATE_FORMAT(msg_time, '%Y-%m-%dT%H:%i:%sZ') AS msg_time
             FROM rf_messages
@@ -282,7 +313,23 @@ function action_messages(PDO $pdo): array {
             LIMIT ?";
 
     $rows = tprfn_query($pdo, $sql, $params);
-    return ['messages' => $rows, 'count' => count($rows)];
+    $out = [
+        'messages' => $rows,
+        'count' => count($rows),
+        'truncated' => count($rows) >= $limit,
+        'has_delivery' => $has_delivery,
+    ];
+
+    if ($want_counts && $has_delivery) {
+        $out['status_counts'] = tprfn_query($pdo,
+            "SELECT partner, direction, msg_type, medium, accept_status,
+                    DATE_FORMAT(msg_time, '%y%m%d') AS day, COUNT(*) AS n
+               FROM rf_messages
+              WHERE $count_where_sql
+              GROUP BY partner, direction, msg_type, medium, accept_status, day",
+            $count_params);
+    }
+    return $out;
 }
 
 /**

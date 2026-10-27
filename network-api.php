@@ -58,8 +58,7 @@ if (file_exists(__DIR__ . '/tprfn-db.php')) {
 }
 
 // Headers
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET');
+bpq_cors_headers('GET');   // config.php 'cors' (2026-10-20: was "*")
 
 // ========== HELPER FUNCTIONS ==========
 

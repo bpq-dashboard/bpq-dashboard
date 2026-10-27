@@ -1,7 +1,7 @@
 <?php
 /**
  * vara-api.php — VARA HF Terminal API
- * BPQ Dashboard v1.5.13
+ * BPQ Dashboard v1.5.14
  *
  * Radio-agnostic version — supports Yaesu, Icom, Kenwood, Elecraft via flrig
  *
@@ -12,12 +12,15 @@
  *   POST action=add           — add callsign to allowlist (auth required)
  *   POST action=toggle        — enable/disable callsign (auth required)
  *   POST action=delete        — remove callsign (auth required)
- *   POST action=request       — email sysop for access (no auth)
+ *   POST action=request       — email sysop for access (no auth; service=chat for the Chat page)
  *   POST action=set_freq      — QSY radio to frequency (auth required)
  *   GET  action=get_freq      — get current frequency (auth required)
  *   GET  action=get_rig_info  — full rig status for rig-status.html
  *   GET  action=get_rig_history — TX power / SWR history for rig-status.html charts
  *   GET  action=get_rig_model — detect radio model from flrig
+ *   GET  action=get_scan_freqs — FLRIG radio's scan schedule from bpq32.cfg (read-only)
+ *   GET  action=get_power     — TX power setting / maximum from flrig
+ *   POST action=set_power     — set TX power via flrig (auth required)
  *   POST action=restore_freq  — restore RADIO 2 scan after VARA session
  *   GET  action=status        — daemon heartbeat status (auth required)
  */
@@ -28,6 +31,7 @@ header('Cache-Control: no-cache');
 
 $SKIP_BBS_CHECK = true;
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/bpq-radio.php';
 if (file_exists(__DIR__.'/dashboard-db.php')) require_once __DIR__.'/dashboard-db.php';
 
 // ── Config — overridden by config.php below ───────────────────────
@@ -42,9 +46,11 @@ $RIGRECONFIG_USER = 'YOURCALL';
 $RIGRECONFIG_PASS = 'YOURPASSWORD';
 
 // ── Smartplug config (NP-05B) ────────────────────────────────────
-$PLUG_HOST    = '192.168.1.100';  // CHANGEME: your TP-Link smart plug LAN IP
+// 2026-10-27: no built-in address any more (it used to try 192.168.1.100 with
+// admin/admin on every install). Set config.php 'smartplug' => ['host' => …].
+$PLUG_HOST    = '';
 $PLUG_USER    = 'admin';
-$PLUG_PASS    = 'admin';
+$PLUG_PASS    = '';
 $PLUG_OUTLET  = 1;
 $PLUG_TIMEOUT = 5;
 
@@ -60,6 +66,14 @@ if (!empty($CONFIG['station']['email'])) $SYSOP_EMAIL      = $CONFIG['station'][
 if (!empty($CONFIG['radio']['flrig_host'])) $FLRIG_HOST    = $CONFIG['radio']['flrig_host'];
 if (!empty($CONFIG['radio']['flrig_port'])) $FLRIG_PORT    = (int)$CONFIG['radio']['flrig_port'];
 if (!empty($CONFIG['paths']['linbpq']))  $BPQ32_CFG        = rtrim($CONFIG['paths']['linbpq'],'/') . '/bpq32.cfg';
+
+// 2026-10-05: which bpq32.cfg RADIO block the Rig page lists (0 = the
+// FLRIG block whose host:port matches flrig_host/flrig_port, else the
+// first FLRIG block), and an optional ceiling for web power changes
+// (0 = the radio's own maximum as reported by flrig).
+$BPQ_RADIO_NUM   = (int)($CONFIG['radio']['bpq_radio'] ?? 0);
+$TX_POWER_CAP    = (int)($CONFIG['radio']['max_power'] ?? 0);
+$TX_POWER_MIN    = max(1, (int)($CONFIG['radio']['min_power'] ?? 1));
 
 // ── Rig history log (TX power / SWR) ───────────────────────────────
 // Appended to by get_rig_info on every poll (throttled to 1 entry/min),
@@ -329,16 +343,40 @@ function getRadioProfile(): array {
     return defaultProfile('Unknown');
 }
 
+/**
+ * Find the profile for a model name from flrig (rig.get_xcvr) or config.
+ *
+ * 2026-10-19: matching is now whole-model, longest name first. The old
+ * partial match tested the table in order and in both directions, so an
+ * FTdx101D matched 'FTdx10' and showed the wrong name. Now:
+ *   - case, dashes and spaces are ignored ("FTDX-101D" = "FTdx101D"),
+ *   - a profile only matches where the model name starts (so 'K3' can't
+ *     match inside "KX3") and only when no digit follows (so 'FTdx10'
+ *     can't match "FTdx101D", but 'K3' still matches "K3S" and 'IC-7300'
+ *     matches "IC-7300MK2"),
+ *   - longer names are tried first, so the most specific profile wins.
+ */
 function matchRadioProfile(string $model): array|false {
     global $RADIO_PROFILES;
-    $modelUpper = strtoupper($model);
-    foreach ($RADIO_PROFILES as $key => $profile) {
-        if (stripos($modelUpper, strtoupper($key)) !== false ||
-            stripos(strtoupper($key), $modelUpper) !== false) {
-            return array_merge(['model' => $key], $profile);
+    $model = strtoupper(trim($model));
+    if ($model === '') return false;
+
+    $keys = array_keys($RADIO_PROFILES);
+    usort($keys, fn($a, $b) => strlen(radioKeyNorm($b)) <=> strlen(radioKeyNorm($a)));
+
+    foreach ($keys as $key) {
+        $chars = str_split(radioKeyNorm($key));
+        $body  = implode('[-_\s]?', array_map(fn($c) => preg_quote($c, '/'), $chars));
+        if (preg_match('/(?<![A-Z0-9])' . $body . '(?![0-9])/', $model)) {
+            return array_merge(['model' => $key], $RADIO_PROFILES[$key]);
         }
     }
     return false;
+}
+
+/** Profile key with case, dashes and spaces removed: 'IC-7300' -> 'IC7300'. */
+function radioKeyNorm(string $key): string {
+    return preg_replace('/[^A-Z0-9]/', '', strtoupper($key));
 }
 
 function defaultProfile(string $detected): array {
@@ -361,6 +399,9 @@ function isAuthed(): bool {
 }
 function requireAuth(): void {
     if (!isAuthed()) { http_response_code(401); die(json_encode(['error'=>'Authentication required'])); }
+    // 2026-10-03: sliding session, so a VARA session longer than an hour can
+    // still restore the radio when it ends (restore_freq now needs the login).
+    $_SESSION['vara_auth_time'] = time();
 }
 function ok(array $data = []): void { echo json_encode(array_merge(['ok'=>true],$data)); exit; }
 function fail(string $msg, int $code=400): void {
@@ -507,7 +548,9 @@ function flrigCall(string $method, array $params=[]): string|false {
     global $FLRIG_HOST, $FLRIG_PORT;
     $paramXml = '';
     foreach ($params as $p) {
-        if (is_float($p)||is_int($p))
+        if (is_int($p))       // 2026-10-05: ints as <i4> (rig.set_power wants an int)
+            $paramXml .= "<param><value><i4>{$p}</i4></value></param>";
+        elseif (is_float($p))
             $paramXml .= "<param><value><double>{$p}</double></value></param>";
         else
             $paramXml .= "<param><value><string>{$p}</string></value></param>";
@@ -526,11 +569,10 @@ function flrigGetFreq(): float|false {
     global $CONFIG;
     $resp = flrigCall('rig.get_vfo');
     if (!$resp) return false;
-    // Try all response formats — different radios use different XML types
-    if (preg_match('/<double>([\d.]+)<\/double>/', $resp, $m)) return (float)$m[1];
-    if (preg_match('/<string>([\d.]+)<\/string>/', $resp, $m)) return (float)$m[1];
-    if (preg_match('/<value>(\d+)<\/value>/',      $resp, $m)) return (float)$m[1];
-    return false;
+    // Different radios/flrig builds reply as <double>, <string>, <i4>, <int>
+    // or a bare <value> — flrigNumber() accepts all of them.
+    $hz = flrigNumber($resp);
+    return ($hz !== null && $hz > 0) ? $hz : false;
 }
 
 function flrigSetFreq(float $hz): bool {
@@ -541,6 +583,44 @@ function flrigSetFreq(float $hz): bool {
 function flrigSetMode(string $mode): bool {
     $resp = flrigCall('rig.set_mode', [$mode]);
     return $resp !== false;
+}
+
+/** Numeric value of an flrig reply (<i4>/<int>/<double>/<string>/bare), or null. */
+function flrigNumber(string|false $resp): ?float {
+    if ($resp === false || str_contains($resp, '<fault>')) return null;
+    $num = '(-?\d+(?:\.\d*)?(?:[eE][-+]?\d+)?)';
+    if (preg_match('/<(?:i4|i8|int|double|string)>\s*' . $num . '\s*<\//', $resp, $m)) return (float)$m[1];
+    if (preg_match('/<value>\s*' . $num . '\s*<\/value>/', $resp, $m)) return (float)$m[1];
+    return null;
+}
+
+/**
+ * TX power setting and the ceiling the web page may use.
+ * max = the radio's maximum (rig.get_maxpwr), lowered to config
+ * radio.max_power when that is set; 100 W when flrig reports nothing.
+ */
+function flrigPowerInfo(): array {
+    global $TX_POWER_CAP, $TX_POWER_MIN;
+    $power  = flrigNumber(flrigCall('rig.get_power'));
+    $rigMax = flrigNumber(flrigCall('rig.get_maxpwr'));
+    $max = ($rigMax !== null && $rigMax > 0) ? (int)round($rigMax) : 100;
+    if ($TX_POWER_CAP > 0) $max = min($max, $TX_POWER_CAP);
+    return [
+        'power'   => $power === null ? null : (int)round($power),
+        'max'     => $max,
+        'min'     => min($TX_POWER_MIN, $max),
+        'rig_max' => $rigMax === null ? null : (int)round($rigMax),
+        'capped'  => $TX_POWER_CAP > 0,
+    ];
+}
+
+function flrigSetPower(int $watts): bool {
+    $resp = flrigCall('rig.set_power', [$watts]);
+    if ($resp !== false && str_contains($resp, '<fault>')) {
+        // Some flrig builds type the parameter as a double — retry that way
+        $resp = flrigCall('rig.set_power', [(float)$watts]);
+    }
+    return $resp !== false && !str_contains($resp, '<fault>');
 }
 
 // ── bpq32.cfg RADIO 2 rewrite ────────────────────────────────────
@@ -604,6 +684,7 @@ function sendRigReconfig(string $user, string $pass, string $host='127.0.0.1', i
 // ── Smartplug helpers (NP-05B) ───────────────────────────────────
 function plugCmd(string $cmd): string|false {
     global $PLUG_HOST, $PLUG_USER, $PLUG_PASS, $PLUG_TIMEOUT;
+    if ($PLUG_HOST === '') return false;          // no power switch configured
     $auth = base64_encode("{$PLUG_USER}:{$PLUG_PASS}");
     $ctx  = stream_context_create(['http' => [
         'timeout' => $PLUG_TIMEOUT,
@@ -614,6 +695,8 @@ function plugCmd(string $cmd): string|false {
 }
 
 function plugStatus(int $outlet): string {
+    global $PLUG_HOST;
+    if ($PLUG_HOST === '') return 'none';         // Rig Status shows "Not set up"
     // $A5 returns $A0,XXXXX — rightmost digit = outlet 1
     $resp = plugCmd('%24A5');
     if (!$resp) return 'unknown';
@@ -645,11 +728,20 @@ function plugReboot(int $outlet): bool {
 }
 
 function getPTT(): int {
-    $raw = flrigCall('rig.get_ptt', []);
-    if (!$raw) return 0;
-    if (preg_match('/<i4>(\d+)<\/i4>/', $raw, $m)) return (int)$m[1];
-    if (preg_match('/<value>(\d+)<\/value>/', $raw, $m)) return (int)$m[1];
-    return 0;
+    $v = flrigNumber(flrigCall('rig.get_ptt', []));
+    return $v === null ? 0 : (int)$v;
+}
+
+/**
+ * A meter reading (rig.get_pwrmeter / get_swrmeter / get_smeter) as an int,
+ * or null when flrig didn't answer or the reply couldn't be read.
+ * 2026-10-19: was a bare-<value> regex only, which matched the FTdx3000 but
+ * returned nothing for radios whose flrig replies use <i4>, <int> or
+ * <double> — the RF Power gauge then stayed blank on those radios.
+ */
+function flrigMeter(string $method): ?int {
+    $v = flrigNumber(flrigCall($method, []));
+    return $v === null ? null : (int)round($v);
 }
 
 /**
@@ -686,24 +778,18 @@ function pollRigStatus(): array {
     if ($modeRaw && preg_match('/<string>([^<]+)<\/string>/', $modeRaw, $mm)) $mode = trim($mm[1]);
     elseif ($modeRaw && preg_match('/<value>([^<]+)<\/value>/', $modeRaw, $mm)) $mode = trim($mm[1]);
 
-    $smeterRaw = flrigCall('rig.get_smeter', []);
-    $smeter = null;
-    if ($smeterRaw && preg_match('/<value>(\d+)<\/value>/', $smeterRaw, $mm)) $smeter = (int)$mm[1];
+    $smeter = flrigMeter('rig.get_smeter');
 
-    $pwrRaw = flrigCall('rig.get_pwrmeter', []);
-    $pwrmeter = null;
-    if ($pwrRaw && preg_match('/<value>(\d+)<\/value>/', $pwrRaw, $mm)) $pwrmeter = (int)$mm[1];
+    $pwrmeter = flrigMeter('rig.get_pwrmeter');
     $pwrOk = ($pwrmeter !== null);
     if (!$pwrOk) {
-        error_log('[vara-api] rig.get_pwrmeter failed/unparseable — raw=' . var_export($pwrRaw, true));
+        error_log('[vara-api] rig.get_pwrmeter failed/unparseable');
     }
 
-    $swrRaw = flrigCall('rig.get_swrmeter', []);
-    $swrmeter = null;
-    if ($swrRaw && preg_match('/<value>(\d+)<\/value>/', $swrRaw, $mm)) $swrmeter = (int)$mm[1];
+    $swrmeter = flrigMeter('rig.get_swrmeter');
     $swrOk = ($swrmeter !== null);
     if (!$swrOk) {
-        error_log('[vara-api] rig.get_swrmeter failed/unparseable — raw=' . var_export($swrRaw, true));
+        error_log('[vara-api] rig.get_swrmeter failed/unparseable');
     }
 
     $ptt      = getPTT();
@@ -811,10 +897,25 @@ switch ($action) {
         $name = trim($input['name'] ?? '');
         $msg  = trim($input['message'] ?? '');
         if (!validCallsign($cs)) fail('Invalid callsign format');
-        $subject = "VARA HF Access Request from $cs";
-        $body    = "Callsign: $cs\nName: $name\nMessage: $msg\n\nSent from BPQ Dashboard VARA terminal — ".date('Y-m-d H:i:s')." UTC";
-        $sent = mail($SYSOP_EMAIL, $subject, $body, "From: dashboard@bpq.local\r\nReply-To: {$cs}@invalid");
-        ok(['sent'=>$sent,'to'=>$SYSOP_EMAIL]);
+        // 2026-10-27: also used by the Chat page (service=chat). The sysop's
+        // address is no longer returned — this action needs no login.
+        $svc  = (($input['service'] ?? '') === 'chat') ? 'BPQ Chat' : 'VARA HF';
+        $name = substr(preg_replace('/[\r\n]+/', ' ', $name), 0, 80);
+        $msg  = substr(preg_replace('/[\r\n]+/', ' ', $msg), 0, 500);
+        if (!filter_var($SYSOP_EMAIL, FILTER_VALIDATE_EMAIL) || preg_match('/@example\.(com|org|net)$/i', $SYSOP_EMAIL)) {
+            ok(['sent'=>false, 'error'=>'No sysop e-mail is set on this server (config.php station.email) — contact the sysop directly']);
+        }
+        // One request per address per 10 minutes (cache/access-requests.json)
+        $rl = __DIR__ . '/cache/access-requests.json';
+        $seen = is_file($rl) ? (json_decode((string)@file_get_contents($rl), true) ?: []) : [];
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'cli';
+        $seen = array_filter($seen, fn($t) => $t > time() - 600);
+        if (isset($seen[$ip])) ok(['sent'=>false, 'error'=>'A request was already sent from here in the last 10 minutes']);
+        $subject = "$svc Access Request from $cs";
+        $body    = "Callsign: $cs\nName: $name\nMessage: $msg\n\nSent from the BPQ Dashboard $svc page — ".gmdate('Y-m-d H:i:s')." UTC";
+        $sent = @mail($SYSOP_EMAIL, $subject, $body, "From: dashboard@bpq.local\r\nReply-To: {$cs}@invalid");
+        if ($sent) { $seen[$ip] = time(); @file_put_contents($rl, json_encode($seen), LOCK_EX); }
+        ok(['sent'=>$sent] + ($sent ? [] : ['error'=>'This server could not send the e-mail — contact the sysop directly']));
 
     // ── FREQUENCY validate ────────────────────────────────────────
     case 'validate_freq':
@@ -826,6 +927,7 @@ switch ($action) {
 
     // ── FREQUENCY set ─────────────────────────────────────────────
     case 'set_freq':
+        requireAuth();   // 2026-10-03: rewrites bpq32.cfg RADIO + RIGRECONFIG — sysop only
         $mhz = (float)($input['mhz'] ?? 0);
         if ($mhz <= 0) fail('Frequency (MHz) required');
         $bandInfo = validateAmateurFreq($mhz);
@@ -890,8 +992,79 @@ switch ($action) {
             'entries' => $result['entries'],
         ]);
 
+    // ── SCAN FREQUENCIES — FLRIG radio's schedule from bpq32.cfg ──
+    // 2026-10-05: replaces the hard-coded list on rig-status.html. Read-only;
+    // returns only time bands / frequencies / modes, never other cfg lines.
+    case 'get_scan_freqs':
+        if (!is_readable($BPQ32_CFG)) {
+            fail('Cannot read bpq32.cfg — check config.php paths.linbpq, and that the web server '
+               . 'user can read the file', 503);
+        }
+        $blocks = bpqRadioBlocks((string)file_get_contents($BPQ32_CFG));
+        $block  = bpqPickFlrigBlock($blocks, $BPQ_RADIO_NUM ?: null, "{$FLRIG_HOST}:{$FLRIG_PORT}");
+        if (!$block) {
+            fail($BPQ_RADIO_NUM
+                ? "bpq32.cfg has no RADIO {$BPQ_RADIO_NUM} block with an FLRIG line (config.php radio.bpq_radio)"
+                : 'bpq32.cfg has no RADIO block with an FLRIG line', 404);
+        }
+        // A VARA keyboard session pins RADIO 2 to one frequency and keeps the
+        // real schedule in the backup file until End Session puts it back.
+        $paused = null;
+        if ($block['radio'] === 2 && is_readable($BPQ32_BACKUP)) {
+            $saved = bpqRadioBlocks((string)file_get_contents($BPQ32_BACKUP));
+            if ($saved && ($savedBands = bpqScanBands($saved[0]))) {
+                $pinned = bpqScanBands($block);
+                $paused = ['mhz' => $pinned[0]['channels'][0]['mhz'] ?? null];
+                $block  = $saved[0];
+            }
+        }
+        $bands = bpqScanBands($block);
+        foreach ($bands as &$b) {
+            foreach ($b['channels'] as &$c) {
+                $c['band'] = validateAmateurFreq($c['mhz'])['band'] ?? null;
+            }
+            unset($c);
+        }
+        unset($b);
+        $nowMin = (int)gmdate('G') * 60 + (int)gmdate('i');
+        ok([
+            'radio'    => $block['radio'],
+            'bands'    => $bands,
+            'active'   => bpqActiveBand($bands, $nowMin),
+            'paused'   => $paused,
+            'utc_now'  => gmdate('H:i'),
+            'cfg_time' => gmdate('Y-m-d\TH:i:s\Z', filemtime($BPQ32_CFG)),
+        ]);
+
+    // ── TX POWER — read (public) / set (sysop) via flrig ──────────
+    case 'get_power':
+        $info = flrigPowerInfo();
+        if ($info['power'] === null) fail("Cannot read TX power from flrig at {$FLRIG_HOST}:{$FLRIG_PORT}", 502);
+        ok($info);
+
+    case 'set_power':
+        requireAuth();
+        $want = $input['watts'] ?? null;
+        if (!is_numeric($want)) fail('watts required');
+        $want = (int)round((float)$want);
+        $info = flrigPowerInfo();
+        if ($info['power'] === null) fail("Cannot reach flrig at {$FLRIG_HOST}:{$FLRIG_PORT}", 502);
+        if ($want < $info['min'] || $want > $info['max']) {
+            fail("Power must be {$info['min']}–{$info['max']} W" . ($info['capped'] ? ' (config.php radio.max_power)' : ''));
+        }
+        if (!flrigSetPower($want)) fail('flrig refused the power change', 502);
+        usleep(400000);   // let the radio settle before reading back
+        $after = flrigNumber(flrigCall('rig.get_power'));
+        error_log(sprintf('[vara-api] TX power %s -> %d W requested from %s, rig now %s W',
+            $info['power'], $want, $_SERVER['REMOTE_ADDR'] ?? '?', $after === null ? '?' : (int)round($after)));
+        ok(array_merge($info, [
+            'requested' => $want,
+            'power'     => $after === null ? null : (int)round($after),
+        ]));
+
     // ── RESTORE RADIO 2 scan ──────────────────────────────────────
     case 'restore_freq':
+        requireAuth();   // 2026-10-03: same as set_freq
         $restored = restoreRadio2($BPQ32_CFG, $BPQ32_BACKUP);
         $rigOk    = false;
         if ($restored) $rigOk = sendRigReconfig($RIGRECONFIG_USER, $RIGRECONFIG_PASS);
@@ -911,9 +1084,7 @@ switch ($action) {
         global $PLUG_OUTLET;
         $status = plugStatus($PLUG_OUTLET);
         $ptt    = getPTT();
-        $pwrRaw = flrigCall('rig.get_pwrmeter', []);
-        $pwr    = 0;
-        if ($pwrRaw && preg_match('/<value>(\d+)<\/value>/', $pwrRaw, $mm)) $pwr = (int)$mm[1];
+        $pwr    = flrigMeter('rig.get_pwrmeter') ?? 0;
         $pttState = $ptt === 0 ? 0 : ($pwr > 0 ? 1 : 2);
         ok([
             'outlet'    => $PLUG_OUTLET,
@@ -926,19 +1097,19 @@ switch ($action) {
     // ── SMARTPLUG ON ───────────────────────────────────────────────
     case 'plug_on':
         requireAuth();
-        global $PLUG_OUTLET;
+        global $PLUG_OUTLET, $PLUG_HOST;
+        if ($PLUG_HOST === '') fail("No power switch is set up (config.php 'smartplug')", 409);
         $result = plugOn($PLUG_OUTLET);
         ok(['outlet' => $PLUG_OUTLET, 'power' => plugStatus($PLUG_OUTLET), 'success' => $result]);
 
     // ── SMARTPLUG OFF ──────────────────────────────────────────────
     case 'plug_off':
         requireAuth();
-        global $PLUG_OUTLET;
+        global $PLUG_OUTLET, $PLUG_HOST;
+        if ($PLUG_HOST === '') fail("No power switch is set up (config.php 'smartplug')", 409);
         // Safety check — block if genuine TX (PTT=1 AND power>0)
         $ptt    = getPTT();
-        $pwrRaw = flrigCall('rig.get_pwrmeter', []);
-        $pwr    = 0;
-        if ($pwrRaw && preg_match('/<value>(\d+)<\/value>/', $pwrRaw, $mm)) $pwr = (int)$mm[1];
+        $pwr    = flrigMeter('rig.get_pwrmeter') ?? 0;
         if ($ptt === 1 && $pwr > 0) {
             fail('Radio is transmitting — cannot power off during TX', 409);
         }
@@ -948,12 +1119,11 @@ switch ($action) {
     // ── SMARTPLUG REBOOT ───────────────────────────────────────────
     case 'plug_reboot':
         requireAuth();
-        global $PLUG_OUTLET;
+        global $PLUG_OUTLET, $PLUG_HOST;
+        if ($PLUG_HOST === '') fail("No power switch is set up (config.php 'smartplug')", 409);
         // Block only genuine TX — allow reboot on stuck PTT
         $ptt    = getPTT();
-        $pwrRaw = flrigCall('rig.get_pwrmeter', []);
-        $pwr    = 0;
-        if ($pwrRaw && preg_match('/<value>(\d+)<\/value>/', $pwrRaw, $mm)) $pwr = (int)$mm[1];
+        $pwr    = flrigMeter('rig.get_pwrmeter') ?? 0;
         if ($ptt === 1 && $pwr > 0) {
             fail('Radio is transmitting — cannot reboot during TX', 409);
         }

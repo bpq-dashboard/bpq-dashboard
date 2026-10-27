@@ -321,6 +321,50 @@ function msgdb_save_messages($messages, $folder = 'Saved') {
 }
 
 /**
+ * File many messages in ONE request (2026-10-04, action=fileMessages).
+ * $items = [ { message: {...}, folder: "Bulletins - WX" }, ... ], up to
+ * 200 per call. Same per-message logic as msgdb_save_message(); replaces
+ * the page's one-POST-per-message filing, which tripped nginx's rate
+ * limit. Returns one result per item, in order, so the page knows which
+ * filings the server actually confirmed:
+ *   results[i] = { ok: true, id } | { ok: false, error }
+ * A duplicate-key error (the archive request inserted the same row a
+ * moment earlier) is retried once, which then takes the update path.
+ */
+function msgdb_file_messages($items) {
+    if (!isFeatureEnabled('bbs_write')) apiError('Write operations disabled', 403);
+    if (!is_array($items)) apiError('Invalid items');
+    $items = array_slice(array_values($items), 0, 200);
+
+    $results = [];
+    $filed = 0;
+    foreach ($items as $it) {
+        $msg    = is_array($it) ? ($it['message'] ?? null) : null;
+        $folder = is_array($it) ? (string)($it['folder'] ?? '') : '';
+        // Checked here because msgdb_save_message() would apiError() —
+        // and die() — on these, which would abort the whole batch.
+        if (!is_array($msg) || empty($msg) || msgdb_sanitize_folder_name($folder) === '') {
+            $results[] = ['ok' => false, 'error' => 'Invalid item'];
+            continue;
+        }
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                $r = msgdb_save_message($msg, $folder);
+                $results[] = ['ok' => true, 'id' => $r['id'] ?? null];
+                $filed++;
+                break;
+            } catch (PDOException $e) {
+                if ($attempt === 0 && $e->getCode() === '23000') continue;   // duplicate key: retry as update
+                $results[] = ['ok' => false, 'error' => 'Database error'];
+                dashboardLog('warning', 'fileMessages item failed', ['error' => $e->getMessage()]);
+                break;
+            }
+        }
+    }
+    return ['success' => true, 'filed' => $filed, 'received' => count($items), 'results' => $results];
+}
+
+/**
  * Auto-archive raw messages fetched straight from BPQ (Personal/NTS/
  * Bulletin), independent of user filing. This is what makes "all messages"
  * durable — every message getMail() ever pulls down gets INSERT-IGNORE'd
@@ -333,6 +377,7 @@ function msgdb_archive_messages($messages) {
     }
     $pdo = tprfn_db();
     $archived = 0;
+    $bulletinKeys = [];   // (dedupeKey, from) of every bulletin in this batch
 
     foreach ($messages as $m) {
         if (!is_array($m)) continue;
@@ -360,9 +405,39 @@ function msgdb_archive_messages($messages) {
             $m['body'] ?? '',
         ]);
         if ($ok && $stmt->rowCount() > 0) $archived++;
+        if ($type === 'B') $bulletinKeys[] = [$dedupeKey, $from];
     }
 
-    return ['success' => true, 'archived' => $archived, 'received' => count($messages)];
+    // 2026-10-04: file bulletins into their "Bulletins - GROUP" folder
+    // here, server-side, in the same request that archives them. Filing
+    // used to depend only on the page's separate per-message saveMessage
+    // POSTs, which nginx's rate limit (tprfn_api, 5 r/s, burst 40) refused
+    // with 503 whenever a Get Mail had a few hundred bulletins to file;
+    // the page never retried, so the rows stayed unfiled and the 14-day
+    // purge deleted them even in 📌 pinned groups.
+    // Only touches unfiled, still-archived rows, and only files into a
+    // group folder that already exists, so it never overrides a user's
+    // own filing or a rule's choice, and never creates folders. Any
+    // failure here is logged and ignored: archiving must not fail.
+    $filed = 0;
+    if (!empty($bulletinKeys)) {
+        try {
+            $file = $pdo->prepare("UPDATE bpq_messages m
+                JOIN bpq_msg_folders f ON f.name = CONCAT('Bulletins - ', UPPER(TRIM(m.to_call)))
+                SET m.folder_id = f.id,
+                    m.rule_matched = COALESCE(m.rule_matched, CONCAT('Bulletin group ', UPPER(TRIM(m.to_call))))
+                WHERE m.msg_type = 'B' AND m.folder_id IS NULL AND m.is_archived = 1
+                  AND m.bbs_number = ? AND m.from_call = ?");
+            foreach ($bulletinKeys as $k) {
+                $file->execute($k);
+                $filed += $file->rowCount();
+            }
+        } catch (Throwable $e) {
+            dashboardLog('warning', 'Bulletin auto-filing failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    return ['success' => true, 'archived' => $archived, 'filed' => $filed, 'received' => count($messages)];
 }
 
 /**
@@ -399,6 +474,9 @@ function msgdb_save_bodies($messages, $insertMissing = true) {
         if (!is_array($m)) continue;
         $body = (string)($m['body'] ?? '');
         if (trim($body) === '') continue;
+        // 2026-10-12: BPQ's "Message N not found" reply is not message text
+        // (the page used to save it as the body; 1722, 2199, … on K1AJD).
+        if (preg_match('/^\s*Message\s+\d+\s+not found/i', $body)) continue;
         if (strlen($body) > 1048576) $body = substr($body, 0, 1048576);   // 1 MB sanity cap
         $m['body'] = $body;
 
@@ -531,9 +609,10 @@ function msgdb_kill_message($number, $type = null) {
 // A bulletin is permanently DELETED when:
 //   - it's in Trash (any age — Trash is a delete signal), OR
 //   - it's older than $days (first_seen_at) AND it is either
-//       * unfiled, or
+//       * unfiled, and its group's "Bulletins - GROUP" folder is not
+//         pinned 📌 (2026-10-04: unfiled-but-pinned-group is kept), or
 //       * in a "Bulletins - GROUP" auto-folder that is NOT pinned 📌.
-// KEPT indefinitely: bulletins in a pinned 📌 folder, and bulletins in
+// KEPT indefinitely: bulletins in (or belonging to) a pinned 📌 group, and bulletins in
 // any folder you made yourself ("My Folders" — no "Bulletins - " prefix),
 // since putting one there is a deliberate choice.
 //
@@ -555,7 +634,15 @@ function msgdb_bulletin_purge_where($days) {
     $days = max(1, min(3650, (int)$days));
     $expired = "m.first_seen_at < DATE_SUB(NOW(), INTERVAL $days DAY)";
     if (msgdb_keep_schema_ready()) {
-        $scope = "(m.folder_id IS NULL
+        // 2026-10-04: an UNFILED bulletin whose group folder is pinned 📌
+        // is kept too. Filing used to fail silently (rate limit), and
+        // those rows were purged even though the user had pinned the
+        // group. The group is the same one the page files into:
+        // "Bulletins - " + UPPER(TRIM(to_call)).
+        $scope = "((m.folder_id IS NULL AND NOT EXISTS (
+                        SELECT 1 FROM bpq_msg_folders kf
+                        WHERE kf.keep_on_kill = 1
+                          AND kf.name = CONCAT('Bulletins - ', UPPER(TRIM(m.to_call)))))
                    OR (f.name LIKE 'Bulletins - %' AND f.keep_on_kill = 0))";
     } else {
         $scope = "m.folder_id IS NULL";

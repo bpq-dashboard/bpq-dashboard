@@ -17,7 +17,12 @@
  * in bpq-rf-connections.html), so filtering happens there. This script
  * just reports the full queue as BPQ sees it.
  *
- * GET ?action=queue → { success, queue: [{call, msgs}, ...], generated_at }
+ * GET ?action=queue → { success, queue: [{call, msgs}, ...], generated_at, cached }
+ *
+ * Rate limit (2026-10-20): the answer is cached in cache/fwd-queue.json for
+ * FWDQ_CACHE_TTL seconds and only one request at a time logs in, so this
+ * public endpoint can't be used to hammer the BBS with SYSOP logins. Every
+ * visitor and refresh within the minute gets the cached copy.
  */
 
 declare(strict_types=1);
@@ -105,6 +110,40 @@ if ($action !== 'queue') apiError('Unknown action');
 
 if (!$config['bbs_pass']) apiError('BBS not configured', 500);
 
+const FWDQ_CACHE_TTL = 60;   // seconds between BBS logins, at most
+$FWDQ_CACHE = __DIR__ . '/cache/fwd-queue.json';
+
+/** Cached answer if younger than FWDQ_CACHE_TTL, else null. */
+function fwdqCached(string $file): ?array {
+    clearstatcache(true, $file);
+    if (!is_readable($file) || (time() - (int)@filemtime($file)) >= FWDQ_CACHE_TTL) return null;
+    $d = json_decode((string)@file_get_contents($file), true);
+    return (is_array($d) && !empty($d['success'])) ? $d : null;
+}
+
+if ($hit = fwdqCached($FWDQ_CACHE)) {
+    $hit['cached'] = true;
+    echo json_encode($hit);
+    exit;
+}
+
+// One login at a time: whoever holds the lock asks the BBS; the others
+// wait for it and then serve its answer from the cache.
+@mkdir(dirname($FWDQ_CACHE), 0750, true);
+$fwdqLock = @fopen($FWDQ_CACHE . '.lock', 'c');
+if ($fwdqLock) {
+    $waited = 0;
+    while (!flock($fwdqLock, LOCK_EX | LOCK_NB)) {
+        if ($waited >= 45) apiError('Forwarding queue check busy, try again shortly', 503);
+        usleep(250000); $waited += 0.25;
+    }
+    if ($hit = fwdqCached($FWDQ_CACHE)) {
+        $hit['cached'] = true;
+        echo json_encode($hit);
+        exit;
+    }
+}
+
 $socket = @stream_socket_client(
     "tcp://{$config['bbs_host']}:{$config['bbs_port']}",
     $errno, $errstr, $config['timeout']
@@ -142,11 +181,15 @@ try {
 
     $queue = parseFwdQueue($queueResponse);
 
-    echo json_encode([
+    $result = [
         'success'      => true,
         'queue'        => $queue,
         'generated_at' => date('c'),
-    ]);
+    ];
+    $tmp = $FWDQ_CACHE . '.' . getmypid() . '.tmp';
+    if (@file_put_contents($tmp, json_encode($result)) !== false) @rename($tmp, $FWDQ_CACHE);
+    $result['cached'] = false;
+    echo json_encode($result);
 
 } catch (Throwable $e) {
     @fclose($socket);

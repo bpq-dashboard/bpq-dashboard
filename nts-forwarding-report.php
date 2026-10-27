@@ -34,6 +34,9 @@ if (file_exists(__DIR__ . '/includes/bootstrap.php')) {
     $SKIP_BBS_CHECK = true;
     require_once __DIR__ . '/includes/bootstrap.php';
 }
+require_once __DIR__ . '/includes/web-login.php';
+// 2026-10-27: NTS traffic and who it went to — admin login only (was public)
+bpq_require_web_login('The NTS forwarding report');
 require_once __DIR__ . '/tprfn-db.php';
 
 // ─── Input ────────────────────────────────────────────────────
@@ -52,7 +55,11 @@ function extractBid(?string $body): ?string {
 // logic top-to-bottom the moment it's included, so it can't safely be
 // require()'d from here. Keeping a second small copy of just the
 // parsing logic avoids touching a file that's already working.
-$LOG_DIR = getenv('BPQ_LOG_DIR') ?: '/var/www/html/logs';
+// BPQ's log folder (2026-10-25): env BPQ_LOG_DIR, else config.php paths.logs,
+// else <web root>/logs. The fallback was /var/www/html/logs, which a standard
+// install doesn't have, so every message showed "Not Yet Forwarded".
+require_once __DIR__ . '/includes/station-config.php';
+$LOG_DIR = rtrim((string)(getenv('BPQ_LOG_DIR') ?: (bpq_config_section('paths')['logs'] ?? '') ?: (__DIR__ . '/logs')), '/');
 $MAX_LOG_BYTES = 50 * 1024 * 1024;
 
 function logFilesForDays(string $logDir, int $days, int $maxBytes): array {

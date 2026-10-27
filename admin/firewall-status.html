@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Firewall Status — YOURCALL BPQ</title>
+<title>Firewall Status - BPQ Dashboard</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
@@ -103,35 +103,44 @@
   .loading{text-align:center;padding:60px 20px;color:var(--muted);font-family:var(--mono);font-size:0.85rem;}
   .error-msg{background:var(--red-dim);border:1px solid var(--red);border-radius:6px;padding:14px 18px;color:var(--red);font-family:var(--mono);font-size:0.82rem;}
   @media(max-width:640px){.port-grid,.f2b-grid{grid-template-columns:1fr;}.summary-bar{grid-template-columns:1fr 1fr;}}
+  .port-card.unk{border-left:3px solid var(--purple);}
+  .port-badge.unk{background:var(--purple-dim);color:var(--purple);}
+  .port-sub{font-family:var(--mono);font-size:0.68rem;color:var(--muted);}
+  .notice{background:var(--amber-dim);border:1px solid var(--amber);border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:0.82rem;color:var(--text);}
+  .notice code{font-family:var(--mono);font-size:0.75rem;background:var(--bg);padding:1px 5px;border-radius:3px;word-break:break-all;}
+  .notice.red{background:var(--red-dim);border-color:var(--red);}
+  .policy-text strong.bad{color:var(--red);}
 </style>
 </head>
 <body data-nav-page="firewall">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="/bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 
 <a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
 
 <header>
-  <h1>🛡️ BPQ Dashboard <span>//</span> Firewall Status <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.13</span></h1>
-  <div class="meta">YOURCALL · YOURNODE · iptables / fail2ban<br>Live data · Refreshes on load</div>
+  <h1>🛡️ BPQ Dashboard <span>//</span> Firewall Status <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.14</span></h1>
+  <div class="meta"><span id="station-line">iptables / ip6tables / fail2ban</span><br>Live data · Refreshes on load</div>
 </header>
 
 <div id="auth-gate" class="auth-gate" style="display:none;">
-  <h2>🔒 Authentication Required</h2>
-  <p>Enter your BBS password to view firewall status</p>
-  <input type="password" id="auth-input" class="auth-input" placeholder="BBS Password">
-  <button class="auth-btn" onclick="attemptAuth()">Unlock</button>
-  <div id="auth-error" class="auth-error" style="display:none;"></div>
+  <h2>🔒 Admin login needed</h2>
+  <p id="auth-msg"></p>
 </div>
 
 <div id="main-content" style="display:none;">
   <div id="ts" class="ts"></div>
+  <div id="notices"></div>
   <div id="policy-banner" class="policy-banner">
     <div class="policy-dot" id="policy-dot"></div>
     <div class="policy-text" id="policy-text"></div>
     <div class="policy-meta" id="policy-meta"></div>
+  </div>
+  <div id="policy6-banner" class="policy-banner" style="display:none;">
+    <div class="policy-dot" id="policy6-dot"></div>
+    <div class="policy-text" id="policy6-text"></div>
   </div>
   <div class="summary-bar" id="summary-bar"></div>
 
@@ -139,17 +148,18 @@
     <div class="section-title blue">Port Access Summary</div>
     <div class="filter-tabs">
       <button class="filter-tab active" onclick="filterPorts('all',this)">All</button>
-      <button class="filter-tab" onclick="filterPorts('pub',this)">Public</button>
-      <button class="filter-tab" onclick="filterPorts('lan',this)">LAN Only</button>
-      <button class="filter-tab" onclick="filterPorts('blk',this)">Blocked</button>
-      <button class="filter-tab" onclick="filterPorts('loc',this)">Localhost</button>
+      <button class="filter-tab" onclick="filterPorts('public',this)">Public</button>
+      <button class="filter-tab" onclick="filterPorts('lan-only',this)">LAN Only</button>
+      <button class="filter-tab" onclick="filterPorts('ip-restricted',this)">IP Restricted</button>
+      <button class="filter-tab" onclick="filterPorts('blocked',this)">Blocked</button>
+      <button class="filter-tab" onclick="filterPorts('localhost',this)">Localhost</button>
     </div>
     <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px;font-family:var(--mono);font-size:0.7rem;color:var(--muted);padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;">
-      <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>PUBLIC — reachable from internet</span>
-      <span><span style="display:inline-block;width:10px;height:10px;background:var(--blue);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>LAN ONLY — local network only</span>
-      <span><span style="display:inline-block;width:10px;height:10px;background:var(--amber);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>IP RESTRICTED — specific IPs only</span>
-      <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>BLOCKED — explicit deny rule</span>
-      <span><span style="display:inline-block;width:10px;height:10px;background:var(--muted);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>LOCALHOST — bound to 127.0.0.1</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>PUBLIC — reachable from the internet (IPv4 or IPv6)</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--blue);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>LAN ONLY — allowed only from private addresses</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--amber);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>IP RESTRICTED — allowed only from listed addresses</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--red);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>BLOCKED — no rule lets the internet in</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:var(--muted);vertical-align:middle;border-radius:2px;margin-right:6px;"></span>LOCALHOST — program listens on 127.0.0.1 only</span>
     </div>
     <div class="port-grid" id="port-grid"></div>
   </div>
@@ -160,10 +170,10 @@
   </div>
 
   <div class="section">
-    <div class="section-title amber">INPUT Chain Rules</div>
+    <div class="section-title amber">Firewall Rules (INPUT<span id="rules-extra"></span>)</div>
     <div style="overflow-x:auto;">
       <table class="rules-table">
-        <thead><tr><th>#</th><th>Action</th><th>Proto</th><th>Source</th><th>Port</th><th>Service</th><th>Pkts</th></tr></thead>
+        <thead><tr><th>#</th><th>Action</th><th>Proto</th><th>Source</th><th>Port</th><th>Service / match</th><th>Pkts</th></tr></thead>
         <tbody id="rules-tbody"></tbody>
       </table>
     </div>
@@ -175,32 +185,32 @@
 <script>
 const API = 'firewall-api.php';
 let allPorts = [];
-let savedPw = sessionStorage.getItem('bbs_pw') || '';
+// /admin/ is behind the admin login and the API checks it (2026-10-05).
+try { sessionStorage.removeItem('bbs_pw'); } catch (e) {}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 function init() {
-  if (savedPw) { loadData(savedPw); }
-  else {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('auth-gate').style.display = 'block';
-    document.getElementById('auth-input').addEventListener('keydown', e => { if(e.key==='Enter') attemptAuth(); });
-  }
+  loadData();
+  fetch('/station-info.php').then(r => r.ok ? r.json() : null).then(s => {
+    if (s && (s.callsign || s.node)) document.getElementById('station-line').textContent =
+      [s.callsign, s.node].filter(Boolean).join(' · ') + ' · iptables / ip6tables / fail2ban';
+  }).catch(() => {});
 }
 
-function attemptAuth() {
-  const pw = document.getElementById('auth-input').value.trim();
-  if (!pw) return;
-  loadData(pw);
-}
-
-function loadData(pw) {
+function loadData() {
   document.getElementById('loading').style.display = 'block';
   document.getElementById('auth-gate').style.display = 'none';
-  fetch(API + '?password=' + encodeURIComponent(pw))
-    .then(r => { if(r.status===401) throw new Error('auth'); return r.json(); })
+  fetch(API)
+    .then(r => r.text().then(t => {
+      let d = null; try { d = JSON.parse(t); } catch (e) {}
+      if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.detail = (d && d.error) || ''; throw e; }
+      if (d === null) throw new Error('HTTP ' + r.status + ' (not JSON)');
+      return d;
+    }))
     .then(data => {
-      if (data.error === 'Unauthorized') throw new Error('auth');
-      savedPw = pw;
-      sessionStorage.setItem('bbs_pw', pw);
       document.getElementById('loading').style.display = 'none';
       document.getElementById('main-content').style.display = 'block';
       render(data);
@@ -209,40 +219,41 @@ function loadData(pw) {
       document.getElementById('loading').style.display = 'none';
       if (err.message === 'auth') {
         document.getElementById('auth-gate').style.display = 'block';
-        document.getElementById('auth-error').textContent = '✗ Invalid password';
-        document.getElementById('auth-error').style.display = 'block';
-        sessionStorage.removeItem('bbs_pw'); savedPw = '';
+        document.getElementById('auth-msg').textContent = err.detail ||
+          'The admin login did not reach this page. Reload the page and log in.';
       } else {
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('main-content').innerHTML =
-          '<div class="error-msg">⚠ Could not load firewall data: ' + err.message +
-          '<br><small>Ensure firewall-api.php is deployed and www-data has sudo iptables access.</small></div>';
+          '<div class="error-msg">⚠ Could not load firewall data: ' + esc(err.message) +
+          '<br><small>Check that admin/firewall-api.php is installed and PHP is running.</small></div>';
       }
     });
 }
 
-function statusClass(s) {
-  if (s==='public') return 'pub';
-  if (s==='lan-only') return 'lan';
-  if (s==='blocked') return 'blk';
-  if (s==='ip-restricted') return 'ipr';
-  return 'loc';
-}
-function statusBadge(s) {
-  const map = {public:'PUBLIC','lan-only':'LAN ONLY',blocked:'BLOCKED','ip-restricted':'IP RESTRICT'};
-  return map[s] || 'LOCALHOST';
-}
+const CLS   = {public:'pub','lan-only':'lan',blocked:'blk','ip-restricted':'ipr',localhost:'loc',unknown:'unk'};
+const BADGE = {public:'PUBLIC','lan-only':'LAN ONLY',blocked:'BLOCKED','ip-restricted':'IP RESTRICT',localhost:'LOCALHOST',unknown:'UNKNOWN'};
 
 function renderPortGrid(ports) {
-  document.getElementById('port-grid').innerHTML = ports.map(p => {
-    const sc = statusClass(p.status);
-    const allowed = (p.allowed||[]).map(a=>`<span>${a}</span>`).join('');
+  const grid = document.getElementById('port-grid');
+  if (!ports.length) { grid.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">No ports in this group.</div>'; return; }
+  grid.innerHTML = ports.map(p => {
+    const sc = CLS[p.status] || 'unk';
+    const allowed = (p.allowed||[]).map(a=>`<span>${esc(a)}</span>`).join('');
+    const via = [];
+    if (p.status === 'public') {
+      if (p.public_v4 === true) via.push('IPv4');
+      if (p.public_v6 === true) via.push('IPv6');
+    }
+    const sub = !p.listening ? 'nothing listening (rule only)'
+      : 'listening on ' + (p.binds||[]).map(b => b === '0.0.0.0' || b === '::' || b === '*' ? 'all interfaces' : b).filter((v,i,a)=>a.indexOf(v)===i).join(', ')
+        + (p.process ? ' · ' + p.process : '');
     return `<div class="port-card ${sc}">
       <div class="port-header">
-        <span class="port-num">:${p.port}</span>
-        <span class="port-badge ${sc}">${statusBadge(p.status)}</span>
+        <span class="port-num">:${esc(p.port)}</span>
+        <span class="port-badge ${sc}">${BADGE[p.status]||esc(p.status)}${via.length ? ' · ' + via.join('+') : ''}</span>
       </div>
-      <div class="port-label">${p.label}</div>
+      <div class="port-label">${esc(p.label)}</div>
+      <div class="port-sub">${esc(sub)}</div>
       ${allowed?`<div class="port-allowed">${allowed}</div>`:''}
     </div>`;
   }).join('');
@@ -251,89 +262,103 @@ function renderPortGrid(ports) {
 function filterPorts(f, btn) {
   document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
-  const map = {pub:'public',lan:'lan-only',blk:'blocked',loc:['localhost','unknown','ip-restricted']};
-  const filtered = f==='all' ? allPorts : allPorts.filter(p => {
-    const target = map[f];
-    return Array.isArray(target) ? target.includes(p.status) : p.status===target;
-  });
-  renderPortGrid(filtered);
+  renderPortGrid(f === 'all' ? allPorts : allPorts.filter(p => p.status === f));
 }
 
 function render(data) {
   document.getElementById('ts').textContent = 'Generated: ' + data.generated_at;
 
-  const isDrop = data.policy === 'DROP';
-  document.getElementById('policy-dot').className = 'policy-dot ' + (isDrop?'green':'red');
-  document.getElementById('policy-text').innerHTML =
-    'INPUT chain policy: <strong>' + data.policy + '</strong>' +
-    (isDrop?' — all unmatched traffic is dropped ✓':' — WARNING: unmatched traffic ACCEPTED');
-  document.getElementById('policy-meta').textContent = data.rules.length + ' rules loaded';
+  // Notices: things this page could not see
+  const notes = [];
+  if (!data.readable) notes.push(`<div class="notice red">The firewall rules could not be read: www-data may not run <code>iptables -L -n --line-numbers -v</code> through sudo. Install the rules from the package:<br><code>${esc(data.sudo_hint)}</code></div>`);
+  if (data.readable && !data.ss_processes) notes.push(`<div class="notice">Program names are missing because <code>ss -tlnp</code> isn't allowed through sudo (same sudoers file).</div>`);
+  if (data.ipv6 && data.ipv6.has_global && !data.ipv6.readable) notes.push(`<div class="notice red">This server has a <b>public IPv6 address</b>, but the IPv6 firewall could not be read (<code>ip6tables</code> sudo rule missing). Ports may be open over IPv6 whatever the IPv4 rules say. Check by hand: <code>sudo ip6tables -S INPUT | head -3</code></div>`);
+  if (data.fail2ban && data.fail2ban.installed && !data.fail2ban.readable) notes.push(`<div class="notice">fail2ban is installed but its status could not be read (<code>fail2ban-client status</code> sudo rule missing).</div>`);
+  if (data.ufw) notes.push(`<div class="notice" style="background:var(--blue-dim);border-color:var(--blue);">ufw manages this firewall. Its "allow" rules are listed below as <b>ufw-user-input</b>; change them with <code>sudo ufw allow|deny …</code>, not iptables.</div>`);
+  document.getElementById('notices').innerHTML = notes.join('');
 
-  const ports = data.port_summary;
-  allPorts = ports;
-  const pub = ports.filter(p=>p.status==='public').length;
-  const lan = ports.filter(p=>p.status==='lan-only').length;
-  const blk = ports.filter(p=>p.status==='blocked').length;
-  const f2bN = data.fail2ban.sshd_banned || 0;
+  const pol = data.policy;
+  const isDrop = pol === 'DROP' || pol === 'REJECT';
+  document.getElementById('policy-dot').className = 'policy-dot ' + (isDrop ? 'green' : 'red');
+  document.getElementById('policy-text').innerHTML = pol === 'UNKNOWN'
+    ? 'IPv4 INPUT policy: <strong class="bad">unknown</strong> — rules not readable'
+    : 'IPv4 INPUT policy: <strong' + (isDrop ? '' : ' class="bad"') + '>' + esc(pol) + '</strong>' +
+      (isDrop ? ' — unmatched traffic is refused ✓' : ' — WARNING: unmatched traffic is ACCEPTED');
+  document.getElementById('policy-meta').textContent = data.rules.length + ' rules';
 
+  const v6 = data.ipv6 || {};
+  const b6 = document.getElementById('policy6-banner');
+  b6.style.display = 'flex';
+  if (!v6.has_global) {
+    document.getElementById('policy6-dot').className = 'policy-dot green';
+    document.getElementById('policy6-text').innerHTML = 'IPv6: no public IPv6 address on this server — nothing reachable over IPv6';
+  } else if (!v6.readable) {
+    document.getElementById('policy6-dot').className = 'policy-dot red';
+    document.getElementById('policy6-text').innerHTML = 'IPv6: public address present, firewall <strong class="bad">not readable</strong>';
+  } else {
+    const ok6 = v6.policy === 'DROP' || v6.policy === 'REJECT';
+    document.getElementById('policy6-dot').className = 'policy-dot ' + (ok6 ? 'green' : 'red');
+    document.getElementById('policy6-text').innerHTML = 'IPv6 INPUT policy: <strong' + (ok6 ? '' : ' class="bad"') + '>' + esc(v6.policy) + '</strong>' +
+      ((v6.public_ports||[]).length ? ' — open over IPv6: ' + v6.public_ports.map(esc).join(', ') : ' — no listening port open over IPv6');
+  }
+
+  allPorts = data.port_summary || [];
+  const n = s => allPorts.filter(p => p.status === s).length;
+  const f2b = data.fail2ban || {};
   document.getElementById('summary-bar').innerHTML = `
-    <div class="summary-card green"><div class="val">${pub}</div><div class="lbl">Public Ports</div></div>
-    <div class="summary-card blue"><div class="val">${lan}</div><div class="lbl">LAN-Only Ports</div></div>
-    <div class="summary-card red"><div class="val">${blk}</div><div class="lbl">Blocked Ports</div></div>
-    <div class="summary-card amber"><div class="val">${data.rules.length}</div><div class="lbl">Total Rules</div></div>
-    <div class="summary-card red"><div class="val">${f2bN}</div><div class="lbl">Fail2ban Banned</div></div>
+    <div class="summary-card green"><div class="val">${n('public')}</div><div class="lbl">Public Ports</div></div>
+    <div class="summary-card blue"><div class="val">${n('lan-only')}</div><div class="lbl">LAN-Only Ports</div></div>
+    <div class="summary-card red"><div class="val">${n('blocked')}</div><div class="lbl">Blocked Ports</div></div>
+    <div class="summary-card amber"><div class="val">${n('localhost')}</div><div class="lbl">Localhost Only</div></div>
+    <div class="summary-card red"><div class="val">${f2b.readable ? (f2b.total_banned||0) : '—'}</div><div class="lbl">Banned now (all jails)</div></div>
   `;
+  renderPortGrid(allPorts);
 
-  renderPortGrid(ports);
-
-  const f2b = data.fail2ban;
-  const ips = (f2b.recent_banned||[]).map(ip=>`<span class="f2b-ip">${ip}</span>`).join('');
-  // Build per-jail summary cards if data is available
-  const jailSummary = f2b.jail_summary || {};
-  const jailNames = Object.keys(jailSummary);
-  const jailCardsHtml = jailNames.length > 0
-    ? jailNames.map(name => {
-        const j = jailSummary[name];
-        const cur = j.banned || 0;
-        const tot = j.total || 0;
-        const colorClass = cur > 0 ? 'red' : 'green';
-        return `<div class="f2b-card">
-          <h3>Jail: ${name}</h3>
-          <div class="f2b-num ${colorClass}">${cur}</div>
-          <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">currently banned · ${tot} total ever</div>
-        </div>`;
-      }).join('')
-    : `<div class="f2b-card">
-        <h3>Currently Banned (SSH)</h3>
-        <div class="f2b-num">${f2b.sshd_banned||0}</div>
-        <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">Total ever banned: ${f2b.banned_count||0}</div>
+  // fail2ban
+  let f2bHtml;
+  if (!f2b.installed) {
+    f2bHtml = `<div class="f2b-card"><h3>fail2ban</h3><div style="font-size:0.85rem;color:var(--muted);">Not installed. Nothing bans addresses that keep guessing passwords: <code>sudo apt install fail2ban</code></div></div>`;
+  } else if (!f2b.readable) {
+    f2bHtml = `<div class="f2b-card"><h3>fail2ban</h3><div style="font-size:0.85rem;color:var(--muted);">Installed; status not readable (sudo rule missing).</div></div>`;
+  } else {
+    const js = f2b.jail_summary || {};
+    f2bHtml = Object.keys(js).map(name => {
+      const j = js[name];
+      return `<div class="f2b-card">
+        <h3>Jail: ${esc(name)}</h3>
+        <div class="f2b-num ${j.banned > 0 ? 'red' : 'green'}">${j.banned||0}</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;">banned now · ${j.total||0} since fail2ban started</div>
       </div>`;
+    }).join('') || `<div class="f2b-card"><h3>fail2ban</h3><div style="font-size:0.85rem;color:var(--muted);">Running, no jails enabled.</div></div>`;
+    const ips = (f2b.recent_banned||[]).map(ip=>`<span class="f2b-ip">${esc(ip)}</span>`).join('');
+    f2bHtml += `<div class="f2b-card"><h3>Banned addresses (up to 10)</h3>
+      <div class="f2b-ips">${ips||'<span style="color:var(--muted);font-size:0.8rem;">None right now</span>'}</div></div>`;
+  }
+  document.getElementById('f2b-grid').innerHTML = f2bHtml;
 
-  document.getElementById('f2b-grid').innerHTML = jailCardsHtml + `
-    <div class="f2b-card">
-      <h3>Recently Banned IPs (last 10)</h3>
-      <div class="f2b-ips">${ips||'<span style="color:var(--muted);font-size:0.8rem;">None recorded</span>'}</div>
-    </div>
-  `;
-
+  // Rules
+  const chains = [...new Set(data.rules.map(r => r.chain).filter(c => c && c !== 'INPUT'))];
+  document.getElementById('rules-extra').textContent = chains.length ? ' + ' + chains.join(', ') : '';
   document.getElementById('rules-tbody').innerHTML = data.rules.map(r => {
-    let tc = r.target.startsWith('f2b-') ? 't-f2b' : 't-'+r.target.toLowerCase();
+    const tc = r.target.startsWith('f2b-') ? 't-f2b' : 't-' + r.target.toLowerCase();
     const portBadge = r.port
-      ? `<span class="pill ${r.category==='block'?'red':r.category==='lan-allow'?'blue':'green'}">${r.port}</span>`
+      ? `<span class="pill ${r.category==='block'?'red':r.category==='lan-allow'?'blue':r.category==='ip-allow'?'amber':'green'}">${esc(r.port)}</span>`
       : '<span style="color:var(--muted)">—</span>';
+    const src = r.in === 'lo' ? 'loopback (lo)' : r.source;
     return `<tr>
-      <td style="color:var(--muted)">${r.num}</td>
-      <td class="${tc}">${r.target}</td>
-      <td style="color:var(--muted)">${r.prot}</td>
-      <td style="font-family:var(--mono);font-size:0.75rem">${r.source}</td>
+      <td style="color:var(--muted)">${r.chain && r.chain !== 'INPUT' ? esc(r.chain.replace('ufw-user-','ufw ')) + ' ' : ''}${esc(r.num)}</td>
+      <td class="${tc}">${esc(r.target)}</td>
+      <td style="color:var(--muted)">${esc(r.prot)}</td>
+      <td style="font-family:var(--mono);font-size:0.75rem">${esc(src)}</td>
       <td>${portBadge}</td>
-      <td style="color:var(--muted);font-size:0.75rem">${r.label||(r.extra?r.extra.substring(0,40):'—')}</td>
-      <td style="color:var(--muted)">${r.pkts}</td>
+      <td style="color:var(--muted);font-size:0.75rem">${esc(r.label || (r.extra ? r.extra.substring(0,60) : '—'))}</td>
+      <td style="color:var(--muted)">${esc(r.pkts)}</td>
     </tr>`;
   }).join('');
 }
 
 init();
 </script>
+<script src="/shared/settings-modal.js"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
 </body>
 </html>

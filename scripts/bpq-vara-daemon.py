@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 bpq-vara-daemon.py — WebSocket to BPQ Telnet proxy for VARA HF terminal
-BPQ Dashboard v1.5.6
+BPQ Dashboard v1.5.14
 
-Bridges browser WebSocket connections to BPQ telnet port 8010,
-logging in and attaching to Port 3 (VARA HF) for keyboard-to-keyboard
-HF sessions via the VARA modem.
+Bridges browser WebSocket connections to BPQ telnet (config.php 'bbs'),
+logging in and attaching to the VARA HF port for keyboard-to-keyboard
+HF sessions via the VARA modem. Login and port come from config.php
+(see "BPQ login + VARA port" below); restart the service after changing them.
 
 BPQ session sequence:
-  Login → NODE → ATT 3 → [VARA HF session] → D → BYE
+  Login → NODE → ATT <VARA port> → [VARA HF session] → D → BYE
 
 Run as: python3 /var/www/bpq-dashboard/scripts/bpq-vara-daemon.py
 Service: bpq-vara.service
@@ -25,25 +26,91 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # ── Configuration ──────────────────────────────────────────────────
-import os as _os
-_candidates = ['/var/www/bpq-dashboard', '/var/www/html/bpq', '/var/www/bpq']
-WEB_ROOT = next((p for p in _candidates if _os.path.isdir(p)), '/var/www/html/bpq')
-
-STATE_DIR   = WEB_ROOT + '/cache/vara-sessions'
-DAEMON_FILE = STATE_DIR + '/vara-daemon.json'
-LOG_FILE    = WEB_ROOT + '/logs/bpq-vara-daemon.log'
 WS_HOST     = '127.0.0.1'
 WS_PORT     = 8767
 
-BPQ_HOST    = '127.0.0.1'
-BPQ_PORT    = 8010
-BPQ_USER    = 'YOURCALL'        # User configured with default app=BBS in bpq32.cfg.
-BPQ_PASS    = 'YOUR_BPQ_PASSWORD'    # YOURCALL has full ATT permission via the BBS→NODE
-                              # escape path (verified manually 2026-05-01).
-                              # SYSOPUSER lands at NODE directly but ATT silently
-                              # fails for him; BPQ apparently restricts ATT to
-                              # users that came in via BBS.
-BPQ_VARA_PORT = 3            # BPQ port number for VARA HF
+# ── BPQ login + VARA port, from config.php (2026-10-25) ────────────
+# Were placeholders here (YOURCALL / YOUR_BPQ_PASSWORD / port 3), so the
+# VARA terminal couldn't log in on any install. Now read from config.php
+# through scripts/print-bbs-config.php, like the chat daemon:
+#   login     'bbs' user/pass/host/port  — or 'vara' user/pass to override
+#   VARA port 'vara' => ['bpq_port' => N]; 0 or unset = the first VARA port
+#             (DRIVER=VARA, not VARA FM) found in <paths.linbpq>/bpq32.cfg
+# Use a BPQ user whose default application is the BBS: on this station
+# (2026-05-01) a user that landed straight at the node could not ATT the
+# VARA port; one that came in via the BBS (then NODE) could.
+import json as _json, subprocess as _subprocess
+
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+WEB_ROOT    = os.path.dirname(_SCRIPT_DIR)      # scripts/ -> dashboard root
+STATE_DIR   = WEB_ROOT + '/cache/vara-sessions'
+DAEMON_FILE = STATE_DIR + '/vara-daemon.json'
+LOG_FILE    = WEB_ROOT + '/logs/bpq-vara-daemon.log'
+
+
+def _fatal(msg: str):
+    sys.stderr.write(f"FATAL: {msg}\n")
+    sys.exit(1)
+
+
+def load_config() -> dict:
+    helper = os.path.join(_SCRIPT_DIR, 'print-bbs-config.php')
+    try:
+        r = _subprocess.run(['php', helper], capture_output=True, text=True, timeout=10)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip() or f"php exited {r.returncode}")
+        return _json.loads(r.stdout)
+    except Exception as e:
+        _fatal(f"could not read config.php via {helper}: {e}\n"
+               f"Check config.php's 'bbs' section and that 'php' is on PATH for this service's user.")
+
+
+def find_vara_port(bpq32_cfg: str):
+    """BPQ port number of the first VARA HF port in bpq32.cfg, or None.
+
+    A port is a PORT ... ENDPORT block; its number is PORTNUM= if given,
+    otherwise its position (1, 2, ...). VARA ports have DRIVER=VARA (or
+    DLLNAME=VARA...); ports whose ID or CONFIG mention VARA FM are skipped.
+    """
+    try:
+        text = Path(bpq32_cfg).read_text(errors='replace')
+    except OSError:
+        return None
+    text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)          # /* block comments */
+    pos = 0
+    for m in re.finditer(r'^\s*PORT\b(.*?)^\s*ENDPORT\b', text, flags=re.S | re.M | re.I):
+        pos += 1
+        block = '\n'.join(l.split(';', 1)[0] for l in m.group(1).splitlines())
+        num = re.search(r'^\s*PORTNUM\s*=\s*(\d+)', block, flags=re.M | re.I)
+        number = int(num.group(1)) if num else pos
+        if not re.search(r'^\s*(DRIVER\s*=\s*VARA|DLLNAME\s*=\s*VARA)', block, flags=re.M | re.I):
+            continue
+        if re.search(r'VARA\s*-?\s*FM', block, flags=re.I):
+            continue
+        return number
+    return None
+
+
+_cfg = load_config()
+BPQ_HOST = _cfg.get('host') or '127.0.0.1'
+if BPQ_HOST == 'localhost':
+    BPQ_HOST = '127.0.0.1'
+BPQ_PORT = int(_cfg.get('port') or 8010)
+BPQ_USER = _cfg.get('vara_user') or _cfg.get('user') or ''
+BPQ_PASS = _cfg.get('vara_pass') or _cfg.get('pass') or ''
+if not BPQ_USER or not BPQ_PASS or BPQ_USER in ('SYSOPUSER', 'YOURCALL') \
+        or BPQ_PASS == 'CHANGE_THIS_PASSWORD':
+    _fatal("config.php 'bbs' user/pass are not set (or 'vara' user/pass).")
+
+BPQ32_CFG = os.path.join(_cfg.get('linbpq') or '/home/linbpq', 'bpq32.cfg')
+BPQ_VARA_PORT = int(_cfg.get('vara_port') or 0)          # BPQ port number for VARA HF
+VARA_PORT_SOURCE = 'config.php vara.bpq_port'
+if BPQ_VARA_PORT <= 0:
+    BPQ_VARA_PORT = find_vara_port(BPQ32_CFG) or 0
+    VARA_PORT_SOURCE = BPQ32_CFG
+if BPQ_VARA_PORT <= 0:
+    _fatal(f"no VARA HF port found in {BPQ32_CFG} (unreadable, or no PORT block "
+           f"with DRIVER=VARA). Set it in config.php: 'vara' => ['bpq_port' => N],")
 
 MAX_SESSIONS = 3
 SESSION_TIMEOUT = 7200       # 2 hour idle timeout
@@ -245,7 +312,32 @@ class VARASession:
             
             clean = self.strip_iac(login_buf).decode('utf-8', errors='replace')
             
-            in_bbs = f'de {BPQ_USER}>' in clean
+            # 2026-10-27: a BBS prompt is not always "de <user>>" — BPQ Mail's
+            # prompt is configurable (this station's: "K1AJD: hello de KA1JD>"),
+            # and the greeting may come after "Connected to BBS" and the SID
+            # with a pause. Any of these means the user landed in the BBS.
+            # Checked before the node test: "Connected to BBS" follows the node
+            # prompt "ALIAS:CALL-N}", which the node test would match.
+            in_bbs = (f'de {BPQ_USER}>' in clean
+                      or 'connected to bbs' in clean.lower()
+                      or bool(re.search(r'\[[A-Za-z0-9.\-]+\$\]', clean))
+                      or bool(re.search(r'\bde [A-Za-z0-9/\-]+>\s*$', clean)))
+            if in_bbs and not re.search(r'>\s*$', clean):
+                # Greeting not finished: wait for the BBS prompt (ends in ">")
+                wait_end = asyncio.get_event_loop().time() + 10.0
+                while asyncio.get_event_loop().time() < wait_end:
+                    try:
+                        chunk = await asyncio.wait_for(self.reader.read(2048), timeout=0.5)
+                        if not chunk:
+                            break
+                        login_buf += chunk
+                        clean = self.strip_iac(login_buf).decode('utf-8', errors='replace')
+                        if re.search(r'>\s*$', clean):
+                            break
+                    except asyncio.TimeoutError:
+                        continue
+                if not re.search(r'>\s*$', clean):
+                    log.warning(f"Session {self.session_id}: no BBS prompt after login. Got: {repr(clean[-120:])}")
             # Node detection — any of these patterns indicate we're in Node:
             #   1. ">" within the last 30 chars (clean prompt)
             #   2. "Returned to Node" string
@@ -264,7 +356,7 @@ class VARASession:
                 return False
             
             if in_bbs:
-                log.info(f"Session {self.session_id}: BBS login OK (user landed in BBS)")
+                log.info(f"Session {self.session_id}: BBS login OK (user landed in BBS; prompt {clean.strip()[-40:]!r})")
                 # Step 4a — switch to node from BBS
                 self.writer.write(b'NODE\r\n')
                 await self.writer.drain()
@@ -507,6 +599,7 @@ async def main():
         sys.exit(1)
 
     log.info(f"BPQ VARA Daemon starting on {WS_HOST}:{WS_PORT}")
+    log.info(f"BPQ telnet {BPQ_HOST}:{BPQ_PORT} as {BPQ_USER}; VARA HF = BPQ port {BPQ_VARA_PORT} (from {VARA_PORT_SOURCE})")
     write_heartbeat()
     log.info(f"websockets version: {websockets.__version__}")
 

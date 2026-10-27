@@ -46,3 +46,26 @@ function bpq_grid_center(string $grid): ?array {
     }
     return [round($lat, 6), round($lon, 6)];
 }
+
+/**
+ * Cross-origin (CORS) headers from config.php 'cors' (2026-10-20).
+ * The dashboard's own pages are same-origin and need none. Default: no
+ * Access-Control-Allow-Origin at all, so other web sites can't use this
+ * dashboard's endpoints (QRZ lookups, BBS logins, proxies) from their
+ * visitors' browsers. 'allowed_origins' lists sites that may;
+ * 'allow_all' => true restores the old "*" behaviour.
+ */
+function bpq_cors_headers(string $methods = 'GET, POST, OPTIONS'): void {
+    $cors   = bpq_config_section('cors');
+    $origin = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
+    if (($cors['allow_all'] ?? false) === true) {
+        header('Access-Control-Allow-Origin: *');
+    } elseif ($origin !== '' && in_array($origin, (array)($cors['allowed_origins'] ?? []), true)) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin');
+    } else {
+        return;
+    }
+    header('Access-Control-Allow-Methods: ' . $methods);
+    header('Access-Control-Allow-Headers: Content-Type');
+}

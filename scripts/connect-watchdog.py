@@ -36,7 +36,8 @@ from pathlib import Path
 # ============================================================================
 
 IS_WINDOWS = platform.system() == 'Windows'
-# Linux defaults come from config.php paths.linbpq / paths.logs (2026-09-26)
+# Linux defaults come from config.php paths.linbpq / paths.logs (2026-09-26);
+# state and log follow the install folder too (2026-10-25, were fixed paths).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpq_db_config  # noqa: E402
 
@@ -51,11 +52,11 @@ CONFIG = {
     ),
     'state_file': (
         'C:\\UniServerZ\\www\\bpq\\cache\\watchdog-state.json'
-        if IS_WINDOWS else '/var/www/bpq-dashboard/cache/watchdog-state.json'
+        if IS_WINDOWS else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cache', 'watchdog-state.json')
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\connect-watchdog.log'
-        if IS_WINDOWS else '/var/www/bpq-dashboard/logs/connect-watchdog.log'
+        if IS_WINDOWS else os.path.join(bpq_db_config.default_logs_dir(), 'connect-watchdog.log')
     ),
 
     # Detection settings

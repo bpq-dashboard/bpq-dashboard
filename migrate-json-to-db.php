@@ -7,7 +7,7 @@
  * Run once, from the CLI, on the server, AFTER running the schema SQL and
  * deploying message-db.php / message-storage.php:
  *
- *   cd /var/www/tprfn   (or wherever the dashboard lives)
+ *   cd /var/www/bpq-dashboard   (or wherever the dashboard lives)
  *   php migrate-json-to-db.php
  *
  * Safe to re-run: everything upserts/INSERT-IGNOREs, so running it twice
@@ -15,6 +15,14 @@
  * you've confirmed the data looks right in bbs-messages.html, you can
  * remove data/messages/*.json yourself.
  */
+
+// Command line only (2026-10-20): it reads and imports message files, so a
+// web request must never be able to start it.
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain');
+    exit("migrate-json-to-db.php runs from the server's command line only:\n  php migrate-json-to-db.php\n");
+}
 
 require_once __DIR__ . '/message-db.php';
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Email Client — BPQ BBS</title>
+<title>Email Client - BPQ Dashboard</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -68,21 +68,81 @@
     body { font-family: var(--font-sans); background: var(--bg-page); color: var(--text-strong); margin: 0; }
 
     /* ── 3-column app shell ──────────────────────────────────────── */
+    /* 2026-10-12: the columns are resizable. Two .pane-splitter grid
+       items sit between sidebar | list | preview; dragging one sets
+       --sb-w / --list-w (px, remembered per browser). Defaults match the
+       old fixed layout. In pop-up reading mode (.reader-popup) the
+       preview column and its splitter are hidden and the message list
+       takes all the remaining width. */
     #appShell {
+        --sb-w: 240px;
+        --list-w: minmax(360px, 1fr);
         display: grid;
-        grid-template-columns: 240px minmax(360px, 1fr) minmax(420px, 1.5fr);
-        gap: 1px;
+        grid-template-columns: var(--sb-w) 6px var(--list-w) 6px minmax(320px, 1.5fr);
         background: var(--border-soft);
         height: calc(100vh - 64px);            /* leave room for nav bar */
         min-height: 600px;
     }
+    #appShell.reader-popup { grid-template-columns: var(--sb-w) 6px minmax(320px, 1fr); }
+    #appShell.reader-popup #previewPane,
+    #appShell.reader-popup #splitList { display: none; }
+    .pane-splitter {
+        background: var(--border-soft); cursor: col-resize; position: relative;
+        transition: background 0.12s; touch-action: none;
+    }
+    .pane-splitter::after {               /* grip dots */
+        content: ''; position: absolute; left: 50%; top: 50%;
+        width: 2px; height: 28px; transform: translate(-50%, -50%);
+        border-left: 2px dotted var(--text-muted); opacity: 0.6;
+    }
+    .pane-splitter:hover, .pane-splitter.dragging { background: var(--accent); }
+    .pane-splitter:hover::after, .pane-splitter.dragging::after { border-color: #fff; opacity: 1; }
+    body.resizing-panes { cursor: col-resize; user-select: none; }
     @media (max-width: 1024px) {
-        #appShell { grid-template-columns: 200px 1fr; height: auto; min-height: 0; }
+        #appShell, #appShell.reader-popup { grid-template-columns: 200px 1fr; height: auto; min-height: 0; }
+        .pane-splitter { display: none; }
         #previewPane { grid-column: 1 / -1; min-height: 50vh; }
     }
     @media (max-width: 640px) {
-        #appShell { grid-template-columns: 1fr; }
+        #appShell, #appShell.reader-popup { grid-template-columns: 1fr; }
         #sidebar.mobile-hidden, #messageList.mobile-hidden, #previewPane.mobile-hidden { display: none; }
+    }
+
+    /* ── Message reader pop-up (2026-10-12) ─────────────────────────
+       The same #previewContent block (header, action toolbar, body,
+       forwarding panel) is moved into this window when reading mode is
+       "pop-up", so every existing action works unchanged. Resizable from
+       the bottom-right corner; size and text size are remembered. */
+    #readerModal .reader-box {
+        background: var(--bg-panel); color: var(--text-strong);
+        border-radius: 12px; box-shadow: 0 25px 50px rgba(0,0,0,0.35);
+        width: min(1000px, 96vw); height: min(80vh, 900px);
+        min-width: 360px; min-height: 320px; max-width: 98vw; max-height: 96vh;
+        display: flex; flex-direction: column; overflow: hidden; resize: both;
+    }
+    #readerModal.maximized .reader-box { width: 98vw !important; height: 96vh !important; resize: none; }
+    #readerModal .reader-top {
+        display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        padding: 10px 14px; border-bottom: 1px solid var(--border-soft);
+        background: var(--bg-sidebar);
+    }
+    #readerModal .reader-title { font-size: 13px; font-weight: 600; color: var(--text-soft); margin-right: auto; white-space: nowrap; }
+    #readerModal .reader-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    #readerModal .reader-tools .ctrl-btn { padding: 6px 11px; font-size: 12px; }
+    #readerModal .reader-tools .toolbar-btn { padding: 5px 9px; font-size: 12px; }
+    #readerModal .reader-sep { width: 1px; align-self: stretch; background: var(--border-soft); margin: 0 2px; }
+    #readerModal .modal-close { color: var(--text-soft); padding: 0 4px; }
+    #readerSlot { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    #readerSlot #previewContent { flex: 1; min-height: 0; }
+    #readerSlot #previewHeader { padding: 12px 20px; }
+    #readerSlot #previewHeader h1 { margin-bottom: 8px; }
+    #readerSlot #actionToolbar { padding: 8px 20px; }
+    #readerSlot #previewBody { flex: 1 1 auto; min-height: 80px; overflow: auto; margin: 0; }
+    #readerSlot #forwardEventsPanel { max-height: 30%; overflow: auto; flex-shrink: 0; }
+    #previewBody { font-size: var(--reader-font, 13px); }
+    @media (max-width: 640px) {
+        #readerModal { padding: 0; }
+        #readerModal .reader-box { width: 100vw !important; height: 100vh !important; max-height: 100vh; border-radius: 0; resize: none; min-width: 0; }
     }
 
     /* ── Sidebar ─────────────────────────────────────────────────── */
@@ -191,7 +251,7 @@
     .toolbar-btn.danger:hover { background: #fee2e2; border-color: var(--new-flag); color: var(--new-flag); }
 
     #previewBody {
-        padding: 24px; font-family: var(--font-mono); font-size: 13px;
+        padding: 24px; font-family: var(--font-mono);
         line-height: 1.55; white-space: pre-wrap; word-break: break-word;
         flex: 1; color: var(--text-strong);
     }
@@ -375,11 +435,11 @@
     }
 </style>
 <script>
-// Station callsign in the title from station-info.php (2026-09-26) — no hard-coded call.
+// Station callsign from station-info.php (2026-09-26) — no hard-coded call. The tab title stays "Page - BPQ Dashboard" (2026-10-19).
 document.addEventListener('DOMContentLoaded', function () {
   fetch('station-info.php', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
     if (!d || !d.callsign) return;
-    document.title = document.title.replace('BPQ BBS', d.callsign + ' BBS');
+    window.STATION_CALL = d.callsign;   // "Forwarded by …" in the message reader (2026-10-27)
     var i = document.getElementById('ciCallsign'); if (i) i.placeholder = d.callsign;
   }).catch(function () {});
 });
@@ -387,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </head>
 
 <body data-nav-page="bbs">
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 <!-- Top control bar -->
 <div id="controlBar">
@@ -501,6 +561,9 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     </aside>
 
+    <!-- Drag to resize the sidebar (2026-10-12; double-click resets) -->
+    <div class="pane-splitter" id="splitSidebar" title="Drag to resize · double-click to reset"></div>
+
     <!-- Message list -->
     <section id="messageList">
         <div id="listHeader">
@@ -516,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </label>
             <h2 id="listTitle" style="flex:1;">Personal &amp; Traffic</h2>
             <span class="meta" id="listMeta">0 messages</span>
-            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.13</span>
+            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.14</span>
         </div>
         <!-- Selection toolbar — only visible when ≥1 message is selected.
              Bulk actions: Move-to-folder dropdown, Mark Read, Archive, Kill,
@@ -547,6 +610,9 @@ document.addEventListener('DOMContentLoaded', function () {
         <div id="listBody"></div>
     </section>
 
+    <!-- Drag to resize the message list vs the reading pane (2026-10-12) -->
+    <div class="pane-splitter" id="splitList" title="Drag to resize · double-click to reset"></div>
+
     <!-- Preview pane -->
     <section id="previewPane">
         <div id="previewEmpty">
@@ -570,6 +636,47 @@ document.addEventListener('DOMContentLoaded', function () {
                  font-size:12px;"></div>
         </div>
     </section>
+</div>
+
+<!-- Message reader pop-up (2026-10-12). Opened by clicking a message when
+     Preferences → "Open messages in" is "Pop-up window" (the default).
+     openReader() moves #previewContent from the reading pane into
+     #readerSlot, so the header, Reply/Forward/Move/Kill toolbar, body and
+     forwarding panel are the same elements in both modes. Declared before
+     the other modals so Compose / Check-In / Properties open on top of it. -->
+<div id="readerModal" class="modal-backdrop hidden">
+    <div class="reader-box" role="dialog" aria-modal="true" aria-labelledby="readerTitle">
+        <div class="reader-top">
+            <span class="reader-title" id="readerTitle">Message</span>
+            <div class="reader-tools">
+                <button class="ctrl-btn secondary" onclick="openComposeModal()" title="Write a new message">
+                    <span>✏</span> Compose
+                </button>
+                <button class="ctrl-btn secondary" onclick="window.open('nts-forwarding-report.php', '_blank')"
+                        title="NTS traffic forwarding report — which stations each message was relayed to">
+                    <span>📄</span> NTS Report
+                </button>
+                <button class="ctrl-btn secondary" onclick="window.open('pktnet-forms/index.html', '_blank')"
+                        title="Full PKTNET form set — check-in, bulletin, ICS-213, FSR, radiogram, severe weather, Form 309">
+                    <span>📻</span> PKTNET Forms
+                </button>
+                <button class="ctrl-btn secondary" onclick="openCheckInModal()"
+                        title="Quick check-in — generates a bulletin and hands it straight to Compose">
+                    <span>✅</span> Quick Check-In
+                </button>
+                <span class="reader-sep"></span>
+                <button class="toolbar-btn" id="readerPrevBtn" onclick="readerStep(-1)" title="Previous message in the list (←)">‹ Prev</button>
+                <button class="toolbar-btn" id="readerNextBtn" onclick="readerStep(1)"  title="Next message in the list (→)">Next ›</button>
+                <span class="reader-sep"></span>
+                <button class="toolbar-btn" onclick="changeReaderFont(-1)" title="Smaller text">A−</button>
+                <button class="toolbar-btn" onclick="changeReaderFont(1)"  title="Larger text">A+</button>
+                <button class="toolbar-btn" id="readerMaxBtn" onclick="toggleReaderMaximize()" title="Fill the window">⤢</button>
+                <button class="toolbar-btn" onclick="setReaderMode('pane')" title="Read in the right-hand pane instead of a pop-up (change back in Preferences)">▣ Dock</button>
+                <button class="modal-close" onclick="closeReader()" title="Close (Esc)">&times;</button>
+            </div>
+        </div>
+        <div id="readerSlot"></div>
+    </div>
 </div>
 
 <!-- Properties modal -->
@@ -620,17 +727,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 </select>
             </div>
             <div class="form-group">
+                <label>Open messages in</label>
+                <select id="settingReaderMode">
+                    <option value="popup" selected>Pop-up window — with Compose, NTS Report, PKTNET Forms, Quick Check-In</option>
+                    <option value="pane">Reading pane on the right</option>
+                </select>
+                <p style="font-size:11px; color: var(--text-muted); margin-top:6px;">
+                    Drag the dividers between the columns to resize them; double-click a divider to reset.
+                </p>
+            </div>
+            <div class="form-group">
                 <label>Body fetching</label>
                 <select id="settingBodyMode">
                     <option value="eager" selected>Eager — fetch all bodies on Get Mail (instant clicks)</option>
                     <option value="lazy">Lazy — fetch body on click (faster Get Mail)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Mark read on BBS when opened</label>
-                <select id="settingMarkRead">
-                    <option value="server" selected>Yes — set Y flag on BBS</option>
-                    <option value="local">No — track read state locally only</option>
                 </select>
             </div>
 
@@ -793,7 +903,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="form-group">
                     <label>Your callsign</label>
-                    <input id="ciCallsign" type="text" placeholder="YOURCALL" style="text-transform:uppercase;">
+                    <input id="ciCallsign" type="text" placeholder="W1AW" style="text-transform:uppercase;">
                 </div>
                 <div class="form-group">
                     <label>Town</label>
@@ -1090,12 +1200,16 @@ const CONFIG = {
         customFolders: 'bbs_v2_custom_folders',
         killedSet:     'bbs_v2_killed_set',
         checkInProfile: 'bbs_v2_checkin_profile',
+        // 2026-10-12: column widths, reader pop-up size + text size
+        layout:        'bbs_v2_layout',
     },
     defaultSettings: {
         autoFetchSeconds: 300,
         maxList:          50,
         bodyMode:         'eager',
-        markReadMode:     'server',
+        // 2026-10-12: 'popup' opens a clicked message in the reader
+        // pop-up; 'pane' uses the right-hand reading pane (old layout).
+        readerMode:       'popup',
         // Bulletin distribution-group labels (e.g. "SITREP", "WX") hidden
         // from the aggregate Bulletins view/badge. Display-only — BPQ still
         // receives, stores, and forwards every one of these; this dashboard
@@ -1211,6 +1325,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadState();
     normalizeAndDedupeInboxes();
     applySettingsToUI();
+    initReader();   // reader pop-up + resizable columns (2026-10-12)
 
     // Toggle for the bulletin-group subfolder tree under the built-in
     // Bulletins nav item. Static element (not re-created per render), so
@@ -1448,21 +1563,72 @@ function loadState() {
     purgeOldKills();
 }
 
+// 2026-10-19: "Could not save messages — local storage may be full".
+// localStorage is only this browser's offline cache — browsers allow
+// about 5 MB per site (iPhone Safari is the strictest), shared by every
+// page on the site — and the full inboxes, with every message body
+// ('eager' mode fetches them all, and the database load brings up to 200
+// per type), outgrew it. The messages themselves were never at risk: the
+// database holds them and their text (archiveMessages / saveBodies /
+// message-bodies.timer), and loadInboxesFromDatabase() fills any missing
+// body back in on the next load (mergeArchiveIntoInbox). So when the full
+// copy doesn't fit, save a smaller one instead of failing:
+//   level 0  everything
+//   level 1  without bulletin bodies   (the bulk of the size)
+//   level 2  without any bodies
+// Bodies of messages already gone from the BBS (_stale) are always kept,
+// because the BBS can't supply them again. The page in memory is never
+// touched — only the saved copy is smaller. If even level 2 doesn't fit,
+// the old (out-of-date) saved copy is removed so the next load comes
+// straight from the database instead of resurrecting stale state, and one
+// toast says so (at most every 10 minutes).
+let inboxSaveLevel = 0;
+let storageFullToastAt = 0;
+function isQuotaError(e) {
+    return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+                   e.code === 22 || e.code === 1014);
+}
+function inboxesForStorage(level) {
+    if (level === 0) return inboxes;
+    const strip = m => (m && m.body && !m._stale) ? { ...m, body: '' } : m;
+    return {
+        ...inboxes,
+        bulletins: (inboxes.bulletins || []).map(strip),
+        personal:  level >= 2 ? (inboxes.personal || []).map(strip) : inboxes.personal,
+        nts:       level >= 2 ? (inboxes.nts || []).map(strip)       : inboxes.nts,
+    };
+}
 function persistInboxes() {
-    try {
-        localStorage.setItem(CONFIG.storageKeys.inboxes, JSON.stringify(inboxes));
-    } catch(e) {
-        showToast('Could not save messages — local storage may be full', 'error');
-        console.error(e);
+    let lastErr = null;
+    for (let level = 0; level <= 2; level++) {
+        try {
+            localStorage.setItem(CONFIG.storageKeys.inboxes, JSON.stringify(inboxesForStorage(level)));
+            if (level !== inboxSaveLevel) {
+                if (level > 0) console.info(`[persistInboxes] browser storage is tight — offline copy saved ${level === 1 ? 'without bulletin text' : 'without message text'} (the database keeps the text)`);
+                inboxSaveLevel = level;
+            }
+            return;
+        } catch (e) {
+            lastErr = e;
+            if (!isQuotaError(e)) break;   // e.g. storage disabled — smaller won't help
+        }
+    }
+    try { localStorage.removeItem(CONFIG.storageKeys.inboxes); } catch (e) {}
+    console.error('[persistInboxes] could not save the offline copy:', lastErr);
+    if (Date.now() - storageFullToastAt > 10 * 60 * 1000) {
+        storageFullToastAt = Date.now();
+        showToast('Browser storage for this site is full — your messages are safe in the database, only this browser\'s offline copy was not updated', 'info');
     }
 }
 
 function persistSettings() {
-    localStorage.setItem(CONFIG.storageKeys.settings, JSON.stringify(settings));
+    try { localStorage.setItem(CONFIG.storageKeys.settings, JSON.stringify(settings)); }
+    catch (e) { console.error('persistSettings failed', e); }
 }
 
 function persistReadSet() {
-    localStorage.setItem(CONFIG.storageKeys.readSet, JSON.stringify([...localReadSet]));
+    try { localStorage.setItem(CONFIG.storageKeys.readSet, JSON.stringify([...localReadSet])); }
+    catch (e) { console.error('persistReadSet failed', e); }
 }
 
 function persistAddressBook() {
@@ -1539,13 +1705,19 @@ let keepFoldersLoaded = false;   // true once the server's pin list has arrived
 // pin list is known — pruning before that could drop a pinned group's
 // messages (they'd come back from the DB, but no reason to churn).
 const BULLETIN_RETENTION_DAYS = 14;
+// Same rule as the server's purge (incl. 2026-10-04: an unfiled bulletin
+// whose group is pinned is kept). Only meaningful once keepFoldersLoaded.
+function isExpiredLocalBulletin(m) {
+    const cutoff = Date.now() - BULLETIN_RETENTION_DAYS * 86400000;
+    return m.type === 'B' && !m._archived &&
+        m._archivedAt && m._archivedAt < cutoff &&
+        (!m._folder
+            ? !isKeepFolder(bulletinGroupFolder(m))
+            : (m._folder.startsWith(BULLETIN_GROUP_PREFIX) && !isKeepFolder(m._folder)));
+}
 function pruneExpiredLocalBulletins() {
     if (!keepFoldersLoaded) return 0;
-    const cutoff = Date.now() - BULLETIN_RETENTION_DAYS * 86400000;
-    const expired = m =>
-        m.type === 'B' && !m._archived &&
-        m._archivedAt && m._archivedAt < cutoff &&
-        (!m._folder || (m._folder.startsWith(BULLETIN_GROUP_PREFIX) && !isKeepFolder(m._folder)));
+    const expired = isExpiredLocalBulletin;
     const before = inboxes.bulletins.length;
     inboxes.bulletins = inboxes.bulletins.filter(m => !expired(m));
     const dropped = before - inboxes.bulletins.length;
@@ -1664,13 +1836,55 @@ function applyKeptKill(number, msgRef) {
     if (msgRef && msgRef._folder) refreshServerFolderCache(msgRef._folder);
 }
 
+// ─── Request pacer for message-storage.php (2026-10-19) ─────────
+// nginx allows this endpoint 5 requests/second per client (the BPQ
+// site's API zone; in older two-site configs that zone was shared with
+// the other site too). Per-message loops — Mark Read on a selection,
+// Empty folder, bulk Kill, folder renames and migrations — used to fire
+// as fast as the database answered (or 5 in flight via
+// runWithConcurrency), blowing through that limit; the 503 retries then
+// kept the bucket pinned full for minutes (2026-10-19: ~720 POSTs in 3
+// min from one desktop), and every OTHER page sharing the zone got 503s
+// in the meantime.
+// Every request to message-storage.php now waits for a slot spaced
+// STORAGE_MIN_GAP_MS apart (4 r/s, under nginx's 5 r/s), and a 503/429
+// pushes the next slot out for EVERYONE, not just the request that hit it.
+var STORAGE_MIN_GAP_MS = 250;
+var storageNextSlot = 0;
+function storagePace() {
+    const now = Date.now();
+    const at = Math.max(now, storageNextSlot);
+    storageNextSlot = at + STORAGE_MIN_GAP_MS;
+    return at > now ? new Promise(res => setTimeout(res, at - now)) : Promise.resolve();
+}
+function storageBackoff(ms) {
+    storageNextSlot = Math.max(storageNextSlot, Date.now() + ms);
+}
+function isStorageUrl(url) {
+    return typeof url === 'string' && url.split('?')[0].endsWith(CONFIG.storageApiUrl);
+}
+
+// 2026-10-04: a 503/429 is nginx's rate limit (tprfn_api), not a real
+// failure. It used to be returned as "Server returned non-JSON" and the
+// caller gave up, which is how bulletin filings were silently lost.
+// Wait and retry (1 s, 2 s, 4 s) before reporting failure.
 async function postToStorageApi(action, body) {
     try {
-        const r = await fetch(CONFIG.storageApiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, ...body }),
-        });
+        const payload = JSON.stringify({ action, ...body });
+        let r;
+        for (let attempt = 0; ; attempt++) {
+            await storagePace();
+            r = await fetch(CONFIG.storageApiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+            });
+            if ((r.status !== 503 && r.status !== 429) || attempt >= 3) break;
+            storageBackoff(1000 * Math.pow(2, attempt));   // slow the whole queue, not just this call
+        }
+        if (r.status === 503 || r.status === 429) {
+            return { success: false, error: `Rate limited (HTTP ${r.status})` };
+        }
         const text = await r.text();
         if (!text || !text.trim()) return { success: false, error: 'Empty response' };
         try { return JSON.parse(text); }
@@ -2141,6 +2355,31 @@ function applyRulesToInboxes() {
             toFile.push({ m, folder });
         }
     }
+
+    // 2026-10-04: retry filings the server never confirmed. The page used
+    // to set `_folder` locally and send one saveMessage per message; when
+    // nginx refused those with 503 the message still LOOKED filed here
+    // (so it was never sent again) while the database row stayed
+    // unfiled, and the 14-day purge deleted it even in 📌 pinned groups.
+    // Unconfirmed = marked _needsFile (a failed filing, or the database
+    // copy is in a different folder: see mergeArchiveIntoInbox), or filed
+    // locally with no server id at all. Waits for the pin list so it
+    // never re-uploads a bulletin the retention rule meant to drop, and
+    // skips Trash (re-uploading into Trash would only be purged again).
+    if (keepFoldersLoaded && serverFoldersAvailable) {
+        const queued = new Set(toFile.map(p => p.m));
+        for (const inboxName of ['personal', 'nts', 'bulletins']) {
+            for (const m of inboxes[inboxName]) {
+                if (!m._folder || m._archived || queued.has(m)) continue;
+                if (m._folder.toLowerCase() === 'trash') continue;
+                if (!m._needsFile && m._serverId) continue;
+                if (isExpiredLocalBulletin(m)) continue;
+                toFile.push({ m, folder: m._folder });
+                queued.add(m);
+            }
+        }
+    }
+
     if (matchedAny) persistCustomFolders();
     if (toFile.length > 0) {
         // A first-run sweep (e.g. right after this feature rolled out, or
@@ -2152,8 +2391,8 @@ function applyRulesToInboxes() {
         // (small, capped batch), then file messages at capped concurrency
         // rather than firing every request in the same tick.
         (async () => {
-            await runWithConcurrency([...newFolders], 5, name => createFolderOnServer(name));
-            await runWithConcurrency(toFile, 5, ({ m, folder }) => fileMessageOnServer(m, folder));
+            await runWithConcurrency([...newFolders], 2, name => createFolderOnServer(name));
+            await fileMessagesBulk(toFile);   // 2026-10-04: bulk, rate-limit safe, retried on next sweep
             persistInboxes();
             if (legacyFoldersTouched.size > 0) {
                 await cleanupEmptyLegacyFolders([...legacyFoldersTouched]);
@@ -2419,6 +2658,45 @@ async function fileMessageOnServer(m, folderName) {
     }
 }
 
+// File many messages with action=fileMessages, 100 per request, one
+// request at a time (2026-10-04). Replaces runWithConcurrency(toFile, 5,
+// fileMessageOnServer): that capped requests IN FLIGHT, not per second,
+// and fast database answers let 5 workers far exceed nginx's 5 r/s, so
+// after the burst of 40 every filing got a 503 and was dropped. A
+// message the server doesn't confirm keeps `_needsFile`, and the next
+// applyRulesToInboxes() sweep sends it again.
+async function fileMessagesBulk(pairs) {
+    if (!serverFoldersAvailable || !pairs.length) return { filed: 0, failed: 0 };
+    let filed = 0, failed = 0;
+    for (let i = 0; i < pairs.length; i += 100) {
+        const chunk = pairs.slice(i, i + 100);
+        const r = await postToStorageApi('fileMessages', {
+            items: chunk.map(({ m, folder }) => ({ message: messageToStoragePayload(m), folder })),
+        });
+        const results = (r && r.success && Array.isArray(r.results)) ? r.results : [];
+        chunk.forEach(({ m, folder }, j) => {
+            const res = results[j];
+            if (res && res.ok && res.id) {
+                m._serverId = res.id;
+                delete m._needsFile;
+                filed++;
+                for (const name of Object.keys(serverFolderCache)) {
+                    if (name !== folder) {
+                        serverFolderCache[name] = (serverFolderCache[name] || []).filter(sm => sm.id !== res.id);
+                    }
+                }
+            } else {
+                m._needsFile = true;
+                failed++;
+            }
+        });
+        if (!results.length) console.warn('[fileMessages] request failed:', r && r.error);
+    }
+    if (failed) console.warn(`[fileMessages] ${failed} filing(s) not confirmed by the server; will retry on the next sweep`);
+    if (filed)  console.log(`[fileMessages] ${filed} message(s) filed on the server`);
+    return { filed, failed };
+}
+
 async function unfileMessageOnServer(m) {
     if (!serverFoldersAvailable || !m._serverId) return;
     const r = await postToStorageApi('deleteMessage', { id: m._serverId });
@@ -2502,21 +2780,79 @@ function persistKilledSet() {
     }
 }
 
-function markKilled(msgNumber) {
+// 2026-10-04: BPQ reuses message numbers once its counter wraps (this
+// station wrapped from ~9999 back to 1 well inside the 90-day window), so
+// a kill remembered by number alone hid brand-new mail that landed on a
+// reused number (#3453 from N4VAD). Entries now carry the killed
+// message's sender + subject, and isKilled(msg) only matches the same
+// message. Old number-only entries (value = timestamp) still work, but
+// are ignored for a message whose BPQ date is after the kill.
+function killFingerprint(m) {
+    const norm = v => String(v || '').trim().toUpperCase();
+    return { f: norm(m && m.from), s: norm(m && m.subject) };
+}
+
+function markKilled(msgNumber, msg) {
     if (msgNumber == null) return;
-    killedSet[String(msgNumber)] = Date.now();
+    const entry = { t: Date.now() };
+    if (msg && (msg.from || msg.subject)) Object.assign(entry, killFingerprint(msg));
+    killedSet[String(msgNumber)] = entry;
     persistKilledSet();
 }
 
-function isKilled(msgNumber) {
-    return killedSet.hasOwnProperty(String(msgNumber));
+function killedEntryTime(e) {
+    return (e && typeof e === 'object') ? Number(e.t) || 0 : Number(e) || 0;
+}
+
+// BPQ list dates are "DD-Mon" (UTC, no year). Start of that day in epoch
+// ms, taking the most recent such date that isn't in the future.
+function bpqDateStartMs(d) {
+    const mt = /^(\d{1,2})-([A-Za-z]{3})$/.exec(String(d || '').trim());
+    if (!mt) return null;
+    const mon = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+        .indexOf(mt[2].toLowerCase());
+    if (mon < 0) return null;
+    const now = Date.now();
+    let y = new Date(now).getUTCFullYear();
+    let ms = Date.UTC(y, mon, parseInt(mt[1], 10));
+    if (ms > now + 2 * 86400000) ms = Date.UTC(y - 1, mon, parseInt(mt[1], 10));
+    return ms;
+}
+
+// Pass the message object where you have it: then a kill of an OLDER
+// message that had the same number doesn't hide this one. A bare number
+// keeps the old by-number behaviour.
+function isKilled(msgOrNumber) {
+    const isObj = msgOrNumber && typeof msgOrNumber === 'object';
+    const num = isObj ? msgOrNumber.number : msgOrNumber;
+    const key = String(num);
+    if (!killedSet.hasOwnProperty(key)) return false;
+    if (!isObj) return true;
+    const e = killedSet[key];
+    let sameMessage = true;
+    if (e && typeof e === 'object' && (e.f || e.s)) {
+        const fp = killFingerprint(msgOrNumber);
+        if ((fp.f || fp.s) && (fp.f !== e.f || fp.s !== e.s)) sameMessage = false;
+    }
+    if (sameMessage) {
+        // Message dated a later day than the kill: can't be what was killed.
+        const day = bpqDateStartMs(msgOrNumber.date);
+        if (day != null && day - 12 * 3600000 > killedEntryTime(e)) sameMessage = false;
+    }
+    if (!sameMessage) {
+        console.log(`[killedSet] #${key} was killed earlier as a different message (BPQ reused the number); showing the new one`);
+        delete killedSet[key];
+        persistKilledSet();
+        return false;
+    }
+    return true;
 }
 
 function purgeOldKills() {
     const cutoff = Date.now() - KILLED_RETENTION_MS;
     let purged = 0;
-    for (const [num, ts] of Object.entries(killedSet)) {
-        if (ts < cutoff) {
+    for (const [num, e] of Object.entries(killedSet)) {
+        if (killedEntryTime(e) < cutoff) {
             delete killedSet[num];
             purged++;
         }
@@ -3274,7 +3610,7 @@ function applySettingsToUI() {
     document.getElementById('settingAutoFetch').value = String(settings.autoFetchSeconds);
     document.getElementById('settingMaxList').value = String(settings.maxList);
     document.getElementById('settingBodyMode').value = settings.bodyMode;
-    document.getElementById('settingMarkRead').value = settings.markReadMode;
+    document.getElementById('settingReaderMode').value = settings.readerMode === 'pane' ? 'pane' : 'popup';
     updateAutoFetchChip();
     renderMutedBulletinGroupsList();
 }
@@ -3327,7 +3663,7 @@ function saveSettings() {
     settings.autoFetchSeconds = parseInt(document.getElementById('settingAutoFetch').value, 10);
     settings.maxList          = parseInt(document.getElementById('settingMaxList').value, 10);
     settings.bodyMode         = document.getElementById('settingBodyMode').value;
-    settings.markReadMode     = document.getElementById('settingMarkRead').value;
+    setReaderMode(document.getElementById('settingReaderMode').value, { silent: true });
     persistSettings();
     updateAutoFetchChip();
     stopAutoFetch();
@@ -3389,9 +3725,31 @@ function stopAutoFetch() {
 // "unexpected end of data" and bubble up as a fatal getMail() error.
 // All BBS-bound requests now go through this helper AND are issued
 // sequentially (not Promise.all), eliminating the race.
+// Kill / Forward on the BBS (2026-10-20): sent as POST with a JSON body,
+// like Send. bbs-messages.php refuses them as GETs. Same result shape as
+// safeFetchJson(): never throws, always { success, ... }.
+async function bbsPost(action, params) {
+    try {
+        const r = await fetch(CONFIG.apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ action }, params || {})),
+        });
+        const text = await r.text();
+        if (!text || !text.trim()) return { success: false, error: 'Empty response from server' };
+        try { return JSON.parse(text); }
+        catch (e) { return { success: false, error: 'Server returned non-JSON: ' + e.message }; }
+    } catch (netErr) {
+        return { success: false, error: 'Network error: ' + netErr.message };
+    }
+}
+
 async function safeFetchJson(url) {
     try {
+        const paced = isStorageUrl(url);
+        if (paced) await storagePace();
         const r = await fetch(url);
+        if (paced && (r.status === 503 || r.status === 429)) storageBackoff(2000);
         const text = await r.text();
         if (!text || !text.trim()) {
             return { success: false, error: 'Empty response from server' };
@@ -3422,6 +3780,7 @@ async function safeFetchJson(url) {
 async function archiveFetchedMessages(messages, isRetry = false) {
     if (!messages || !messages.length) return;
     try {
+        await storagePace();
         const r = await fetch('message-storage.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3489,7 +3848,7 @@ async function getMail({ silent = false } = {}) {
         // deletion is eventually consistent, so it may briefly still
         // return messages we've killed. Track count for logging.
         const allFetchedUnfiltered = [...newPersonalRaw, ...newTrafficRaw];
-        const allFetched = allFetchedUnfiltered.filter(m => !isKilled(m.number));
+        const allFetched = allFetchedUnfiltered.filter(m => !isKilled(m));
         const suppressedKills = allFetchedUnfiltered.length - allFetched.length;
         if (suppressedKills > 0) {
             console.log(`[getMail] Suppressed ${suppressedKills} previously-killed message${suppressedKills === 1 ? '' : 's'} from results`);
@@ -3504,12 +3863,16 @@ async function getMail({ silent = false } = {}) {
 
         // Bulletins likewise filtered for previously-killed numbers.
         const newBulletinsRaw = (all.bulletins || []).map(normalizeMessage);
-        const newBulletins = newBulletinsRaw.filter(m => !isKilled(m.number));
+        const newBulletins = newBulletinsRaw.filter(m => !isKilled(m));
 
-        // Merge with existing (preserve cached bodies on messages we already have)
-        inboxes.personal  = mergeInbox(inboxes.personal,  newPersonal);
-        inboxes.nts       = mergeInbox(inboxes.nts,       newTraffic);
-        inboxes.bulletins = mergeInbox(inboxes.bulletins, newBulletins);
+        // Merge with existing (preserve cached bodies on messages we already have).
+        // A listing that came back with `count` entries was cut to the
+        // newest `count` by bbs-messages.php — see mergeInbox().
+        const cappedP = (all.personal  || []).length >= count || (all.traffic || []).length >= count;
+        const cappedB = (all.bulletins || []).length >= count;
+        inboxes.personal  = mergeInbox(inboxes.personal,  newPersonal, cappedP);
+        inboxes.nts       = mergeInbox(inboxes.nts,       newTraffic,  cappedP);
+        inboxes.bulletins = mergeInbox(inboxes.bulletins, newBulletins, cappedB);
 
         persistInboxes();
 
@@ -3542,7 +3905,11 @@ async function getMail({ silent = false } = {}) {
         // callsign and miss the body's full routing form.
         if (settings.bodyMode === 'eager') {
             setStatus('fetching', 'Loading message bodies…');
-            await prefetchBodies();
+            // Only messages in THIS listing: their numbers are current on
+            // the BBS right now. Older body-less ones are fetched (and
+            // checked against their header) when opened — see
+            // recoverMissingBody().
+            await prefetchBodies(new Set([...newPersonal, ...newTraffic, ...newBulletins].map(m => m.number)));
         }
 
         // Update address book from the newly-fetched messages. We need
@@ -3690,6 +4057,9 @@ function mergeArchiveIntoInbox(existing, dbRows) {
             if (!already._serverId) already._serverId = dm._serverId;
             if (!already._dbKey) already._dbKey = dm._dbKey;
             if (!already._folder && dm._folder) already._folder = dm._folder;
+            // 2026-10-04: filed here but not in the database (or in a
+            // different folder there): applyRulesToInboxes() re-files it.
+            else if (already._folder && already._folder !== dm._folder) already._needsFile = true;
             if (!already._archivedAt && dm._archivedAt) already._archivedAt = dm._archivedAt;
             continue;
         }
@@ -3726,7 +4096,7 @@ async function loadInboxesFromDatabase() {
         // failed, this browser's own killedSet still remembers the kill
         // and keeps it from resurfacing here regardless of what the
         // database currently says.
-        const notKilled = m => !isKilled(m.number);
+        const notKilled = m => !isKilled(m);
         let gotAny = false;
         if (p && p.success && Array.isArray(p.messages)) {
             inboxes.personal = mergeArchiveIntoInbox(inboxes.personal, p.messages.map(dbRowToInboxMessage).filter(notKilled));
@@ -3757,8 +4127,29 @@ async function loadInboxesFromDatabase() {
     }
 }
 
-function mergeInbox(existing, fresh) {
+// `capped` = BPQ's listing was cut to the newest `settings.maxList`
+// (bbs-messages.php slices LP/LT/LB to that count). 2026-10-12: in that
+// case a message missing from `fresh` is usually just OLDER than the
+// window, not killed. Flagging those `_stale` ("killed on BBS") was why
+// older bulletins (e.g. SITREP) showed "This message was removed from the
+// BBS…" and why their text was never fetched or saved: prefetchBodies()
+// and lazyLoadBody() both skip `_stale`. Now, for a capped list, only a
+// message whose number falls INSIDE the fresh window's number range is
+// treated as gone; older ones keep `_stale` only if the database says the
+// message was killed (`_goneFromBbs`).
+function mergeInbox(existing, fresh, capped = false) {
     const byNum = new Map(existing.map(m => [m.number, m]));
+    const freshNums = fresh.map(m => m.number).filter(n => typeof n === 'number');
+    const lo = freshNums.length ? Math.min(...freshNums) : null;
+    const hi = freshNums.length ? Math.max(...freshNums) : null;
+    // A huge span means BPQ's counter wrapped inside the window, so a
+    // number range says nothing; treat everything missing as unknown.
+    const rangeUsable = lo != null && (hi - lo) < 5000;
+    const provablyGone = m => {
+        if (!capped) return true;                       // complete listing
+        if (!rangeUsable || typeof m.number !== 'number') return false;
+        return m.number >= lo && m.number <= hi;        // gap inside the window
+    };
     const merged = [];
     const seenNums = new Set();
     for (const fm of fresh) {
@@ -3779,7 +4170,7 @@ function mergeInbox(existing, fresh) {
     // still want them in their local copy. (User can archive them.)
     for (const m of existing) {
         if (!seenNums.has(m.number)) {
-            merged.push({ ...m, _stale: true });
+            merged.push({ ...m, _stale: provablyGone(m) || !!m._goneFromBbs });
         }
     }
     // Sort newest-first by receipt time, not bbs_number — BPQ's message
@@ -3853,11 +4244,12 @@ function normalizeMessage(raw) {
 // sessions reliably — racing requests caused some to return empty bodies
 // (logged as "JSON.parse: unexpected end of data" client-side). One at
 // a time is slower but produces reliable results.
-async function prefetchBodies() {
+async function prefetchBodies(onlyNums = null) {
+    const want = m => !m.body && !m._stale && (!onlyNums || onlyNums.has(m.number));
     const needs = [
-        ...inboxes.personal.filter(m => !m.body && !m._stale),
-        ...inboxes.nts.filter(m => !m.body && !m._stale),
-        ...inboxes.bulletins.filter(m => !m.body && !m._stale),
+        ...inboxes.personal.filter(want),
+        ...inboxes.nts.filter(want),
+        ...inboxes.bulletins.filter(want),
     ];
     if (needs.length === 0) return;
 
@@ -3867,7 +4259,10 @@ async function prefetchBodies() {
     for (const m of needs) {
         setStatus('fetching', `Loading bodies… ${done+1}/${needs.length}`);
         const d = await safeFetchJson(`${CONFIG.apiUrl}?action=read&msg=${m.number}`);
-        if (d.success) {
+        // 2026-10-12: only keep a reply that is this message (BPQ header
+        // matches); "Message N not found" used to be saved as the body.
+        const hdr = d.success ? parseBpqReadHeader(d.body) : null;
+        if (d.success && hdr && sameMessage(m, hdr)) {
             m.body = d.body || '';
             bodyBatch.push(m);
             if (bodyBatch.length >= 10) { await saveBodiesToDb(bodyBatch, true); bodyBatch = []; }
@@ -3956,6 +4351,24 @@ function currentFolderMessages() {
         // server-only entries lacking a number always show (can't
         // collide with anything local).
         const localNums = new Set(local.map(m => m.number).filter(n => n != null));
+        // 2026-10-12: a local copy without text used to hide the database
+        // copy (deduped by number below) even when the database HAS the
+        // text — so a 📌 folder showed "removed from the BBS" for messages
+        // it had saved. Fill the gap from the server copy instead.
+        const serverByNum = new Map();
+        for (const sm of (serverFolderCache[name] || [])) {
+            const n = (sm.number != null && sm.number !== '') ? Number(sm.number) : null;
+            if (n != null && !Number.isNaN(n)) serverByNum.set(n, sm);
+        }
+        let filled = 0;
+        for (const m of local) {
+            const sm = m.number != null ? serverByNum.get(m.number) : null;
+            if (!sm || !sameMessage(m, sm)) continue;
+            if (!m.body && sm.body) { m.body = sm.body; filled++; }
+            if (!m._serverId && sm.id) m._serverId = sm.id;
+            if (sm._goneFromBbs) { m._stale = true; m._goneFromBbs = true; }
+        }
+        if (filled) persistInboxesSoon();
         const serverOnly = (serverFolderCache[name] || [])
             .map(sm => {
                 // bbs_number is a VARCHAR(20) column — action=messages
@@ -4007,15 +4420,23 @@ function currentFolderMessages() {
     return src.filter(m => !m._archived && !m._folder);
 }
 
-function renderList() {
+// The messages the list currently shows: current folder + search box.
+// Shared by renderList(), shift-click range select and the reader
+// pop-up's Prev/Next, so all three agree on the order.
+function visibleMessages() {
     const list = currentFolderMessages();
     const q    = searchQuery.toLowerCase();
-    const filtered = q
+    return q
         ? list.filter(m => {
             const hay = `${m.from} ${m.to} ${m.subject} ${m.body || ''}`.toLowerCase();
             return hay.includes(q);
           })
         : list;
+}
+
+function renderList() {
+    const list = currentFolderMessages();
+    const filtered = visibleMessages();
 
     const body = document.getElementById('listBody');
     const meta = document.getElementById('listMeta');
@@ -4075,7 +4496,32 @@ function renderList() {
 // onclick/onchange). The checkbox's stopPropagation prevents this
 // handler from firing when the user clicks a checkbox.
 function rowClick(event, num) {
+    // Ctrl/Cmd-click toggles the row's selection and Shift-click selects a
+    // range (as USER-GUIDE §9 describes) instead of opening the message —
+    // with the reader pop-up, opening it would cover the list mid-select.
+    if (event && (event.ctrlKey || event.metaKey)) {
+        toggleSelectRow(num);
+        syncRowCheckbox(num);
+        return;
+    }
+    if (event && event.shiftKey && lastClickedRowNum != null) {
+        const list = visibleMessages();
+        const a = list.findIndex(m => m.number === lastClickedRowNum);
+        const b = list.findIndex(m => m.number === num);
+        if (a !== -1 && b !== -1) {
+            const [lo, hi] = a < b ? [a, b] : [b, a];
+            for (let i = lo; i <= hi; i++) selectedSet.add(list[i].number);
+            lastClickedRowNum = num;
+            renderList();
+            return;
+        }
+    }
     selectMsg(num);
+}
+
+function syncRowCheckbox(num) {
+    const cb = document.querySelector(`.msg-row[data-num="${num}"] .row-checkbox input`);
+    if (cb) cb.checked = selectedSet.has(num);
 }
 
 // Render the user-created custom folders in the sidebar. Each is a
@@ -4466,8 +4912,10 @@ function moveSelectedToFolder(folderName) {
     // the storage endpoint does read-modify-write on a shared JSON
     // file with no per-request locking, so concurrent writes can
     // clobber each other.
+    // 2026-10-04: one bulk request per 100 messages (fileMessagesBulk),
+    // not one per message, so a big move can't trip the rate limit.
     (async () => {
-        for (const m of msgs) await fileMessageOnServer(m, folderName);
+        await fileMessagesBulk(msgs.map(m => ({ m, folder: folderName })));
         persistInboxes(); // pick up the _serverId stamps
     })();
 }
@@ -4578,9 +5026,9 @@ async function bulkKill() {
             try {
                 // 📌 keep folder: save the body to the DB before BPQ loses it
                 if (m._folder && isKeepFolder(m._folder)) await ensureBodyStoredBeforeKill(m);
-                const d = await safeFetchJson(`${CONFIG.apiUrl}?action=kill&msg=${m.number}`);
+                const d = await bbsPost('kill', { msg: m.number });
                 if (d.success) {
-                    markKilled(m.number);  // remember it so it can't reappear
+                    markKilled(m.number, m);  // remember it so it can't reappear
                     // Also soft-delete from the DB archive — without this,
                     // loadInboxesFromDatabase() would pull it right back in
                     // on the next reload (or from another browser). Awaited
@@ -4889,14 +5337,14 @@ async function emptyFolderFromModal() {
         // dropped it and reused its number — a BBS kill by number could
         // then hit an unrelated newer message. Anything still on BPQ ages
         // off there by BPQ's own lifetime rules.
-        else killable.push({ number: m.number, type: m.type, gone: !!(m._goneFromBbs || m._stale) });
+        else killable.push({ number: m.number, type: m.type, from: m.from, subject: m.subject, gone: !!(m._goneFromBbs || m._stale) });
     }
     for (const sm of serverOnly) {
         const typeChar = (sm.type || 'P').charAt(0).toUpperCase();
         if (typeChar === 'B' && !sm._goneFromBbs) {
             if (sm.id) serverMustUnfileIds.push(sm.id);
         } else {
-            killable.push({ number: sm.number, type: sm.type, gone: !!sm._goneFromBbs });
+            killable.push({ number: sm.number, type: sm.type, from: sm.from, subject: sm.subject, gone: !!sm._goneFromBbs });
         }
     }
 
@@ -4927,9 +5375,9 @@ async function emptyFolderFromModal() {
                 // soft-delete only, no second BBS kill (numbers get reused).
                 const d = item.gone
                     ? { success: true, alreadyGone: true }
-                    : await safeFetchJson(`${CONFIG.apiUrl}?action=kill&msg=${item.number}`);
+                    : await bbsPost('kill', { msg: item.number });
                 if (d && d.success) {
-                    markKilled(item.number);
+                    markKilled(item.number, item);
                     const kd = await postToStorageApi('killMessage', { number: item.number, type: item.type });
                     if (!kd || !kd.success) { dbSyncFailed++; console.error(`killMessage failed for #${item.number}:`, kd && kd.error); }
                     for (const key of ['personal', 'nts', 'bulletins']) {
@@ -5019,7 +5467,11 @@ function selectMsg(num) {
     if (!msg) return;
     selectedMsg = msg;
 
-    // Mark read locally + on BBS if configured
+    // Mark read locally. 2026-10-04: no longer also sent to the BBS. BPQ has
+    // no "set read flag" command: "Y <n>" got "Invalid Command" on every
+    // open (harmless, but it filled the log and looked like a fault). BPQ
+    // sets the Y flag itself when the addressee reads the message with
+    // R <n>, which the body fetch already does.
     if (msg._unread) {
         msg._unread = false;
         localReadSet.add(num);
@@ -5027,28 +5479,30 @@ function selectMsg(num) {
         persistInboxes();
         renderSidebarBadges();
         renderList();
-        if (settings.markReadMode === 'server') {
-            // Fire-and-forget; don't block UI
-            fetch(`${CONFIG.apiUrl}?action=mark&msg=${num}&flag=Y`)
-                .then(r => r.json())
-                .then(d => {
-                    if (!d.success) console.warn(`Mark-read on BBS failed for #${num}:`, d.error);
-                })
-                .catch(e => console.warn('mark-read error', e));
-        }
         // If this message is filed in a custom folder (has a server
         // copy), persist the read flag there too so the folder's
         // unread badge is correct from every browser, not just this one.
         if (msg._serverId) markServerMessageRead(msg);
     }
 
+    // Keep the list highlight on the open message (renderList() above
+    // only runs for unread ones; Prev/Next in the pop-up moves it too).
+    document.querySelectorAll('#listBody .msg-row.selected').forEach(r => r.classList.remove('selected'));
+    const row = document.querySelector(`#listBody .msg-row[data-num="${num}"]`);
+    if (row) {
+        row.classList.add('selected');
+        if (row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+    }
+
     renderPreview(msg);
+    if (isReaderPopup()) openReader();
 }
 
 function showPreviewEmpty() {
     document.getElementById('previewEmpty').style.display = 'flex';
     document.getElementById('previewContent').style.display = 'none';
     selectedMsg = null;
+    closeReader();
 }
 
 function renderPreview(msg) {
@@ -5085,7 +5539,9 @@ function renderPreview(msg) {
         </div>
         <button class="toolbar-btn" onclick="actProperties()" title="View all properties">ℹ Properties</button>
         <button class="toolbar-btn danger" onclick="actKill()" title="Delete from BBS (irreversible)">🗑 Kill</button>
+        ${isReaderPopup() ? '' : '<button class="toolbar-btn" onclick="popOutReader()" title="Read in a pop-up window with Compose, NTS Report, PKTNET Forms and Quick Check-In">⧉ Pop out</button>'}
     `;
+    updateReaderTitle();
 
     const bodyEl = document.getElementById('previewBody');
     if (msg.body) {
@@ -5093,14 +5549,141 @@ function renderPreview(msg) {
         // Body is already cached — load forward events immediately
         loadForwardEventsForPreview(msg);
     } else if (msg._stale) {
-        bodyEl.textContent = '(This message was removed from the BBS; only the listing metadata remains.)';
+        // 2026-10-12: `_stale` used to end here, but it was often wrong
+        // (see mergeInbox()) and the database may hold the text anyway.
+        bodyEl.textContent = 'Looking for the saved text…';
         document.getElementById('forwardEventsPanel').style.display = 'none';
+        recoverMissingBody(msg);
     } else {
         bodyEl.textContent = 'Loading body…';
         document.getElementById('forwardEventsPanel').style.display = 'none';
-        lazyLoadBody(msg);
+        // 2026-10-12: database first (scripts/fetch-message-bodies.php saves
+        // text server-side every 5 min), then a header-checked BBS read.
+        recoverMissingBody(msg);
     }
 }
+
+// ─── Recovering text for messages listed without it (2026-10-12) ───
+//
+// Order: (1) the database (message-storage.php action=archive, searched by
+// subject, matched on number + sender); (2) unless the database says the
+// message was killed, read it from the BBS — but only keep the result if
+// BPQ's header (From:/Title:) matches this listing, because BPQ reuses
+// message numbers and an old number may now be a different message.
+
+function sameMessage(a, b) {
+    const norm = v => String(v || '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const call = v => norm(v).split('@')[0];
+    if (call(a.from) && call(b.from) && call(a.from) !== call(b.from)) return false;
+    const sa = norm(a.subject), sb = norm(b.subject);
+    if (sa && sb && !(sa.startsWith(sb) || sb.startsWith(sa))) return false;
+    return true;
+}
+
+// Reads From:/Title: from the header block BPQ puts on top of an R <n>
+// reply. Returns null when there is no header at all (not a message,
+// e.g. "not found").
+function parseBpqReadHeader(text) {
+    if (!text || typeof text !== 'string') return null;
+    const lines = text.split(/\r?\n/).slice(0, 20);
+    let from = null, subject = null;
+    for (const line of lines) {
+        const f = line.match(/^[\s>|]*from:\s*(\S+)/i);
+        if (f && from == null) from = f[1];
+        const t = line.match(/^[\s>|]*title:\s*(.*)$/i);
+        if (t && subject == null) subject = t[1].trim();
+    }
+    if (from == null && subject == null) return null;
+    return { from, subject };
+}
+
+let persistSoonTimer = null;
+function persistInboxesSoon() {
+    clearTimeout(persistSoonTimer);
+    persistSoonTimer = setTimeout(persistInboxes, 500);
+}
+
+function showBodyIfCurrent(msg, text) {
+    if (selectedMsg && selectedMsg === msg) {
+        document.getElementById('previewBody').textContent = text;
+    }
+}
+
+async function findBodyInDatabase(msg) {
+    const typeChar = (msg.type || 'P').charAt(0).toUpperCase();
+    const q = (msg.subject || '').trim().slice(0, 40) || (msg.from || '').trim();
+    if (!q) return null;
+    const d = await safeFetchJson(`${CONFIG.storageApiUrl}?action=archive&type=${typeChar}` +
+                                  `&q=${encodeURIComponent(q)}&limit=100`);
+    if (!d || !d.success || !Array.isArray(d.messages)) return null;
+    const hit = d.messages.find(r => r.body &&
+        ((msg._serverId && r.id === msg._serverId) ||
+         (r.number != null && Number(r.number) === msg.number && sameMessage(msg, r))));
+    return hit || null;
+}
+
+async function recoverMissingBody(msg, opts = {}) {
+    const myToken = ++bodyFetchToken;
+
+    // 1. Database
+    try {
+        const row = await findBodyInDatabase(msg);
+        if (myToken !== bodyFetchToken) return;
+        if (row) {
+            msg.body = row.body;
+            if (!msg._serverId && row.id) msg._serverId = row.id;
+            if (row._goneFromBbs) { msg._stale = true; msg._goneFromBbs = true; }
+            persistInboxes();
+            showBodyIfCurrent(msg, msg.body);
+            if (selectedMsg === msg) loadForwardEventsForPreview(msg);
+            return;
+        }
+    } catch (e) {
+        console.warn('[recoverMissingBody] database lookup failed:', e);
+    }
+
+    // 2. BBS, checked against the header
+    if (msg._goneFromBbs || msg.number == null || opts.skipBbs) {
+        showBodyIfCurrent(msg, NO_TEXT_SAVED_NOTE);
+        return;
+    }
+    if (fetchInProgress) {
+        showBodyIfCurrent(msg, '(Get Mail in progress; open this message again when the fetch finishes.)');
+        return;
+    }
+    showBodyIfCurrent(msg, 'Not in the database — asking the BBS…');
+    const d = await safeFetchJson(`${CONFIG.apiUrl}?action=read&msg=${msg.number}`);
+    if (myToken !== bodyFetchToken) return;
+    const hdr = d && d.success ? parseBpqReadHeader(d.body) : null;
+    if (hdr && sameMessage(msg, hdr)) {
+        msg.body = d.body;
+        msg._stale = false;               // it IS still on the BBS
+        persistInboxes();
+        saveBodiesToDb([msg], true);
+        renderList();
+        showBodyIfCurrent(msg, msg.body);
+        if (selectedMsg === msg) loadForwardEventsForPreview(msg);
+        return;
+    }
+    if (d && d.success) {
+        // Answer was "not found", or that number is now someone else's
+        // message: this one really is gone from the BBS.
+        if (hdr) console.log(`[recoverMissingBody] #${msg.number} is now a different message on the BBS ` +
+                             `(${hdr.from} "${hdr.subject}") — not using it`);
+        msg._stale = true;
+        persistInboxes();
+        renderList();
+        showBodyIfCurrent(msg, NO_TEXT_SAVED_NOTE);
+    } else {
+        showBodyIfCurrent(msg, 'Could not reach the BBS to fetch this message: ' +
+                               ((d && d.error) || 'unknown error') + '. Try again later.');
+    }
+}
+
+const NO_TEXT_SAVED_NOTE =
+    '(This message is no longer on the BBS, and its text was never saved to the database — ' +
+    'it was listed, but not opened or downloaded before BPQ removed it. ' +
+    'Only the listing details above remain.)';
 
 async function lazyLoadBody(msg) {
     // Don't race against an in-progress getMail — both would talk to BPQ
@@ -5114,6 +5697,15 @@ async function lazyLoadBody(msg) {
     const d = await safeFetchJson(`${CONFIG.apiUrl}?action=read&msg=${msg.number}`);
     if (myToken !== bodyFetchToken) return;   // stale; user clicked elsewhere
     if (d.success) {
+        const hdr = parseBpqReadHeader(d.body);
+        if (!hdr || !sameMessage(msg, hdr)) {
+            // Not found, or BPQ reused the number: don't store a wrong body.
+            msg._stale = true;
+            persistInboxes();
+            renderList();
+            if (selectedMsg && selectedMsg.number === msg.number) recoverMissingBody(msg, { skipBbs: true });
+            return;
+        }
         msg.body = d.body || '';
         persistInboxes();
         saveBodiesToDb([msg], true);   // fire-and-forget: keep the body server-side too
@@ -5199,7 +5791,7 @@ function renderForwardEventsPanel(panel, bid, events) {
     }
 
     let html = `<div style="font-weight:600; margin-bottom:6px;">
-        Forwarded by YOURCALL to ${Object.keys(byDest).length} BBS${Object.keys(byDest).length === 1 ? '' : 'es'}
+        Forwarded by ${escapeHtml(window.STATION_CALL || 'this BBS')} to ${Object.keys(byDest).length} BBS${Object.keys(byDest).length === 1 ? '' : 'es'}
         <span style="color:var(--text-muted); font-weight:400; font-family:var(--font-mono); margin-left:6px;">
             BID ${escapeHtml(bid)}
         </span>
@@ -5268,8 +5860,7 @@ function actForward() {
     const addr = prompt('Forward to (e.g. N4VAD@N4VAD.GA.USA.NOAM):');
     if (!addr) return;
     setStatus('fetching', `Forwarding #${selectedMsg.number} to ${addr}…`);
-    fetch(`${CONFIG.apiUrl}?action=forward&msg=${selectedMsg.number}&to=${encodeURIComponent(addr)}`)
-        .then(r => r.json())
+    bbsPost('forward', { msg: selectedMsg.number, to: addr })
         .then(d => {
             if (d.success) {
                 showToast(`Forwarded to ${addr}`, 'success');
@@ -5292,13 +5883,7 @@ function actMarkUnread() {
     persistInboxes();
     renderSidebarBadges();
     renderList();
-    if (settings.markReadMode === 'server') {
-        fetch(`${CONFIG.apiUrl}?action=mark&msg=${selectedMsg.number}&flag=N`)
-            .then(r => r.json())
-            .then(d => {
-                if (!d.success) console.warn('Mark-unread on BBS failed:', d.error);
-            });
-    }
+    // Local only: BPQ can't clear a read flag (see selectMsg()).
     showToast('Marked unread', 'info');
 }
 
@@ -5389,15 +5974,14 @@ function actKill() {
         : Promise.resolve();
     console.log('[actKill] sending kill request for #', killedNumber, 'type:', killedType);
     keepPrep
-        .then(() => fetch(`${CONFIG.apiUrl}?action=kill&msg=${killedNumber}`))
-        .then(r => r.json())
+        .then(() => bbsPost('kill', { msg: killedNumber }))
         .then(d => {
             console.log('[actKill] BBS kill response:', d);
             if (d.success) {
                 // Track the kill so a subsequent Get Mail can't return
                 // the message to us if BPQ's deletion hasn't fully
                 // propagated yet
-                markKilled(killedNumber);
+                markKilled(killedNumber, killedMsg);
                 // Also soft-delete from the DB archive — see bulkKill's
                 // comment: without this, a reload or another browser
                 // would pull it right back in via loadInboxesFromDatabase().
@@ -5597,6 +6181,271 @@ function openNewFolderFromPreview() {
     document.getElementById('folderModalDelete').style.display = 'none';
     document.getElementById('folderModal').classList.remove('hidden');
     setTimeout(() => document.getElementById('folderModalInput').focus(), 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Message reader pop-up + resizable columns (2026-10-12)
+// ═══════════════════════════════════════════════════════════════
+//
+// Pop-up mode moves the one #previewContent block into #readerSlot, so
+// renderPreview(), lazyLoadBody(), the forwarding panel and every
+// act*() / Move-menu function keep working on the same element IDs.
+// Layout prefs (column widths, pop-up size, text size) live in
+// localStorage key bbs_v2_layout: per browser, convenience only.
+
+const READER_FONT_MIN = 10, READER_FONT_MAX = 22, READER_FONT_DEFAULT = 13;
+let layoutPrefs = {};
+let readerBackdropDown = false;
+
+function loadLayoutPrefs() {
+    try {
+        const raw = localStorage.getItem(CONFIG.storageKeys.layout);
+        layoutPrefs = raw ? (JSON.parse(raw) || {}) : {};
+    } catch (e) { layoutPrefs = {}; }
+}
+function saveLayoutPrefs() {
+    try { localStorage.setItem(CONFIG.storageKeys.layout, JSON.stringify(layoutPrefs)); }
+    catch (e) { /* private window / storage full: layout just isn't remembered */ }
+}
+
+function isReaderPopup() {
+    return settings.readerMode !== 'pane';
+}
+function isReaderOpen() {
+    return !document.getElementById('readerModal').classList.contains('hidden');
+}
+
+// Put #previewContent where the current mode wants it and show/hide the
+// reading-pane column.
+function applyReaderMode() {
+    const shell   = document.getElementById('appShell');
+    const content = document.getElementById('previewContent');
+    if (isReaderPopup()) {
+        shell.classList.add('reader-popup');
+        document.getElementById('readerSlot').appendChild(content);
+    } else {
+        closeReader();
+        shell.classList.remove('reader-popup');
+        document.getElementById('previewPane').appendChild(content);
+        if (selectedMsg) renderPreview(selectedMsg);
+        else {
+            document.getElementById('previewEmpty').style.display = 'flex';
+            content.style.display = 'none';
+        }
+    }
+    clampColumnWidths();
+}
+
+function setReaderMode(mode, opts = {}) {
+    settings.readerMode = mode === 'pane' ? 'pane' : 'popup';
+    persistSettings();
+    applyReaderMode();
+    const sel = document.getElementById('settingReaderMode');
+    if (sel) sel.value = settings.readerMode;
+    if (!opts.silent) {
+        showToast(settings.readerMode === 'pane'
+            ? 'Reading pane on — ⧉ Pop out (or Preferences) switches back'
+            : 'Messages now open in a pop-up', 'info');
+    }
+}
+
+function popOutReader() {
+    setReaderMode('popup', { silent: true });
+    if (selectedMsg) {
+        renderPreview(selectedMsg);
+        openReader();
+    }
+}
+
+function openReader() {
+    const modal = document.getElementById('readerModal');
+    const box   = modal.querySelector('.reader-box');
+    if (layoutPrefs.readerW) box.style.width  = layoutPrefs.readerW;
+    if (layoutPrefs.readerH) box.style.height = layoutPrefs.readerH;
+    modal.classList.toggle('maximized', !!layoutPrefs.readerMax);
+    modal.classList.remove('hidden');
+    updateReaderTitle();
+    const body = document.getElementById('previewBody');
+    if (body) body.scrollTop = 0;
+}
+
+function closeReader() {
+    const modal = document.getElementById('readerModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    rememberReaderSize();
+    closePreviewMoveMenu();
+    modal.classList.add('hidden');
+}
+
+function rememberReaderSize() {
+    const modal = document.getElementById('readerModal');
+    if (modal.classList.contains('maximized') || modal.classList.contains('hidden')) return;
+    const box = modal.querySelector('.reader-box');
+    // CSS resize writes inline width/height; only keep a size the user set.
+    if (box.style.width || box.style.height) {
+        layoutPrefs.readerW = box.style.width  || layoutPrefs.readerW;
+        layoutPrefs.readerH = box.style.height || layoutPrefs.readerH;
+        saveLayoutPrefs();
+    }
+}
+
+function toggleReaderMaximize() {
+    rememberReaderSize();
+    layoutPrefs.readerMax = !layoutPrefs.readerMax;
+    saveLayoutPrefs();
+    document.getElementById('readerModal').classList.toggle('maximized', layoutPrefs.readerMax);
+}
+
+function updateReaderTitle() {
+    const t = document.getElementById('readerTitle');
+    if (!t || !selectedMsg) return;
+    const list = visibleMessages();
+    const i = list.findIndex(m => m.number === selectedMsg.number);
+    const folderName = (document.getElementById('listTitle') || {}).textContent || '';
+    t.textContent = `#${selectedMsg.number}` +
+        (folderName ? ` · ${folderName}` : '') +
+        (i !== -1 ? ` · ${i + 1} of ${list.length}` : '');
+    const prev = document.getElementById('readerPrevBtn');
+    const next = document.getElementById('readerNextBtn');
+    if (prev) prev.disabled = i <= 0;
+    if (next) next.disabled = i === -1 || i >= list.length - 1;
+}
+
+function readerStep(delta) {
+    if (!selectedMsg) return;
+    const list = visibleMessages();
+    const i = list.findIndex(m => m.number === selectedMsg.number);
+    const target = list[i + delta];
+    if (i === -1 || !target) return;
+    closePreviewMoveMenu();
+    selectMsg(target.number);
+}
+
+function changeReaderFont(delta) {
+    const cur = layoutPrefs.font || READER_FONT_DEFAULT;
+    layoutPrefs.font = Math.min(READER_FONT_MAX, Math.max(READER_FONT_MIN, cur + delta));
+    saveLayoutPrefs();
+    applyReaderFont();
+}
+function applyReaderFont() {
+    document.documentElement.style.setProperty('--reader-font', (layoutPrefs.font || READER_FONT_DEFAULT) + 'px');
+}
+
+// ─── Column splitters ──────────────────────────────────────────
+const SIDEBAR_MIN = 160, SIDEBAR_MAX = 480, LIST_MIN = 260, PREVIEW_MIN = 320;
+
+function applyColumnWidths() {
+    const shell = document.getElementById('appShell');
+    if (layoutPrefs.sbW) shell.style.setProperty('--sb-w', layoutPrefs.sbW + 'px');
+    else shell.style.removeProperty('--sb-w');
+    if (layoutPrefs.listW) shell.style.setProperty('--list-w', layoutPrefs.listW + 'px');
+    else shell.style.removeProperty('--list-w');
+}
+
+// Keep saved widths inside the window (e.g. after it is made smaller)
+// so the reading pane never gets pushed off-screen.
+function clampColumnWidths() {
+    const shell = document.getElementById('appShell');
+    const total = shell.getBoundingClientRect().width;
+    if (!total) return;
+    if (layoutPrefs.sbW) {
+        layoutPrefs.sbW = Math.min(Math.max(layoutPrefs.sbW, SIDEBAR_MIN),
+                                   Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, total - LIST_MIN - 12)));
+    }
+    if (layoutPrefs.listW) {
+        const room = total - (layoutPrefs.sbW || 240) - PREVIEW_MIN - 12;
+        layoutPrefs.listW = Math.max(LIST_MIN, Math.min(layoutPrefs.listW, room));
+    }
+    applyColumnWidths();
+}
+
+function initSplitters() {
+    const shell = document.getElementById('appShell');
+    const setup = (id, which) => {
+        const bar = document.getElementById(id);
+        if (!bar) return;
+        bar.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            const startX = e.clientX;
+            const startW = document.getElementById(which === 'sb' ? 'sidebar' : 'messageList')
+                                   .getBoundingClientRect().width;
+            const total  = shell.getBoundingClientRect().width;
+            bar.classList.add('dragging');
+            document.body.classList.add('resizing-panes');
+            try { bar.setPointerCapture(e.pointerId); } catch (_) {}
+            const move = (ev) => {
+                let w = startW + (ev.clientX - startX);
+                if (which === 'sb') {
+                    const listRoom = isReaderPopup() ? LIST_MIN
+                        : (layoutPrefs.listW || LIST_MIN) + PREVIEW_MIN;
+                    w = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, total - listRoom - 12, w));
+                    layoutPrefs.sbW = Math.round(w);
+                } else {
+                    const sb = document.getElementById('sidebar').getBoundingClientRect().width;
+                    w = Math.max(LIST_MIN, Math.min(total - sb - PREVIEW_MIN - 12, w));
+                    layoutPrefs.listW = Math.round(w);
+                }
+                applyColumnWidths();
+            };
+            const up = () => {
+                bar.classList.remove('dragging');
+                document.body.classList.remove('resizing-panes');
+                bar.removeEventListener('pointermove', move);
+                bar.removeEventListener('pointerup', up);
+                bar.removeEventListener('pointercancel', up);
+                saveLayoutPrefs();
+            };
+            bar.addEventListener('pointermove', move);
+            bar.addEventListener('pointerup', up);
+            bar.addEventListener('pointercancel', up);
+        });
+        bar.addEventListener('dblclick', () => {
+            if (which === 'sb') delete layoutPrefs.sbW; else delete layoutPrefs.listW;
+            saveLayoutPrefs();
+            applyColumnWidths();
+        });
+    };
+    setup('splitSidebar', 'sb');
+    setup('splitList', 'list');
+    let t = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(t);
+        t = setTimeout(() => { clampColumnWidths(); }, 150);
+    });
+}
+
+function initReader() {
+    loadLayoutPrefs();
+    applyReaderFont();
+    applyColumnWidths();
+    initSplitters();
+    applyReaderMode();
+
+    const modal = document.getElementById('readerModal');
+    // Close on a click on the dark backdrop, but only when the press also
+    // started there: finishing a corner-resize drag outside the box must
+    // not close it.
+    modal.addEventListener('mousedown', (e) => { readerBackdropDown = (e.target === modal); });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal && readerBackdropDown) closeReader();
+        readerBackdropDown = false;
+    });
+    modal.querySelector('.reader-box').addEventListener('mouseup', rememberReaderSize);
+
+    document.addEventListener('keydown', (e) => {
+        if (!isReaderOpen()) return;
+        // Leave keys alone while Compose / Check-In / Properties etc. are
+        // open on top, or while typing anywhere.
+        const otherOpen = [...document.querySelectorAll('.modal-backdrop')]
+            .some(m => m.id !== 'readerModal' && !m.classList.contains('hidden'));
+        if (otherOpen) return;
+        const tag = (e.target && e.target.tagName) || '';
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (e.target && e.target.isContentEditable)) return;
+        if (e.key === 'Escape') { e.preventDefault(); closeReader(); }
+        else if (e.key === 'ArrowLeft'  && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); readerStep(-1); }
+        else if (e.key === 'ArrowRight' && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); readerStep(1); }
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -5918,6 +6767,14 @@ window.closePreviewMoveMenu = closePreviewMoveMenu;
 window.movePreviewMessageToFolder = movePreviewMessageToFolder;
 window.unfilePreviewMessage = unfilePreviewMessage;
 window.openNewFolderFromPreview = openNewFolderFromPreview;
+// Reader pop-up + resizable columns (2026-10-12)
+window.openReader = openReader;
+window.closeReader = closeReader;
+window.readerStep = readerStep;
+window.changeReaderFont = changeReaderFont;
+window.toggleReaderMaximize = toggleReaderMaximize;
+window.setReaderMode = setReaderMode;
+window.popOutReader = popOutReader;
 </script>
 
 </body>

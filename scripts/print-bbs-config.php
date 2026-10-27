@@ -26,10 +26,18 @@ if (!file_exists($configFile)) {
 
 $CONFIG = require $configFile;
 $bbs    = $CONFIG['bbs'] ?? [];
+$vara   = $CONFIG['vara'] ?? [];
 
+// 2026-10-25: also used by bpq-vara-daemon.py — node call, LinBPQ folder
+// (to find the VARA port in bpq32.cfg) and the optional 'vara' overrides.
 echo json_encode([
-    'host' => $bbs['host'] ?? 'localhost',
-    'port' => $bbs['port'] ?? 8010,
-    'user' => $bbs['user'] ?? '',
-    'pass' => $bbs['pass'] ?? '',
+    'host'      => $bbs['host'] ?? 'localhost',
+    'port'      => $bbs['port'] ?? 8010,
+    'user'      => $bbs['user'] ?? '',
+    'pass'      => $bbs['pass'] ?? '',
+    'node'      => $CONFIG['station']['node'] ?? '',
+    'linbpq'    => $CONFIG['paths']['linbpq'] ?? '/home/linbpq',
+    'vara_port' => (int)($vara['bpq_port'] ?? 0),
+    'vara_user' => $vara['user'] ?? '',
+    'vara_pass' => $vara['pass'] ?? '',
 ]);

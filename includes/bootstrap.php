@@ -73,7 +73,7 @@ elseif (file_exists($oldConfigFile)) {
                 'burst_limit'         => 10,
             ],
             'cors' => [
-                'allow_all'       => true,
+                'allow_all'       => false,
                 'allowed_origins' => [],
             ],
             'ui' => [
@@ -108,7 +108,7 @@ if ($CONFIG === null) {
         'logs'  => ['vara_file' => ''],
         'logging' => ['enabled' => false],
         'rate_limit' => ['enabled' => false],
-        'cors' => ['allow_all' => true],
+        'cors' => ['allow_all' => false],
     ];
 }
 
@@ -158,16 +158,26 @@ header('X-Frame-Options: SAMEORIGIN');
 // CORS
 // =========================================================================
 
+// 2026-10-20: default is now same-origin only (was "*"). The dashboard's
+// pages don't need CORS; "*" let any web site call these endpoints from
+// its visitors' browsers. config.php 'cors' => ['allowed_origins' => [...]]
+// names sites that may; 'allow_all' => true restores the old behaviour.
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($CONFIG['cors']['allow_all'] ?? true) {
+$corsOk = false;
+if (($CONFIG['cors']['allow_all'] ?? false) === true) {
     header('Access-Control-Allow-Origin: *');
-} elseif (!empty($origin) && in_array($origin, $CONFIG['cors']['allowed_origins'] ?? [])) {
+    $corsOk = true;
+} elseif (!empty($origin) && in_array($origin, (array)($CONFIG['cors']['allowed_origins'] ?? []), true)) {
     header('Access-Control-Allow-Origin: ' . $origin);
+    header('Vary: Origin');
+    $corsOk = true;
 }
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+if ($corsOk) {
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type');
+}
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
     exit;
 }

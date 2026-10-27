@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>System Logs — YOURCALL BPQ</title>
+    <title>System Logs - BPQ Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Preconnect for faster CDN loading -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -394,7 +394,7 @@
 <body class="min-h-screen" data-nav-page="system">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
     <!-- Modern Navigation with gradient -->
     
@@ -406,7 +406,7 @@
                     <div class="text-center flex-1">
                         <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                             <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">System Logs</h1>
-                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.13</span>
+                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.14</span>
                         </div>
                         <p class="text-gray-600 text-sm sm:text-lg">Real-time event monitoring</p>
                         <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -475,8 +475,8 @@
                     <div id="errorCount" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
                     <div class="text-xs sm:text-sm text-gray-600 space-y-1">
                         <div class="grid grid-cols-2 gap-1 sm:gap-2 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-red-200">
-                            <div class="flex flex-col">
-                                <span class="text-xs text-gray-500">RF Fail:</span>
+                            <div class="flex flex-col" title="BBS log lines reading &quot;Error - Port in use&quot; (radio port already attached to another session). This is one kind of RF failure only &mdash; the full count of failed RF sessions (timeouts, no data, channel busy, port in use, incoming failed) is on the RF Connections page.">
+                                <span class="text-xs text-gray-500">Port in Use:</span>
                                 <span id="rfFailures" class="text-xs sm:text-sm font-semibold text-orange-600">0</span>
                             </div>
                             <div class="flex flex-col">
@@ -1023,7 +1023,7 @@
         // TCP/NODESRTT/INTERNET-STATIONS ONLY. The raw log viewer below
         // (allLogs, displayLogs(), applyFilters(), searchForError()) keeps
         // reading log_YYMMDD_BBS.txt directly, unchanged — see
-        // RF-MESSAGES-MEDIUM-MIGRATION.md-style docs for why (raw line
+        // CHANGELOG (System Logs DB migration) for why (raw line
         // storage/search was deliberately kept out of scope). MHeard and
         // RTKnown have their own separate API-first loaders further down,
         // since they're independent tabs with their own refresh buttons.
@@ -3041,7 +3041,7 @@
             doc.setTextColor(150);
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
-            doc.text(`BPQ Dashboard v1.5.13 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            doc.text(`BPQ Dashboard v1.5.14 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
             
             // Generate filename
             const dateStr = new Date().toISOString().slice(0, 10);
@@ -4146,6 +4146,5 @@
     <script>
     (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
     </script>
-<script src="shared/settings-modal.js"></script>
 </body>
 </html>

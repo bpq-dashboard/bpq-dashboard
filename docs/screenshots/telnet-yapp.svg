@@ -4,7 +4,7 @@
 
   <!-- Page title -->
   <text x="20" y="35" font-family="Helvetica" font-size="22" fill="#1f2937" font-weight="700">Telnet Client</text>
-  <text x="170" y="35" font-family="Helvetica" font-size="12" fill="#7c3aed" font-weight="600">v1.5.13</text>
+  <text x="170" y="35" font-family="Helvetica" font-size="12" fill="#7c3aed" font-weight="600">v1.5.14</text>
 
   <!-- Toolbar -->
   <g transform="translate(20, 55)">

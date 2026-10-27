@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VARA HF Terminal — YOURCALL BPQ</title>
+<title>VARA HF Terminal - BPQ Dashboard</title>
 <style>
 :root {
     --bg:#080a0d;--surface:#0f1318;--surface2:#161b22;
@@ -131,14 +131,14 @@ html,body{height:100%;overflow:hidden}
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Sits ABOVE the page's own #topbar, which preserves the per-page
      status badges (IDLE/CONNECTED, BW, SNR, frequency) and tool buttons. -->
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 <div id="loginOverlay">
   <div class="login-box">
     <div class="login-logo">
       <span class="icon">📡</span>
-      <h1>VARA HF Terminal <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.13</span></h1>
-      <p>YOURCALL-4 · Authorized Access Only</p>
+      <h1>VARA HF Terminal <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.14</span></h1>
+      <p><span id="stationNode">This station</span> · Authorized Access Only</p>
     </div>
     <div class="lf">
       <label>Sysop Password</label>
@@ -151,12 +151,12 @@ html,body{height:100%;overflow:hidden}
     </div>
     <div id="reqPanel">
       <hr class="req-sep">
-      <p class="req-note">Fill in your details and an email will be sent to the sysop at <strong>YOUR_EMAIL@example.com</strong>.</p>
+      <p class="req-note">Fill in your details and an e-mail will be sent to the sysop.</p>
       <div class="lf"><label>Your Callsign</label><input type="text" id="reqCall" placeholder="K1ABC" oninput="this.value=this.value.toUpperCase()"></div>
       <div class="lf"><label>Your Name</label><input type="text" id="reqName" placeholder="First Last"></div>
       <div class="lf"><label>Message (optional)</label><input type="text" id="reqMsg" placeholder="Reason for access..."></div>
       <button class="req-btn" onclick="sendReq()">📧 Send Access Request</button>
-      <div class="req-ok" id="reqOk">✓ Request sent to YOUR_EMAIL@example.com</div>
+      <div class="req-ok" id="reqOk">✓ Request sent to the sysop</div>
     </div>
   </div>
 </div>
@@ -216,7 +216,7 @@ html,body{height:100%;overflow:hidden}
       <div class="idle-text">
         Select a frequency, enter a remote callsign,<br>
         then click <strong>Connect</strong>.<br>
-        <span style="font-size:10px;margin-top:4px;display:block">BPQ Port 3 · VARA HF · Auto-adapts rate to conditions</span>
+        <span style="font-size:10px;margin-top:4px;display:block">VARA HF · Auto-adapts rate to conditions</span>
       </div>
     </div>
     <div id="terminal"></div>
@@ -279,9 +279,19 @@ async function sendReq(){
     const name=document.getElementById('reqName').value.trim();
     const msg=document.getElementById('reqMsg').value.trim();
     if(!cs){alert('Callsign required');return;}
-    await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'request',callsign:cs,name,message:msg})});
-    document.getElementById('reqOk').style.display='block';
+    const ok=document.getElementById('reqOk');
+    // 2026-10-27: the server e-mails config.php station.email; say if it couldn't
+    try{
+        const r=await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'request',callsign:cs,name,message:msg})});
+        const d=await r.json();
+        ok.textContent=d.sent?'✓ Request sent to the sysop':'✗ Could not send the e-mail from this server — please contact the sysop directly.';
+    }catch(e){ok.textContent='✗ Could not reach the server — please contact the sysop directly.';}
+    ok.style.display='block';
 }
+// Station node for the login box (2026-10-27; was a placeholder)
+fetch('station-info.php',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{
+    const v=d&&(d.node||d.callsign); if(v)document.getElementById('stationNode').textContent=v;
+}).catch(()=>{});
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
 // FREQUENCY

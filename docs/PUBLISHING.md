@@ -71,15 +71,26 @@ commit. Start again with a repository that has no history:
    sudo python3 tools/prepublish-check.py --secrets-from /var/www/bpq-dashboard
    git init -b main
    git add -A
-   git ls-files | grep -E '^private/|SESSION-JOURNAL|(^|/)(db-)?config\.php$|\.bak' \
+   git ls-files | grep -E '^private/|^pktnet-forms/|SESSION-JOURNAL|^(db-|bbs-|nws-)?config\.php$|\.bak' \
        && echo "STOP: private file staged" || echo "staging OK"
-   git commit -m "BPQ Dashboard v1.5.13"
-   git tag -a v1.5.13 -m "BPQ Dashboard v1.5.13"
+   git commit -m "BPQ Dashboard v1.5.14"
+   git tag -a v1.5.14 -m "BPQ Dashboard v1.5.14"
    git remote add origin https://github.com/OWNER/REPO.git
    git push -u origin main
-   git push origin v1.5.13
+   git push origin v1.5.14
+   ```
+
+   When `git push` asks for a password, give it a GitHub personal access
+   token (Contents: read and write), not your account password. If
+   pasting into the hidden prompt is awkward (PuTTY), put the token in a
+   file you can see, push with it, then delete the file:
+
+   ```bash
+   nano ~/.gh-token && chmod 600 ~/.gh-token
+   git -c credential.helper= -c credential.helper='!f() { echo username=OWNER; printf "password=%s\n" "$(tr -d " \r\n" < "$HOME/.gh-token")"; }; f' push -u origin main v1.5.14
+   rm -f ~/.gh-token
    ```
 
 3. Check that the download link in the README works:
-   `https://github.com/OWNER/REPO/archive/refs/tags/v1.5.13.zip`
-   should unzip to a folder named `REPO-1.5.13`.
+   `https://github.com/OWNER/REPO/archive/refs/tags/v1.5.14.zip`
+   should unzip to a folder named `REPO-1.5.14`.

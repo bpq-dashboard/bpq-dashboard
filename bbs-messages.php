@@ -12,6 +12,11 @@ ini_set('log_errors', 1);
 
 // Load configuration and security via bootstrap
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/web-login.php';
+// Reads your mail and acts on the BBS as the sysop: admin login only (2026-10-04)
+// (CLI is exempt inside bpq_require_web_login(); scripts/fetch-message-bodies.php
+// includes this file with BPQ_MESSAGES_LIB defined to reuse the telnet helpers.)
+bpq_require_web_login('The Email Client');
 
 // Get BBS config from loaded $CONFIG (bootstrap handles both config formats)
 $config = [
@@ -71,7 +76,7 @@ function verifyPasswordHash($clientHash) {
 }
 
 // Handle authentication requests (before other actions)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (!defined('BPQ_MESSAGES_LIB') && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $authAction = $input['authAction'] ?? null;
     
@@ -133,6 +138,47 @@ $config['log_file'] = $config['log_file'] ?? __DIR__ . '/logs/bbs-messages.log';
 // ===========================
 // BBS-SPECIFIC HELPER FUNCTIONS
 // ===========================
+
+// ===========================
+// ONE BBS SESSION AT A TIME (2026-10-12)
+// ===========================
+// BPQ's telnet port copes badly with two logins at once or back to back
+// ("No password prompt", seen 10-06 and 10-12). The page's requests and
+// scripts/fetch-message-bodies.php (systemd timer) take this lock around
+// every BBS session, and a new session waits until 2 s after the last one
+// ended. The lock file lives in cache/ (writable by www-data, also under
+// php-fpm's PrivateTmp, which /tmp would not be). Returns the handle,
+// null when no lock file can be opened (then we just go ahead, as before),
+// or false when another session held it for longer than $waitSeconds.
+define('BPQ_TELNET_LOCK_FILE', __DIR__ . '/cache/bpq-telnet.lock');
+define('BPQ_TELNET_GAP_SECONDS', 2.0);
+
+function bpqTelnetLock($waitSeconds = 40) {
+    $h = @fopen(BPQ_TELNET_LOCK_FILE, 'c+');
+    if (!$h) return null;
+    $start = microtime(true);
+    while (!flock($h, LOCK_EX | LOCK_NB)) {
+        if (microtime(true) - $start > $waitSeconds) { fclose($h); return false; }
+        usleep(250000);
+    }
+    rewind($h);
+    $last = (float)trim((string)stream_get_contents($h));
+    $since = microtime(true) - $last;
+    if ($last > 0 && $since >= 0 && $since < BPQ_TELNET_GAP_SECONDS) {
+        usleep((int)((BPQ_TELNET_GAP_SECONDS - $since) * 1e6));
+    }
+    return $h;
+}
+
+function bpqTelnetUnlock($h) {
+    if (!$h) return;
+    // Record when this session ended, for the next one's gap.
+    @ftruncate($h, 0); @rewind($h);
+    @fwrite($h, sprintf('%.3f', microtime(true)));
+    @fflush($h);
+    @flock($h, LOCK_UN);
+    @fclose($h);
+}
 
 function validateMsgNum($num) {
     return is_numeric($num) && intval($num) > 0;
@@ -208,9 +254,14 @@ function responseLooksTruncated($response) {
 }
 
 function sendCmd($socket, $cmd) {
+    global $config;
     fwrite($socket, $cmd . "\r\n");
     fflush($socket);
-    logMessage("  >> $cmd");
+    // 2026-10-03: never write the BBS password to the log. Every login
+    // used to log ">> <password>" in plain text, and logs/ is web-served.
+    $isPass = isset($config['bbs_pass']) && $config['bbs_pass'] !== ''
+        && $cmd === $config['bbs_pass'];
+    logMessage($isPass ? "  >> (password)" : "  >> $cmd");
     usleep(100000);
 }
 
@@ -628,7 +679,7 @@ function deleteMessage($msgNum) {
 // Used by the new email-client UI (bbs-messages.html v2). Provides:
 //   - fetchMessageListByType()  — LP / LT / LB selective listing
 //   - forwardMessage()          — F <n> <to>
-//   - markMessageStatus()       — Y/N/F status-flag changes
+//   (markMessageStatus() removed 2026-10-04: BPQ has no set-read-flag command)
 //
 // All these helpers reuse the existing connection pattern (open socket,
 // login, send cmd, parse, close). For efficiency, a future optimization
@@ -1004,68 +1055,6 @@ function forwardMessage($msgNum, $toAddr) {
  * @param string $flag    Y (read), N (new/unread), F (forwarded)
  * @return array
  */
-function markMessageStatus($msgNum, $flag) {
-    global $config;
-
-    $flag = strtoupper(trim($flag));
-    if (!in_array($flag, ['Y', 'N', 'F'])) {
-        return ['success' => false, 'error' => "Invalid status flag: $flag"];
-    }
-
-    logMessage("=== Set msg #$msgNum status to $flag ===");
-
-    $socket = @stream_socket_client(
-        "tcp://{$config['bbs_host']}:{$config['bbs_port']}",
-        $errno, $errstr, $config['timeout']
-    );
-    if (!$socket) {
-        return ['success' => false, 'error' => "Cannot connect: $errstr"];
-    }
-    stream_set_timeout($socket, $config['timeout']);
-
-    try {
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        sendCmd($socket, $config['bbs_user']);
-
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        sendCmd($socket, $config['bbs_pass']);
-
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        sendCmd($socket, $config['bbs_alias']);
-
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
-
-        // BPQ command: <FLAG> <msgnum>  (e.g. "Y 8050", "N 8050", "F 8050")
-        $cmd = "$flag $msgNum";
-        logMessage("Sending: $cmd");
-        sendCmd($socket, $cmd);
-
-        $response = waitFor($socket, '>', 10);
-        logMessage("Response: " . cleanLog($response));
-
-        sendCmd($socket, 'B');
-        fclose($socket);
-
-        $err = (stripos($response, 'not found') !== false ||
-                stripos($response, 'invalid') !== false ||
-                stripos($response, 'error') !== false);
-
-        if ($err) {
-            return ['success' => false, 'error' => "BBS rejected status change"];
-        }
-        return ['success' => true, 'message' => "Set msg #$msgNum to $flag"];
-
-    } catch (Exception $e) {
-        logMessage("ERROR markMessageStatus: " . $e->getMessage());
-        if (is_resource($socket)) { @fwrite($socket, "B\r\n"); @fclose($socket); }
-        return ['success' => false, 'error' => $e->getMessage()];
-    }
-}
-
 // ===========================
 // SEND MESSAGE
 // ===========================
@@ -1293,12 +1282,31 @@ function parseMessageList($raw) {
 // MAIN
 // ===========================
 
+// Included as a library (scripts/fetch-message-bodies.php): functions and
+// $config only, no request handling.
+if (defined('BPQ_MESSAGES_LIB')) return;
+
+// Every request below talks to the BBS: take the shared lock first, and
+// release it when PHP finishes (all paths end in echo/exit/apiError).
+$bpqLock = bpqTelnetLock(40);
+if ($bpqLock === false) {
+    logMessage("BBS busy: lock not free after 40 s");
+    apiError('The BBS is busy (background message download). Try again in a minute.', 503);
+}
+register_shutdown_function(function () use ($bpqLock) { bpqTelnetUnlock($bpqLock); });
+
 // Handle POST requests (for sending messages)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     $action = $input['action'] ?? '';
     
     logMessage("POST Request: action=$action");
+
+    // Everything that changes the BBS honours features.bbs_write
+    // (forced off in public mode by bootstrap.php). 2026-10-20.
+    if (in_array($action, ['send', 'delete', 'kill', 'forward'], true) && !isFeatureEnabled('bbs_write')) {
+        apiError('Sending, forwarding and killing messages is turned off on this dashboard (features.bbs_write in config.php)', 403);
+    }
     
     if ($action === 'send') {
         $to = trim($input['to'] ?? '');
@@ -1337,6 +1345,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(deleteMessage($msgNum), JSON_INVALID_UTF8_SUBSTITUTE);
         exit;
     }
+
+    // Kill / Forward (2026-10-20): POST only. They were GETs, which a link,
+    // an image tag or a prefetch could trigger for a logged-in sysop.
+    if ($action === 'kill') {
+        $msgNum = intval($input['msg'] ?? $input['msgNum'] ?? 0);
+        if (!validateMsgNum($msgNum)) apiError('Invalid message number');
+        logMessage("Killing message: $msgNum");
+        echo json_encode(deleteMessage($msgNum), JSON_INVALID_UTF8_SUBSTITUTE);   // K command
+        exit;
+    }
+
+    if ($action === 'forward') {
+        $msgNum = intval($input['msg'] ?? $input['msgNum'] ?? 0);
+        if (!validateMsgNum($msgNum)) apiError('Invalid message number');
+        $toAddr = trim((string)($input['to'] ?? ''));
+        if (!validateAddress($toAddr)) apiError('Invalid forwarding address');
+        logMessage("Forwarding message $msgNum to $toAddr");
+        echo json_encode(forwardMessage($msgNum, $toAddr), JSON_INVALID_UTF8_SUBSTITUTE);
+        exit;
+    }
     
     apiError('Unknown action');
 }
@@ -1355,9 +1383,13 @@ $allowedActions = [
     'list_personal', 'list_traffic', 'list_bulletins',
     // v2.1 — combined-session listing (preferred for v2 client)
     'list_all',
-    // v2 — message actions
-    'forward', 'mark', 'kill',
 ];
+
+// Kill / Forward moved to POST (2026-10-20); say so instead of "Invalid action".
+if ($action === 'kill' || $action === 'forward') {
+    header('Allow: POST');
+    apiError("'$action' must be sent as a POST request (update bbs-messages.html)", 405);
+}
 
 if (!in_array($action, $allowedActions)) {
     apiError('Invalid action');
@@ -1408,25 +1440,6 @@ switch ($action) {
     // ── v2.1 combined-session listing ────────────────────────────
     case 'list_all':
         echo json_encode(fetchAllLists($count), JSON_INVALID_UTF8_SUBSTITUTE);
-        break;
-
-    // ── v2 message actions ───────────────────────────────────────
-    case 'forward':
-        if (!validateMsgNum($msgNum)) apiError('Invalid message number');
-        $toAddr = $_GET['to'] ?? '';
-        if (!validateAddress($toAddr)) apiError('Invalid forwarding address');
-        echo json_encode(forwardMessage($msgNum, $toAddr), JSON_INVALID_UTF8_SUBSTITUTE);
-        break;
-
-    case 'mark':
-        if (!validateMsgNum($msgNum)) apiError('Invalid message number');
-        $flag = $_GET['flag'] ?? '';
-        echo json_encode(markMessageStatus($msgNum, $flag), JSON_INVALID_UTF8_SUBSTITUTE);
-        break;
-
-    case 'kill':
-        if (!validateMsgNum($msgNum)) apiError('Invalid message number');
-        echo json_encode(deleteMessage($msgNum), JSON_INVALID_UTF8_SUBSTITUTE);   // K command, same op
         break;
 
     case 'test':

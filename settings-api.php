@@ -18,6 +18,13 @@ require_once __DIR__ . '/includes/bootstrap.php';
 
 header('Content-Type: application/json');
 
+// Wrong-password throttle (2026-10-20): 5 wrong passwords from one address
+// within 15 minutes locks that address out for the rest of the 15 minutes.
+// Without it the BBS password could be guessed here at full speed.
+// (Defined before the dispatch below: top-level consts exist only once reached.)
+const SETTINGS_AUTH_MAX_FAILS = 5;
+const SETTINGS_AUTH_WINDOW    = 900;
+
 // ============================================================================
 // SETTINGS FILE
 // ============================================================================
@@ -308,7 +315,40 @@ function requireAuth($input) {
     jsonError('Authentication required', 401);
 }
 
+// Wrong-password throttle (2026-10-20): see SETTINGS_AUTH_* at the top.
+function settingsAuthFailFile(): string {
+    $dir = __DIR__ . '/cache/settings-auth';
+    if (!is_dir($dir)) @mkdir($dir, 0750, true);
+    return $dir . '/' . hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? 'cli')) . '.json';
+}
+
+function settingsAuthFailState(): array {
+    $f = settingsAuthFailFile();
+    $s = is_readable($f) ? json_decode((string)@file_get_contents($f), true) : null;
+    if (!is_array($s) || (time() - (int)($s['first'] ?? 0)) >= SETTINGS_AUTH_WINDOW) {
+        return ['count' => 0, 'first' => time()];
+    }
+    return ['count' => (int)($s['count'] ?? 0), 'first' => (int)$s['first']];
+}
+
 function verifyBbsPassword($password) {
+    $state = settingsAuthFailState();
+    if ($state['count'] >= SETTINGS_AUTH_MAX_FAILS) {
+        $wait = max(1, (int)ceil((SETTINGS_AUTH_WINDOW - (time() - $state['first'])) / 60));
+        header('Retry-After: ' . ($wait * 60));
+        jsonError("Too many wrong passwords. Try again in $wait minute" . ($wait === 1 ? '' : 's') . '.', 429);
+    }
+    $ok = verifyBbsPasswordValue((string)$password);
+    if ($ok) {
+        @unlink(settingsAuthFailFile());
+    } else {
+        $state['count']++;
+        @file_put_contents(settingsAuthFailFile(), json_encode($state), LOCK_EX);
+    }
+    return $ok;
+}
+
+function verifyBbsPasswordValue(string $password): bool {
     // Re-use existing BBS auth from bootstrap if available
     if (function_exists('verifyBbsAuth')) {
         return verifyBbsAuth($password);
@@ -324,7 +364,7 @@ function verifyBbsPassword($password) {
         $stored = $CONFIG['bbs']['pass'];
     }
 
-    return !empty($stored) && $password === $stored;
+    return !empty($stored) && hash_equals((string)$stored, $password);
 }
 
 /**

@@ -41,9 +41,9 @@ anymore.
 ## Deploy
 
 ```bash
-sudo cp vara-api.php rf-power-monitor.html rig-status.html /var/www/tprfn/
-sudo chown www-data:www-data /var/www/tprfn/vara-api.php \
-    /var/www/tprfn/rf-power-monitor.html /var/www/tprfn/rig-status.html
+sudo cp vara-api.php rf-power-monitor.html rig-status.html /var/www/bpq-dashboard/
+sudo chown www-data:www-data /var/www/bpq-dashboard/vara-api.php \
+    /var/www/bpq-dashboard/rf-power-monitor.html /var/www/bpq-dashboard/rig-status.html
 ```
 
 No schema/database changes, no new dependencies, no service restarts

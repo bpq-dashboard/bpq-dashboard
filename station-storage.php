@@ -16,6 +16,15 @@
  *   POST {action: "deleteLocation", callsign: "XX0XX"} - Delete one location
  *   POST {action: "clearLocations"}                     - Delete all locations
  *   POST {action: "importLocations", locations: {...}}  - Merge imported locations
+ *   GET  ?action=bbsinfo            - BBS station info shown on the APRS map (public)
+ *   POST {action: "saveBbsInfo", info: {...}}           - Save BBS station info
+ *
+ * BBS station info (2026-10-16): what the APRS map's home (BBS) marker shows —
+ * name, BBS callsign, location, sysop, ports/frequencies, services, hours,
+ * website, notes and an optional marker position. Everything in it is
+ * PUBLIC (the APRS map is a public page); the sysop chooses what to put in.
+ * Stored in data/stations/bbs-info.json. Saving needs the admin login, like
+ * every other POST here.
  */
 
 // Station storage is a data-only endpoint — does not require BBS credentials
@@ -30,6 +39,7 @@ header('Content-Type: application/json');
 $STORAGE_DIR = __DIR__ . '/data/stations/';
 $LOCATIONS_FILE = $STORAGE_DIR . 'locations.json';
 $PARTNERS_FILE = $STORAGE_DIR . 'partners.json';
+$BBS_INFO_FILE = $STORAGE_DIR . 'bbs-info.json';
 $MAX_STORAGE_SIZE = 2 * 1024 * 1024; // 2MB limit (locations are small)
 $MAX_LOCATIONS = 500;  // Sanity limit on station count
 
@@ -278,6 +288,129 @@ function savePartners($partners) {
 }
 
 // ===========================
+// BBS STATION INFO (APRS map home marker) — 2026-10-16
+// ===========================
+
+/**
+ * One line of plain text: control characters removed, spaces collapsed,
+ * cut to $max characters (UTF-8 safe).
+ */
+function bbsInfoLine($v, $max) {
+    if (!is_scalar($v)) return '';
+    $s = (string)$v;
+    if (!mb_check_encoding($s, 'UTF-8')) $s = mb_convert_encoding($s, 'UTF-8', 'ISO-8859-1');
+    $s = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $s);
+    $s = trim(preg_replace('/\s{2,}/u', ' ', $s));
+    return mb_substr($s, 0, $max, 'UTF-8');
+}
+
+/**
+ * Several lines of plain text: each line cleaned like bbsInfoLine(),
+ * empty lines dropped, at most $maxLines lines.
+ */
+function bbsInfoLines($v, $maxLines, $maxLen) {
+    if (!is_scalar($v)) return '';
+    $out = [];
+    foreach (preg_split('/\r\n|\r|\n/', (string)$v) as $line) {
+        $line = bbsInfoLine($line, $maxLen);
+        if ($line !== '') $out[] = $line;
+        if (count($out) >= $maxLines) break;
+    }
+    return implode("\n", $out);
+}
+
+/** Stored BBS info (empty object when nothing has been saved). */
+function getBbsInfo() {
+    global $BBS_INFO_FILE;
+    $d = readJsonFile($BBS_INFO_FILE, null);
+    return is_array($d) ? $d : new stdClass();
+}
+
+/** Validate and save the BBS info (full replace). */
+function saveBbsInfo($info) {
+    global $BBS_INFO_FILE;
+
+    if (!is_array($info)) {
+        apiError('Invalid BBS info');
+    }
+
+    $clean = [
+        'name'        => bbsInfoLine($info['name']     ?? '', 60),
+        'callsign'    => strtoupper(bbsInfoLine($info['callsign'] ?? '', 15)),
+        'location'    => bbsInfoLine($info['location'] ?? '', 100),
+        'sysop'       => bbsInfoLine($info['sysop']    ?? '', 60),
+        'frequencies' => bbsInfoLines($info['frequencies'] ?? '', 12, 100),
+        'services'    => bbsInfoLine($info['services'] ?? '', 150),
+        'hours'       => bbsInfoLine($info['hours']    ?? '', 60),
+        'website'     => bbsInfoLine($info['website']  ?? '', 200),
+        'notes'       => bbsInfoLines($info['notes']   ?? '', 15, 300),
+    ];
+
+    if ($clean['callsign'] !== '' && !preg_match('/^[A-Z0-9]{1,8}(-[A-Z0-9]{1,2})?$/', $clean['callsign'])) {
+        apiError('BBS callsign should look like CALL or CALL-SSID');
+    }
+    if (mb_strlen($clean['notes'], 'UTF-8') > 1000) {
+        apiError('Notes are too long (1000 characters max)');
+    }
+    if ($clean['website'] !== '') {
+        if (!preg_match('~^https?://[^\s"<>]+$~i', $clean['website'])
+            || !filter_var($clean['website'], FILTER_VALIDATE_URL)) {
+            apiError('Website must be a full http:// or https:// address');
+        }
+    }
+
+    // Optional marker position. Both empty = use the grid-square centre.
+    $lat = $info['lat'] ?? '';
+    $lon = $info['lon'] ?? '';
+    $hasLat = !($lat === '' || $lat === null);
+    $hasLon = !($lon === '' || $lon === null);
+    if ($hasLat || $hasLon) {
+        if (!$hasLat || !$hasLon || !is_numeric($lat) || !is_numeric($lon)) {
+            apiError('Marker position needs both latitude and longitude, as decimal degrees');
+        }
+        $lat = (float)$lat; $lon = (float)$lon;
+        if ($lat < -90 || $lat > 90 || $lon < -180 || $lon > 180 || ($lat == 0.0 && $lon == 0.0)) {
+            apiError('Marker position is out of range (latitude -90..90, longitude -180..180)');
+        }
+        $clean['lat'] = round($lat, 5);
+        $clean['lon'] = round($lon, 5);
+    }
+
+    // APRS-IS beacon (2026-10-16): sent by scripts/bpq-aprs-daemon.py as the
+    // config.php 'aprs' callsign. Off unless switched on here.
+    $clean['beacon_enabled']  = !empty($info['beacon_enabled']) && $info['beacon_enabled'] !== 'false';
+    $clean['beacon_type']     = (($info['beacon_type'] ?? '') === 'position') ? 'position' : 'object';
+    $clean['beacon_name']     = rtrim(bbsInfoLine($info['beacon_name'] ?? '', 20));
+    $clean['beacon_comment']  = bbsInfoLine($info['beacon_comment'] ?? '', 100);
+    $iv = (int)($info['beacon_interval'] ?? 30);
+    $clean['beacon_interval'] = ($iv >= 10 && $iv <= 120) ? $iv : 30;
+
+    if ($clean['beacon_name'] !== '' && !preg_match('~^[A-Za-z0-9 ./-]{1,9}$~', $clean['beacon_name'])) {
+        apiError('Beacon object name: 1–9 characters, letters, digits, space . - / only');
+    }
+    if (preg_match('/[^\x20-\x7E]|[|~]/', $clean['beacon_comment'])) {
+        apiError('Beacon comment: plain ASCII only (no accents or symbols, no | or ~)');
+    }
+    if (strlen($clean['beacon_comment']) > 43) {
+        apiError('Beacon comment is too long (43 characters max for APRS)');
+    }
+    if ($clean['beacon_enabled']) {
+        if (!isset($clean['lat'], $clean['lon'])) {
+            apiError('The APRS beacon needs a marker position: enter it or use Pick on map');
+        }
+        if ($clean['beacon_type'] === 'object' && $clean['beacon_name'] === '') {
+            apiError('The APRS beacon needs an object name (up to 9 characters)');
+        }
+    }
+
+    $clean['updated'] = time();
+
+    writeJsonFile($BBS_INFO_FILE, $clean);
+
+    return ['success' => true, 'info' => $clean];
+}
+
+// ===========================
 // REQUEST HANDLER
 // ===========================
 
@@ -305,6 +438,11 @@ if ($method === 'GET') {
             ]);
             break;
             
+        case 'bbsinfo':
+            header('Cache-Control: no-cache');
+            echo json_encode(['success' => true, 'info' => getBbsInfo()]);
+            break;
+
         case 'stats':
             $locs = (array)getLocations();
             $parts = getPartners();
@@ -331,6 +469,9 @@ if ($method === 'GET') {
 
 // Handle POST requests
 if ($method === 'POST') {
+    // Saving locations/partners: admin login (reads above stay public) (2026-10-04)
+    require_once __DIR__ . '/includes/web-login.php';
+    bpq_require_web_login('Saving station locations, partners or BBS info', true);
     $input = json_decode(file_get_contents('php://input'), true);
     
     if (!$input || !isset($input['action'])) {
@@ -358,6 +499,10 @@ if ($method === 'POST') {
             
         case 'importLocations':
             echo json_encode(importLocations($input['locations'] ?? []));
+            break;
+
+        case 'saveBbsInfo':
+            echo json_encode(saveBbsInfo($input['info'] ?? null), JSON_UNESCAPED_UNICODE);
             break;
             
         default:

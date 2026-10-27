@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>APRS Map — YOURCALL BPQ</title>
+    <title>APRS Map - BPQ Dashboard</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -44,14 +44,18 @@
         #app{display:flex;flex-direction:column;flex:1;min-height:0;}
 
         /* ── Toolbar ── */
-        #toolbar{height:38px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:6px;flex-shrink:0;}
+        /* Wraps onto a second row on narrow windows instead of pushing the
+           last items (counts, version badge) off-screen. (2026-10-16) */
+        #toolbar{min-height:38px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;padding:4px 10px;gap:6px;flex-shrink:0;}
+        .page-title{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--accent);white-space:nowrap;margin-right:2px;}
+        .ver-badge{padding:2px 8px;background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%);color:#fff;border-radius:9999px;font-size:10px;font-weight:700;line-height:1.4;}
         .tb-btn{padding:4px 10px;border-radius:var(--radius);border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;}
         .tb-btn:hover{border-color:var(--accent);color:var(--accent);}
         .tb-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
         .tb-sep{width:1px;height:20px;background:var(--border);margin:0 2px;}
         #stationCount{font-size:11px;color:var(--muted);font-family:var(--font-mono);}
         #lastUpdate{font-size:10px;color:var(--muted);margin-left:4px;}
-        #filterInput{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 8px;font-size:11px;outline:none;width:140px;}
+        #filterInput{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:3px 8px;font-size:11px;outline:none;width:120px;}
         #filterInput:focus{border-color:var(--accent);}
 
         /* ── Main layout ── */
@@ -225,6 +229,37 @@
         .bw-action-btn { padding:3px 10px; border-radius:var(--radius); border:1px solid var(--border); background:none; color:var(--muted); font-size:10px; cursor:pointer; }
         .bw-action-btn:hover { border-color:var(--accent); color:var(--accent); }
 
+        /* ── BBS station info (home marker) — 2026-10-16 ── */
+        .bbs-detail-call{color:#ff6b1a;}
+        .bbs-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin:-4px 0 6px;}
+        .bbs-lines{white-space:pre-line;}
+        .bbs-empty{color:var(--muted);font-style:italic;margin:4px 0;}
+        .bbs-edit-link{color:var(--accent);font-size:10px;cursor:pointer;background:none;border:none;padding:0;}
+        .bbs-edit-link:hover{text-decoration:underline;}
+        .bbs-popup-row{color:var(--muted);line-height:1.6;}
+        .bbs-popup-row span{color:var(--text);}
+        #bbsModal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:2000;}
+        #bbsModal.hidden{display:none;}
+        #bbsModalBox{background:var(--surface);border:1px solid var(--border);border-radius:10px;width:520px;max-width:95vw;box-shadow:0 16px 48px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:90vh;}
+        .bbs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;}
+        .bbs-grid .full{grid-column:1/-1;}
+        .bbs-hint{font-size:10px;color:var(--muted);line-height:1.5;margin-top:3px;}
+        .bbs-pos-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
+        .bbs-pos-row > div{flex:1;min-width:110px;}
+        .bbs-mini-btn{padding:6px 10px;border-radius:var(--radius);border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;cursor:pointer;white-space:nowrap;}
+        .bbs-mini-btn:hover{border-color:var(--accent);color:var(--accent);}
+        .bbs-saved{font-size:10px;color:var(--muted);margin-right:auto;align-self:center;}
+        #bbsError{display:none;color:var(--red);font-size:11px;line-height:1.5;margin-top:10px;}
+        #map.picking{cursor:crosshair;}
+        .bbs-beacon{border-top:1px solid var(--border);padding-top:12px;margin-top:2px;}
+        .bbs-check{display:flex;align-items:center;gap:8px;font-weight:700;font-size:12px;cursor:pointer;}
+        .bbs-check input{width:16px;height:16px;accent-color:var(--accent);}
+        #bcnFields{margin-top:6px;}
+        #bcnFields.off{opacity:.45;pointer-events:none;}
+        .bcn-preview{font-family:var(--font-mono);font-size:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;word-break:break-all;color:var(--text);}
+        .bcn-ok{color:var(--green);} .bcn-warn{color:var(--orange);}
+        @media(max-width:520px){ .bbs-grid{grid-template-columns:1fr;} }
+
         /* ── Toast ── */
         #toast{position:fixed;top:54px;right:14px;z-index:2000;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);}
         #toast.hidden{display:none;}
@@ -242,13 +277,15 @@
 <body data-nav-page="aprs">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 
 <div id="app">
 
     <!-- Toolbar -->
     <div id="toolbar">
+        <span class="page-title">📍 APRS Map <span class="ver-badge" title="BPQ Dashboard version">v1.5.14</span></span>
+        <div class="tb-sep"></div>
         <button class="tb-btn active" id="btnAll"     onclick="setFilter('all')">All</button>
         <button class="tb-btn"        id="btnMobile"  onclick="setFilter('mobile')">🚗 Mobile</button>
         <button class="tb-btn"        id="btnWx"      onclick="setFilter('wx')">🌡 WX</button>
@@ -259,7 +296,7 @@
         <button class="tb-btn active" id="btnTracks" onclick="toggleTracks()">🛤 Tracks</button>
         <button class="tb-btn" id="btnPhg" onclick="togglePhg()">⭕ PHG</button>
         <div class="tb-sep"></div>
-        <span style="font-size:11px;color:var(--muted);margin-right:2px">⏱ Last heard:</span>
+        <span style="font-size:11px;color:var(--muted);margin-right:2px" title="Show stations last heard within">⏱ Heard:</span>
         <select id="ageFilter" onchange="setAgeFilter(this.value)"
                 style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
                        color:var(--text);padding:2px 6px;font-size:11px;outline:none;cursor:pointer">
@@ -276,13 +313,13 @@
         <input id="filterInput" type="text" placeholder="🔍 Filter callsign…" oninput="applyFilter()">
         <div class="tb-sep"></div>
         <button class="tb-btn" onclick="openBrowser()">📋 Browse</button>
+        <button class="tb-btn" id="btnBbsInfo" onclick="showBbsOnMap()" title="Show and edit this BBS's station info">🏠 BBS Info</button>
         <button class="tb-btn" id="msgModalBtn" onclick="openMsgModal()" style="position:relative">
             ✉ Message <span id="msgBadge">0</span>
         </button>
         <div class="tb-sep"></div>
         <span id="stationCount">— stations</span>
         <span id="lastUpdate"></span>
-        <span style="margin-left:auto; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.13</span>
     </div>
 
     <!-- Main -->
@@ -345,11 +382,137 @@
     </div>
 </div>
 
+<!-- ── BBS Station Info editor (2026-10-16) ──────────────── -->
+<div id="bbsModal" class="hidden">
+    <div id="bbsModalBox">
+        <div class="mm-header">
+            <span class="mm-title">🏠 BBS Station Info</span>
+            <button onclick="closeBbsEdit()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">×</button>
+        </div>
+        <div class="mm-body">
+            <div class="bbs-hint" style="margin:0 0 12px">
+                Shown on the BBS marker for <strong>everyone</strong> who opens this map, so only enter what you want public.
+                Saving needs the admin login. Leave a field empty to hide it.
+            </div>
+            <div class="bbs-grid">
+                <div>
+                    <label class="mm-label" for="bbsName">Name</label>
+                    <input class="mm-input" id="bbsName" maxlength="60" style="font-family:var(--font-ui)" placeholder="YOURCALL BBS">
+                </div>
+                <div>
+                    <label class="mm-label" for="bbsCall">BBS callsign</label>
+                    <input class="mm-input" id="bbsCall" maxlength="11" style="text-transform:uppercase"
+                           autocomplete="off" autocapitalize="characters" placeholder="YOURCALL-4"
+                           oninput="this.value=this.value.toUpperCase()">
+                </div>
+                <div>
+                    <label class="mm-label" for="bbsLocation">Location</label>
+                    <input class="mm-input" id="bbsLocation" maxlength="100" style="font-family:var(--font-ui)" placeholder="Town, State">
+                </div>
+                <div>
+                    <label class="mm-label" for="bbsSysop">Sysop</label>
+                    <input class="mm-input" id="bbsSysop" maxlength="60" style="font-family:var(--font-ui)" placeholder="Name, callsign">
+                </div>
+                <div class="full">
+                    <label class="mm-label" for="bbsFreqs">Ports / frequencies</label>
+                    <textarea class="mm-input mm-textarea" id="bbsFreqs" rows="3" style="min-height:64px"
+                              placeholder="One per line, e.g.&#10;VARA HF 7.101 MHz USB (dial)&#10;1200 bd 145.010 MHz"></textarea>
+                </div>
+                <div class="full">
+                    <label class="mm-label" for="bbsServices">Services</label>
+                    <input class="mm-input" id="bbsServices" maxlength="150" style="font-family:var(--font-ui)" placeholder="BBS · Chat · NTS · Winlink RMS">
+                </div>
+                <div>
+                    <label class="mm-label" for="bbsHours">Hours</label>
+                    <input class="mm-input" id="bbsHours" maxlength="60" style="font-family:var(--font-ui)" placeholder="24/7">
+                </div>
+                <div>
+                    <label class="mm-label" for="bbsWebsite">Website</label>
+                    <input class="mm-input" id="bbsWebsite" maxlength="200" type="url" placeholder="https://…">
+                </div>
+                <div class="full">
+                    <label class="mm-label" for="bbsNotes">Notes</label>
+                    <textarea class="mm-input mm-textarea" id="bbsNotes" rows="3" style="min-height:64px" maxlength="1000"
+                              placeholder="How to connect, who may use it, net times…"></textarea>
+                </div>
+                <div class="full">
+                    <label class="mm-label">Marker position</label>
+                    <div class="bbs-pos-row">
+                        <div><input class="mm-input" id="bbsLat" inputmode="decimal" placeholder="Latitude" oninput="updateBeaconUi()"></div>
+                        <div><input class="mm-input" id="bbsLon" inputmode="decimal" placeholder="Longitude" oninput="updateBeaconUi()"></div>
+                        <button class="bbs-mini-btn" type="button" onclick="startPickPosition()">📍 Pick on map</button>
+                        <button class="bbs-mini-btn" type="button" onclick="clearBbsPosition()">↺ Grid centre</button>
+                    </div>
+                    <div class="bbs-hint" id="bbsPosHint">
+                        Empty = centre of your grid square (from config.php). A position you enter here is public.
+                    </div>
+                </div>
+                <!-- APRS-IS beacon (2026-10-16) -->
+                <div class="full bbs-beacon">
+                    <label class="bbs-check">
+                        <input type="checkbox" id="bcnEnabled" onchange="updateBeaconUi()">
+                        <span>📡 Beacon this BBS to APRS-IS (shows on aprs.fi)</span>
+                    </label>
+                    <div id="bcnFields">
+                        <div class="bbs-hint" style="margin:4px 0 10px">
+                            Sent by the dashboard's APRS service as <strong class="aprs-call">your station</strong>
+                            (config.php <code>aprs</code>), with the BBS icon at the marker position above.
+                        </div>
+                        <div class="bbs-grid">
+                            <div>
+                                <label class="mm-label" for="bcnType">Send as</label>
+                                <select class="mm-input" style="font-family:var(--font-ui)" id="bcnType" onchange="updateBeaconUi()">
+                                    <option value="object">Object (own name on the map)</option>
+                                    <option value="position">This station's position</option>
+                                </select>
+                            </div>
+                            <div id="bcnNameWrap">
+                                <label class="mm-label" for="bcnName">Object name</label>
+                                <input class="mm-input" id="bcnName" maxlength="9" placeholder="TPRFN BBS" oninput="updateBeaconUi()">
+                            </div>
+                            <div class="full">
+                                <label class="mm-label" for="bcnComment">Beacon comment
+                                    <span style="text-transform:none;font-weight:400">(<span id="bcnCount">0</span>/43)</span></label>
+                                <div class="bbs-pos-row">
+                                    <div><input class="mm-input" id="bcnComment" maxlength="43" style="font-family:var(--font-ui)"
+                                                placeholder="BBS 145.010 MHz, VARA W1AW-4" oninput="updateBeaconUi()"></div>
+                                    <button class="bbs-mini-btn" type="button" onclick="fillBeaconComment()">↧ From info</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mm-label" for="bcnInterval">Every</label>
+                                <select class="mm-input" style="font-family:var(--font-ui)" id="bcnInterval" onchange="updateBeaconUi()">
+                                    <option value="10">10 minutes</option>
+                                    <option value="15">15 minutes</option>
+                                    <option value="20">20 minutes</option>
+                                    <option value="30" selected>30 minutes</option>
+                                    <option value="60">60 minutes</option>
+                                </select>
+                            </div>
+                            <div class="full">
+                                <label class="mm-label">Packet preview</label>
+                                <div class="bcn-preview" id="bcnPreview">—</div>
+                                <div class="bbs-hint" id="bcnStatus"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="bbsError"></div>
+        </div>
+        <div class="mm-footer">
+            <span class="bbs-saved" id="bbsSaved"></span>
+            <button class="btn-secondary" onclick="closeBbsEdit()">Cancel</button>
+            <button class="btn-primary" id="bbsSaveBtn" onclick="saveBbsInfo()">💾 Save</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── APRS Messaging Modal ──────────────────────────────── -->
 <div id="msgModal" class="hidden">
     <div id="msgModalBox">
         <div class="mm-header">
-            <span class="mm-title">✉ APRS Messaging — YOURCALL-1</span>
+            <span class="mm-title">✉ APRS Messaging — <span class="aprs-call">your station</span></span>
             <button onclick="closeMsgModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">×</button>
         </div>
         <div class="mm-tabs">
@@ -372,13 +535,16 @@
                     <div class="mm-charcount"><span id="charCount">0</span>/67</div>
                 </div>
                 <div style="font-size:10px;color:var(--muted);line-height:1.6">
-                    Message sent via APRS-IS as <strong style="color:var(--accent)">YOURCALL-1</strong>.
+                    Message sent via APRS-IS as <strong class="aprs-call" style="color:var(--accent)">your station</strong>.
                     Max 67 characters per APRS spec.
+                    <div id="aprsSendNote" style="display:none;color:var(--red);margin-top:4px">
+                        Sending is off: set <code>aprs</code> callsign and passcode in config.php.
+                    </div>
                 </div>
             </div>
             <!-- Inbox tab -->
             <div id="tabInboxBody" style="display:none">
-                <div id="inboxList"><div class="inbox-empty">📭 No messages for YOURCALL-1</div></div>
+                <div id="inboxList"><div class="inbox-empty">📭 No messages yet</div></div>
             </div>
         </div>
         <div class="mm-footer">
@@ -397,16 +563,58 @@ const API     = 'bpq-aprs.php';
 // (config.php 'station'), never the exact coordinates. Filled in by
 // loadStationInfo() before initMap() runs. (2026-09-26)
 const CENTER  = [0, 0];
-const HOME    = { callsign: 'YOURCALL', grid: '' };
+const HOME    = { callsign: 'YOURCALL', node: '', grid: '' };
+// Position station-info.php gave (grid-square centre). CENTER moves to the
+// BBS info's own marker position when the sysop has set one. (2026-10-16)
+const STATION_POS = [0, 0];
+// BBS station info shown on the home marker (station-storage.php
+// ?action=bbsinfo, data/stations/bbs-info.json). Public. (2026-10-16)
+let BBS_INFO = {};
+const STORAGE_API = 'station-storage.php';
+// APRS-IS callsign-SSID the station sends as: config.php 'aprs' => 'callsign',
+// reported by bpq-aprs.php (2026-10-04). Empty until the first stations load.
+let APRS_CALL = '';
+let APRS_CAN_SEND = false;
+function applyAprsCall(call, canSend) {
+    APRS_CALL = (call || '').toUpperCase();
+    APRS_CAN_SEND = !!canSend;
+    document.querySelectorAll('.aprs-call').forEach(el => {
+        el.textContent = APRS_CALL || 'your station';
+    });
+    const note = document.getElementById('aprsSendNote');
+    if (note) note.style.display = APRS_CAN_SEND ? 'none' : '';
+    const btn = document.getElementById('sendMsgBtn');
+    if (btn && btn.textContent.indexOf('Sending') < 0) btn.disabled = !APRS_CAN_SEND;
+}
 async function loadStationInfo() {
     try {
         const r = await fetch('station-info.php', { cache: 'no-cache' });
         const d = r.ok ? await r.json() : null;
         if (!d) return;
-        if (d.map_lat != null && d.map_lon != null) { CENTER[0] = d.map_lat; CENTER[1] = d.map_lon; }
+        if (d.map_lat != null && d.map_lon != null) {
+            CENTER[0] = STATION_POS[0] = d.map_lat;
+            CENTER[1] = STATION_POS[1] = d.map_lon;
+        }
         if (d.callsign) HOME.callsign = d.callsign;
+        if (d.node) HOME.node = d.node;
         if (d.grid) HOME.grid = d.grid;
+        if (d.carto_key) CARTO_KEY = d.carto_key;
     } catch (e) { console.warn('[station-info] not available, using defaults:', e); }
+}
+async function loadBbsInfo() {
+    try {
+        const r = await fetch(STORAGE_API + '?action=bbsinfo', { cache: 'no-cache' });
+        const d = r.ok ? await r.json() : null;
+        BBS_INFO = (d && d.success && d.info && typeof d.info === 'object') ? d.info : {};
+    } catch (e) { BBS_INFO = {}; console.warn('[bbs-info] not available:', e); }
+    applyHomePosition();
+}
+// The BBS marker's position: the sysop's own (BBS info) or the grid centre.
+function applyHomePosition() {
+    const lat = parseFloat(BBS_INFO.lat), lon = parseFloat(BBS_INFO.lon);
+    const custom = isFinite(lat) && isFinite(lon) && !(lat === 0 && lon === 0);
+    CENTER[0] = custom ? lat : STATION_POS[0];
+    CENTER[1] = custom ? lon : STATION_POS[1];
 }
 const ZOOM    = 9;
 const RADIUS_MILES = 50;
@@ -422,7 +630,8 @@ let filterCall  = '';
 let selectedCall = null;
 let showTracks  = true;
 let ageFilterHours = 2;    // show stations heard within N hours
-let map, radiusCircle;
+let map, radiusCircle, homeMarker;
+let pickingPosition = false;   // "Pick on map" in the BBS info editor
 let phgCircles  = {};    // call -> L.circle
 let showPhg     = false; // PHG circles off by default
 let refreshTimer = null;
@@ -449,13 +658,23 @@ function toggleTheme() {
     const nxt = cur==='dark'?'light':'dark';
     localStorage.setItem('aprs_theme', nxt); applyTheme(nxt);
 }
+// CARTO map tile key, from config.php 'map' => ['carto_key'] via
+// station-info.php (2026-10-20). CARTO now stamps "API KEY REQUIRED" on
+// tiles requested without one. Each station uses its own free key from
+// https://www.carto.com/basemaps/apikey/ — see USER-MANUAL.md, Step 10.
+let CARTO_KEY = '';
 function addTileLayer() {
-    // CARTO basemaps need no API key (2026-09-26: removed the hard-coded one).
-    const dark  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    const light = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    const q = CARTO_KEY ? '?key=' + encodeURIComponent(CARTO_KEY) : '';
+    const dark  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' + q;
+    const light = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png' + q;
     const theme = document.documentElement.getAttribute('data-theme')||'dark';
+    let attribution = '© OpenStreetMap © CARTO';
+    if (!CARTO_KEY) {
+        attribution = '<span style="color:#e5a00d">⚠ No CARTO map key: set map → carto_key in config.php</span> | ' + attribution;
+        console.warn('[map] No CARTO key in config.php (map → carto_key); tiles will show "API KEY REQUIRED". Free key: https://www.carto.com/basemaps/apikey/');
+    }
     L.tileLayer(theme==='dark'?dark:light, {
-        attribution:'© OpenStreetMap © CARTO',
+        attribution,
         maxZoom:18, subdomains:'abcd'
     }).addTo(map);
 }
@@ -489,12 +708,328 @@ function initMap() {
               '">\u2709</div>',
         iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-16]
     });
-    L.marker(CENTER, {icon: homeIcon, zIndexOffset: 1000})
+    homeMarker = L.marker(CENTER, {icon: homeIcon, zIndexOffset: 1000, title: bbsDisplayName()})
      .addTo(map)
-     .bindPopup('<div class="aprs-popup-call">' + HOME.callsign + ' BBS</div>' +
-                (HOME.grid ? '<div class="aprs-popup-row">Grid ' + HOME.grid + '</div>' : ''));
+     .bindPopup(buildBbsPopup());
+    homeMarker.on('click', () => { deselectStation(); clearPathLines(); showBbsDetail(); });
 
-    map.on('click', () => { closeDetail(); deselectStation(); });
+    map.on('click', (e) => {
+        if (pickingPosition) { finishPickPosition(e.latlng); return; }
+        closeDetail(); deselectStation();
+    });
+}
+
+// ═══════════════════════════════════════════════════════
+//  BBS STATION INFO (home marker) — 2026-10-16
+// ═══════════════════════════════════════════════════════
+function bbsDisplayName() {
+    return (BBS_INFO.name || '').trim() || (HOME.callsign + ' BBS');
+}
+function bbsSafeUrl(u) {
+    u = String(u || '').trim();
+    return /^https?:\/\/[^\s"'<>]+$/i.test(u) ? u : '';
+}
+function bbsHasInfo() {
+    return ['callsign','location','sysop','frequencies','services','hours','website','notes']
+        .some(k => String(BBS_INFO[k] || '').trim() !== '');
+}
+
+function buildBbsPopup() {
+    const i = BBS_INFO;
+    let h = `<div class="aprs-popup-call" style="color:#ff6b1a">🏠 ${escHtml(bbsDisplayName())}</div>`;
+    const row = (label, val) => val ? `<div class="bbs-popup-row">${label}: <span>${escHtml(val)}</span></div>` : '';
+    h += row('BBS', i.callsign);
+    h += row('Location', i.location);
+    h += row('Services', i.services);
+    if (!i.location && HOME.grid) h += row('Grid', HOME.grid);
+    h += `<div style="margin-top:6px"><button class="bbs-edit-link" onclick="showBbsDetail()">ℹ Full info</button>`
+       + ` &nbsp;·&nbsp; <button class="bbs-edit-link" onclick="openBbsEdit()">✏ Edit</button></div>`;
+    return h;
+}
+
+function showBbsDetail() {
+    const i = BBS_INFO;
+    const row = (label, val, cls) => val
+        ? `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-val${cls ? ' ' + cls : ''}">${escHtml(val)}</span></div>`
+        : '';
+    let h = `<div class="detail-call bbs-detail-call">🏠 ${escHtml(bbsDisplayName())}</div>`;
+    const sub = [i.callsign || HOME.node, HOME.grid].filter(Boolean).join(' · ');
+    if (sub) h += `<div class="bbs-sub">${escHtml(sub)}</div>`;
+    h += row('Location', i.location);
+    h += row('Sysop', i.sysop);
+    h += row('Ports', i.frequencies, 'bbs-lines');
+    h += row('Services', i.services);
+    h += row('Hours', i.hours);
+    const url = bbsSafeUrl(i.website);
+    if (url) {
+        h += `<div class="detail-row"><span class="detail-label">Website</span><span class="detail-val">`
+           + `<a href="${escAttr(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">${escHtml(url.replace(/^https?:\/\//i, ''))} ↗</a></span></div>`;
+    }
+    h += row('Notes', i.notes, 'bbs-lines');
+    const fi = beaconAprsFiUrl(i);
+    if (fi) {
+        h += `<div class="detail-row"><span class="detail-label">APRS</span><span class="detail-val">`
+           + `<a href="${escAttr(fi)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">`
+           + `${escHtml(i.beacon_type === 'position' ? (APRS_CALL || 'station') : String(i.beacon_name || '').trim())} on aprs.fi ↗</a></span></div>`;
+    }
+    if (!bbsHasInfo()) {
+        h += `<div class="bbs-empty">No station info yet.</div>`;
+    }
+    const pos = (isFinite(parseFloat(i.lat)) && isFinite(parseFloat(i.lon))) ? 'set by sysop' : (HOME.grid ? 'grid ' + HOME.grid + ' centre' : 'approximate');
+    h += `<div class="detail-row"><span class="detail-label">Position</span><span class="detail-val" style="font-size:10px;color:var(--muted)">${escHtml(pos)}</span></div>`;
+    h += `<div class="detail-row" style="margin-top:6px"><button class="bbs-edit-link" onclick="openBbsEdit()">✏ ${bbsHasInfo() ? 'Edit' : 'Add'} station info</button>`;
+    if (i.updated) h += `<span style="margin-left:auto;font-size:9px;color:var(--muted)">updated ${escHtml(new Date(i.updated * 1000).toISOString().slice(0, 10))}</span>`;
+    h += `</div>`;
+    document.getElementById('detailContent').innerHTML = h;
+    document.getElementById('detailPanel').classList.add('visible');
+}
+
+// Toolbar "🏠 BBS Info": centre on the BBS, open its popup and panel.
+function showBbsOnMap() {
+    if (!map || !homeMarker) return;
+    deselectStation(); clearPathLines();
+    map.setView(homeMarker.getLatLng(), Math.max(map.getZoom(), ZOOM));
+    homeMarker.openPopup();
+    showBbsDetail();
+}
+
+// After a save: move the marker / radius circle, refresh texts and distances.
+function refreshHomeMarker() {
+    applyHomePosition();
+    if (homeMarker) {
+        homeMarker.setLatLng(CENTER);
+        homeMarker.setPopupContent(buildBbsPopup());
+        if (homeMarker.options) homeMarker.options.title = bbsDisplayName();
+        const el = homeMarker.getElement && homeMarker.getElement();
+        if (el) el.title = bbsDisplayName();
+    }
+    if (radiusCircle) radiusCircle.setLatLng(CENTER);
+    renderStations([]);   // distances in popups/lists are from CENTER
+}
+
+function setBbsField(id, v) { document.getElementById(id).value = (v === undefined || v === null) ? '' : v; }
+function getBbsField(id)    { return document.getElementById(id).value.trim(); }
+
+function openBbsEdit() {
+    const i = BBS_INFO;
+    document.getElementById('bbsName').placeholder = HOME.callsign + ' BBS';
+    document.getElementById('bbsCall').placeholder = HOME.node || (HOME.callsign + '-4');
+    setBbsField('bbsName',     i.name);
+    setBbsField('bbsCall',     i.callsign);
+    setBbsField('bbsLocation', i.location);
+    setBbsField('bbsSysop',    i.sysop);
+    setBbsField('bbsFreqs',    i.frequencies);
+    setBbsField('bbsServices', i.services);
+    setBbsField('bbsHours',    i.hours);
+    setBbsField('bbsWebsite',  i.website);
+    setBbsField('bbsNotes',    i.notes);
+    setBbsField('bbsLat',      i.lat);
+    setBbsField('bbsLon',      i.lon);
+    document.getElementById('bcnEnabled').checked = !!i.beacon_enabled;
+    document.getElementById('bcnType').value = i.beacon_type === 'position' ? 'position' : 'object';
+    setBbsField('bcnName',     i.beacon_name || '');
+    setBbsField('bcnComment',  i.beacon_comment || '');
+    document.getElementById('bcnInterval').value = String([10,15,20,30,60].includes(+i.beacon_interval) ? +i.beacon_interval : 30);
+    updateBeaconUi();
+    loadBeaconStatus();
+    document.getElementById('bbsSaved').textContent = i.updated
+        ? 'Last saved ' + new Date(i.updated * 1000).toISOString().replace('T', ' ').slice(0, 16) + 'Z' : '';
+    showBbsError('');
+    reopenBbsEdit();
+}
+// Show the editor without reloading the fields (used after "Pick on map").
+function reopenBbsEdit() {
+    if (map) map.closePopup();
+    document.getElementById('bbsModal').classList.remove('hidden');
+}
+function closeBbsEdit() {
+    document.getElementById('bbsModal').classList.add('hidden');
+    stopPickPosition();
+}
+function showBbsError(msg) {
+    const el = document.getElementById('bbsError');
+    el.textContent = msg || '';
+    el.style.display = msg ? 'block' : 'none';
+}
+
+function startPickPosition() {
+    pickingPosition = true;
+    document.getElementById('bbsModal').classList.add('hidden');
+    document.getElementById('map').classList.add('picking');
+    showToast('Click the map where the BBS is (Esc to cancel)', 'info');
+}
+function stopPickPosition() {
+    pickingPosition = false;
+    const m = document.getElementById('map');
+    if (m) m.classList.remove('picking');
+}
+function finishPickPosition(latlng) {
+    stopPickPosition();
+    setBbsField('bbsLat', latlng.lat.toFixed(5));
+    setBbsField('bbsLon', latlng.lng.toFixed(5));
+    updateBeaconUi();
+    reopenBbsEdit();
+}
+function clearBbsPosition() {
+    setBbsField('bbsLat', '');
+    setBbsField('bbsLon', '');
+    updateBeaconUi();
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (pickingPosition) { stopPickPosition(); reopenBbsEdit(); }
+    else if (!document.getElementById('bbsModal').classList.contains('hidden')) closeBbsEdit();
+});
+
+// ── APRS-IS beacon settings (sent by bpq-aprs-daemon.py) — 2026-10-16 ──
+function readBeaconFields() {
+    return {
+        beacon_enabled:  document.getElementById('bcnEnabled').checked,
+        beacon_type:     document.getElementById('bcnType').value,
+        beacon_name:     document.getElementById('bcnName').value.replace(/\s+$/, ''),
+        beacon_comment:  document.getElementById('bcnComment').value.trim(),
+        beacon_interval: parseInt(document.getElementById('bcnInterval').value, 10) || 30
+    };
+}
+// APRS text must be plain ASCII; | and ~ are reserved.
+function aprsAscii(t, max) {
+    return String(t || '').replace(/[·•–—]/g, '-').replace(/[^\x20-\x7E]/g, '').replace(/[|~]/g, '')
+        .replace(/\s+/g, ' ').trim().slice(0, max);
+}
+function aprsLat(lat) {
+    const h = lat >= 0 ? 'N' : 'S'; lat = Math.abs(lat);
+    let d = Math.floor(lat), m = Math.round((lat - d) * 6000) / 100;
+    if (m >= 60) { d += 1; m = 0; }
+    return String(d).padStart(2, '0') + m.toFixed(2).padStart(5, '0') + h;
+}
+function aprsLon(lon) {
+    const h = lon >= 0 ? 'E' : 'W'; lon = Math.abs(lon);
+    let d = Math.floor(lon), m = Math.round((lon - d) * 6000) / 100;
+    if (m >= 60) { d += 1; m = 0; }
+    return String(d).padStart(3, '0') + m.toFixed(2).padStart(5, '0') + h;
+}
+function beaconAprsFiUrl(i) {
+    if (!i || !i.beacon_enabled) return '';
+    const who = i.beacon_type === 'position' ? APRS_CALL : String(i.beacon_name || '').trim();
+    return who ? 'https://aprs.fi/#!call=a%2F' + encodeURIComponent(who) : '';
+}
+function fillBeaconComment() {
+    const freq = (getBbsField('bbsFreqs').split('\n')[0] || '').trim();
+    const call = getBbsField('bbsCall');
+    const parts = [freq, call ? 'BBS ' + call : '', getBbsField('bbsHours')].filter(Boolean);
+    setBbsField('bcnComment', aprsAscii(parts.join(' ') || getBbsField('bbsServices'), 43));
+    updateBeaconUi();
+}
+function updateBeaconUi() {
+    const on   = document.getElementById('bcnEnabled').checked;
+    const type = document.getElementById('bcnType').value;
+    document.getElementById('bcnFields').classList.toggle('off', !on);
+    document.getElementById('bcnNameWrap').style.display = type === 'object' ? '' : 'none';
+    const c = document.getElementById('bcnComment').value;
+    document.getElementById('bcnCount').textContent = c.length;
+    const lat = parseFloat(getBbsField('bbsLat')), lon = parseFloat(getBbsField('bbsLon'));
+    const prev = document.getElementById('bcnPreview');
+    if (!isFinite(lat) || !isFinite(lon)) {
+        prev.textContent = 'Needs a marker position (above).';
+        return;
+    }
+    const pos = aprsLat(lat) + '/' + aprsLon(lon) + 'B';
+    const cm  = aprsAscii(c, 43);
+    const call = APRS_CALL || 'YOURCALL-1';
+    let body;
+    if (type === 'object') {
+        const nm = (document.getElementById('bcnName').value || 'NAME').slice(0, 9).padEnd(9, ' ');
+        const t = new Date(), z = n => String(n).padStart(2, '0');
+        body = ';' + nm + '*' + z(t.getUTCDate()) + z(t.getUTCHours()) + z(t.getUTCMinutes()) + 'z' + pos + cm;
+    } else {
+        body = '=' + pos + cm;
+    }
+    prev.textContent = call + '>APRS,TCPIP*:' + body;
+}
+async function loadBeaconStatus() {
+    const el = document.getElementById('bcnStatus');
+    el.textContent = '';
+    try {
+        const r = await fetch(API + '?action=status', { cache: 'no-cache' });
+        const d = await r.json();
+        if (!d || !d.success) return;
+        if (!d.running) { el.innerHTML = '<span class="bcn-warn">⚠ The APRS service (bpq-aprs) is not running, so nothing is sent.</span>'; return; }
+        const b = (d.daemon && d.daemon.beacon) || null;
+        if (!b) { el.innerHTML = '<span class="bcn-warn">⚠ The APRS service is an older version without beacons — restart bpq-aprs after updating it.</span>'; return; }
+        const when = b.last_sent ? new Date(b.last_sent * 1000).toISOString().slice(11, 16) + 'Z' : '';
+        let h = '';
+        if (b.enabled && b.state === 'ok') {
+            h = '<span class="bcn-ok">● Beaconing</span>' + (when ? ' — last sent ' + when : '')
+              + (b.next_in != null ? ', next in ' + Math.max(1, Math.round(b.next_in / 60)) + ' min' : '');
+        } else if (b.enabled) {
+            h = '<span class="bcn-warn">⚠ Not sending: ' + escHtml(b.state || 'waiting') + '</span>';
+        } else {
+            h = 'Beacon is off' + (when ? ' (last sent ' + when + ')' : '') + '.';
+        }
+        if (d.daemon && d.daemon.verified === false) h += ' <span class="bcn-warn">APRS-IS login is not verified.</span>';
+        el.innerHTML = h;
+    } catch (e) { /* status is optional */ }
+}
+
+async function saveBbsInfo() {
+    const lat = getBbsField('bbsLat'), lon = getBbsField('bbsLon');
+    if ((lat === '') !== (lon === '')) { showBbsError('Enter both latitude and longitude, or leave both empty.'); return; }
+    if (lat !== '' && (!isFinite(+lat) || !isFinite(+lon) || Math.abs(+lat) > 90 || Math.abs(+lon) > 180)) {
+        showBbsError('Latitude must be -90…90 and longitude -180…180 (decimal degrees, e.g. 41.7292, -72.7083).'); return;
+    }
+    const web = getBbsField('bbsWebsite');
+    if (web && !bbsSafeUrl(web)) { showBbsError('Website must start with http:// or https://'); return; }
+    const bcn = readBeaconFields();
+    if (bcn.beacon_enabled) {
+        if (lat === '') { showBbsError('The APRS beacon needs a marker position: type it or use 📍 Pick on map.'); return; }
+        if (bcn.beacon_type === 'object' && !/^[A-Za-z0-9 .\/-]{1,9}$/.test(bcn.beacon_name)) {
+            showBbsError('Object name: 1–9 letters, digits, spaces or . - /'); return;
+        }
+    }
+    if (bcn.beacon_comment !== aprsAscii(bcn.beacon_comment, 43)) {
+        showBbsError('Beacon comment: plain ASCII only, 43 characters max (no accents, ·, | or ~). Use ↧ From info to tidy it.'); return;
+    }
+
+    const info = {
+        name: getBbsField('bbsName'),        callsign: getBbsField('bbsCall').toUpperCase(),
+        location: getBbsField('bbsLocation'), sysop: getBbsField('bbsSysop'),
+        frequencies: getBbsField('bbsFreqs'), services: getBbsField('bbsServices'),
+        hours: getBbsField('bbsHours'),       website: web,
+        notes: getBbsField('bbsNotes'),       lat: lat, lon: lon,
+        ...bcn
+    };
+    const btn = document.getElementById('bbsSaveBtn');
+    btn.disabled = true; btn.textContent = '⏳ Saving…';
+    showBbsError('');
+    try {
+        const r = await fetch(STORAGE_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'saveBbsInfo', info })
+        });
+        let d = null;
+        try { d = await r.json(); } catch (_) { d = null; }
+        if (r.ok && d && d.success) {
+            BBS_INFO = d.info || info;
+            refreshHomeMarker();
+            closeBbsEdit();
+            showBbsDetail();
+            showToast(BBS_INFO.beacon_enabled
+                ? 'Saved — the APRS beacon goes out within about 2 minutes'
+                : 'BBS station info saved', 'ok');
+        } else if (r.status === 401) {
+            showBbsError('Not saved: the admin login was not given.');
+        } else if (r.status === 403 && !(d && d.error)) {
+            showBbsError('Not saved: this site does not allow changes. Open the dashboard on the sysop (admin) site to edit the BBS info.');
+        } else if (r.status === 429 || r.status === 503) {
+            showBbsError('Not saved: the server is busy, try again in a few seconds.');
+        } else {
+            showBbsError('Not saved: ' + ((d && d.error) || ('HTTP ' + r.status)));
+        }
+    } catch (e) {
+        showBbsError('Not saved: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = '💾 Save';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -944,6 +1479,9 @@ function distanceMiles(lat, lon) {
 
 function bearingTo(lat, lon) {
     if (!lat || !lon) return '';
+    // HOME_LAT/HOME_LON were globals before 2026-09-26; without this line
+    // every WX marker failed with a ReferenceError (2026-10-16).
+    const HOME_LAT = CENTER[0], HOME_LON = CENTER[1];
     const dLon  = (lon - HOME_LON) * Math.PI / 180;
     const lat1  = HOME_LAT * Math.PI / 180;
     const lat2  = lat * Math.PI / 180;
@@ -974,7 +1512,7 @@ function showDetail(st) {
         // Full WX display in imperial
         const dist = distanceMiles(st.lat, st.lon);
         const bear = bearingTo(st.lat, st.lon);
-        const distStr = dist !== null ? `${dist} mi ${bear} of YOURCALL` : '';
+        const distStr = dist !== null ? `${dist} mi ${bear} of ${escHtml(HOME.callsign)}` : '';
         rows += `<div style="margin:8px 0 4px;font-size:10px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.5px">Weather Data${distStr ? ' <span style="color:var(--muted);font-weight:400;text-transform:none">— ' + distStr + '</span>' : ''}</div>`;
         if (wx.temp_f !== undefined)
             rows += `<div class="detail-row"><span class="detail-label">🌡 Temp</span><span class="detail-val">${wx.temp_f}°F (${((wx.temp_f-32)*5/9).toFixed(1)}°C)</span></div>`;
@@ -1057,6 +1595,7 @@ async function loadStations() {
         const d = await r.json();
         if (d.success) {
             stations = {};
+            applyAprsCall(d.aprs_call, d.can_send);
             renderStations(d.stations || []);
             if (d.updated) {
                 const dt = new Date(d.updated*1000);
@@ -1191,7 +1730,7 @@ function getBwDetail(st, cat) {
     if (cat === 'wx') {
         const dist = distanceMiles(st.lat, st.lon);
         const bear = bearingTo(st.lat, st.lon);
-        if (dist !== null) fields.push(f('📏 Distance', dist + ' mi ' + bear + ' of YOURCALL'));
+        if (dist !== null) fields.push(f('📏 Distance', dist + ' mi ' + bear + ' of ' + HOME.callsign));
         if (wx.temp_f !== undefined) fields.push(f('🌡 Temp', wx.temp_f + '°F (' + ((wx.temp_f-32)*5/9).toFixed(1) + '°C)'));
         if (wx.humidity !== undefined) fields.push(f('💧 Humidity', wx.humidity + '%'));
         if (wx.wind_speed !== undefined) fields.push(f('💨 Wind', windDir(wx.wind_dir) + ' @ ' + wx.wind_speed + ' mph'));
@@ -1379,7 +1918,7 @@ async function sendAprsMsg() {
             showToast('Message sent to ' + to, 'ok');
             // Add to sent log in inbox
             inboxMsgs.unshift({
-                call: 'YOURCALL-1', msgDest: to, msgText: txt,
+                call: APRS_CALL, msgDest: to, msgText: txt,
                 ts: Math.floor(Date.now()/1000), sent: true
             });
             renderInbox();
@@ -1396,7 +1935,7 @@ async function sendAprsMsg() {
 function renderInbox() {
     const el = document.getElementById('inboxList');
     if (!inboxMsgs.length) {
-        el.innerHTML = '<div class="inbox-empty">📭 No messages for YOURCALL-1</div>';
+        el.innerHTML = '<div class="inbox-empty">📭 No messages for ' + escHtml(APRS_CALL || 'this station') + '</div>';
         return;
     }
     el.innerHTML = inboxMsgs.map(m => {
@@ -1414,8 +1953,9 @@ function renderInbox() {
 }
 
 function updateInbox(messages) {
-    // Find messages addressed to YOURCALL-1
-    const myCall = 'YOURCALL-1';
+    // Find messages addressed to the station's APRS callsign
+    const myCall = APRS_CALL;
+    if (!myCall) return;
     const incoming = messages.filter(m =>
         m.isMsg && m.msgDest &&
         m.msgDest.trim().toUpperCase() === myCall
@@ -1451,6 +1991,9 @@ function ageStr(ts) {
 function escHtml(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+function escAttr(s) {
+    return escHtml(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 let toastTimer;
 function showToast(msg, type='ok') {
     const el = document.getElementById('toast');
@@ -1475,6 +2018,7 @@ setInterval(() => {
     const saved = localStorage.getItem('aprs_theme');
     applyTheme(saved || (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark'));
     await loadStationInfo();   // home position/callsign before the map is built
+    await loadBbsInfo();       // BBS station info; its own marker position if set
     initMap();
     // Leaflet needs invalidateSize() called after layout settles —
     // the shared nav loads asynchronously and changes the available

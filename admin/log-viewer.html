@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Log Viewer — YOURCALL BPQ</title>
+<title>Log Viewer - BPQ Dashboard</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
@@ -126,22 +126,19 @@
 <body data-nav-page="logs">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-04-29-3"></script>
+<script src="/bpq-nav-loader.js?v=2026-10-27-1"></script>
 
 
 <a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
 
 <header>
-  <h1>📋 BPQ Dashboard <span>//</span> Log Viewer <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.13</span></h1>
-  <div class="meta">YOURCALL · YOURNODE · Real-time log access<br>BPQ Dashboard · VARA · BPQ Node · System</div>
+  <h1>📋 BPQ Dashboard <span>//</span> Log Viewer <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.14</span></h1>
+  <div class="meta"><span id="station-line">Log access</span><br>Dashboard services · Log parsers · VARA · BPQ Node · System</div>
 </header>
 
 <div id="auth-gate" class="auth-gate" style="display:none;">
-  <h2>🔒 Authentication Required</h2>
-  <p>Enter your BBS password to view system logs</p>
-  <input type="password" id="auth-input" class="auth-input" placeholder="BBS Password">
-  <button class="auth-btn" onclick="attemptAuth()">Unlock</button>
-  <div id="auth-error" class="auth-error" style="display:none;"></div>
+  <h2>🔒 Admin login needed</h2>
+  <p id="auth-msg"></p>
 </div>
 
 <div id="main-content" style="display:none;">
@@ -172,7 +169,10 @@
 
 <script>
 const API = 'log-viewer-api.php';
-let savedPw = sessionStorage.getItem('bbs_pw') || '';
+// 2026-10-05: no BBS password any more. /admin/ is behind the admin login
+// and the API checks it; the password used to go in the URL (web-server logs).
+let savedPw = '';
+try { sessionStorage.removeItem('bbs_pw'); } catch (e) {}
 let currentLog = null;
 let currentDate = '';
 let searchMode = false;
@@ -180,20 +180,11 @@ let logCatalogue = [];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function init() {
-  if (savedPw) loadCatalogue(savedPw);
-  else {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('auth-gate').style.display = 'block';
-    document.getElementById('auth-input').addEventListener('keydown', e => {
-      if (e.key === 'Enter') attemptAuth();
-    });
-  }
-}
-
-function attemptAuth() {
-  const pw = document.getElementById('auth-input').value.trim();
-  if (!pw) return;
-  loadCatalogue(pw);
+  loadCatalogue('');
+  fetch('/station-info.php').then(r => r.ok ? r.json() : null).then(s => {
+    if (s && (s.callsign || s.node)) document.getElementById('station-line').textContent =
+      [s.callsign, s.node].filter(Boolean).join(' · ') + ' · Log access';
+  }).catch(() => {});
 }
 
 function loadCatalogue(pw) {
@@ -201,12 +192,14 @@ function loadCatalogue(pw) {
   document.getElementById('loading').innerHTML = '<span class="icon">⟳</span>Loading…';
   document.getElementById('auth-gate').style.display = 'none';
 
-  fetch(`${API}?action=list&password=${encodeURIComponent(pw)}`)
-    .then(r => { if(r.status===401) throw new Error('auth'); return r.json(); })
+  fetch(`${API}?action=list`)
+    .then(r => r.text().then(t => {
+      let d = null; try { d = JSON.parse(t); } catch (e) {}
+      if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.detail = (d && d.error) || ''; throw e; }
+      if (d === null) throw new Error('HTTP ' + r.status + ' (not JSON)');
+      return d;
+    }))
     .then(data => {
-      if (data.error === 'Unauthorized') throw new Error('auth');
-      savedPw = pw;
-      sessionStorage.setItem('bbs_pw', pw);
       logCatalogue = data.logs;
       document.getElementById('loading').style.display = 'none';
       document.getElementById('main-content').style.display = 'block';
@@ -216,13 +209,12 @@ function loadCatalogue(pw) {
       document.getElementById('loading').style.display = 'none';
       if (err.message === 'auth') {
         document.getElementById('auth-gate').style.display = 'block';
-        document.getElementById('auth-error').textContent = '✗ Invalid password';
-        document.getElementById('auth-error').style.display = 'block';
-        sessionStorage.removeItem('bbs_pw'); savedPw = '';
+        document.getElementById('auth-msg').textContent = err.detail ||
+          'The admin login did not reach this page. Reload the page and log in.';
       } else {
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('log-list-container').innerHTML =
-          `<div class="error-msg">Could not load log list: ${err.message}</div>`;
+          `<div class="error-msg">Could not load log list: ${escHtml(err.message)}</div>`;
       }
     });
 }
@@ -238,16 +230,21 @@ function renderSidebar(logs) {
   let html = '';
   Object.keys(groups).forEach(grp => {
     html += `<div class="log-group">
-      <div class="group-label">${grp}</div>`;
+      <div class="group-label">${escHtml(grp)}</div>`;
     groups[grp].forEach(l => {
       const sizeStr = l.exists && l.size ? fmtSize(l.size) : '';
       const missing = !l.exists ? ' log-btn-missing' : '';
       const modStr = l.modified ? new Date(l.modified*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '';
-      html += `<button class="log-btn${missing}" onclick="selectLog('${l.key}')">
+      // 2026-10-25: say why a log is absent (optional feature) and show what it is
+      const status = l.exists
+        ? (l.readable === false ? 'no read permission' : (sizeStr + (modStr?' · '+modStr:'')))
+        : (l.opt ? 'not used here' : 'not found');
+      const tip = [l.desc, l.path && l.path !== '(dynamic)' ? l.path : '', !l.exists && l.opt ? l.opt : ''].filter(Boolean).join('\n');
+      html += `<button class="log-btn${missing}" onclick="selectLog('${l.key}')" title="${escHtml(tip).replace(/"/g,'&quot;')}">
         <span class="log-dot ${l.color}"></span>
         <span class="log-btn-info">
-          <div class="log-btn-label">${l.label}</div>
-          <div class="log-btn-size">${l.exists ? (sizeStr + (modStr?' · '+modStr:'')) : 'not found'}</div>
+          <div class="log-btn-label">${escHtml(l.label)}</div>
+          <div class="log-btn-size">${escHtml(status)}</div>
         </span>
       </button>`;
     });
@@ -278,6 +275,10 @@ function selectLog(key) {
 
   if (!meta.exists) {
     renderPanel(meta, null);
+    // 2026-10-25: say where it was looked for, and why it may not exist
+    const out = document.getElementById('log-output');
+    if (out) out.innerHTML = `<div class="loading-line" style="color:var(--muted)">No file at <code>${escHtml(meta.path || '')}</code>` +
+      (meta.opt ? `<br>${escHtml(meta.opt)}.` : '<br>It appears once the program that writes it has run.') + `</div>`;
     return;
   }
 
@@ -355,7 +356,7 @@ function renderPanel(meta, lines, loading=false) {
 
 // ── Load log ──────────────────────────────────────────────────────────────────
 function loadLog(key, date, lines) {
-  let url = `${API}?action=read&log=${key}&lines=${lines}&password=${encodeURIComponent(savedPw)}`;
+  let url = `${API}?action=read&log=${key}&lines=${lines}`;
   if (date) url += `&date=${date}`;
 
   fetch(url)
@@ -363,7 +364,7 @@ function loadLog(key, date, lines) {
     .then(data => {
       if (data.error) {
         document.getElementById('log-output').innerHTML =
-          `<div class="error-msg">${data.error}</div>`;
+          `<div class="error-msg">${escHtml(data.error)}${(() => { const m = logCatalogue.find(x => x.key === currentLog); return m && m.opt ? '<br><small>' + escHtml(m.opt) + '</small>' : ''; })()}</div>`;
         return;
       }
       renderLines(data.lines || [], key);
@@ -373,7 +374,7 @@ function loadLog(key, date, lines) {
     })
     .catch(err => {
       document.getElementById('log-output').innerHTML =
-        `<div class="error-msg">Failed to load: ${err.message}</div>`;
+        `<div class="error-msg">Failed to load: ${escHtml(err.message)}</div>`;
     });
 }
 
@@ -453,20 +454,20 @@ function runSearch() {
 
   document.getElementById('log-output').innerHTML = '<div class="loading-line">Searching…</div>';
 
-  let url = `${API}?action=search&log=${currentLog}&q=${encodeURIComponent(q)}&password=${encodeURIComponent(savedPw)}`;
+  let url = `${API}?action=search&log=${currentLog}&q=${encodeURIComponent(q)}`;
   if (currentDate) url += `&date=${currentDate}`;
 
   fetch(url)
     .then(r => r.json())
     .then(data => {
       if (data.error) {
-        document.getElementById('log-output').innerHTML = `<div class="error-msg">${data.error}</div>`;
+        document.getElementById('log-output').innerHTML = `<div class="error-msg">${escHtml(data.error)}${(() => { const m = logCatalogue.find(x => x.key === currentLog); return m && m.opt ? '<br><small>' + escHtml(m.opt) + '</small>' : ''; })()}</div>`;
         return;
       }
       renderSearchResults(data, q);
     })
     .catch(err => {
-      document.getElementById('log-output').innerHTML = `<div class="error-msg">Search failed: ${err.message}</div>`;
+      document.getElementById('log-output').innerHTML = `<div class="error-msg">Search failed: ${escHtml(err.message)}</div>`;
     });
 }
 
@@ -521,5 +522,6 @@ function fmtSize(bytes) {
 
 init();
 </script>
+<script src="/shared/settings-modal.js"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
 </body>
 </html>

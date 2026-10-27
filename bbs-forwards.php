@@ -59,7 +59,11 @@ declare(strict_types=1);
 header('Content-Type: application/json');
 
 // ─── Configuration ────────────────────────────────────────────
-$LOG_DIR    = getenv('BPQ_LOG_DIR') ?: '/var/www/html/logs';  // override via env BPQ_LOG_DIR
+// BPQ's log folder (2026-10-25): env BPQ_LOG_DIR, else config.php paths.logs,
+// else <web root>/logs. The fallback was /var/www/html/logs, which a standard
+// install doesn't have, so every message showed "Not Yet Forwarded".
+require_once __DIR__ . '/includes/station-config.php';
+$LOG_DIR = rtrim((string)(getenv('BPQ_LOG_DIR') ?: (bpq_config_section('paths')['logs'] ?? '') ?: (__DIR__ . '/logs')), '/');
 $CACHE_DIR  = '/tmp';
 $CACHE_TTL  = 30;   // seconds
 $MAX_LOG_BYTES = 50 * 1024 * 1024;  // 50 MB safety cap — refuse to read more

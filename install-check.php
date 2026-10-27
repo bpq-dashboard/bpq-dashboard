@@ -1,14 +1,29 @@
 <?php
 /**
- * BPQ Dashboard v1.5.13 — Post-Installation Check
+ * BPQ Dashboard v1.5.14 — Post-Installation Check
  * Checks every component installed by bpq-dashboard-install.sh
- * Access: https://your.domain/install-check.php?pass=bpqcheck
- * REMOVE THIS FILE after troubleshooting is complete.
+ * Access: https://your.domain/install-check.php  (behind the admin login)
+ *
+ * 2026-10-05: no more ?pass=bpqcheck. That password was published in the
+ * docs, so it protected nothing. The page now runs only when the web server
+ * checked the admin login (same rule as the Email Client APIs, see
+ * includes/web-login.php), or when config.php says
+ * 'require_web_login' => false.
  */
 
 // ── Auth ───────────────────────────────────────────────────────────
-define('CHECK_PASS', 'bpqcheck');
-if (($_GET['pass'] ?? '') !== CHECK_PASS) { showLogin(); exit; }
+if (!is_readable(__DIR__ . '/includes/web-login.php')) {
+    showLogin('includes/web-login.php is missing, so this page cannot check the admin login. Copy the includes/ folder from the release (or re-run install.sh).');
+    exit;
+}
+require_once __DIR__ . '/includes/web-login.php';
+if (!bpq_web_login_ok(false)) {
+    showLogin('This page shows paths, versions and configuration, so it needs the dashboard admin login, '
+            . "and the web server didn't pass one to PHP. nginx: inside  location = /install-check.php { auth_basic … }  add  "
+            . 'fastcgi_param BPQ_WEB_LOGIN $remote_user;  before the fastcgi include, then  sudo nginx -t && sudo systemctl reload nginx. '
+            . 'Apache: protect install-check.php with AuthType Basic. Or re-run install.sh.');
+    exit;
+}
 
 // ── State ──────────────────────────────────────────────────────────
 $BASE = __DIR__;
@@ -95,36 +110,98 @@ $apache  = fileOk('/etc/apache2/apache2.conf');
 $wsName  = $nginx ? 'Nginx' : ($apache ? 'Apache2' : 'Unknown');
 chk('Web Server','Web server installed', $nginx||$apache,
     $wsName.' detected', 'sudo apt install nginx OR sudo apt install apache2');
+// This page is behind the admin login, so the web server should have told
+// PHP who logged in (nginx: BPQ_WEB_LOGIN, Apache: REMOTE_USER). 2026-10-04
+require_once __DIR__ . '/includes/web-login.php';
+$who = bpq_web_login_user();
+chk('Web Server','Login reaches PHP', $who !== '',
+    $who !== '' ? "Logged in as $who — the Email Client, NWS posting, Chat and APRS sending will accept requests"
+                : "PHP wasn't told about a login for this page, so the Email Client, NWS posting, Chat, APRS sending and map saves will refuse",
+    'nginx: add  fastcgi_param BPQ_WEB_LOGIN $remote_user;  inside every location with auth_basic that passes to PHP (install-check.php, the LOGIN section). Apache: protect this page with AuthType Basic.');
 
 if ($nginx) {
-    // Check for our config
-    $hasCfg = fileOk('/etc/nginx/sites-enabled/bpq-dashboard.conf')
-           || fileOk('/etc/nginx/sites-enabled/dashboard.conf');
+    // Find the site config that serves this folder (2026-10-03: install.sh
+    // names it "bpq-dashboard" with no .conf, and hand-built sites use their
+    // own names, so match on "root <this folder>" rather than a file name).
+    $cfgFile = '';
+    $cands = array_merge(
+        ['/etc/nginx/sites-enabled/bpq-dashboard', '/etc/nginx/sites-enabled/bpq-dashboard.conf',
+         '/etc/nginx/sites-enabled/dashboard.conf'],
+        glob('/etc/nginx/sites-enabled/*') ?: [], glob('/etc/nginx/conf.d/*.conf') ?: []);
+    foreach (array_unique($cands) as $f) {
+        if (!is_file($f) || !is_readable($f)) continue;
+        $txt = @file_get_contents($f);
+        if ($txt !== false && preg_match('~^\s*root\s+' . preg_quote(rtrim($BASE, '/'), '~') . '/?\s*;~m', $txt)) {
+            $cfgFile = $f; break;
+        }
+    }
+    $hasCfg = $cfgFile !== '';
     chk('Web Server','Nginx site config active', $hasCfg,
-        $hasCfg ? 'bpq-dashboard.conf or dashboard.conf found' : 'No site config found',
-        'sudo cp bpq-dashboard.conf /etc/nginx/sites-enabled/ && sudo nginx -t && sudo systemctl reload nginx');
+        $hasCfg ? basename($cfgFile).' serves '.$BASE : 'No file in sites-enabled has "root '.$BASE.';"',
+        'Re-run install.sh, or copy bpq-dashboard.conf to /etc/nginx/sites-available/, link it into sites-enabled, then: sudo nginx -t && sudo systemctl reload nginx');
 
     if ($hasCfg) {
-        $cfgFile = fileOk('/etc/nginx/sites-enabled/bpq-dashboard.conf')
-                 ? '/etc/nginx/sites-enabled/bpq-dashboard.conf'
-                 : '/etc/nginx/sites-enabled/dashboard.conf';
         $nc = file_get_contents($cfgFile);
-        chk('Web Server','Rate limit zone configured', strpos($nc,'limit_req_zone')!==false,
+        $ncAll = $nc . "\n" . (@file_get_contents('/etc/nginx/nginx.conf') ?: '');
+        chk('Web Server','Rate limit zone configured', strpos($ncAll,'limit_req_zone')!==false,
             'Prevents API throttling', 'Add limit_req_zone to nginx.conf or site config');
         chk('Web Server','bpq-chat.php timeout (90s)', strpos($nc,'bpq-chat.php')!==false,
             '', 'Add location = /bpq-chat.php { fastcgi_read_timeout 90s; }');
         chk('Web Server','bpq-aprs.php timeout (60s)', strpos($nc,'bpq-aprs.php')!==false,
             '', 'Add location = /bpq-aprs.php { fastcgi_read_timeout 60s; }');
-        chkWarn('Web Server','Admin pages LAN-restricted',
-            strpos($nc,'bpq-maintenance')!==false || strpos($nc,'allow 127.0.0.1')!==false
-                ? 'LAN restriction found' : 'No LAN restriction detected — admin pages may be public',
-            'Add allow 10.0.0.0/8; deny all; to admin location blocks');
+        // Admin login: every server block with this root needs /admin/ behind
+        // auth_basic (or a redirect away). Count both to catch a second vhost.
+        $roots  = preg_match_all('~^\s*root\s+' . preg_quote(rtrim($BASE, '/'), '~') . '/?\s*;~m', $nc);
+        $guards = preg_match_all('#location\s+\^~\s+/admin/\s*\{\s*(auth_basic\s|return\s+30[12]\s)#', $nc);
+        chk('Web Server','Admin folder behind the login', $guards >= max(1, $roots),
+            $guards >= max(1, $roots)
+                ? "location ^~ /admin/ guarded in $guards of $roots server block(s)"
+                : "Only $guards of $roots server block(s) serving $BASE guard /admin/ — those pages may open with no password",
+            'Add location ^~ /admin/ { auth_basic … } (see bpq-dashboard.conf), or a 301 to the protected host, to every server block with this root');
+        // 2026-10-04: the Email Client APIs, NWS posting, Chat, APRS sending and
+        // map saves refuse unless nginx passes BPQ_WEB_LOGIN from a location
+        // with auth_basic (nginx's own REMOTE_USER can be forged by a visitor).
+        $sigN    = preg_match_all('~fastcgi_param\s+BPQ_WEB_LOGIN\s+\$remote_user\s*;~', $nc);
+        $missing = [];
+        foreach (['bbs-messages', 'message-storage', 'nws-bbs-post', 'bpq-chat', 'station-storage', 'bpq-aprs', 'nts-forwarding-report'] as $ep) {
+            if (strpos($nc, $ep) === false) $missing[] = "$ep.php";
+        }
+        $lockOk = $sigN > 0 && !$missing;
+        chk('Web Server','Station-acting pages behind the login', $lockOk,
+            $lockOk ? "Login signal set in $sigN location(s); Email Client, NWS, Chat, NTS report, APRS, map saves configured"
+                    : ($sigN === 0 ? 'No "fastcgi_param BPQ_WEB_LOGIN $remote_user;" — those pages will refuse with "needs the dashboard admin login"'
+                                   : 'No location for: ' . implode(', ', $missing)),
+            'Compare your site file with nginx-bpq-dashboard.conf / bpq-dashboard.conf (LOGIN section), or re-run install.sh');
+        // 2026-10-25: Telnet Client + VARA HF Terminal connect through /ws/telnet
+        // and /ws/vara; the VARA bridge has no login of its own.
+        $wsT = preg_match('#location\s+\^~\s+/ws/telnet\b#', $nc) > 0;
+        $wsV = preg_match('#location\s+\^~\s+/ws/vara\s*\{[^}]*auth_basic\s#s', $nc) > 0;
+        $wsVany = preg_match('#location\s+\^~\s+/ws/vara\b#', $nc) > 0;
+        chk('Web Server','Telnet / VARA connections (/ws/telnet, /ws/vara)', $wsT && $wsV,
+            ($wsT && $wsV) ? 'Both passed through; /ws/vara behind the login'
+                : (!$wsT && !$wsVany ? 'Neither is in the site file — the Telnet and VARA pages can\'t connect'
+                : (!$wsT ? 'No /ws/telnet — the Telnet page can\'t connect'
+                : ($wsVany ? '/ws/vara has no auth_basic — anyone reaching it could transmit as your station'
+                           : 'No /ws/vara — the VARA page can\'t connect'))),
+            'Copy the /ws/telnet and /ws/vara blocks (and the bpq-telnet/bpq-vara page block) from nginx-bpq-dashboard.conf, or re-run install.sh', !$wsVany || $wsV);
+        chk('Web Server','Admin pages LAN-restricted (optional)', strpos($nc,'allow 127.0.0.1')!==false,
+            strpos($nc,'allow 127.0.0.1')!==false ? 'allow/deny rules found' : 'Not LAN-restricted — the admin login is the protection',
+            'Optional: add allow/deny lines inside location ^~ /admin/ (see nginx-maintenance-block.conf)', true);
     }
 } elseif ($apache) {
     $hasCfg = fileOk('/etc/apache2/sites-enabled/bpq-dashboard.conf');
     chk('Web Server','Apache site config active', $hasCfg,
         $hasCfg ? 'bpq-dashboard.conf found' : 'No site config found',
         'sudo a2ensite bpq-dashboard && sudo systemctl reload apache2');
+    if ($hasCfg) {   // 2026-10-25: Telnet / VARA WebSocket proxy
+        $ac  = (string)@file_get_contents('/etc/apache2/sites-enabled/bpq-dashboard.conf');
+        $wsA = strpos($ac, '/ws/telnet') !== false && strpos($ac, '/ws/vara') !== false;
+        $wst = fileOk('/etc/apache2/mods-enabled/proxy_wstunnel.load');
+        chk('Web Server','Telnet / VARA connections (/ws/telnet, /ws/vara)', $wsA && $wst,
+            $wsA ? ($wst ? 'ProxyPass for both; mod_proxy_wstunnel on' : 'ProxyPass found but mod_proxy_wstunnel is off')
+                 : 'Not in the site file — the Telnet and VARA pages can\'t connect',
+            'Re-run install.sh, or: sudo a2enmod proxy proxy_http proxy_wstunnel, add the /ws/ ProxyPass lines and <Location /ws/> login from install.sh, then sudo systemctl reload apache2', true);
+    }
 }
 
 // SSL
@@ -148,8 +225,6 @@ $htmlFiles = [
     'bpq-aprs.html'           => 'APRS Map',
     'bpq-telnet.html'         => 'Telnet Client',
     'bpq-vara.html'           => 'VARA HF Terminal',
-    'rig-status.html'         => 'Rig Status',
-    'rf-power-monitor.html'   => 'RF Power Monitor',
     'admin/bpq-maintenance.html' => 'Maintenance Page',
     'admin/firewall-status.html' => 'Firewall Status',
     'admin/system-audit.html'    => 'System Audit',
@@ -159,6 +234,21 @@ foreach ($htmlFiles as $f => $label) {
     chk('Dashboard HTML',"$label ($f)", fileOk("$BASE/$f"),
         fileOk("$BASE/$f") ? 'Present' : 'Missing',
         "sudo cp $f $BASE/$f && sudo chown www-data:www-data $BASE/$f");
+}
+
+// 2026-10-05: Rig Status and RF Power Monitor need flrig; install.sh leaves
+// them out when flrig is skipped (config.php radio.enabled = false).
+// Only an explicit radio.enabled = false means "no flrig": installs whose
+// config.php has no 'radio' section use vara-api.php's flrig defaults.
+$flrigOn = ($cfg['radio']['enabled'] ?? true) !== false;
+foreach (['rig-status.html' => 'Rig Status', 'rf-power-monitor.html' => 'RF Power Monitor'] as $f => $label) {
+    if ($flrigOn) {
+        chk('Dashboard HTML',"$label ($f)", fileOk("$BASE/$f"),
+            fileOk("$BASE/$f") ? 'Present' : 'Missing',
+            "sudo cp $f $BASE/$f && sudo chown www-data:www-data $BASE/$f");
+    } else {
+        chkPass('Dashboard HTML',"$label ($f)", 'Not installed — no flrig (config.php radio.enabled = false)');
+    }
 }
 
 $phpFiles = [
@@ -174,6 +264,7 @@ $phpFiles = [
     'admin/firewall-api.php'     => 'Firewall API',
     'admin/system-audit-api.php' => 'System audit API',
     'admin/log-viewer-api.php'   => 'Log viewer API',
+    'includes/admin-firewall.php' => 'Firewall rule reader (Firewall + Audit)',
 ];
 foreach ($phpFiles as $f => $label) {
     chk('PHP Files',"$label ($f)", fileOk("$BASE/$f"),
@@ -289,6 +380,20 @@ if (!empty($cfg)) {
     else
         chkWarn('Configuration','APRS-IS passcode', 'Receive-only (passcode -1) - fine unless you want to send',
             'Set aprs.passcode in config.php - generate at https://apps.magicbug.co.uk/passcode/');
+    // 2026-10-20: CORS was "*" by default; now same-origin unless configured.
+    if (($cfg['cors']['allow_all'] ?? false) === true)
+        chkWarn('Configuration','Other web sites (CORS)', "cors.allow_all is true - any web site can call this dashboard's endpoints from its visitors' browsers",
+            "Set 'cors' => ['allow_all' => false, 'allowed_origins' => []] in config.php (list a site in allowed_origins only if it really needs to call the dashboard)");
+    else
+        chkPass('Configuration','Other web sites (CORS)', 'Same-origin only' . (!empty($cfg['cors']['allowed_origins']) ? ' + ' . implode(', ', (array)$cfg['cors']['allowed_origins']) : ''));
+    // 2026-10-20: CARTO stamps "API KEY REQUIRED" on map tiles without a key.
+    $cartoKey = trim((string)($cfg['map']['carto_key'] ?? ''));
+    if (preg_match('/^[A-Za-z0-9_-]{8,128}$/', $cartoKey))
+        chkPass('Configuration','CARTO map key (APRS map)', 'Set');
+    else
+        chkWarn('Configuration','CARTO map key (APRS map)',
+            $cartoKey === '' ? 'Not set - APRS map tiles show "API KEY REQUIRED"' : 'Invalid characters - ignored',
+            "Get a free key at https://www.carto.com/basemaps/apikey/ and set 'map' => ['carto_key' => '...'] in config.php");
     chk('Configuration','DB host configured', !empty($cfg['db']['host']??''),
         $cfg['db']['host']??'NOT SET', 'Set db.host in config.php');
     chk('Configuration','DB name configured', !empty($cfg['db']['name']??''),
@@ -455,13 +560,55 @@ if ($bpqCfg) {
     chkPass('LinBPQ','bpq32.cfg found', $bpqCfg);
     $bc = file_get_contents($bpqCfg);
     chk('LinBPQ','NODECALL set',    preg_match('/^NODECALL\s*=/mi',$bc)>0, '', 'Set NODECALL=YOURCALL-N');
-    chk('LinBPQ','LINMAIL enabled', preg_match('/^LINMAIL\s*$/mi',$bc)>0,  '', 'Add LINMAIL to bpq32.cfg');
-    chk('LinBPQ','LINCHAT enabled', preg_match('/^LINCHAT\s*$/mi',$bc)>0,  '', 'Add LINCHAT to bpq32.cfg');
+    // LinBPQ turns on its mail and chat servers either with LINMAIL / LINCHAT
+    // lines in bpq32.cfg or with "mail" / "chat" on its command line
+    // (e.g. ExecStart=.../linbpq mail chat). Accept either (2026-10-03).
+    // Only the linbpq process itself (by program name), not any command line
+    // that merely mentions it.
+    $bpqArgs = strtolower((string)@shell_exec("ps -C linbpq -o args= 2>/dev/null"));
+    foreach (['LINMAIL' => 'mail', 'LINCHAT' => 'chat'] as $kw => $arg) {
+        $inCfg = preg_match('/^\s*' . $kw . '\b/mi', $bc) > 0;
+        $inCmd = preg_match('/\b' . $arg . '\b/', $bpqArgs) > 0;
+        chk('LinBPQ', "$kw enabled", $inCfg || $inCmd,
+            $inCfg ? "$kw line in bpq32.cfg" : ($inCmd ? "\"$arg\" on the running linbpq command line" : 'Not in bpq32.cfg and not on the linbpq command line'),
+            "Add $kw to bpq32.cfg, or start linbpq with \"$arg\" (then restart LinBPQ)");
+    }
     chk('LinBPQ','BBS APPLICATION', preg_match('/^APPLICATION.*BBS/mi',$bc)>0,  '', 'Add APPLICATION line for BBS');
     chk('LinBPQ','CHAT APPLICATION',preg_match('/^APPLICATION.*CHAT/mi',$bc)>0, '', 'Add APPLICATION line for CHAT');
-    chkWarn('LinBPQ','TCPPORT in config', preg_match('/^TCPPORT\s*=/mi',$bc)>0,
+    chk('LinBPQ','TCPPORT in config', preg_match('/^\s*TCPPORT\s*=/mi',$bc)>0,
         'TCPPORT setting in bpq32.cfg telnet port section',
-        'Set TCPPORT=8010 in the PORT/DRIVER=TELNET section');
+        'Set TCPPORT=8010 in the PORT/DRIVER=TELNET section', true);
+    // 2026-10-25: the VARA HF Terminal (bpq-vara) attaches this port
+    $vWant = (int)($cfg['vara']['bpq_port'] ?? 0);
+    $vPort = 0; $vPos = 0;
+    $bcNc  = preg_replace('#/\*.*?\*/#s', '', $bc);
+    if (preg_match_all('/^\s*PORT\b(.*?)^\s*ENDPORT\b/smi', $bcNc, $pm)) {
+        foreach ($pm[1] as $blk) {
+            $vPos++;
+            $blk = implode("\n", array_map(fn($l) => explode(';', $l, 2)[0], explode("\n", $blk)));
+            $num = preg_match('/^\s*PORTNUM\s*=\s*(\d+)/mi', $blk, $nm) ? (int)$nm[1] : $vPos;
+            if (!preg_match('/^\s*(DRIVER\s*=\s*VARA|DLLNAME\s*=\s*VARA)/mi', $blk)) continue;
+            if (preg_match('/VARA\s*-?\s*FM/i', $blk)) continue;
+            $vPort = $num; break;
+        }
+    }
+    chk('LinBPQ', 'VARA HF port (VARA HF Terminal)', $vWant > 0 || $vPort > 0,
+        $vWant > 0 ? "config.php vara.bpq_port = $vWant" . ($vPort && $vPort !== $vWant ? " (bpq32.cfg's first VARA HF port is $vPort)" : '')
+                   : ($vPort ? "Port $vPort (first DRIVER=VARA port that isn't VARA FM)" : 'No DRIVER=VARA port found'),
+        "Only needed for the VARA HF Terminal. Add a VARA port to bpq32.cfg, or set 'vara' => ['bpq_port' => N] in config.php", true);
+    // 2026-10-05: the Rig page lists the scan schedule of the FLRIG RADIO block
+    if ($flrigOn) {
+        require_once "$BASE/includes/bpq-radio.php";
+        $want  = (int)($cfg['radio']['bpq_radio'] ?? 0);
+        $hp    = ($cfg['radio']['flrig_host'] ?? '127.0.0.1') . ':' . ($cfg['radio']['flrig_port'] ?? 12345);
+        $rb    = bpqPickFlrigBlock(bpqRadioBlocks($bc), $want ?: null, $hp);
+        $nChan = $rb ? array_sum(array_map(fn($b) => count($b['channels']), bpqScanBands($rb))) : 0;
+        chk('LinBPQ', 'FLRIG RADIO block (Rig page scan list)', $rb && $nChan > 0,
+            $rb ? "RADIO {$rb['radio']} (FLRIG {$rb['flrig']}), $nChan scan channel(s)"
+                : ($want ? "No RADIO $want block with an FLRIG line" : 'No RADIO block with an FLRIG line'),
+            $want ? 'Check config.php radio.bpq_radio, or set it to 0 for automatic'
+                  : 'Add a RADIO n block with "FLRIG host:port" and its scan channels to bpq32.cfg', true);
+    }
 } else {
     chkWarn('LinBPQ','bpq32.cfg not readable',
         'Not found or not readable by web server — checks skipped',
@@ -568,7 +715,7 @@ else
     chkWarn('Cron Jobs','connect-watchdog not scheduled (optional)',
         'Only needed if you use the Connect Watchdog',
         '# Add to root crontab (sudo crontab -e):'."
-".'*/5 * * * * /usr/bin/python3 /var/www/<dashboard>/scripts/connect-watchdog.py >> /var/log/connect-watchdog.log 2>&1');
+".'*/5 * * * * /usr/bin/python3 '.$BASE.'/scripts/connect-watchdog.py >> /var/log/connect-watchdog.log 2>&1');
 
 // Dashboard log parsers (installed by install.sh as /etc/cron.d/bpq-dashboard)
 $parsersFound = [];
@@ -588,7 +735,7 @@ if ($wpSched) chkPass('Cron Jobs','wp_manager --auto-clean (3am daily)', 'Schedu
 else chkWarn('Cron Jobs','wp_manager --auto-clean not scheduled',
     'WP.cfg will not be automatically cleaned',
     '# sudo crontab -e — add:'."
-".'0 3 * * * cd <your linbpq dir> && /usr/bin/python3 /var/www/<dashboard>/scripts/wp_manager.py --auto-clean >> /var/log/wp-auto-clean.log 2>&1');
+".'0 3 * * * cd '.(!empty($cfg['paths']['linbpq']) ? rtrim($cfg['paths']['linbpq'],'/') : '<your linbpq dir>').' && /usr/bin/python3 '.$BASE.'/scripts/wp_manager.py --auto-clean >> /var/log/wp-auto-clean.log 2>&1');
 
 // prop-scheduler
 if (strpos($allCron,'prop-scheduler') !== false)
@@ -650,28 +797,21 @@ $sc    = $score>=90?'#3fb950':($score>=70?'#d29922':'#f85149');
 renderPage($results,$pass,$fail,$warn,$score,$sc);
 
 // ── Login page ─────────────────────────────────────────────────────
-function showLogin() { ?>
+function showLogin(string $why) {
+    http_response_code(403);
+    header('Cache-Control: no-store'); ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BPQ Dashboard — Install Check</title>
 <style>
 body{margin:0;background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;
      display:flex;align-items:center;justify-content:center;min-height:100vh;}
-.box{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:40px;text-align:center;width:340px;}
-h2{color:#4a9eff;margin:0 0 8px;}p{color:#8b949e;font-size:13px;margin:0 0 24px;}
-input{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;
-      padding:10px 14px;font-size:14px;box-sizing:border-box;margin-bottom:12px;outline:none;}
-input:focus{border-color:#4a9eff;}
-button{width:100%;background:#4a9eff;border:none;border-radius:6px;color:#fff;
-       padding:11px;font-size:14px;font-weight:700;cursor:pointer;}
-button:hover{background:#6ab0ff;}
+.box{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:32px;max-width:560px;margin:16px;}
+h2{color:#4a9eff;margin:0 0 8px;}p{color:#8b949e;font-size:14px;line-height:1.5;margin:0;}
 </style></head><body>
 <div class="box">
-<h2>🔧 BPQ Dashboard</h2>
-<p>Post-Installation Check v1.5.13</p>
-<form method="get">
-<input type="password" name="pass" placeholder="Enter check password" autofocus>
-<button type="submit">▶ Run Checks</button>
-</form></div></body></html>
+<h2>🔒 Install Check needs the admin login</h2>
+<p><?=htmlspecialchars($why)?></p>
+</div></body></html>
 <?php }
 
 // ── Main render ────────────────────────────────────────────────────
@@ -679,7 +819,7 @@ function renderPage($results,$pass,$fail,$warn,$score,$sc) {
 $total = $pass+$fail+$warn; ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BPQ Dashboard v1.5.13 — Install Check</title>
+<title>BPQ Dashboard v1.5.14 — Install Check</title>
 <style>
 :root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;
       --acc:#4a9eff;--grn:#3fb950;--red:#f85149;--org:#d29922;--pur:#bc8cff;}
@@ -725,7 +865,7 @@ h1{font-size:20px;color:var(--acc);margin-bottom:4px;}
         color:var(--org);font-size:12px;text-align:center;line-height:1.8;}
 .footer strong{color:var(--red);}
 </style></head><body>
-<h1>🔧 BPQ Dashboard v1.5.13 — Post-Installation Check</h1>
+<h1>🔧 BPQ Dashboard v1.5.14 — Post-Installation Check</h1>
 <p class="sub"><?=date('Y-m-d H:i:s T')?> · PHP <?=phpversion()?> · <?=htmlspecialchars(php_uname('n'))?></p>
 
 <div class="card">
@@ -773,7 +913,7 @@ foreach ($cats as $cat => $items):
 <div class="footer">
     <strong>⚠ Security reminder:</strong> Remove this file when done troubleshooting.<br>
     <code>sudo rm <?=htmlspecialchars($GLOBALS['BASE'])?>/install-check.php</code><br>
-    BPQ Dashboard v1.5.13 · Access: <?=htmlspecialchars("https://{$_SERVER['HTTP_HOST']}/install-check.php?pass=".CHECK_PASS)?>
+    BPQ Dashboard v1.5.14 · Access: <?=htmlspecialchars("https://".($_SERVER['HTTP_HOST'] ?? 'your-server')."/install-check.php")?> (admin login)
 </div>
 </body></html>
 <?php }
