@@ -642,6 +642,10 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <div class="cmd-label">Lists the user names only (never the hashes). The file should be <span class="kw">root:www-data 640</span> or similar, and must be outside the web root. If it's missing, nginx answers 500 on every admin page, which fails closed.</div>
     </div><div class="cmd-tag blue">inspect</div></div>
     <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> chown root:www-data /etc/nginx/.bpq-mgmt-auth &amp;&amp; <span class="sudo">sudo</span> chmod 640 /etc/nginx/.bpq-mgmt-auth</code>
+      <div class="cmd-label">Every admin-login page answers <span class="kw">500</span> and the error log says <span class="kw">open() "/etc/nginx/.bpq-mgmt-auth" failed (13: Permission denied)</span>: the file is <span class="kw">root:root</span>, so nginx's workers (www-data) can't read it. Installers before 2026-10-30 left it that way. No reload needed. <span class="kw">fix-permissions.sh</span> does the same.</div>
+    </div><div class="cmd-tag red">fix 500</div></div>
+    <div class="cmd"><div class="cmd-inner">
       <code>for p in config.php db-config.php bbs-config.php includes/bootstrap.php scripts/bpq_db_config.py data/partners.json sql/2026-07-messages-schema.sql docs/SESSION-JOURNAL.md config.php.bak-test; do printf '%-36s %s\n' "$p" "$(curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span class="flag">-w</span> '%{http_code} %{size_download}B' <span class="flag">-A</span> 'Mozilla/5.0' <var data-v="site">https://bpq.example.com</var>/$p)"; done</code>
       <div class="cmd-label">Private files must never download. Every line should be <span class="kw">403</span> or <span class="kw">404</span>. A <span class="kw">200</span> whose size equals your home page is a catch-all <span class="kw">try_files … /index.php</span> fallback, not the file; any other 200 is a leak. <span class="kw">config.php</span> and <span class="kw">db-config.php</span> return nothing even when reachable, but should still be 403.</div>
     </div><div class="cmd-tag red">private files</div></div>
@@ -1186,6 +1190,10 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <div class="cmd-label">PHP errors, then a restart for hung pages or 502 Bad Gateway. Use your PHP version number.</div>
     </div><div class="cmd-tag amber">php</div></div>
     <div class="cmd"><div class="cmd-inner">
+      <code>ls <span class="flag">-l</span> /run/php/; <span class="sudo">sudo</span> grep <span class="flag">-n</span> fastcgi_pass /etc/nginx/sites-enabled/*</code>
+      <div class="cmd-label">502 on every PHP page while PHP-FPM is running: the site file names a socket that isn't there. Each <span class="kw">fastcgi_pass</span> must name one that <span class="kw">ls</span> lists, by its versioned name (<span class="kw">php8.5-fpm.sock</span>), not the generic <span class="kw">php-fpm.sock</span> that installers before 2026-10-30 could write. Fix: <span class="kw">sudo sed -i --follow-symlinks 's|unix:/run/php/php-fpm.sock|unix:/run/php/php8.5-fpm.sock|g' /etc/nginx/sites-enabled/bpq-dashboard</span> (your version), then test and reload. System Audit and Install Check flag it.</div>
+    </div><div class="cmd-tag red">socket</div></div>
+    <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> grep "limiting requests" /var/log/nginx/*error.log | tail -5</code>
       <div class="cmd-label">Rate-limit hits. Since 2026-10-19 a rate limit answers <span class="kw">429 Too Many Requests</span> (it used to be 503, which looked like an outage). The line names the zone: <span class="kw">dashboard_api</span> / <span class="kw">bpq_dashboard_api</span> (PHP APIs, 5 r/s), <span class="kw">dashboard_limit</span> (pages), <span class="kw">dashboard_logs</span> (log files, 100 r/s). Raise a zone's <span class="kw">burst</span> in your site config only if normal use hits it.</div>
     </div><div class="cmd-tag amber">rate limit</div></div>
@@ -1199,11 +1207,11 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> WEB_ROOT=<var data-v="root">/var/www/bpq-dashboard</var> bash <var data-v="root">/var/www/bpq-dashboard</var>/fix-permissions.sh <span class="flag">--dry-run</span>
 <span class="sudo">sudo</span> WEB_ROOT=<var data-v="root">/var/www/bpq-dashboard</var> bash <var data-v="root">/var/www/bpq-dashboard</var>/fix-permissions.sh</code>
-      <div class="cmd-label">The everyday tool: preview, then apply. Files 644, folders 755, config.php 640, cache/data/logs/yapp-files 750. Safe to repeat; doesn't touch the web-server config.</div>
+      <div class="cmd-label">The everyday tool: preview, then apply. Files 644, folders 755, config.php 640, cache/data/logs/yapp-files 750, and the admin login file <span class="kw">/etc/nginx/.bpq-mgmt-auth</span> root:www-data 640. Safe to repeat; doesn't touch the web-server config.</div>
     </div><div class="cmd-tag green">routine</div></div>
     <div class="cmd note"><div class="cmd-inner">
       <div class="note-head">set-permissions.sh</div>
-      <div class="cmd-label">First-install only. It also <b>copies nginx-bpq-dashboard.conf over your nginx site config</b>. Don't run it on a working install.</div>
+      <div class="cmd-label">First-install only. It also <b>copies nginx-bpq-dashboard.conf over your nginx site config</b> (pointing it at this server's PHP-FPM socket since 2026-10-30). Don't run it on a working install.</div>
     </div><div class="cmd-tag red">caution</div></div>
   </div>
 </div>

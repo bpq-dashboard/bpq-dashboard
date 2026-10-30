@@ -48,6 +48,24 @@ if [ -f "$DASH_DIR/nginx-bpq-dashboard.conf" ]; then
         echo "  ✓ Nginx config installed to $NGINX_CONF"
     fi
 
+    # The template names php8.3's socket. Point it at this server's real,
+    # versioned PHP-FPM socket (2026-10-30: PHP 8.5 on Ubuntu got 502s).
+    PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+    if [ -n "$PHP_VER" ] && [ -S "/run/php/php${PHP_VER}-fpm.sock" ]; then
+        sed -i "s|unix:/run/php/php[0-9.]*-fpm\.sock|unix:/run/php/php${PHP_VER}-fpm.sock|g" "$NGINX_CONF"
+        echo "  ✓ PHP-FPM socket set to /run/php/php${PHP_VER}-fpm.sock"
+    else
+        echo "  ⚠ No /run/php/php${PHP_VER:-?}-fpm.sock — check fastcgi_pass in $NGINX_CONF (ls /run/php/)"
+    fi
+
+    # Admin login file: the nginx workers (www-data) must be able to read it,
+    # or every admin page answers 500 (2026-10-30).
+    if [ -f /etc/nginx/.bpq-mgmt-auth ]; then
+        chown root:"$WEB_GROUP" /etc/nginx/.bpq-mgmt-auth
+        chmod 640 /etc/nginx/.bpq-mgmt-auth
+        echo "  ✓ /etc/nginx/.bpq-mgmt-auth set to root:$WEB_GROUP 640"
+    fi
+
     # Ensure symlink exists in sites-enabled
     if [ ! -L "$NGINX_ENABLED" ]; then
         ln -sf "$NGINX_CONF" "$NGINX_ENABLED"

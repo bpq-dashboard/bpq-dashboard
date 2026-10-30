@@ -280,6 +280,8 @@ Results:
 - **⚠** is something to know about, not a failure. For example, *"Skipping flrig setup"* just means you answered **n**.
 - **✗** is an error. It is listed underneath with what went wrong. The log file has the details; include it if you ask for help.
 
+Just before the summary, the installer asks the web server for three addresses the way a browser would: a PHP file (expects **200**; **502** means the web server can't reach PHP), an admin page with no login (expects **401**; **500** means the web server can't read the admin login file) and the same page with your admin login (expects **200**). A ✗ on any of them names the fix; Section 12 has the details.
+
 #### Step 7 — Open your dashboard
 
 On the LinBPQ computer, find its network address:
@@ -537,7 +539,19 @@ sudo ln -s /path/to/linbpq/logs $W/logs
 For a LAN-only server, the simplest safe choice is to let `install.sh` write it. By hand, start from `bpq-dashboard.conf` (HTTPS, public-facing) and keep **all** of its `return 403` blocks. They stop `scripts/`, `data/`, `.sql`, backup files and anything in `logs/` other than log files from being downloaded. The template protects `/admin/` with the password file `/etc/nginx/.bpq-mgmt-auth`. Create it:
 
 ```bash
-sudo htpasswd -c /etc/nginx/.bpq-mgmt-auth admin
+sudo htpasswd -cB /etc/nginx/.bpq-mgmt-auth admin
+sudo chown root:www-data /etc/nginx/.bpq-mgmt-auth
+sudo chmod 640 /etc/nginx/.bpq-mgmt-auth
+```
+
+The last two lines matter: `htpasswd -c` makes the file readable by root only, and nginx's workers (user `www-data`) then can't read it, so every admin page answers **500**.
+
+Both templates name PHP 8.3's socket (`fastcgi_pass unix:/run/php/php8.3-fpm.sock;`). Use your own version's socket — `ls /run/php/` shows it, for example `php8.5-fpm.sock` — and always the versioned name, not `php-fpm.sock`:
+
+```bash
+ls /run/php/
+SITE=/etc/nginx/sites-available/bpq-dashboard     # your site file
+sudo sed -i 's|php8.3-fpm.sock|php8.5-fpm.sock|g' $SITE   # your version
 ```
 
 Both templates have the `/ws/telnet` and `/ws/vara` blocks: `nginx-bpq-dashboard.conf` puts them and the two pages behind the admin login, like the installer; `bpq-dashboard.conf` limits `/ws/telnet` to private addresses and puts `/ws/vara` behind the admin login as well.
@@ -1210,12 +1224,42 @@ sudo journalctl -u nginx -n 30
 
 ### 502 Bad Gateway
 
-PHP-FPM is not running.
+nginx can't reach PHP: either PHP-FPM is not running, or the site file points at a socket that doesn't exist.
 
 ```bash
-systemctl list-units 'php*-fpm*'          # shows your version, e.g. php8.2-fpm
-sudo systemctl restart php8.2-fpm         # use the name shown above
+systemctl list-units 'php*-fpm*'          # shows your version, e.g. php8.5-fpm
+sudo systemctl restart php8.5-fpm         # use the name shown above
+ls -l /run/php/                           # the socket PHP really listens on
+sudo grep -n fastcgi_pass /etc/nginx/sites-enabled/*
 ```
+
+Every `fastcgi_pass` line must name a socket that `ls` shows, with its version number (`php8.5-fpm.sock`). Installers before 2026-10-30 could write the generic `/run/php/php-fpm.sock`, which doesn't exist on some systems (seen on Ubuntu with PHP 8.5). Fix it with your version:
+
+```bash
+SITE=/etc/nginx/sites-enabled/bpq-dashboard
+sudo sed -i --follow-symlinks \
+  's|php-fpm.sock|php8.5-fpm.sock|g' $SITE
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+The nginx error log shows this as `connect() to unix:/run/php/php-fpm.sock failed (2: No such file or directory)`. Install Check (*PHP-FPM socket in site config*) and System Audit flag it.
+
+### 500 Internal Server Error on the admin pages (and Email Client, Chat, Install Check)
+
+Usually the web server can't read the admin login file. The error log shows:
+
+```
+[crit] open() "/etc/nginx/.bpq-mgmt-auth" failed (13: Permission denied)
+```
+
+```bash
+sudo tail -20 /var/log/nginx/bpq-dashboard.error.log
+ls -l /etc/nginx/.bpq-mgmt-auth            # should be: -rw-r----- root www-data
+sudo chown root:www-data /etc/nginx/.bpq-mgmt-auth
+sudo chmod 640 /etc/nginx/.bpq-mgmt-auth
+```
+
+No reload is needed; the next request reads the file. Installers before 2026-10-30 left it `root:root` (fixed: the installer and `fix-permissions.sh` now set `root:www-data 640`). If the file is missing altogether, nginx also answers 500; create it with `sudo htpasswd -cB /etc/nginx/.bpq-mgmt-auth admin` and run the two lines above.
 
 ### 503 Service Temporarily Unavailable / 429 Too Many Requests
 

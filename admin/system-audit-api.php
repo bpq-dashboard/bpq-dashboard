@@ -126,6 +126,12 @@ if (file_exists($authFile)) {
         $findings[] = finding('admin-auth-perms','security','warn','Admin login file is world-readable (' . decoct($mode) . ')',
             "$authFile ($owner) can be read by every account on the server, password hashes included.",
             "sudo chown root:www-data $authFile && sudo chmod 640 $authFile");
+    } elseif (!is_readable($authFile)) {
+        // PHP runs as the web user, so this is what nginx's workers see too
+        // (2026-10-30, KG9NI: root:root left every admin page at 500).
+        $findings[] = finding('admin-auth-perms','security','crit','Web server cannot read the admin login file',
+            "$authFile is " . decoct($mode) . " $owner; the web user can't read it, so pages using it answer 500. (This page opened, so your site probably uses another file.)",
+            "sudo chown root:www-data $authFile && sudo chmod 640 $authFile");
     } else {
         $findings[] = finding('admin-auth-perms','security','ok','Admin login file protected',
             "$authFile: mode " . decoct($mode) . " $owner.");
@@ -411,6 +417,35 @@ if ($isNginx && is_dir('/etc/nginx/sites-available') && is_dir('/etc/nginx/sites
         $findings[] = finding('nginx-stale-configs','nginx','info', count($stale) . ' unused file(s) in sites-available/',
             'Not loaded (not linked from sites-enabled/): ' . implode(', ', array_slice($stale, 0, 8)) . '. Harmless, but easy to edit by mistake: changes there do nothing.',
             'sudo mkdir -p /root/nginx-old-configs && for f in ' . implode(' ', array_map('escapeshellarg', $stale)) . '; do sudo mv "/etc/nginx/sites-available/$f" /root/nginx-old-configs/; done');
+    }
+}
+// PHP-FPM sockets named by the enabled sites (2026-10-30, KG9NI: the
+// installer wrote the generic /run/php/php-fpm.sock, which didn't exist on a
+// PHP 8.5 server, so every PHP page failed). Each one must exist; the generic
+// name is only an alias link, so the versioned path is preferred.
+if ($isNginx) {
+    $fpSocks = []; $fpFiles = [];
+    foreach (array_merge(glob('/etc/nginx/sites-enabled/*') ?: [], glob('/etc/nginx/conf.d/*.conf') ?: []) as $f) {
+        if (!is_file($f) || !is_readable($f)) continue;
+        if (preg_match_all('~^\s*fastcgi_pass\s+unix:([^;\s]+)\s*;~m', (string)@file_get_contents($f), $fm)) {
+            foreach ($fm[1] as $sk) { $fpSocks[$sk] = true; $fpFiles[$sk][basename($f)] = true; }
+        }
+    }
+    $fpSocks = array_keys($fpSocks);
+    $fpGone  = array_values(array_filter($fpSocks, fn($p) => !file_exists($p)));
+    $fpAlias = array_values(array_filter($fpSocks, fn($p) => !preg_match('~php[0-9]+\.[0-9]+-fpm\.sock$~', $p)));
+    $where   = fn(array $l) => implode(', ', array_map(fn($p) => "$p (" . implode(', ', array_keys($fpFiles[$p])) . ')', $l));
+    $fpFix   = "sudo sed -i --follow-symlinks 's|unix:/run/php/[^;]*|unix:/run/php/php$phpVer-fpm.sock|' /etc/nginx/sites-enabled/FILE && sudo nginx -t && sudo systemctl reload nginx";
+    if (!$fpSocks) {
+        // TCP fastcgi (127.0.0.1:9000) or an include we can't see: nothing to check
+    } elseif ($fpGone) {
+        $findings[] = finding('php-fpm-socket','nginx','crit','nginx points PHP at a socket that does not exist',
+            'Missing: ' . $where($fpGone) . '. Pages under those locations answer 502 Bad Gateway. This PHP listens on /run/php/php' . $phpVer . '-fpm.sock.', $fpFix);
+    } elseif ($fpAlias) {
+        $findings[] = finding('php-fpm-socket','nginx','warn','nginx uses the generic PHP-FPM socket name',
+            $where($fpAlias) . ' is an alias link that some systems don\'t create or lose after a PHP upgrade; then every PHP page fails. Name the versioned socket instead.', $fpFix);
+    } else {
+        $findings[] = finding('php-fpm-socket','nginx','ok','nginx PHP-FPM socket(s) exist', implode(', ', $fpSocks) . '.');
     }
 }
 

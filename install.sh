@@ -369,23 +369,59 @@ else
         "package name for your distro version), and re-run this script."
 fi
 
-# Detect installed PHP-FPM version (e.g. php8.1-fpm, php8.2-fpm)
-PHP_FPM_SVC=$(systemctl list-units --type=service --state=loaded | \
-              awk '/php[0-9.]+-fpm/{print $1; exit}')
+# Detect the PHP-FPM version (e.g. php8.3-fpm, php8.5-fpm).
+# 2026-10-30 (KG9NI's Ubuntu / PHP 8.5 report): the old code took the first
+# '*fpm.sock' that `find` listed and fell back to /run/php/php-fpm.sock. That
+# name is only a generic alias link (or missing), so nginx was written with a
+# socket that didn't exist and every PHP page failed. Now the version comes
+# from the CLI PHP that apt just installed (the php-fpm meta-package pulls the
+# same version), the socket is read from that version's pool file, and the
+# nginx config always gets the real, versioned path.
+PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null)
+PHP_FPM_SVC=""
+if [[ -n "$PHP_VER" ]] && systemctl list-unit-files "php${PHP_VER}-fpm.service" 2>/dev/null | grep -q "php${PHP_VER}-fpm"; then
+    PHP_FPM_SVC="php${PHP_VER}-fpm"
+fi
 if [[ -z "$PHP_FPM_SVC" ]]; then
-    # Fall back to whatever php-fpm meta-package set up
-    PHP_FPM_SVC=$(ls /etc/init.d/ 2>/dev/null | grep '^php.*fpm' | head -1)
+    # CLI and FPM versions differ, or no CLI: take the newest FPM unit installed
+    PHP_FPM_SVC=$(systemctl list-unit-files --type=service 2>/dev/null | \
+                  awk '$1 ~ /^php[0-9]+\.[0-9]+-fpm\.service$/ {sub(/\.service$/,"",$1); print $1}' | \
+                  sort -V | tail -1)
+    [[ -n "$PHP_FPM_SVC" ]] && PHP_VER="${PHP_FPM_SVC#php}" && PHP_VER="${PHP_VER%-fpm}"
 fi
 if [[ -n "$PHP_FPM_SVC" ]]; then
     systemctl enable --now "$PHP_FPM_SVC" >/dev/null 2>&1
-    ok "PHP-FPM running: $PHP_FPM_SVC"
+    if systemctl is-active --quiet "$PHP_FPM_SVC"; then
+        ok "PHP-FPM running: $PHP_FPM_SVC"
+    else
+        warn "$PHP_FPM_SVC is installed but did not start. Check: sudo systemctl status $PHP_FPM_SVC"
+    fi
 else
     warn "Could not detect a PHP-FPM service. PHP pages may not work."
 fi
 
-# Find the FPM socket path (varies by PHP version)
-PHP_FPM_SOCK=$(find /run/php /var/run/php -maxdepth 1 -name '*fpm.sock' 2>/dev/null | head -1)
-[[ -z "$PHP_FPM_SOCK" ]] && PHP_FPM_SOCK="/run/php/php-fpm.sock"
+# Find the FPM socket. The pool file's 'listen =' line is the truth; the
+# default is /run/php/php<ver>-fpm.sock.
+PHP_FPM_SOCK=""
+PHP_POOL="/etc/php/${PHP_VER}/fpm/pool.d/www.conf"
+if [[ -n "$PHP_VER" && -f "$PHP_POOL" ]]; then
+    PHP_FPM_SOCK=$(awk -F= '/^[[:space:]]*listen[[:space:]]*=/ {gsub(/[[:space:]]/,"",$2); print $2; exit}' "$PHP_POOL")
+    [[ "$PHP_FPM_SOCK" == /* ]] || PHP_FPM_SOCK=""   # a TCP listen (127.0.0.1:9000) isn't a socket path
+fi
+[[ -z "$PHP_FPM_SOCK" && -n "$PHP_VER" ]] && PHP_FPM_SOCK="/run/php/php${PHP_VER}-fpm.sock"
+if [[ -z "$PHP_FPM_SOCK" ]]; then
+    # Last resort: a real versioned socket that exists (never the generic alias)
+    PHP_FPM_SOCK=$(find /run/php /var/run/php -maxdepth 1 -name 'php*.*-fpm.sock' -type s 2>/dev/null | sort -V | tail -1)
+fi
+# The socket appears a moment after the service starts — wait up to 10 s.
+for _ in $(seq 1 10); do [[ -n "$PHP_FPM_SOCK" && -S "$PHP_FPM_SOCK" ]] && break; sleep 1; done
+if [[ -n "$PHP_FPM_SOCK" && -S "$PHP_FPM_SOCK" ]]; then
+    ok "PHP-FPM socket: $PHP_FPM_SOCK"
+else
+    warn "PHP-FPM socket ${PHP_FPM_SOCK:-(unknown)} not found — PHP pages will show 502 Bad Gateway."
+    warn "Check: ls -l /run/php/ ; sudo systemctl status ${PHP_FPM_SVC:-'php*-fpm'}"
+    [[ -z "$PHP_FPM_SOCK" ]] && PHP_FPM_SOCK="/run/php/php-fpm.sock"
+fi
 
 # Python 3 plus pip and the libraries the daemon scripts need
 PY_PKGS=(python3 python3-pip python3-requests python3-pexpect python3-serial python3-pymysql python3-reportlab python3-websockets)
@@ -562,6 +598,7 @@ fi
 # install, so always safe to use -c here); -B uses bcrypt, the stronger
 # hash bpq-maintenance.html's own docs recommend over MD5-APR1 for new
 # entries.
+mkdir -p "$(dirname "$ADMIN_HTPASSWD")"   # /etc/nginx doesn't exist on an Apache-only server
 if htpasswd -cbB "$ADMIN_HTPASSWD" "$ADMIN_USER" "$ADMIN_PASS" 2>/dev/null; then
     ok "Admin credentials saved to $ADMIN_HTPASSWD"
 else
@@ -569,7 +606,25 @@ else
     die "Cannot continue without admin auth configured. Check permissions on" \
         "$(dirname "$ADMIN_HTPASSWD") and re-run this script."
 fi
+# The web server's worker processes read this file on every login, and they
+# don't run as root. 2026-10-30 (KG9NI): htpasswd -c creates it root:root, and
+# chmod 640 alone left www-data unable to read it, so nginx answered 500
+# ("open() ... failed (13: Permission denied)") on every admin page.
+# root:<worker group> 640 = the workers can read it, other accounts can't.
+AUTH_READER="$WEB_USER"
+if [[ "$WEBSERVER" == "nginx" && -f /etc/nginx/nginx.conf ]]; then
+    NGINX_WORKER=$(awk '$1=="user" {gsub(/;/,"",$2); print $2; exit}' /etc/nginx/nginx.conf)
+    [[ -n "$NGINX_WORKER" ]] && id "$NGINX_WORKER" >/dev/null 2>&1 && AUTH_READER="$NGINX_WORKER"
+fi
+AUTH_GROUP=$(id -gn "$AUTH_READER" 2>/dev/null || echo "$WEB_USER")
+chown "root:$AUTH_GROUP" "$ADMIN_HTPASSWD"
 chmod 640 "$ADMIN_HTPASSWD"
+if sudo -u "$AUTH_READER" test -r "$ADMIN_HTPASSWD" 2>/dev/null; then
+    ok "$ADMIN_HTPASSWD is root:$AUTH_GROUP 640 (web server can read it, other accounts can't)"
+else
+    warn "$AUTH_READER can't read $ADMIN_HTPASSWD — admin pages will answer 500."
+    warn "Fix: sudo chown root:$AUTH_GROUP $ADMIN_HTPASSWD && sudo chmod 640 $ADMIN_HTPASSWD"
+fi
 
 # ============================================================================
 hdr "STEP 8 — Copy dashboard files"
@@ -1211,6 +1266,42 @@ APACHE
     else
         err "Apache config test failed. See: sudo apache2ctl configtest"
     fi
+fi
+
+# Smoke test (2026-10-30): a config test can pass while PHP or the admin
+# login is still broken (wrong FPM socket -> 502, unreadable login file ->
+# 500), so ask the web server the way a browser would.
+sleep 2   # the reload finishes a moment after systemctl returns
+http_code() { curl -s -o /dev/null -m 15 -w '%{http_code}' -A 'Mozilla/5.0 (install.sh)' "$@" 2>/dev/null; }
+if command -v curl >/dev/null 2>&1; then
+    CODE=$(http_code http://127.0.0.1/api/config.php)
+    case "$CODE" in
+        200) ok "PHP answers through the web server (api/config.php → 200)" ;;
+        502|504) err "PHP pages answer $CODE — the web server can't reach PHP-FPM at $PHP_FPM_SOCK."
+             err "Check: ls -l /run/php/ ; then fix fastcgi_pass in /etc/nginx/sites-available/bpq-dashboard" ;;
+        *)   warn "api/config.php answered ${CODE:-nothing} (expected 200). See the web server error log." ;;
+    esac
+    CODE=$(http_code http://127.0.0.1/admin/bpq-maintenance.html)
+    case "$CODE" in
+        401) ok "Admin pages ask for the login (no login → 401)" ;;
+        500) err "Admin pages answer 500 — the web server can't read $ADMIN_HTPASSWD."
+             err "Fix: sudo chown root:${AUTH_GROUP:-$WEB_USER} $ADMIN_HTPASSWD && sudo chmod 640 $ADMIN_HTPASSWD" ;;
+        200) err "Admin pages open WITHOUT a login — check the /admin/ block of the site config." ;;
+        *)   warn "Admin page answered ${CODE:-nothing} with no login (expected 401)." ;;
+    esac
+    # Same page with the login. The password goes to curl on stdin, not the
+    # command line, so it never shows in the process list.
+    ESC_PASS=${ADMIN_PASS//\\/\\\\}; ESC_PASS=${ESC_PASS//\"/\\\"}
+    ESC_USER=${ADMIN_USER//\\/\\\\}; ESC_USER=${ESC_USER//\"/\\\"}
+    CODE=$(printf 'user = "%s:%s"\n' "$ESC_USER" "$ESC_PASS" | http_code -K - http://127.0.0.1/admin/bpq-maintenance.html)
+    unset ESC_PASS ESC_USER
+    if [[ "$CODE" == "200" ]]; then
+        ok "Admin login works (user $ADMIN_USER → 200)"
+    else
+        warn "Admin page answered ${CODE:-nothing} with the login (expected 200)."
+    fi
+else
+    warn "curl not installed — skipped the web smoke test. Open /admin/bpq-maintenance.html in a browser."
 fi
 
 # ============================================================================

@@ -4,6 +4,46 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed (2026-10-30) — Ubuntu / PHP 8.5 install: 502 and 500 errors
+Reported by KG9NI after a v1.5.15 install on Ubuntu with PHP 8.5 and nginx:
+every PHP page failed, and every admin-login page answered 500.
+- **`install.sh` — PHP-FPM socket**: nginx was written with
+  `fastcgi_pass unix:/run/php/php-fpm.sock` (the first `*fpm.sock` found, or
+  that generic fallback), which didn't exist on that server. The version now
+  comes from the installed PHP (`php -r`, falling back to the newest
+  `phpX.Y-fpm` unit), the socket from that version's pool file
+  (`listen =`, default `/run/php/phpX.Y-fpm.sock`), waiting up to 10 s for it
+  to appear; the generic alias is never written unless nothing else is found,
+  and then with a warning.
+- **`install.sh` — admin login file**: `/etc/nginx/.bpq-mgmt-auth` was left
+  `root:root 640`, so nginx's workers couldn't read it (`open() … failed (13:
+  Permission denied)`) and every page behind the login answered 500. Now
+  `root:<nginx worker group> 640` (www-data by default), checked with
+  `sudo -u www-data test -r`; `/etc/nginx` is created first on Apache-only
+  servers.
+- **`install.sh` — web smoke test** after the site is written: a PHP file
+  (expects 200, names the socket on 502), an admin page with no login
+  (expects 401, names the login-file fix on 500) and with the admin login
+  (expects 200; password passed to curl on stdin).
+- **`fix-permissions.sh`**: new Step 6 sets the admin login file to
+  `root:www-data 640` (`AUTH_FILE=` to override). **`set-permissions.sh`**:
+  points the copied template at this server's `phpX.Y-fpm.sock` and fixes the
+  login file's owner/mode.
+- **Install Check**: *PHP-FPM socket exists* found only 8.1–8.4 (PHP 8.5
+  failed); now any version, preferring the one serving the page. New *PHP-FPM
+  socket in site config*: fails when a `fastcgi_pass` socket doesn't exist,
+  warns on the generic `php-fpm.sock`.
+- **System Audit**: new *nginx PHP-FPM socket(s)* row (crit missing / warn
+  generic, all enabled sites); *Admin login file* goes critical when the web
+  user can't read it.
+- Templates `nginx-bpq-dashboard.conf` / `bpq-dashboard.conf`: header notes to
+  use your versioned socket; login-file setup lines add the chown/chmod.
+- Docs: Manual Part B step 6 (login file chown/chmod, socket version), Part A
+  Step 6 (smoke test), §12 *502 Bad Gateway* (socket) and new *500 Internal
+  Server Error on the admin pages*; Guide §22 System Audit, §23 Install Check,
+  §26 (500 and 502 rows); maintenance page: Admin login *fix 500* row, Web
+  server & PHP *socket* row, Permissions labels.
+
 ## [1.5.15] - 2026-10-27
 
 VARA HF log for RF Connections on fresh installs: the installer now sets up

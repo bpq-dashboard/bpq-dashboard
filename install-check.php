@@ -75,14 +75,23 @@ $phpver = phpversion();
 chk('PHP Environment','PHP ≥ 8.0', version_compare($phpver,'8.0','>='),
     "PHP $phpver", 'sudo apt install php8.3-fpm');
 
-// Detect active FPM
+// Detect active FPM. 2026-10-30: was a fixed 8.4…8.1 list, so PHP 8.5
+// (Ubuntu, KG9NI) failed this row. Prefer the version running this page.
 $fpmVer = null;
-foreach (['8.4','8.3','8.2','8.1'] as $v) {
-    if (fileOk("/run/php/php$v-fpm.sock")) { $fpmVer = $v; break; }
+$myVer  = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+if (file_exists("/run/php/php$myVer-fpm.sock")) {
+    $fpmVer = $myVer;
+} else {
+    $vers = [];
+    foreach (glob('/run/php/php*.*-fpm.sock') ?: [] as $sk) {
+        if (preg_match('~php([0-9]+\.[0-9]+)-fpm\.sock$~', $sk, $m)) $vers[] = $m[1];
+    }
+    usort($vers, 'version_compare');
+    if ($vers) $fpmVer = end($vers);
 }
 chk('PHP Environment','PHP-FPM socket exists', $fpmVer!==null,
-    $fpmVer ? "php$fpmVer-fpm socket found" : 'No PHP-FPM socket found',
-    'sudo systemctl start php8.3-fpm && sudo systemctl enable php8.3-fpm');
+    $fpmVer ? "php$fpmVer-fpm socket found (/run/php/php$fpmVer-fpm.sock)" : 'No PHP-FPM socket found',
+    "sudo systemctl start php$myVer-fpm && sudo systemctl enable php$myVer-fpm");
 
 foreach (['json'=>true,'curl'=>true,'sockets'=>true,'mbstring'=>true,
           'openssl'=>true,'pdo'=>true,'pdo_mysql'=>true,'xml'=>false] as $ext=>$req) {
@@ -143,6 +152,24 @@ if ($nginx) {
     if ($hasCfg) {
         $nc = file_get_contents($cfgFile);
         $ncAll = $nc . "\n" . (@file_get_contents('/etc/nginx/nginx.conf') ?: '');
+        // 2026-10-30 (KG9NI): fastcgi_pass named /run/php/php-fpm.sock, which
+        // didn't exist on that server, and every PHP page failed. Each socket
+        // the site names must exist; the generic alias is only a link that
+        // some systems don't have, so ask for the versioned path.
+        preg_match_all('~^\s*fastcgi_pass\s+unix:([^;\s]+)\s*;~m', $nc, $fm);
+        $fpSocks = array_values(array_unique($fm[1] ?? []));
+        $fpGone  = array_values(array_filter($fpSocks, fn($p) => !file_exists($p)));
+        $fpAlias = array_values(array_filter($fpSocks, fn($p) => !preg_match('~php[0-9]+\.[0-9]+-fpm\.sock$~', $p)));
+        $fpFix   = "sudo sed -i 's|unix:/run/php/[^;]*|unix:/run/php/php$myVer-fpm.sock|' " . (realpath($cfgFile) ?: $cfgFile) . ' && sudo nginx -t && sudo systemctl reload nginx';
+        if (!$fpSocks) {
+            chkWarn('Web Server','PHP-FPM socket in site config', 'No "fastcgi_pass unix:…" lines found in ' . basename($cfgFile), 'Compare with bpq-dashboard.conf');
+        } elseif ($fpGone) {
+            chkFail('Web Server','PHP-FPM socket in site config', 'Site config names a socket that does not exist: ' . implode(', ', $fpGone) . ' — those locations answer 502', $fpFix);
+        } elseif ($fpAlias) {
+            chkWarn('Web Server','PHP-FPM socket in site config', 'Uses the generic ' . implode(', ', $fpAlias) . ' (an alias link that can be missing after an upgrade or reboot)', $fpFix);
+        } else {
+            chkPass('Web Server','PHP-FPM socket in site config', implode(', ', $fpSocks));
+        }
         chk('Web Server','Rate limit zone configured', strpos($ncAll,'limit_req_zone')!==false,
             'Prevents API throttling', 'Add limit_req_zone to nginx.conf or site config');
         chk('Web Server','bpq-chat.php timeout (90s)', strpos($nc,'bpq-chat.php')!==false,

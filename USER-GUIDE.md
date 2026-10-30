@@ -980,11 +980,11 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 ### What's checked
 
-**Security:** the admin login reaches PHP; admin pages and private files refused without the login (asked of the server itself); config files not world-readable; CORS; IPv4 and IPv6 firewall policy; BPQ, MariaDB, flrig and dashboard ports open to the internet; fail2ban and SSH.
+**Security:** the admin login reaches PHP; admin pages and private files refused without the login (asked of the server itself); config files not world-readable; the admin login file readable by the web server but not by other accounts; CORS; IPv4 and IPv6 firewall policy; BPQ, MariaDB, flrig and dashboard ports open to the internet; fail2ban and SSH.
 
 **Resources:** memory, swap, CPU load, free disk space (root and the web root's disk).
 
-**Web server & PHP:** which server is running; `nginx -t`; recent nginx errors (known harmless lines ignored); the PHP version serving the dashboard, extra PHP-FPM versions running, missing PHP extensions; unused files in sites-available.
+**Web server & PHP:** which server is running; `nginx -t`; recent nginx errors (known harmless lines ignored); the PHP version serving the dashboard, extra PHP-FPM versions running, missing PHP extensions; every PHP-FPM socket the enabled nginx sites name exists, by its versioned name (`php8.5-fpm.sock`, not the generic `php-fpm.sock`); unused files in sites-available.
 
 **Database:** connection exactly as the pages make it; the Email Client, RF Connections, Traffic and System Logs tables; the 2026-09/10 updates (📌 keep, Forwarded Messages "Via" and delivery status); data size against the InnoDB buffer pool; whether MariaDB listens on the network.
 
@@ -1018,6 +1018,7 @@ Runs dozens of checks on this install and reports each one with what it found an
 - `config.php` values are filled in (no placeholders left), including the APRS, CARTO, CORS and radio settings
 - folders are readable/writable as needed (logs, cache, data, YAPP files)
 - services and daemons are running, PHP and the database work, the log parsers are scheduled
+- PHP-FPM's socket is found for any PHP version (8.5 included), and every `fastcgi_pass` in the site file names a socket that exists
 - the web server's site file serves this folder, the admin folder and the station-acting pages are behind the login, and the login reaches PHP
 - LinBPQ is reachable, with mail and chat enabled, and the FLRIG `RADIO` block is readable
 - the VARA HF log arrives: the server listens for syslog on UDP 514 and the `.vara` file has had a line in the last 7 days (warnings only — VARA HF is optional)
@@ -1108,6 +1109,8 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"BBS busy"* (Email Client) | Another BBS session is running; the dashboard allows one at a time | Wait a moment and retry |
 | **429 Too Many Requests** | The web server's rate limit: too many requests in a burst | Wait a few seconds; repeated 429s are in *Installation Manual* §12 |
 | **503 Service Temporarily Unavailable** | Usually an older config's rate limit, or PHP down | *Installation Manual* §12 |
+| **500 Internal Server Error** on every admin-login page | The web server can't read its admin login file (`/etc/nginx/.bpq-mgmt-auth` must be `root:www-data 640`) | `sudo chown root:www-data /etc/nginx/.bpq-mgmt-auth && sudo chmod 640 /etc/nginx/.bpq-mgmt-auth`; *Installation Manual* §12 |
+| **502 Bad Gateway** on PHP pages | The web server can't reach PHP-FPM: not running, or the site file names a socket that doesn't exist | *Installation Manual* §12 (502); Install Check, *PHP-FPM socket in site config* |
 | A note that the browser's storage is full (Email Client) | The browser's space for this site is used up; the dashboard keeps less in the browser and reads the rest from the database | Nothing; your mail is in the database |
 | *"Chat daemon not connected"* | `bpq-chat` isn't connected to BPQ | `sudo systemctl restart bpq-chat` |
 | *"WebSocket error — check: sudo systemctl status bpq-vara"* | The VARA page can't reach its service | Section 7. If the service stopped, `sudo journalctl -u bpq-vara -n 20` says why (e.g. no VARA port found, `bbs` login not set) |

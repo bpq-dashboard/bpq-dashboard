@@ -144,6 +144,23 @@ for d in cache data yapp-files logs; do
 done
 
 # ────────────────────────────────────────────────────────────────────────────
+# Step 6 — Admin login file (outside the web root)
+#   The web server's workers read it on every admin login. root:<web group>
+#   640: they can read it, other local accounts can't. 2026-10-30 (KG9NI):
+#   the installer left it root:root, so nginx answered 500 on every admin page.
+#   Override the path with AUTH_FILE=… if yours lives elsewhere.
+# ────────────────────────────────────────────────────────────────────────────
+AUTH_FILE="${AUTH_FILE:-/etc/nginx/.bpq-mgmt-auth}"
+hdr "Step 6 — Admin login file → root:$(id -gn "$WEB_USER") 640"
+if [[ -f "$AUTH_FILE" ]]; then
+    run chown "root:$(id -gn "$WEB_USER")" "$AUTH_FILE"
+    run chmod 640 "$AUTH_FILE"
+    ok "$AUTH_FILE set to root:$(id -gn "$WEB_USER") 640 (web server can read it, other accounts can't)"
+else
+    say "$AUTH_FILE not present — skipping (set AUTH_FILE=… if your login file lives elsewhere)"
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
 # Summary
 # ────────────────────────────────────────────────────────────────────────────
 hdr "Done"
