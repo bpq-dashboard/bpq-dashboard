@@ -1,6 +1,6 @@
 <?php
 /**
- * BPQ Dashboard v1.5.15 — Post-Installation Check
+ * BPQ Dashboard v1.5.16 — Post-Installation Check
  * Checks every component installed by bpq-dashboard-install.sh
  * Access: https://your.domain/install-check.php  (behind the admin login)
  *
@@ -867,7 +867,7 @@ function renderPage($results,$pass,$fail,$warn,$score,$sc) {
 $total = $pass+$fail+$warn; ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BPQ Dashboard v1.5.15 — Install Check</title>
+<title>BPQ Dashboard v1.5.16 — Install Check</title>
 <style>
 :root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;
       --acc:#4a9eff;--grn:#3fb950;--red:#f85149;--org:#d29922;--pur:#bc8cff;}
@@ -913,7 +913,7 @@ h1{font-size:20px;color:var(--acc);margin-bottom:4px;}
         color:var(--org);font-size:12px;text-align:center;line-height:1.8;}
 .footer strong{color:var(--red);}
 </style></head><body>
-<h1>🔧 BPQ Dashboard v1.5.15 — Post-Installation Check</h1>
+<h1>🔧 BPQ Dashboard v1.5.16 — Post-Installation Check</h1>
 <p class="sub"><?=date('Y-m-d H:i:s T')?> · PHP <?=phpversion()?> · <?=htmlspecialchars(php_uname('n'))?></p>
 
 <div class="card">
@@ -961,7 +961,7 @@ foreach ($cats as $cat => $items):
 <div class="footer">
     <strong>⚠ Security reminder:</strong> Remove this file when done troubleshooting.<br>
     <code>sudo rm <?=htmlspecialchars($GLOBALS['BASE'])?>/install-check.php</code><br>
-    BPQ Dashboard v1.5.15 · Access: <?=htmlspecialchars("https://".($_SERVER['HTTP_HOST'] ?? 'your-server')."/install-check.php")?> (admin login)
+    BPQ Dashboard v1.5.16 · Access: <?=htmlspecialchars("https://".($_SERVER['HTTP_HOST'] ?? 'your-server')."/install-check.php")?> (admin login)
 </div>
 </body></html>
 <?php }

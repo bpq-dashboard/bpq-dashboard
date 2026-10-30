@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.15**
+**Version 1.5.16**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -70,7 +70,7 @@ Most sysops are all three. Read everything that applies to you.
 24. What runs behind the pages
 25. Where your settings are kept
 26. Common messages and what they mean
-27. Known limitations in v1.5.15
+27. Known limitations in v1.5.16
 28. Keyboard shortcuts
 29. Page URL reference
 30. Getting help
@@ -1125,7 +1125,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.15
+## 27. Known limitations in v1.5.16
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1183,7 +1183,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.15-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.16-User-Guide.pdf` | None |
 
 ## 30. Getting help
 
@@ -1204,7 +1204,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.15 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.16 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1219,6 +1219,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.15 — User Guide**
+**73 — BPQ Dashboard v1.5.16 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.15**
+**Version 1.5.16**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -80,6 +80,10 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.16
+
+- **Fresh installs: admin pages and PHP work first time.** The v1.5.15 installer left the admin login file readable by root only, so every page behind the admin login answered **500**, and on some systems (seen on Ubuntu with PHP 8.5) it pointed nginx at a PHP socket that didn't exist, so PHP pages answered **502**. The installer now sets the login file to `root:www-data 640`, writes your PHP version's real socket, and tests both before it finishes. Install Check and System Audit flag either problem; §12 has the fixes by hand. Thanks to KG9NI for the report.
 
 ### In v1.5.15
 
@@ -227,14 +231,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.15.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.16.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.15
+cd bpq-dashboard-1.5.16
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -1484,10 +1488,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.15-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.16-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.15 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.16 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

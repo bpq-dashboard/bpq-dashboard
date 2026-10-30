@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.15 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.16 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -80,7 +80,7 @@ fi
 if [[ ! -f "$SCRIPT_DIR/config.php.example" ]] || \
    [[ ! -f "$SCRIPT_DIR/bbs-messages.html" ]]; then
     die "Could not find the dashboard files. Are you running this script
-   from the folder where you unzipped BPQ-Dashboard-v1.5.15.zip?
+   from the folder where you unzipped BPQ-Dashboard-v1.5.16.zip?
 
    Current folder: $SCRIPT_DIR"
 fi
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.15 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.16 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝

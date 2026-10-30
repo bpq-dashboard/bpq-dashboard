@@ -81,7 +81,12 @@ if ! id "$WEB_USER" &>/dev/null; then
 fi
 ok "Found web user: $WEB_USER"
 
-[[ "$DRY_RUN" == "1" ]] && warn "DRY RUN — no changes will be made"
+if [[ "$DRY_RUN" == "1" ]]; then
+    warn "DRY RUN — no changes will be made"
+    # From here on every "ok" reports a change, so under --dry-run say it
+    # would happen rather than that it did (2026-10-30).
+    ok() { echo "$(stamp) ${YLW}[WOULD]${NC} $*"; }
+fi
 
 # ────────────────────────────────────────────────────────────────────────────
 # Step 1 — Ownership

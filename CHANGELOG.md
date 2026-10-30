@@ -4,6 +4,17 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.16] - 2026-10-30
+
+Fresh-install fixes from KG9NI's report (Ubuntu, PHP 8.5, nginx). The v1.5.15
+installer left the admin login file readable by root only, so on a fresh
+nginx install every page behind the admin login answered 500; and it could
+write a PHP-FPM socket that doesn't exist, so PHP pages answered 502. Both
+are fixed, the installer now tests PHP and the login before it finishes, and
+Install Check / System Audit flag both problems. Existing installs that work
+need nothing; one that shows these errors can be fixed by hand (Manual §12)
+or by re-running `install.sh`.
+
 ### Fixed (2026-10-30) — Ubuntu / PHP 8.5 install: 502 and 500 errors
 Reported by KG9NI after a v1.5.15 install on Ubuntu with PHP 8.5 and nginx:
 every PHP page failed, and every admin-login page answered 500.
@@ -43,6 +54,11 @@ every PHP page failed, and every admin-login page answered 500.
   Server Error on the admin pages*; Guide §22 System Audit, §23 Install Check,
   §26 (500 and 502 rows); maintenance page: Admin login *fix 500* row, Web
   server & PHP *socket* row, Permissions labels.
+- **`fix-permissions.sh --dry-run`** says `[WOULD]` for each change instead
+  of `[ OK ] … set to`, which read as if the change had been made.
+- Version 1.5.16: badges, menu (`NAV_VERSION` 2026-10-30-1), PDFs
+  `BPQ-Dashboard-v1.5.16-*.pdf`, installer and script headers, README and
+  Manual download commands (tag v1.5.16); Manual *What's New* "In v1.5.16".
 
 ## [1.5.15] - 2026-10-27
 

@@ -73,11 +73,11 @@ commit. Start again with a repository that has no history:
    git add -A
    git ls-files | grep -E '^private/|^pktnet-forms/|SESSION-JOURNAL|^(db-|bbs-|nws-)?config\.php$|\.bak' \
        && echo "STOP: private file staged" || echo "staging OK"
-   git commit -m "BPQ Dashboard v1.5.15"
-   git tag -a v1.5.15 -m "BPQ Dashboard v1.5.15"
+   git commit -m "BPQ Dashboard v1.5.16"
+   git tag -a v1.5.16 -m "BPQ Dashboard v1.5.16"
    git remote add origin https://github.com/OWNER/REPO.git
    git push -u origin main
-   git push origin v1.5.15
+   git push origin v1.5.16
    ```
 
    When `git push` asks for a password, give it a GitHub personal access
@@ -87,10 +87,10 @@ commit. Start again with a repository that has no history:
 
    ```bash
    nano ~/.gh-token && chmod 600 ~/.gh-token
-   git -c credential.helper= -c credential.helper='!f() { echo username=OWNER; printf "password=%s\n" "$(tr -d " \r\n" < "$HOME/.gh-token")"; }; f' push -u origin main v1.5.15
+   git -c credential.helper= -c credential.helper='!f() { echo username=OWNER; printf "password=%s\n" "$(tr -d " \r\n" < "$HOME/.gh-token")"; }; f' push -u origin main v1.5.16
    rm -f ~/.gh-token
    ```
 
 3. Check that the download link in the README works:
-   `https://github.com/OWNER/REPO/archive/refs/tags/v1.5.15.zip`
-   should unzip to a folder named `REPO-1.5.15`.
+   `https://github.com/OWNER/REPO/archive/refs/tags/v1.5.16.zip`
+   should unzip to a folder named `REPO-1.5.16`.
