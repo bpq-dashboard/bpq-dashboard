@@ -355,11 +355,11 @@ body {
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Sits ABOVE the page's own #topbar, which preserves the per-page
      status (Disconnected/Connected, session info) and tool buttons. -->
-<script src="bpq-nav-loader.js?v=2026-10-30-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-01-1"></script>
 
 <!-- Top Bar -->
 <div id="topbar">
-    <h1>⚡ BPQ Telnet Client <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.16</span></h1>
+    <h1>⚡ BPQ Telnet Client <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.18</span></h1>
     <div id="statusDot"></div>
     <span id="statusLabel">Disconnected</span>
     <button class="tb-btn" id="clearBtn" onclick="clearTerminal()">🗑 Clear</button>
@@ -375,20 +375,20 @@ body {
     <div id="sidebar">
         <div class="sidebar-section">Local</div>
 
-        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ Node')">
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', BPQ_TELNET_PORT, 'BPQ Node')">
             <span class="qicon">📡</span>
             <span class="qname">BPQ Node</span>
-            <span class="qport">:8010</span>
+            <span class="qport bpq-telnet-port">:8010</span>
         </div>
-        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ BBS', 'BBS')">
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', BPQ_TELNET_PORT, 'BPQ BBS', 'BBS')">
             <span class="qicon">📬</span>
             <span class="qname">BPQ BBS</span>
-            <span class="qport">:8010</span>
+            <span class="qport bpq-telnet-port">:8010</span>
         </div>
-        <div class="quick-btn" onclick="quickConnect('127.0.0.1', 8010, 'BPQ Chat', 'CHAT')">
+        <div class="quick-btn" onclick="quickConnect('127.0.0.1', BPQ_TELNET_PORT, 'BPQ Chat', 'CHAT')">
             <span class="qicon">💬</span>
             <span class="qname">BPQ Chat</span>
-            <span class="qport">:8010</span>
+            <span class="qport bpq-telnet-port">:8010</span>
         </div>
         <div class="quick-btn" onclick="quickConnect('server.winlink.org', 8772, 'WL2K CMS')">
             <span class="qicon">✉</span>
@@ -1047,6 +1047,18 @@ function pasteCmd(cmd) {
 
 // ── Init ──────────────────────────────────────────────────────────
 renderSessionLog();
+// 2026-11-01: this station's BPQ telnet and FBB ports (station-info.php, from
+// config.php bbs.port / bpq32.cfg). Until v1.5.17 the page only knew 8010 and
+// 8011, so a station on other ports (N3MEL: 8015/8017) couldn't connect.
+var BPQ_TELNET_PORT = 8010, BPQ_FBB_PORT = 8011;
+fetch('station-info.php', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    if (+d.bpq_telnet_port > 0) BPQ_TELNET_PORT = +d.bpq_telnet_port;
+    if (+d.bpq_fbb_port > 0)    BPQ_FBB_PORT    = +d.bpq_fbb_port;
+    document.querySelectorAll('.bpq-telnet-port').forEach(el => { el.textContent = ':' + BPQ_TELNET_PORT; });
+    const cp = document.getElementById('customPort');
+    if (cp && cp.value === '8010') cp.value = BPQ_TELNET_PORT;
+}).catch(() => {});
 loadNodes();
 setInterval(loadNodes, 30000);  // refresh NetROM nodes every 30s
 
@@ -1098,7 +1110,7 @@ function renderNodes(nodes) {
             ? `<span style="font-size:9px;color:var(--muted);font-family:var(--font-mono)">${n.qual}</span>`
             : '';
         const cmd   = `<span style="display:block;font-size:9px;color:var(--accent);font-family:var(--font-mono)">C ${n.call}</span>`;
-        return `<div class="quick-btn" style="cursor:pointer" onclick="quickConnect('127.0.0.1', 8010, '${label}')">
+        return `<div class="quick-btn" style="cursor:pointer" onclick="quickConnect('127.0.0.1', BPQ_TELNET_PORT, '${label}')">
             <span class="qicon"><span style="color:var(--green);font-size:9px">●</span></span>
             <span class="qname" style="flex:1;min-width:0">
                 <span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
@@ -1231,7 +1243,7 @@ function yappRenderMode() {
     const haveLogin = sessionLogin.user && sessionLogin.pass &&
                       sessionLogin.host === currentHost && !yappLoginForm;
     const intro = `<div style="margin-bottom:8px;">Files need <strong>file-transfer mode</strong>
-        (BPQ's FBB port 8011). This reconnects to your node, opens the BBS and lists
+        (BPQ's FBB port ${BPQ_FBB_PORT}). This reconnects to your node, opens the BBS and lists
         its files. Your current terminal session closes.</div>`;
     if (haveLogin) {
         box.innerHTML = intro +
@@ -1252,7 +1264,7 @@ function yappRenderMode() {
     }
 }
 
-// One click: reconnect on 8011 in FBB mode, then BBS, then list files
+// One click: reconnect on the FBB port in FBB mode, then BBS, then list files
 function yappSwitch(user, pass) {
     user = user || sessionLogin.user;
     pass = pass || sessionLogin.pass;
@@ -1263,9 +1275,9 @@ function yappSwitch(user, pass) {
     yappFilesCache = null;
     yappFlow = { stage: 'login', timer: null };
     yappRenderMode();
-    appendSys(`Switching to file-transfer mode (FBB, port 8011) as '${user}'…`);
+    appendSys(`Switching to file-transfer mode (FBB, port ${BPQ_FBB_PORT}) as '${user}'…`);
     const host = currentHost || '127.0.0.1';
-    connect(host, 8011, `${host}:8011 (FBB)`, '',
+    connect(host, BPQ_FBB_PORT, `${host}:${BPQ_FBB_PORT} (FBB)`, '',
             { fbb: true, username: user, password: pass });
 }
 

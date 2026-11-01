@@ -126,13 +126,13 @@
 <body data-nav-page="logs">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-10-30-1"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-01-1"></script>
 
 
 <a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
 
 <header>
-  <h1>📋 BPQ Dashboard <span>//</span> Log Viewer <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.16</span></h1>
+  <h1>📋 BPQ Dashboard <span>//</span> Log Viewer <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.18</span></h1>
   <div class="meta"><span id="station-line">Log access</span><br>Dashboard services · Log parsers · VARA · BPQ Node · System</div>
 </header>
 
@@ -177,6 +177,15 @@ let currentLog = null;
 let currentDate = '';
 let searchMode = false;
 let logCatalogue = [];
+
+// Parse an API reply; say what came back instead of a bare JSON.parse error
+function readJson(r) {
+  return r.text().then(t => {
+    if (!t.trim()) throw new Error(`Empty reply from the server (HTTP ${r.status}). Check Web Server Errors for a PHP error.`);
+    try { return JSON.parse(t); }
+    catch (e) { throw new Error(`Server reply was not JSON (HTTP ${r.status}): ${t.replace(/<[^>]*>/g, ' ').trim().slice(0, 200)}`); }
+  });
+}
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function init() {
@@ -360,7 +369,7 @@ function loadLog(key, date, lines) {
   if (date) url += `&date=${date}`;
 
   fetch(url)
-    .then(r => r.json())
+    .then(readJson)
     .then(data => {
       if (data.error) {
         document.getElementById('log-output').innerHTML =
@@ -458,7 +467,7 @@ function runSearch() {
   if (currentDate) url += `&date=${currentDate}`;
 
   fetch(url)
-    .then(r => r.json())
+    .then(readJson)
     .then(data => {
       if (data.error) {
         document.getElementById('log-output').innerHTML = `<div class="error-msg">${escHtml(data.error)}${(() => { const m = logCatalogue.find(x => x.key === currentLog); return m && m.opt ? '<br><small>' + escHtml(m.opt) + '</small>' : ''; })()}</div>`;

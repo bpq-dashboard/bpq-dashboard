@@ -123,6 +123,7 @@ def inline_format(text):
         '⚙️': '(gear)',
         '🔄': '[Refresh]',
         '×': 'x',
+        '\ufffd': '(replacement character)',   # 2026-10-30: Log Viewer's mark for unreadable bytes
         # Button icons from the APRS Map (2026-10-16): arrows outside the
         # built-in fonts' glyph set render as boxes, so drop them.
         '↺ ': '', '↧ ': '', '↺': '', '↧': '',
@@ -415,6 +416,7 @@ def _emoji_subs_for_code(text):
         '✓': 'OK', '✗': 'X',
         '↑': '^', '↓': 'v', '←': '<', '→': '>',
         '×': 'x',
+        '\ufffd': '?',
     }
     for k, v in subs.items():
         text = text.replace(k, v)

@@ -69,3 +69,31 @@ function bpq_cors_headers(string $methods = 'GET, POST, OPTIONS'): void {
     header('Access-Control-Allow-Methods: ' . $methods);
     header('Access-Control-Allow-Headers: Content-Type');
 }
+
+/**
+ * BPQ's telnet, FBB and web-management ports for this station (2026-11-01).
+ * Telnet: config.php bbs.port. FBB / HTTP: config.php bbs.fbb_port /
+ * bbs.http_port if set, else FBBPORT= / HTTPPORT= in <paths.linbpq>/bpq32.cfg
+ * if readable, else BPQ's defaults 8011 / 8008. Until v1.5.17 the Telnet
+ * Client only knew 8010/8011 (N3MEL uses 8015/8017).
+ */
+function bpq_bbs_ports(): array {
+    static $ports = null;
+    if ($ports !== null) return $ports;
+    $bbs = bpq_config_section('bbs');
+    $cfgText = '';
+    $dir = (string)(bpq_config_section('paths')['linbpq'] ?? '');
+    if ($dir !== '' && is_readable(rtrim($dir, '/') . '/bpq32.cfg')) {
+        $cfgText = (string)@file_get_contents(rtrim($dir, '/') . '/bpq32.cfg');
+    }
+    $fromCfg = function (string $key) use ($cfgText): int {
+        return preg_match('/^\s*' . $key . '\s*=\s*(\d+)/mi', $cfgText, $m) ? (int)$m[1] : 0;
+    };
+    $ports = [
+        'telnet' => (int)($bbs['port'] ?? 0) ?: ($fromCfg('TCPPORT') ?: 8010),
+        'fbb'    => (int)($bbs['fbb_port'] ?? 0) ?: ($fromCfg('FBBPORT') ?: 8011),
+        'http'   => (int)($bbs['http_port'] ?? 0) ?: ($fromCfg('HTTPPORT') ?: 8008),
+    ];
+    return $ports;
+}
+

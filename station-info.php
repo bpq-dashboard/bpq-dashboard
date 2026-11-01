@@ -37,4 +37,8 @@ echo json_encode([
     'map_lat'  => $pos[0] ?? null,
     'map_lon'  => $pos[1] ?? null,
     'carto_key' => $carto !== '' ? $carto : null,
+    // 2026-11-01: for the Telnet Client's Node/BBS/Chat buttons and file-transfer
+    // mode. Port numbers only (they are reachable on the station anyway).
+    'bpq_telnet_port' => bpq_bbs_ports()['telnet'],
+    'bpq_fbb_port'    => bpq_bbs_ports()['fbb'],
 ]);

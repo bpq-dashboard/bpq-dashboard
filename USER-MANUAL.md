@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.16**
+**Version 1.5.18**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -80,6 +80,19 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.18
+
+From the first Linux Mint install (thanks to N3MEL for the testing):
+
+- **Email Client, message text job and forwarding queue log in on every BBS.** They waited for a `}` in BPQ's greeting after the password and reported *"Login failed"* when it never came. One shared login (`includes/bbs-login.php`) now accepts a login that lands at the node or straight in the BBS, whatever the greeting, and a failure says which step went wrong and shows BPQ's last line.
+- **Telnet Client uses your BPQ ports.** The Node, BBS and Chat buttons, the Custom port and file-transfer mode use `bbs.port` from `config.php` and `FBBPORT=` from `bpq32.cfg` (or the new optional `bbs.fbb_port`) instead of 8010 / 8011, and the `bpq-telnet` service allows those ports.
+- **Traffic Report finds BPQ's reports.** BPQ writes `Traffic_YYMMDD.txt` in the LinBPQ folder; the parser now looks there (`paths.linbpq`) as well as in `logs/`, and says where it looked when it finds none.
+- **System Audit is more accurate:** LinBPQ running as `linbpq64` or `pilinbpq` is recognised (Install Check too); a dashboard service you switched off is *Info*, not *Critical*; the local-only ports `ssh -X` opens (6010+) aren't reported as SSH; the Maintenance page's own login check isn't counted as nginx errors; open station ports are reported as *open to every network (check your router)*.
+
+### In v1.5.17
+
+- **Log Viewer opens every log.** Message text job, Email Client (BBS) and Dashboard log failed with *"JSON.parse: unexpected end of data"*: they hold raw BBS text, and one byte that wasn't valid UTF-8 made the server send an empty reply. Such bytes now show as **�** and the rest of the log reads normally. If a log still can't be read, the page shows what the server sent back instead of a bare JSON error.
 
 ### In v1.5.16
 
@@ -231,14 +244,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.16.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.18.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.16
+cd bpq-dashboard-1.5.18
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -666,7 +679,7 @@ YAPP (Yet Another Packet Protocol) is a file transfer protocol used by BBS netwo
 
 1. Open the **Telnet Client** page, click **BPQ Node** in the sidebar and log in at BPQ's `user:` / `password:` prompts
 2. Click the **📁 Files** button under the terminal, next to **Send ↵** (it's active once you're connected)
-3. Click **⚡ Switch to file-transfer mode**. It reconnects on the FBB port (8011) with the login you just typed, enters the BBS and lists its files. *(YAPP needs the FBB port because it's a binary protocol; the standard telnet port changes some bytes.)*
+3. Click **⚡ Switch to file-transfer mode**. It reconnects on the FBB port (`FBBPORT=` in `bpq32.cfg`, 8011 by default) with the login you just typed, enters the BBS and lists its files. *(YAPP needs the FBB port because it's a binary protocol; the standard telnet port changes some bytes.)*
 4. **Click any file** in the list. The dashboard arms the receiver and types `YAPP <filename>` for you
 5. The progress bar shows speed and time left
 6. When complete, click **⬇ Save** to save the file. Recent downloads stay listed in the panel
@@ -811,7 +824,7 @@ The NWS page needs no setup to show alerts: it reads api.weather.gov directly in
 - `features.nws_post` (on by default; forced off in public mode);
 - the admin login.
 
-Posts are logged in `logs/dashboard.log` (Log Viewer → *NWS posting*). `nws-config.php.example` is left over from an older version and isn't read.
+Posts are logged in `logs/dashboard.log` (Log Viewer → *Dashboard log*). `nws-config.php.example` is left over from an older version and isn't read.
 
 **Automatic posting (optional).** `scripts/nws-auto-post.php`, run every 5 minutes by `nws-auto-post.timer`, posts new Warnings and Watches for one state as bulletins (`SB`, through the Email Client's send code and BBS lock). It posts the **first issue** of each alert only (no updates, extensions or cancellations), skips anything that has already ended, never posts the same alert twice (`cache/nws-auto-post-state.json`), and combines a watch that several NWS offices each issued into one bulletin (waiting `watch_hold_minutes` for their pieces). Settings are `'nws' => ['auto_post' => [...]]` in `config.php` (see `config.php.example`); nothing posts until `enabled` is `true` and `area` is a state code. It does not depend on `features.nws_post` or public mode.
 
@@ -1294,20 +1307,32 @@ PHP-FPM crashed during the request. Common causes:
 - Bad sudoers configuration
 
 ```bash
-sudo tail -50 /var/log/nginx/error.log      # the installer's site logs to /var/log/nginx/bpq-dashboard.error.log
+# the installer's site logs to /var/log/nginx/bpq-dashboard.error.log
+sudo tail -50 /var/log/nginx/error.log
 sudo tail -50 /var/log/php*-fpm.log
 sudo systemctl restart 'php*-fpm'
 ```
 
+### Log Viewer: "JSON.parse: unexpected end of data" on some logs
+
+Up to v1.5.16 the Log Viewer's PHP sent an empty reply for any log holding bytes that aren't valid UTF-8 — usually the BBS-session logs (Message text job, Email Client (BBS), Dashboard log). Fixed in v1.5.17 (`admin/log-viewer-api.php` 1.3.1): those bytes show as **�**. Update `admin/log-viewer-api.php` and `admin/log-viewer.html`, then reload with Ctrl+Shift+R. To see which lines of a log have such bytes:
+
+```bash
+LANG=C.UTF-8 grep -naxv '.*' /var/www/bpq-dashboard/logs/bbs-messages.log | head
+```
+
+If the page now says *"Empty reply from the server"* or *"Server reply was not JSON"*, the PHP error is in the web-server error log (above).
+
 ### YAPP transfer fails
 
-- Are you in FBB mode? YAPP requires port 8011, not the standard telnet port.
+- Are you in FBB mode? YAPP requires BPQ's FBB port (8011 by default), not the standard telnet port. If yours is different and the dashboard can't read `bpq32.cfg`, set `'fbb_port' => N` in the `bbs` section of `config.php` and restart bpq-telnet.
 - Is bpq-telnet daemon running? `sudo systemctl status bpq-telnet`
 - Check `/var/www/bpq-dashboard/logs/bpq-telnet-daemon.log` for protocol errors (Admin → Logs → bpq-telnet).
 
 ### Telnet or VARA page can't connect
 
 - Is the service running? `sudo systemctl status bpq-telnet bpq-vara`
+- Telnet: a port is refused, or the buttons show the wrong port — the page uses `bbs.port` from `config.php` and the FBB port from `bpq32.cfg` (or `bbs.fbb_port`). After changing `config.php`, `sudo systemctl restart bpq-telnet`; its log (Log Viewer → *bpq-telnet*) lists the allowed ports when it starts.
 - Does the web server pass `/ws/telnet` and `/ws/vara` through? The installer's site file does from 2026-10-25; an older one doesn't — re-run the installer or copy the blocks from `nginx-bpq-dashboard.conf`.
 - VARA: `sudo journalctl -u bpq-vara -n 30` shows the login, the VARA port it chose and the `ATT` reply (Section 9). NetROM list empty: the error under the list says whether the `bbs` login or `station.node` is the problem.
 
@@ -1318,6 +1343,17 @@ sudo systemctl status bpq-chat bpq-vara
 sudo journalctl -u bpq-chat -n 30
 sudo systemctl restart bpq-chat
 ```
+
+### Email Client or message text job: "Login refused" / "Login failed"
+
+The dashboard logs in with `bbs.user` / `bbs.pass` from `config.php`. The message names the step and the last line BPQ sent.
+
+- *Login refused* — BPQ rejected the user name or password: make them match the `USER=` line in `bpq32.cfg`.
+- *nothing came back after the password* — LinBPQ stopped answering; check it's running and the port (`bbs.port`) is its telnet port.
+- *No BBS prompt after 'bbs'* — the BBS application has another name: set `bbs.alias` to it (`APPLICATION` line in `bpq32.cfg`).
+- Plain *"Login failed"* on v1.5.17 or earlier: BPQ's greeting had no `}`; update to v1.5.18.
+
+Test by hand: `sudo -u www-data php /var/www/bpq-dashboard/scripts/fetch-message-bodies.php --dry-run --limit=1`, or `telnet localhost <bbs.port>` and log in as the dashboard does.
 
 ### "BBS password not configured" error
 
@@ -1488,10 +1524,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.16-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.18-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.16 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.18 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

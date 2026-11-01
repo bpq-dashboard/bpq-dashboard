@@ -67,6 +67,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpq_db_config  # noqa: E402
 DEFAULT_LOGS_DIR = bpq_db_config.default_logs_dir()
 
+
+def default_search_dirs():
+    """Where BPQ's Traffic_YYMMDD.txt reports may be (2026-11-01): the
+    dashboard's logs folder (config.php paths.logs) and the LinBPQ folder
+    itself (paths.linbpq). BPQ writes them into its own folder; on stations
+    whose logs/ link points at LinBPQ's logs subfolder (N3MEL) the parser
+    found nothing and the Traffic page stayed empty."""
+    dirs = [DEFAULT_LOGS_DIR]
+    linbpq = (bpq_db_config.load_config_section('paths') or {}).get('linbpq')
+    if linbpq:
+        dirs.append(linbpq.rstrip('/'))
+    out = []
+    for d in dirs:
+        if d and os.path.realpath(d) not in [os.path.realpath(x) for x in out]:
+            out.append(d)
+    return out
+
 # Match tprfn-db.php defaults
 # DB credentials: see scripts/bpq_db_config.py (2026-09-26). Nothing
 # secret is hard-coded here any more — it comes from --db-* flags, BPQ_DB_*
@@ -230,17 +247,42 @@ def dates_for_window(days):
     return [today - dt.timedelta(days=i) for i in range(days)]
 
 
-def discover_backfill_dates(logs_dir):
-    """Every Traffic_YYMMDD.txt file actually present in logs_dir,
+def discover_backfill_dates(dirs):
+    """Every Traffic_YYMMDD.txt file actually present in any of dirs,
     oldest first."""
-    found = []
-    for path in glob.glob(os.path.join(logs_dir, 'Traffic_??????.txt')):
-        m = FILENAME_RE.match(os.path.basename(path))
-        if not m:
-            continue
-        yy, mm, dd = (int(g) for g in m.groups())
-        found.append(dt.date(2000 + yy, mm, dd))
+    found = set()
+    for d in dirs:
+        for path in glob.glob(os.path.join(d, 'Traffic_??????.txt')):
+            m = FILENAME_RE.match(os.path.basename(path))
+            if not m:
+                continue
+            yy, mm, dd = (int(g) for g in m.groups())
+            found.add(dt.date(2000 + yy, mm, dd))
     return sorted(found)
+
+
+def find_report(dirs, filename):
+    """First dirs/<filename> that exists, or None. Needs only search (x)
+    permission on the folders, not the right to list them."""
+    for d in dirs:
+        path = os.path.join(d, filename)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def explain_none_found(dirs):
+    """One line saying why no report was read, for the cron log."""
+    listable = [d for d in dirs if os.access(d, os.R_OK | os.X_OK)]
+    if any(glob.glob(os.path.join(d, 'Traffic_??????.txt')) for d in listable):
+        return None   # reports exist, just none in this run's date window
+    hidden = [d for d in dirs if d not in listable]
+    msg = ("No Traffic_YYMMDD.txt reports found in " + ', '.join(listable or dirs) +
+           ". BPQ Mail usually writes one a week (named after the week's start) in the LinBPQ folder;"
+           " set config.php paths.linbpq to that folder, or pass --logs-dir.")
+    if hidden:
+        msg += " (Can't list: " + ', '.join(hidden) + ".)"
+    return msg
 
 
 def main():
@@ -249,14 +291,15 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
-    ap.add_argument('--logs-dir', default=DEFAULT_LOGS_DIR,
-                    help=f'Directory containing Traffic_YYMMDD.txt files (default: {DEFAULT_LOGS_DIR})')
+    ap.add_argument('--logs-dir', default=None,
+                    help='Directory containing Traffic_YYMMDD.txt files (default: '
+                         'config.php paths.logs, then paths.linbpq: ' + ', '.join(default_search_dirs()) + ')')
     ap.add_argument('--days', type=int, default=2,
                     help='Re-parse the trailing N days, today inclusive (default: 2)')
     ap.add_argument('--date',
                     help='Parse one specific date only, as YYMMDD (overrides --days)')
     ap.add_argument('--backfill', action='store_true',
-                    help='Parse every Traffic_*.txt file found in --logs-dir, ignoring --days/--date')
+                    help='Parse every Traffic_*.txt file found (see --logs-dir), ignoring --days/--date')
     ap.add_argument('--dry-run', action='store_true',
                     help="Show what would be written, don't actually INSERT")
     ap.add_argument('--verbose', '-v', action='store_true',
@@ -274,14 +317,17 @@ def main():
         if val is not None:
             DB_CONFIG[key] = val
 
-    if not os.path.isdir(args.logs_dir):
-        sys.stderr.write(f"ERROR: logs directory not found: {args.logs_dir}\n")
+    search_dirs = [args.logs_dir] if args.logs_dir else default_search_dirs()
+    search_dirs = [d for d in search_dirs if os.path.isdir(d)]
+    if not search_dirs:
+        wanted = args.logs_dir or ', '.join(default_search_dirs())
+        sys.stderr.write(f"ERROR: folder not found (or not reachable for this user): {wanted}\n")
         sys.exit(1)
 
     if args.backfill:
-        dates = discover_backfill_dates(args.logs_dir)
+        dates = discover_backfill_dates(search_dirs)
         if not dates:
-            sys.stderr.write(f"No Traffic_*.txt files found in {args.logs_dir}\n")
+            sys.stderr.write(f"No Traffic_*.txt files found in {', '.join(search_dirs)}\n")
     elif args.date:
         try:
             dates = [dt.datetime.strptime(args.date, '%y%m%d').date()]
@@ -298,8 +344,8 @@ def main():
     try:
         for date in dates:
             filename = filename_for_date(date)
-            path = os.path.join(args.logs_dir, filename)
-            if not os.path.isfile(path):
+            path = find_report(search_dirs, filename)
+            if not path:
                 if args.verbose:
                     sys.stdout.write(f"  {filename}: not found, skipping\n")
                 continue
@@ -323,6 +369,10 @@ def main():
         sys.stdout.write(
             f"Processed {files_processed} file(s), wrote {rows_written} station-day row(s)\n"
         )
+        if files_processed == 0:
+            why = explain_none_found(search_dirs)
+            if why:
+                sys.stdout.write(why + "\n")
         if args.dry_run:
             sys.stdout.write("  [DRY RUN — no DB writes performed]\n")
     except pymysql.MySQLError as e:

@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.16**
+**Version 1.5.18**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -70,7 +70,7 @@ Most sysops are all three. Read everything that applies to you.
 24. What runs behind the pages
 25. Where your settings are kept
 26. Common messages and what they mean
-27. Known limitations in v1.5.16
+27. Known limitations in v1.5.18
 28. Keyboard shortcuts
 29. Page URL reference
 30. Getting help
@@ -206,9 +206,9 @@ A terminal on your BPQ node in the browser: connect to the node, BBS or chat, ru
 
 - **Top bar** — connection status, 🗑 Clear, 📋 Copy (copies the whole session text), ⏹ Disconnect.
 - **Left sidebar:**
-  - **Local** quick-connect buttons — *BPQ Node*, *BPQ BBS* and *BPQ Chat* (all port 8010 on this server) and *WL2K CMS* (Winlink's server, port 8772).
+  - **Local** quick-connect buttons — *BPQ Node*, *BPQ BBS* and *BPQ Chat* (all on this server's BPQ telnet port: `bbs.port` in `config.php`, 8010 by default; the button shows the number) and *WL2K CMS* (Winlink's server, port 8772).
   - **NetROM Nodes** — the node's current NetROM table, refreshed every 30 seconds (↻ refreshes now).
-  - **Custom** — host and port. Only this server and Winlink's CMS servers are allowed, on ports 23, 8008, 8010, 8011 and 8772; the service refuses anything else so it can't be used as a relay.
+  - **Custom** — host and port (filled in with your BPQ telnet port). Only this server, your home network and Winlink's CMS servers are allowed, on ports 23, 8008, 8010, 8011, 8772 and your own BPQ telnet, FBB and web ports (from `config.php` and `bpq32.cfg`); the service refuses anything else so it can't be used as a relay.
   - **Session Log** — your recent connections in this browser.
   - **BPQ Commands** — click a command to paste it into the input line (node commands such as `NODES`, `ROUTES`, `PORTS`, `MHEARD`, BBS commands such as `L`, `R #`, `S CALL`, `K #`).
 - **Terminal (centre, stays dark)** and, under it, the input line with two buttons: **📁 Files** (YAPP file transfer) and **Send ↵**. Both stay greyed out until you're connected to the node.
@@ -231,6 +231,8 @@ Section 10. There is no separate YAPP button: **📁 Files**, next to **Send ↵
 
 - Nothing happens when you click a target, or the status says it can't reach the service: check `sudo systemctl status bpq-telnet`. The page connects through the web server's `/ws/telnet` (over HTTP or HTTPS); a site file from before 2026-10-25 doesn't have it — re-run the installer or add it from the template (*Installation Manual* Part A, Step 9).
 - The NetROM Nodes list stays empty or shows an error: `bpq-nodes-api.php` logs in with `bbs.user` / `bbs.pass` from `config.php` and needs `station.node` (your node call-SSID). The error under the list says which part failed.
+- *Connecting to 127.0.0.1:… WebSocket error — is the telnet daemon running?*: the bpq-telnet service isn't running (`sudo systemctl enable --now bpq-telnet`).
+- The buttons show the wrong port: the page takes it from `bbs.port` in `config.php`; fix it there and reload. If a port is refused, restart bpq-telnet after changing `config.php` (it reads the allowed ports when it starts; its log lists them).
 - The service's log is in the Log Viewer under *Dashboard services → bpq-telnet* (passwords are blanked out).
 
 ---
@@ -404,6 +406,8 @@ A webmail-style client for your BBS: Personal mail, NTS traffic and bulletins, w
 - With *Body fetching* on **Eager** (default), the page also reads every new message's text during Get Mail, so clicks open instantly. **Lazy** reads a message's text only when you open it, which makes Get Mail faster.
 - Separately, the server saves the text of new messages to the database every 5 minutes (`message-bodies.timer`), even when no browser is open. Which bulletins it saves is set by `messages.bulletin_text` in `config.php`: `all` (default), `pinned` (only 📌 groups) or `none`.
 
+The dashboard logs in to the BBS with `bbs.user` / `bbs.pass` from `config.php`. It works whether BPQ's `USER=` line lands that login at the node (then it types `bbs`, or `bbs.alias`) or straight in the BBS, and whatever BPQ's greeting looks like (since v1.5.18; before that the greeting had to contain a `}`). If the login fails, the message says which step and shows the last line BPQ sent (Section 26).
+
 Only one session with the BBS runs at a time across the whole dashboard. If the BBS is busy (Get Mail in another browser, the text-saving job, the forwarding-queue check), the request waits; after 40 seconds it gives up with "BBS busy". Try again a moment later.
 
 ### Reading
@@ -524,11 +528,11 @@ YAPP (Yet Another Packet Protocol) moves binary files — documents, pictures, s
 
 ### File-transfer mode
 
-YAPP is a binary protocol, and normal telnet (port 8010) changes certain bytes, which breaks it. Files therefore go over BPQ's **FBB port (8011)**, which passes bytes through untouched. The panel calls this **file-transfer mode**.
+YAPP is a binary protocol, and normal telnet changes certain bytes, which breaks it. Files therefore go over BPQ's **FBB port** (`FBBPORT=` in `bpq32.cfg`, 8011 by default; set `bbs.fbb_port` in `config.php` if the dashboard can't read `bpq32.cfg`), which passes bytes through untouched. The panel calls this **file-transfer mode**.
 
 You don't have to set it up yourself. Log in on the Telnet Client as usual, then open **📁 Files** and click **⚡ Switch to file-transfer mode**. The dashboard:
 
-1. reconnects to your node on port 8011, using the user name and password you typed at BPQ's prompts in this tab;
+1. reconnects to your node on the FBB port, using the user name and password you typed at BPQ's prompts in this tab;
 2. types `BBS` for you;
 3. lists the BBS's files as soon as its prompt appears.
 
@@ -706,6 +710,8 @@ Per-station traffic from BPQ's own traffic reports: who connects, how many messa
 ### Tips
 
 - It reads BPQ's `Traffic_YYMMDD.txt` reports. Many BBSes write one per week (named after the week's start date); then the newest days appear only after BPQ writes the next report.
+- BPQ writes the reports in the LinBPQ folder itself. The parser looks in the dashboard's `logs/` folder and in `paths.linbpq` from `config.php` (since v1.5.18; before that only `logs/`, so stations whose `logs/` link points at LinBPQ's `logs` subfolder had an empty page). To load older reports once: `sudo -u www-data python3 /var/www/bpq-dashboard/scripts/parse-traffic-report.py --backfill`.
+- Still empty? The parser's log (`/var/log/bpq-dashboard/parse-traffic-report.log`) says which folders it searched when it finds no reports.
 - The **Messages** card and the Message Distribution chart count Personal and bulletin messages only; NTS traffic (T) is in the per-station table but not in those two.
 - "(DB)" in the status line means the database copy is in use (`parse-traffic-report.py`, every 5 minutes).
 - A sudden drop for one partner usually means its link or schedule has stopped; check RF Connections and the System Logs for that call.
@@ -953,20 +959,21 @@ Reads the server's logs from the browser, no SSH needed.
 ### What you see
 
 - **Log list**, by group:
-  - **Dashboard services** — bpq-telnet (Telnet Client and YAPP; passwords are redacted), bpq-vara, the message-text job, the Email Client's BBS sessions, NWS posting.
+  - **Dashboard services** — bpq-telnet (Telnet Client and YAPP; passwords are redacted), bpq-vara, the message-text job, the Email Client's BBS sessions, the Dashboard log (NWS Post to BBS), NWS auto-post.
   - **Log parsers** — RF Connections, Traffic and System Logs parsers (every 5 minutes).
   - **Forwarding tools** — prop-scheduler, storm monitor, connect watchdog and its state, White Pages auto-clean (only if you run them).
   - **VARA** — the VARA session log (config.php `logs.vara_file`) and the callsign validator.
   - **BPQ Node** — today's BBS, TCP, Connect and CMS logs, and earlier BBS logs by date.
   - **System** — the web-server error log (PHP errors land here too) and the auth log.
   Each entry shows its size and last change; hover for what it is and where it lives. Logs for features you don't use say **not used here**.
-- **Viewer** — the last 100, 200 (default), 500 or 1000 lines, colour-coded (errors red, warnings amber), with ⟳ Refresh.
+- **Viewer** — the last 100, 200 (default), 500 or 1000 lines, colour-coded (errors red, warnings amber), with ⟳ Refresh. Characters the browser can't show (raw bytes from BBS sessions, for example) appear as **�**; the rest of the line is unchanged.
 - **Search** — every line in the file containing the text (at least 2 characters), with two lines of context either side (up to 100 matches).
 
 ### Tips
 
 - bpq-chat and bpq-aprs log only to the system journal: `sudo journalctl -u bpq-chat -n 50` (the Maintenance page has these commands).
-- The auth log is usually readable by root only, so it shows "no read permission"; use `sudo tail /var/log/auth.log`.
+- The auth log is usually readable by root only, so it shows "no read permission"; use `sudo tail /var/log/auth.log`. (Adding `www-data` to the `adm` group would let the page read it, but also lets the web server read every system log; not recommended.)
+- If a log won't open, the box says what the server sent back (for example *"Empty reply from the server (HTTP 500)"*); the cause is in **Web Server Errors**.
 
 ---
 
@@ -980,22 +987,23 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 ### What's checked
 
-**Security:** the admin login reaches PHP; admin pages and private files refused without the login (asked of the server itself); config files not world-readable; the admin login file readable by the web server but not by other accounts; CORS; IPv4 and IPv6 firewall policy; BPQ, MariaDB, flrig and dashboard ports open to the internet; fail2ban and SSH.
+**Security:** the admin login reaches PHP; admin pages and private files refused without the login (asked of the server itself); config files not world-readable; the admin login file readable by the web server but not by other accounts; CORS; IPv4 and IPv6 firewall policy; BPQ, MariaDB, flrig and dashboard ports open to every network (System Audit can't see your router, so it says *check your router*: only ports the router forwards are reachable from the internet); fail2ban and SSH (only SSH ports reachable from the network count; the local-only ports `ssh -X` opens, 6010 and up, are ignored).
 
 **Resources:** memory, swap, CPU load, free disk space (root and the web root's disk).
 
-**Web server & PHP:** which server is running; `nginx -t`; recent nginx errors (known harmless lines ignored); the PHP version serving the dashboard, extra PHP-FPM versions running, missing PHP extensions; every PHP-FPM socket the enabled nginx sites name exists, by its versioned name (`php8.5-fpm.sock`, not the generic `php-fpm.sock`); unused files in sites-available.
+**Web server & PHP:** which server is running; `nginx -t`; recent nginx errors (known harmless lines ignored, including the Maintenance page's own check that the admin pages are locked, logged as user `bpq-protection-probe`); the PHP version serving the dashboard, extra PHP-FPM versions running, missing PHP extensions; every PHP-FPM socket the enabled nginx sites name exists, by its versioned name (`php8.5-fpm.sock`, not the generic `php-fpm.sock`); unused files in sites-available.
 
 **Database:** connection exactly as the pages make it; the Email Client, RF Connections, Traffic and System Logs tables; the 2026-09/10 updates (📌 keep, Forwarded Messages "Via" and delivery status); data size against the InnoDB buffer pool; whether MariaDB listens on the network.
 
 **Logs & updates:** security updates waiting; /var/log size; log rotation for the dashboard's own logs; each log parser scheduled, running and error-free.
 
-**Application:** LinBPQ running; each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status; APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry.
+**Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status; APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry.
 
 ### Reading the results
 
 - ✅ **OK**, ⚠️ **Warn** (worth a look), 🔴 **Critical** (fix soon).
-- ℹ️ **Info** — something that isn't installed (an optional service) or that the page couldn't check (for example the sudo rules are missing). Info rows don't count towards the score.
+- ℹ️ **Info** — something that isn't installed (an optional service), a dashboard service you switched off (*switched off*: installed but disabled, e.g. bpq-chat on a station without BPQ Chat), or something the page couldn't check (for example the sudo rules are missing). Info rows don't count towards the score.
+- A dashboard service that is **enabled but not running** is 🔴 Critical: it's meant to run and has failed or keeps restarting. Its row gives the `journalctl` command that shows why. To stop using a service instead: `sudo systemctl disable --now <name>`.
 - Click a row for the detail and the **recommended action**. Run it over SSH, then **⟳ Re-run Audit**.
 
 ### Tips
@@ -1107,6 +1115,9 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"Could not send the e-mail …"* / *"No sysop e-mail is set …"* (Chat or VARA access request) | The server has no working mail setup, or `station.email` is empty or an example address | Set `station.email`; set up mail on the server (e.g. a sendmail-compatible relay), or contact the sysop another way |
 | **(DB)** missing from a status line | The page couldn't use the database and is reading log files in your browser (slower, less history) | Check the parsers (Section 24) and the database (System Audit) |
 | *"BBS busy"* (Email Client) | Another BBS session is running; the dashboard allows one at a time | Wait a moment and retry |
+| *"Login refused: check bbs.user / bbs.pass …"* (Email Client, message-bodies, forwarding queue) | BPQ answered the password with an error or asked again | Make `bbs.user` / `bbs.pass` in `config.php` match the `USER=` line in `bpq32.cfg` |
+| *"Login failed: nothing came back after the password"* / *"No BBS prompt after 'bbs'"* | BPQ went silent after the login, or the BBS application has another name | Check LinBPQ is running and `bbs.alias` in `config.php` is your BBS's application name (`APPLICATION` line in `bpq32.cfg`) |
+| *"Login failed"* (Email Client, message-bodies; v1.5.17 and earlier) | BPQ's greeting after the login had no `}` | Update to v1.5.18 or later |
 | **429 Too Many Requests** | The web server's rate limit: too many requests in a burst | Wait a few seconds; repeated 429s are in *Installation Manual* §12 |
 | **503 Service Temporarily Unavailable** | Usually an older config's rate limit, or PHP down | *Installation Manual* §12 |
 | **500 Internal Server Error** on every admin-login page | The web server can't read its admin login file (`/etc/nginx/.bpq-mgmt-auth` must be `root:www-data 640`) | `sudo chown root:www-data /etc/nginx/.bpq-mgmt-auth && sudo chmod 640 /etc/nginx/.bpq-mgmt-auth`; *Installation Manual* §12 |
@@ -1118,6 +1129,8 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"No VARA Log File Found"* (RF Connections) | No VARA log yet, and no database data | VARA HF's Syslog setting, the rsyslog receiver and `vara-logger` (*Installation Manual* §10.11); Install Check's *VARA HF log* rows say which step is missing |
 | "API KEY REQUIRED" across the APRS map | No CARTO key | Section 8, *Map tiles* |
 | A page looks old or its menu is missing an item after an update | Browser cache | Ctrl+Shift+R |
+| *"Failed to load: JSON.parse: unexpected end of data"* (Log Viewer, v1.5.16 and earlier) | The log held characters that weren't valid UTF-8 (raw BBS text), so the server sent an empty reply | Update to v1.5.17 or later, then Ctrl+Shift+R |
+| *"Empty reply from the server"* / *"Server reply was not JSON"* (Log Viewer) | The Log Viewer's PHP stopped with an error | Open **Web Server Errors** in the Log Viewer (or `sudo tail -30 /var/log/nginx/error.log`) for the PHP error |
 | *"nws-auto-post: disabled …"* (journal) | Automatic NWS bulletins are off | Nothing, or turn them on (*Installation Manual* §10.4) |
 | *"Set config.php nws.auto_post.area to your 2-letter state code"* | Turned on, but no state chosen | Set `'area'` in `config.php` `nws` → `auto_post` |
 | *"FAILED (BBS not reachable; will retry next run)"* (NWS auto-post log) | BPQ wasn't answering on its telnet port | Nothing if BPQ is back; the alert goes out on the next run while it's still in force |
@@ -1125,7 +1138,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.16
+## 27. Known limitations in v1.5.18
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1183,7 +1196,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.16-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.18-User-Guide.pdf` | None |
 
 ## 30. Getting help
 
@@ -1204,7 +1217,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.16 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.18 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1219,6 +1232,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.16 — User Guide**
+**73 — BPQ Dashboard v1.5.18 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

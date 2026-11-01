@@ -43,6 +43,7 @@ if (!isset($_SERVER['PHP_SELF'])) $_SERVER['PHP_SELF'] = '/bpq-fwd-queue.php';
 
 $SKIP_BBS_CHECK = true;   // this script validates bbs_pass itself, below
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/bbs-login.php';   // shared BBS login (2026-11-01)
 
 header('Content-Type: application/json');
 
@@ -152,20 +153,8 @@ if (!$socket) apiError("Cannot connect: $errstr", 502);
 stream_set_timeout($socket, $config['timeout']);
 
 try {
-    $response = waitFor($socket, 'user:', 10);
-    if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-    sendCmd($socket, $config['bbs_user']);
-
-    $response = waitFor($socket, 'password:', 10);
-    if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-    sendCmd($socket, $config['bbs_pass']);
-
-    $response = waitFor($socket, '}', 20);
-    if (strpos($response, '}') === false) throw new Exception('Login failed');
-    sendCmd($socket, $config['bbs_alias']);
-
-    $response = waitFor($socket, '>', 15);
-    if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+    // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+    $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], null);
 
     // Sysop-only command — requires bbs_user to actually have the SYSOP
     // flag (true by default per config above, but a misconfigured

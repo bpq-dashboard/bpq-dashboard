@@ -1,6 +1,9 @@
 <?php
 /**
  * log-viewer-api.php — Log file reader API
+ * Version: 1.3.1 (2026-10-30) — JSON output survives non-UTF-8 bytes in logs
+ *   (BBS dialogue in message-bodies / bbs-messages / dashboard logs made
+ *   json_encode fail and the page saw an empty reply)
  * Version: 1.3.0 (2026-10-25) — catalogue covers the dashboard's own logs, the
  *   parsers and BPQ's dated logs; nws-monitor removed; VARA log from logs.vara_file
  */
@@ -150,6 +153,20 @@ function resolve_path(array $meta, string $date = ''): ?string {
     return $meta['path'] ?? null;
 }
 
+// 2026-10-30: BBS logs carry raw bytes (Latin-1, CP437, control codes) and a
+// tail can start mid-character. Plain json_encode() returns false on any
+// invalid UTF-8, so the page got an empty body ("JSON.parse: unexpected end
+// of data"). Substitute bad bytes with U+FFFD and never send an empty reply.
+function out(array $data): void {
+    $flags = JSON_PRETTY_PRINT | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR;
+    $json  = json_encode($data, $flags);
+    if ($json === false) {
+        http_response_code(500);
+        $json = json_encode(['error' => 'Could not encode log as JSON: ' . json_last_error_msg()]);
+    }
+    echo $json;
+}
+
 $action = $_GET['action'] ?? 'list';
 
 if ($action === 'list') {
@@ -168,7 +185,7 @@ if ($action === 'list') {
         }
         $out[] = $e;
     }
-    echo json_encode(['logs' => $out, 'generated_at' => gmdate('Y-m-d H:i:s').' UTC'], JSON_PRETTY_PRINT);
+    out(['logs' => $out, 'generated_at' => gmdate('Y-m-d H:i:s').' UTC']);
     exit;
 }
 
@@ -176,13 +193,13 @@ if ($action === 'read') {
     $key   = $_GET['log'] ?? '';
     $lines = min(1000, max(50, (int)($_GET['lines'] ?? 200)));
     $date  = preg_replace('/[^0-9]/', '', $_GET['date'] ?? '');
-    if (!isset($LOGS[$key])) { http_response_code(400); echo json_encode(['error'=>"Unknown log: $key"]); exit; }
+    if (!isset($LOGS[$key])) { http_response_code(400); out(['error'=>"Unknown log: $key"]); exit; }
     $path = resolve_path($LOGS[$key], $date);
-    if (!$path) { echo json_encode(['error'=>'Date required for archive log (YYMMDD)']); exit; }
+    if (!$path) { out(['error'=>'Date required for archive log (YYMMDD)']); exit; }
     $result = read_tail($path, $lines);
     $result['log_key'] = $key; $result['log_label'] = $LOGS[$key]['label'];
     $result['lines_requested'] = $lines;
-    echo json_encode($result, JSON_PRETTY_PRINT);
+    out($result);
     exit;
 }
 
@@ -190,20 +207,20 @@ if ($action === 'search') {
     $key  = $_GET['log'] ?? '';
     $q    = trim($_GET['q'] ?? '');
     $date = preg_replace('/[^0-9]/', '', $_GET['date'] ?? '');
-    if (!isset($LOGS[$key])) { http_response_code(400); echo json_encode(['error'=>"Unknown log: $key"]); exit; }
+    if (!isset($LOGS[$key])) { http_response_code(400); out(['error'=>"Unknown log: $key"]); exit; }
     $path = resolve_path($LOGS[$key], $date);
-    if (!$path) { echo json_encode(['error'=>'Date required for archive search']); exit; }
+    if (!$path) { out(['error'=>'Date required for archive search']); exit; }
     $result = search_log($path, $q);
     $result['log_key'] = $key; $result['log_label'] = $LOGS[$key]['label'];
-    echo json_encode($result, JSON_PRETTY_PRINT);
+    out($result);
     exit;
 }
 
 if ($action === 'dates') {
     global $LOG_DIR;
-    echo json_encode(['dates' => list_bbs_dates($LOG_DIR)], JSON_PRETTY_PRINT);
+    out(['dates' => list_bbs_dates($LOG_DIR)]);
     exit;
 }
 
 http_response_code(400);
-echo json_encode(['error' => "Unknown action: $action"]);
+out(['error' => "Unknown action: $action"]);

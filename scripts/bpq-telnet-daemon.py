@@ -66,7 +66,38 @@ ALLOWED_HOSTS = [
     'server.winlink.org',
     'cms.winlink.org',
 ]
-ALLOWED_PORTS = [23, 8010, 8011, 8008, 8772]  # telnet, BPQ, FBB, WL2K
+ALLOWED_PORTS = [23, 8010, 8011, 8008, 8772]  # telnet, BPQ, FBB, WL2K (defaults)
+
+
+def _station_bpq_ports():
+    """This station's BPQ telnet / FBB / web ports (2026-11-01): config.php
+    bbs.port, bbs.fbb_port, bbs.http_port, and TCPPORT= / FBBPORT= / HTTPPORT=
+    in <paths.linbpq>/bpq32.cfg when readable. Until v1.5.17 only the defaults
+    above were allowed, so a station on other ports (N3MEL: 8015 / 8017) was
+    refused even when the port was typed in by hand."""
+    ports = set()
+    try:
+        import bpq_db_config
+        bbs = bpq_db_config.load_config_section('bbs') or {}
+        for k in ('port', 'fbb_port', 'http_port'):
+            try:
+                if int(bbs.get(k) or 0) > 0:
+                    ports.add(int(bbs.get(k)))
+            except (TypeError, ValueError):
+                pass
+        cfg = bpq_db_config.default_linbpq_path('bpq32.cfg')
+        if os.path.isfile(cfg) and os.access(cfg, os.R_OK):
+            with open(cfg, errors='replace') as f:
+                for m in re.finditer(r'^\s*(?:TCPPORT|FBBPORT|HTTPPORT)\s*=\s*(\d+)', f.read(), re.M | re.I):
+                    ports.add(int(m.group(1)))
+    except Exception:
+        pass   # fall back to the defaults
+    return sorted(p for p in ports if 0 < p < 65536)
+
+
+for _p in _station_bpq_ports():
+    if _p not in ALLOWED_PORTS:
+        ALLOWED_PORTS.append(_p)
 
 # ── Logging ────────────────────────────────────────────────────────
 Path(STATE_DIR).mkdir(parents=True, exist_ok=True)
@@ -1182,6 +1213,7 @@ async def main():
     # Support both websockets v10 and v11+ API
     ws_ver = tuple(int(x) for x in websockets.__version__.split('.')[:2])
     log.info(f"websockets version: {websockets.__version__}")
+    log.info(f"Allowed telnet ports: {ALLOWED_PORTS}")
 
     # 2026-10-24: an upload arrives as one base64 message (4/3 of the file).
     # The library's default 1 MiB message limit closed the connection for

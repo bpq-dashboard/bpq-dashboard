@@ -109,24 +109,20 @@ function vlog($line) {
 
 // ─── Telnet session helpers ─────────────────────────────────────────
 
-/** Log in to the BBS (same dialogue as fetchMessageBody()). Returns socket. */
+/** Log in to the BBS (includes/bbs-login.php, as every BBS page does). Returns socket. */
 function bbsOpen() {
     global $config;
     $sock = @stream_socket_client("tcp://{$config['bbs_host']}:{$config['bbs_port']}",
                                   $errno, $errstr, (int)$config['timeout']);
     if (!$sock) throw new Exception("Cannot connect to BBS: $errstr");
     stream_set_timeout($sock, (int)$config['timeout']);
-    $r = waitFor($sock, 'user:', 10);
-    if (strpos($r, 'user:') === false) { @fclose($sock); throw new Exception('No user prompt'); }
-    sendCmd($sock, $config['bbs_user']);
-    $r = waitFor($sock, 'password:', 10);
-    if (strpos($r, 'password:') === false) { @fclose($sock); throw new Exception('No password prompt'); }
-    sendCmd($sock, $config['bbs_pass']);
-    $r = waitFor($sock, '}', 20);
-    if (strpos($r, '}') === false) { @fclose($sock); throw new Exception('Login failed'); }
-    sendCmd($sock, $config['bbs_alias']);
-    $r = bbsReadUntilPrompt($sock, 15);
-    if (!$r['prompt']) { @fclose($sock); throw new Exception('No BBS prompt'); }
+    // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+    try {
+        bpq_bbs_login($sock, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
+    } catch (Exception $e) {
+        @fclose($sock);
+        throw $e;
+    }
     return $sock;
 }
 

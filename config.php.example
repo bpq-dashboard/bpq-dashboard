@@ -62,6 +62,11 @@ return [
         'pass'    => 'CHANGE_THIS_PASSWORD',// BBS login password
         'alias'   => 'bbs',                 // Application alias to connect to the BBS
         'timeout' => 30,                    // Connection timeout in seconds
+        // Optional (v1.5.18): BPQ's FBB and web-management ports, for the Telnet
+        // Client. Leave out to read FBBPORT= / HTTPPORT= from bpq32.cfg
+        // (default 8011 / 8008).
+        // 'fbb_port'  => 8011,
+        // 'http_port' => 8008,
     ],
 
     // ---- Message text saved to the database (message-bodies.timer) ----

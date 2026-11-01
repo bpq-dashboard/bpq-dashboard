@@ -265,8 +265,9 @@ foreach ($sens as $port => $label) {
 }
 if ($exposed) {
     $findings[] = finding('exposed-ports','security', $fw4policy ? 'crit' : 'warn',
-        ($fw4policy ? 'Station ports open to the internet' : 'Station ports listen on all interfaces'),
-        'Listening on all interfaces' . ($fw4policy ? ' with no IPv4 firewall rule stopping them' : ' (firewall not readable, so they may be reachable)') . ': ' . implode('; ', $exposed) . '.',
+        ($fw4policy ? 'Station ports open to every network (check your router)' : 'Station ports listen on all interfaces'),
+        'Listening on all interfaces' . ($fw4policy ? ' with no IPv4 firewall rule stopping them' : ' (firewall not readable, so they may be reachable)') . ': ' . implode('; ', $exposed) . '.'
+        . ' Only ports your router forwards to this machine can be reached from the internet; System Audit cannot see the router.',
         'Bind them to 127.0.0.1 where the program allows it (MariaDB: bind-address = 127.0.0.1), or allow them only from your LAN in the firewall. BPQ telnet/FBB send passwords unencrypted; reach them from outside through the dashboard (HTTPS) or a VPN.');
 } else {
     $findings[] = finding('exposed-ports','security','ok','Station ports not open to the internet',
@@ -279,7 +280,14 @@ $f2bState = unit_state('fail2ban.service');
 [$ssok, $ssOut] = sudo_run('/usr/bin/ss -tlnp');
 $sshPorts = [];
 if ($ssok) {
-    foreach (explode("\n", $ssOut) as $l) if (strpos($l, '"sshd"') !== false && preg_match('/:(\d+)\s/', $l, $m)) $sshPorts[(int)$m[1]] = true;
+    // 2026-11-01: only ports reachable from the network. sshd also listens on
+    // 127.0.0.1:6010+ while someone is logged in with ssh -X (X11 forwarding);
+    // those are local-only and were reported as SSH ports (N3MEL).
+    foreach (explode("\n", $ssOut) as $l) {
+        if (strpos($l, '"sshd"') === false) continue;
+        $p = preg_split('/\s+/', trim($l));
+        if (count($p) >= 4 && preg_match('/^(.*):(\d+)$/', $p[3], $m) && is_public_bind([trim($m[1], '[]')])) $sshPorts[(int)$m[2]] = true;
+    }
 }
 if (!$sshPorts && isset($listen[22])) $sshPorts[22] = true;   // best guess without -p
 if (!$f2bState[0]) {
@@ -376,7 +384,9 @@ if ($isApache) {
     }
     // Recent errors in the error logs we can read (installer's file first)
     $errLogs = array_filter(['/var/log/nginx/bpq-dashboard.error.log', '/var/log/nginx/error.log'], 'is_readable');
-    $ignore = '/rename\(.*cache.*\.tmp|access forbidden by rule|limiting requests/';
+    // 2026-11-01: 'bpq-protection-probe' is the Maintenance page's own check that
+    // the admin pages are locked (a deliberately wrong login, four lines each time).
+    $ignore = '/rename\(.*cache.*\.tmp|access forbidden by rule|limiting requests|bpq-protection-probe/';
     $errs = [];
     foreach ($errLogs as $el) {
         foreach (explode("\n", sh_quiet('tail -n 300 ' . escapeshellarg($el))) as $l) {
@@ -632,12 +642,13 @@ if ($parserRows === 0 && $dbConfigured) {
 // ═══════════════════════════════════════════════════════
 
 // LinBPQ — by process, whatever the service is called
-$bpqPids = sh_quiet('pgrep -x linbpq');
+// 2026-11-01: the program is also shipped/renamed as linbpq64 or pilinbpq (N3MEL runs linbpq64).
+$bpqPids = sh_quiet("pgrep -x 'linbpq|linbpq64|pilinbpq'");
 if ($bpqPids !== '') {
-    $findings[] = finding('linbpq','application','ok','LinBPQ is running', 'linbpq process ' . str_replace("\n", ', ', $bpqPids) . '.');
+    $findings[] = finding('linbpq','application','ok','LinBPQ is running', 'LinBPQ process ' . str_replace("\n", ', ', $bpqPids) . '.');
 } else {
     $findings[] = finding('linbpq','application','crit','LinBPQ is not running',
-        'No linbpq process: no BBS, no RF, no forwarding, and most pages show errors.',
+        'No LinBPQ process (linbpq, linbpq64 or pilinbpq): no BBS, no RF, no forwarding, and most pages show errors.',
         'Start it with your service (often: sudo systemctl start bpq). Its log: sudo journalctl -u bpq -n 50');
 }
 
@@ -661,9 +672,18 @@ foreach ($daemons as [$u, $what, $hb, $maxAge, $optional]) {
         continue;
     }
     if ($act !== 'active') {
-        $findings[] = finding("svc-$u",'application', ($optional && $en !== 'enabled') ? 'info' : 'crit', "$u is $act",
-            "$u.service is installed but $act ($en), so $what " . (($optional && $en !== 'enabled') ? 'is switched off.' : 'is down.'),
-            "sudo journalctl -u $u -n 30 --no-pager; sudo systemctl enable --now $u");
+        // 2026-11-01: a helper the station switched off (disabled) is 'not in
+        // use', not a fault, for every helper, not just the optional ones. One
+        // that is enabled but not running is meant to run and is down: critical.
+        if ($en !== 'enabled') {
+            $findings[] = finding("svc-$u",'application','info',"$u is switched off",
+                "$u.service is installed but $en, so $what is not in use. That's fine if you don't use it.",
+                "Only if you want it: sudo systemctl enable --now $u");
+        } else {
+            $findings[] = finding("svc-$u",'application','crit',"$u is $act",
+                "$u.service is enabled but $act, so $what is down (it failed or keeps restarting).",
+                "sudo journalctl -u $u -n 30 --no-pager; sudo systemctl restart $u");
+        }
         continue;
     }
     if ($hb === null) {

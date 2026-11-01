@@ -34,6 +34,23 @@ repository; they remain his work under his own terms.
 
 - https://github.com/N3MEL39/TPRFN_HTML_Forms
 
+## Testers
+
+Thank you to the sysops who installed the dashboard on their own stations and
+reported, clearly and patiently, everything that didn't work:
+
+- **Glenn Allison, N3MEL** — the first Linux Mint install (2026-10/11). His
+  station turned up the BBS login that needed a `}` in BPQ's greeting, the
+  Telnet Client's fixed ports, Traffic reports in the LinBPQ folder, the
+  private home-folder access on Mint/Ubuntu, `linbpq64` in System Audit and
+  more (fixed in v1.5.18). His setup (no local BPQ Chat, APRS through
+  APRSIS32) also led to the coming installer option to choose which pages and
+  helper services a station installs.
+- **Ernie, KG9NI** — the first Ubuntu / PHP 8.5 install (2026-10). His
+  report, with the exact log lines and his own fixes, found the installer's
+  PHP-FPM socket and admin-login file problems (fixed in v1.5.16) and Install
+  Check's PHP-version gap. His feedback shaped the same page-choice work.
+
 ## Also built on
 
 These projects and services are used by the dashboard; each keeps its own

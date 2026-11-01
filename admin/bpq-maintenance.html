@@ -511,10 +511,10 @@
 <body data-nav-page="maint">
 <!-- Shared navigation (loaded from /_nav.html via /bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-10-30-1"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-01-1"></script>
 
 <!--
-  Maintenance reference — v1.5.16 (rebuilt 2026-10-03, checked against the code 2026-10-25)
+  Maintenance reference — v1.5.18 (rebuilt 2026-10-03, checked against the code 2026-10-25)
   This page must only be reachable after the admin login: it lives in
   /admin/, which nginx (location ^~ /admin/) or Apache (<Directory …/admin>)
   protects with /etc/nginx/.bpq-mgmt-auth. The status box below checks that.
@@ -524,7 +524,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.16 · updated October 2026
+    v1.5.18 · updated November 2026
   </div>
 </header>
 
@@ -595,7 +595,7 @@
     </div><div class="cmd-tag blue">schedule</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> ss <span class="flag">-tlnp</span> | grep <span class="flag">-E</span> ':(80|443|3306|8008|8010|8011|8765|8767|9025|12345)\b'</code>
-      <div class="cmd-label">Listening ports: 80/443 nginx, 3306 MariaDB (should show 127.0.0.1), 8008/8010/8011 LinBPQ web/telnet/FBB, 8765 bpq-telnet, 8767 bpq-vara, 9025 vara-validator, 12345 flrig. A missing line means that program is not running or not listening.</div>
+      <div class="cmd-label">Listening ports: 80/443 nginx, 3306 MariaDB (should show 127.0.0.1), 8008/8010/8011 LinBPQ web/telnet/FBB (your own ports if bpq32.cfg sets others; add them to the grep), 8765 bpq-telnet, 8767 bpq-vara, 9025 vara-validator, 12345 flrig. A missing line means that program is not running or not listening.</div>
     </div><div class="cmd-tag cyan">ports</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>ps aux | grep <span class="flag">-E</span> 'linbpq|bpq-(telnet|chat|aprs|vara)|vara-|flrig' | grep <span class="flag">-v</span> grep</code>
@@ -731,7 +731,7 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
     </div><div class="cmd-tag purple">dry run</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-traffic-report.py <span class="flag">--days</span> 8 <span class="flag">--dry-run</span> <span class="flag">--verbose</span></code>
-      <div class="cmd-label">BPQ traffic reports → <span class="kw">traffic_stats</span>. BPQ writes <b>one Traffic_YYMMDD.txt per week</b> (named for the week start, written the following Saturday), so the cron line needs <span class="kw">--days 8</span>; without it every run logs "Processed 0 file(s)".</div>
+      <div class="cmd-label">BPQ traffic reports → <span class="kw">traffic_stats</span>. BPQ writes <b>one Traffic_YYMMDD.txt per week</b> (named for the week start, written the following Saturday), so the cron line needs <span class="kw">--days 8</span>; without it every run logs "Processed 0 file(s)". BPQ writes them in the LinBPQ folder: the parser looks in <span class="kw">logs/</span> and in config.php <span class="kw">paths.linbpq</span> (since v1.5.18) and, when it finds none, says which folders it searched. Load all older reports once: same command with <span class="kw">--backfill</span> instead of <span class="kw">--days 8 --dry-run</span>.</div>
     </div><div class="cmd-tag purple">dry run</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-system-logs.py <span class="flag">--dry-run</span> <span class="flag">--verbose</span></code>
@@ -812,6 +812,10 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <code><span class="sudo">sudo</span> mysql <var data-v="db">bpqdash</var> <span class="flag">-e</span> "SELECT name FROM bpq_msg_folders WHERE name REGEXP '^Bulletins - [0-9]';"</code>
       <div class="cmd-label">Bulletin folders with garbled names such as "Bulletins - 1 ARNR" (a parser bug fixed in 2026-08). Should return nothing. If it does, use Email Client → Settings → <b>Clean up Bulletin folders</b>, which repairs them in place.</div>
     </div><div class="cmd-tag amber">diagnose</div></div>
+    <div class="cmd note"><div class="cmd-inner">
+      <div class="note-head">"Login refused" / "Login failed" (Email Client, message-text job, forwarding queue)</div>
+      <div class="cmd-label">All three log in through <span class="kw">includes/bbs-login.php</span> (v1.5.18) with config.php <span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span>; it accepts a login that lands at the node (then sends <span class="kw">bbs.alias</span>) or straight in the BBS, whatever BPQ's greeting. The error names the step and BPQ's last line. <b>Login refused</b>: user/password don't match the <span class="kw">USER=</span> line in bpq32.cfg. <b>nothing came back after the password</b>: LinBPQ not answering on <span class="kw">bbs.port</span>. <b>No BBS prompt after 'bbs'</b>: set <span class="kw">bbs.alias</span> to the BBS's APPLICATION name. Test: <span class="kw">sudo -u www-data php …/scripts/fetch-message-bodies.php --dry-run --limit=1</span>; the dialogue is in <span class="kw">logs/message-bodies.log</span> (password never written).</div>
+    </div><div class="cmd-tag amber">troubleshoot</div></div>
     <div class="cmd note"><div class="cmd-inner">
       <div class="note-head">"The BBS is busy" / a wait before Get Mail</div>
       <div class="cmd-label">Only one BBS login at a time (2026-10-12): the Email Client and the message-text job share the lock <span class="kw">cache/bpq-telnet.lock</span>, and a new login waits until 2 s after the last one ended. The job's sessions are short, so the page normally waits seconds; after 40 s it says the BBS is busy. If it says so all the time, look for a stuck job: <span class="kw">systemctl status message-bodies.service</span>.</div>
@@ -1141,7 +1145,7 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
     </div><div class="cmd-tag cyan">log</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>grep <span class="flag">-i</span> fbbport <var data-v="linbpq">/opt/linbpq</var>/bpq32.cfg</code>
-      <div class="cmd-label">YAPP needs BPQ's FBB port (usually <span class="kw">FBBPORT=8011</span>); without it the Files panel's "Switch to file-transfer mode" can't connect.</div>
+      <div class="cmd-label">YAPP needs BPQ's FBB port (usually <span class="kw">FBBPORT=8011</span>); without it the Files panel's "Switch to file-transfer mode" can't connect. The Telnet Client uses this port (and <span class="kw">bbs.port</span> for Node/BBS/Chat) since v1.5.18; if the web server can't read bpq32.cfg, set <span class="kw">'fbb_port' =&gt; N</span> in config.php's <span class="kw">bbs</span> section, then <span class="kw">sudo systemctl restart bpq-telnet</span> (its log lists the allowed ports at start).</div>
     </div><div class="cmd-tag blue">check</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/yapp_protocol.py</code>
@@ -1185,6 +1189,10 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <code><span class="sudo">sudo</span> tail -30 /var/log/nginx/bpq-dashboard.error.log /var/log/nginx/error.log 2&gt;/dev/null</code>
       <div class="cmd-label">Recent web-server errors (500s, blank pages, permission problems). The first file is the installer's; hand-built sites usually log to the second.</div>
     </div><div class="cmd-tag blue">log</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>LANG=C.UTF-8 grep <span class="flag">-naxv</span> '.*' <var data-v="root">/var/www/bpq-dashboard</var>/logs/bbs-messages.log | head</code>
+      <div class="cmd-label">Lines that aren't valid UTF-8 (raw BBS text). Since v1.5.17 the Log Viewer shows those bytes as <span class="kw">�</span>; before, such a log failed with <span class="kw">JSON.parse: unexpected end of data</span>. If the Log Viewer says <span class="kw">Empty reply from the server</span>, the PHP error is in the log above.</div>
+    </div><div class="cmd-tag cyan">log viewer</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> tail -30 /var/log/php8.3-fpm.log &amp;&amp; <span class="sudo">sudo</span> systemctl restart php8.3-fpm</code>
       <div class="cmd-label">PHP errors, then a restart for hung pages or 502 Bad Gateway. Use your PHP version number.</div>
@@ -1294,6 +1302,10 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
     <div class="cmd note"><div class="cmd-inner">
       <div class="note-head">parse-vara-log: in-flight session at end of file</div>
       <div class="cmd-label">The VARA log ended mid-session. The next run picks it up.</div>
+    </div><div class="cmd-tag amber">expected</div></div>
+    <div class="cmd note"><div class="cmd-inner">
+      <div class="note-head">user "bpq-protection-probe" was not found in "/etc/nginx/.bpq-mgmt-auth"</div>
+      <div class="cmd-label">nginx error log, four lines each time this page opens: the <a href="#protection">Admin login</a> check sends a deliberately wrong login to prove the admin pages are locked. System Audit doesn't count these (v1.5.18).</div>
     </div><div class="cmd-tag amber">expected</div></div>
   </div>
 </div>

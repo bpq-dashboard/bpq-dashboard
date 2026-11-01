@@ -4,6 +4,124 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.18] - 2026-11-01
+
+Fixes from the first Linux Mint install (N3MEL: Mint 22.3, LinBPQ in a home
+folder, `linbpq64`, BPQ telnet/FBB on 8015/8017). Thanks to Glenn, N3MEL, for
+the testing, and to Ernie, KG9NI, whose Ubuntu report led to v1.5.16; both are
+now credited in CREDITS.md (*Testers*). Their installs also led to the next
+release's main change: the installer will ask which pages and helper services
+a station wants (Chat, APRS map, Telnet Client, VARA HF Terminal, Rig) and
+install only those. Email Client, message-text job and forwarding queue now log in on
+his BBS; Telnet Client uses the station's own BPQ ports; Traffic Report finds
+BPQ's reports in the LinBPQ folder; System Audit stops raising false alarms.
+
+### Fixed — BBS login ("Login failed")
+- New **`includes/bbs-login.php`** (`bpq_bbs_login()`), one login for every
+  page and job, based on the logic `bpq-nodes-api.php` already used: after
+  the password it waits for BPQ's greeting to finish; a node prompt `}`, a
+  BBS prompt (`de CALL>`, "Connected to BBS", the SID) or quiet all count as
+  logged in, and *sorry / invalid / incorrect / bad password* or a repeated
+  `user:` / `password:` as refused. At the node it sends `bbs.alias`;
+  already in the BBS (USER line whose application is BBS) it carries on.
+  Errors name the step and BPQ's last line ("Login refused: check bbs.user /
+  bbs.pass …", "nothing came back after the password", "No BBS prompt after
+  'bbs'"); the password is never logged.
+- Before, `bbs-messages.php` (7 places), `bpq-fwd-queue.php` and
+  `scripts/fetch-message-bodies.php` waited 20 s for a `}` after the password
+  and threw "Login failed" when the greeting had none, as on N3MEL's station
+  (`USER=…,"",SYSOP`, lands at the node, greeting without `}`). All nine now
+  call the shared login. `sendMessage()` and `nws-bbs-post.php` were not
+  affected (they don't wait for `}`) and are unchanged.
+- Tested against a scripted BPQ: greeting with `}`, without `}`, slow
+  greeting, landing in the BBS, wrong password, connection closed, silence;
+  and `fetchMessages()` end to end with the no-`}` greeting.
+
+### Fixed — Telnet Client ports
+- `bpq-telnet.html`: the Node / BBS / Chat buttons, the Custom port default,
+  the NetROM node buttons and file-transfer mode used 8010 / 8011. They now
+  use the station's ports from `station-info.php` (new fields
+  `bpq_telnet_port`, `bpq_fbb_port`).
+- `includes/station-config.php`: new `bpq_bbs_ports()` — telnet from
+  `bbs.port`; FBB / web from new optional `bbs.fbb_port` / `bbs.http_port`,
+  else `FBBPORT=` / `HTTPPORT=` in `<paths.linbpq>/bpq32.cfg`, else 8011 /
+  8008. `config.php.example` documents the two optional keys.
+- `scripts/bpq-telnet-daemon.py`: the allowed ports (23, 8010, 8011, 8008,
+  8772) now also include `bbs.port`, `bbs.fbb_port`, `bbs.http_port` and
+  bpq32.cfg's TCPPORT / FBBPORT / HTTPPORT; the list is logged at start.
+
+### Fixed — Traffic Report empty
+- `scripts/parse-traffic-report.py`: BPQ writes `Traffic_YYMMDD.txt` in the
+  LinBPQ folder, but the parser only looked in `logs/` (N3MEL: 74 reports in
+  `/home/n3mel/linbpq`, `logs/` linked to LinBPQ's `logs` subfolder). It now
+  searches `paths.logs` then `paths.linbpq` (`--logs-dir` still overrides;
+  dated lookups need only search permission on the folder, `--backfill`
+  needs read). When a run finds none, the log says which folders it searched.
+
+### Fixed — System Audit / Install Check false alarms
+- LinBPQ running as `linbpq64` or `pilinbpq` is recognised
+  (`pgrep -x 'linbpq|linbpq64|pilinbpq'`; Install Check's
+  `ps -C linbpq,linbpq64,pilinbpq`). Was "LinBPQ is not running" (critical).
+- A dashboard service that is installed but disabled is *Info* ("switched
+  off: … not in use") for every service, not just the optional ones; enabled
+  but not running stays *Critical* ("failed or keeps restarting").
+- SSH ports: only ports reachable from the network count; the local-only
+  X11-forwarding ports `ssh -X` opens (127.0.0.1:6010+) no longer show as
+  "SSH listening on port 22, 6010".
+- nginx error count ignores `bpq-protection-probe`, the Maintenance page's own
+  check that the admin pages are locked (four lines per page load).
+- "Station ports open to the internet" → "Station ports open to every
+  network (check your router)", with a line saying only ports the router
+  forwards are reachable from the internet.
+
+### Docs
+- Guide §6 Telnet Client (ports, troubleshooting), §9 Email Client (how the
+  login works), §10 file-transfer mode (FBB port), §13 Traffic Report (where
+  the reports are, backfill), §22 System Audit (what's checked, *switched
+  off*, enabled-but-down), §26 three login messages. Manual What's New *In
+  v1.5.18*, §8 YAPP FBB port, §12 new *Email Client or message text job:
+  "Login refused" / "Login failed"*, *Telnet or VARA page can't connect*
+  ports line, *YAPP transfer fails* FBB port. Maintenance page: login note
+  (Email section), traffic parser row, FBB port row, listening-ports row,
+  *Messages you can ignore* (`bpq-protection-probe`).
+- Version 1.5.18: badges, menu (`NAV_VERSION` 2026-11-01-1), PDFs
+  `BPQ-Dashboard-v1.5.18-*.pdf`, installer and script headers, README and
+  Manual download commands, PUBLISHING.md, screenshots.
+
+## [1.5.17] - 2026-10-30
+
+Log Viewer fix. Logs that record raw BBS sessions (Message text job, Email
+Client (BBS), Dashboard log) wouldn't open: *"Failed to load: JSON.parse:
+unexpected end of data"*. They now open, with any unreadable bytes shown as
+�. Nothing else changes; update the two Log Viewer files (and the PDFs).
+
+### Fixed (2026-10-30) — Log Viewer: "JSON.parse: unexpected end of data"
+- **`admin/log-viewer-api.php` 1.3.1**: a log holding bytes that aren't
+  valid UTF-8 (Latin-1 / CP437 characters and control codes from BBS
+  sessions, or a multi-byte character cut by the tail read) made
+  `json_encode()` return false, so the API sent an empty body. All replies
+  now go through one `out()` helper using `JSON_INVALID_UTF8_SUBSTITUTE`
+  (bad bytes → U+FFFD) and `JSON_PARTIAL_OUTPUT_ON_ERROR`; if encoding still
+  fails it answers HTTP 500 with the JSON error instead of nothing. Affects
+  `list`, `read`, `search` and `dates`.
+- **`admin/log-viewer.html`**: Read and Search parse the reply with a new
+  `readJson()` helper, so an empty or non-JSON reply shows *"Empty reply
+  from the server (HTTP n) …"* or *"Server reply was not JSON (HTTP n): …"*
+  rather than a bare JSON.parse error.
+- Docs: Guide §21 (Dashboard services list names the Dashboard log and NWS
+  auto-post; � note; auth-log note on the `adm` group; what to do when a log
+  won't open), §26 (two Log Viewer rows); Manual What's New *In v1.5.17*, §12
+  new *Log Viewer: "JSON.parse: unexpected end of data"*, §10 NWS posting
+  log label corrected to *Dashboard log*; maintenance page *Web server & PHP*
+  new *log viewer* row (find non-UTF-8 lines).
+- `scripts/generate-user-manual-pdf.py`: � (U+FFFD) printed as
+  "(replacement character)" — the PDF fonts have no glyph for it. Manual §12
+  *"JSON.parse: unexpected character"*: the long `tail` line no longer runs
+  off the page.
+- Version 1.5.17: badges, menu (`NAV_VERSION` 2026-10-30-2), PDFs
+  `BPQ-Dashboard-v1.5.17-*.pdf`, installer and script headers, README and
+  Manual download commands, PUBLISHING.md, screenshots.
+
 ## [1.5.16] - 2026-10-30
 
 Fresh-install fixes from KG9NI's report (Ubuntu, PHP 8.5, nginx). The v1.5.15

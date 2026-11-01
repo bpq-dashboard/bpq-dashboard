@@ -13,6 +13,7 @@ ini_set('log_errors', 1);
 // Load configuration and security via bootstrap
 require_once __DIR__ . '/includes/bootstrap.php';
 require_once __DIR__ . '/includes/web-login.php';
+require_once __DIR__ . '/includes/bbs-login.php';   // shared BBS login (2026-11-01)
 // Reads your mail and acts on the BBS as the sysop: admin login only (2026-10-04)
 // (CLI is exempt inside bpq_require_web_login(); scripts/fetch-message-bodies.php
 // includes this file with BPQ_MESSAGES_LIB defined to reuse the telnet helpers.)
@@ -289,20 +290,8 @@ function fetchMessages($count) {
     
     try {
         // Login sequence
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        
-        sendCmd($socket, $config['bbs_user']);
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        
-        sendCmd($socket, $config['bbs_pass']);
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        
-        sendCmd($socket, $config['bbs_alias']);
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+        // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+        $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
         
         // Get message list
         sendCmd($socket, 'LM');
@@ -359,20 +348,8 @@ function fetchMessageBody($msgNum) {
     
     try {
         // Login sequence
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        
-        sendCmd($socket, $config['bbs_user']);
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        
-        sendCmd($socket, $config['bbs_pass']);
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        
-        sendCmd($socket, $config['bbs_alias']);
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+        // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+        $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
         
         // Read the message
         sendCmd($socket, "R $msgNum");
@@ -425,20 +402,8 @@ function fetchBulletins($address, $count = 10) {
     
     try {
         // Login sequence
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        
-        sendCmd($socket, $config['bbs_user']);
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        
-        sendCmd($socket, $config['bbs_pass']);
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        
-        sendCmd($socket, $config['bbs_alias']);
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+        // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+        $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
         
         // Use LB command to list all bulletins
         logMessage("Sending: LB");
@@ -605,20 +570,8 @@ function deleteMessage($msgNum) {
     
     try {
         // Login sequence
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        
-        sendCmd($socket, $config['bbs_user']);
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        
-        sendCmd($socket, $config['bbs_pass']);
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        
-        sendCmd($socket, $config['bbs_alias']);
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+        // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+        $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
         
         // Send kill command
         logMessage("Sending: K $msgNum");
@@ -721,20 +674,8 @@ function fetchMessageListByType($type, $count) {
 
     try {
         // Login (same pattern as fetchMessages)
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        sendCmd($socket, $config['bbs_user']);
-
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        sendCmd($socket, $config['bbs_pass']);
-
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        sendCmd($socket, $config['bbs_alias']);
-
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+        // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+        $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
 
         // Send the typed list command. LB (bulletins) gets a longer
         // timeout than LP/LT — it's typically the largest listing, and a
@@ -839,20 +780,8 @@ function fetchAllLists($count) {
 
     try {
         // Login
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        sendCmd($socket, $config['bbs_user']);
-
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        sendCmd($socket, $config['bbs_pass']);
-
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        sendCmd($socket, $config['bbs_alias']);
-
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+        // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+        $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
 
         $results = [];
         $truncated = [];
@@ -975,20 +904,8 @@ function forwardMessage($msgNum, $toAddr) {
     stream_set_timeout($socket, $config['timeout']);
 
     try {
-        $response = waitFor($socket, 'user:', 10);
-        if (strpos($response, 'user:') === false) throw new Exception('No user prompt');
-        sendCmd($socket, $config['bbs_user']);
-
-        $response = waitFor($socket, 'password:', 10);
-        if (strpos($response, 'password:') === false) throw new Exception('No password prompt');
-        sendCmd($socket, $config['bbs_pass']);
-
-        $response = waitFor($socket, '}', 20);
-        if (strpos($response, '}') === false) throw new Exception('Login failed');
-        sendCmd($socket, $config['bbs_alias']);
-
-        $response = waitFor($socket, '>', 15);
-        if (strpos($response, '>') === false) throw new Exception('No BBS prompt');
+        // Shared login (includes/bbs-login.php, 2026-11-01): node or BBS, '}' or not
+        $response = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
 
         // BPQ Mail's user-callable forward is "SC" (Send Copy):
         //   SC <msg#> <callsign>          — within local BBS
