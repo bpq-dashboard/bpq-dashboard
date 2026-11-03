@@ -523,7 +523,7 @@
 <body data-nav-page="maint">
 <!-- Shared navigation (loaded from /_nav.html via /bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-11-02-1"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-03-1"></script>
 
 <!--
   Maintenance reference — v1.5.19 (rebuilt 2026-10-03, checked against the code 2026-10-25)
@@ -536,7 +536,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.19 · updated November 2026
+    v1.5.20 · updated November 2026
   </div>
 </header>
 
@@ -1365,7 +1365,7 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
         <button class="editor-btn reload" onclick="verStatus(true)">⟳ Check for a new release</button>
         <span class="editor-status info" id="verLine" role="status"></span>
       </div>
-      <div class="cmd-label" style="margin-top:8px"><span class="kw">update.sh</span> updates this install in place, no reinstall: it keeps config.php, data/, the database contents, the logs link, the PKTNET forms and your web-server and firewall settings; backs up every file it replaces; copies only what changed (each checked); applies the database updates; refreshes the helper units and sudo rules the installer set up; and restarts only the helpers whose program changed. Files you edited on the server are listed and kept in the backup. <span class="kw">--dry-run</span> shows the plan without changing anything; every run prints its own <span class="kw">--rollback</span> command. The update is run over SSH (it needs root); this page only checks for a new release.</div>
+      <div class="cmd-label" style="margin-top:8px"><span class="kw">update.sh</span> updates this install in place, no reinstall: it keeps config.php, data/, the database contents, the logs link, the PKTNET forms and your web-server and firewall settings; backs up every file it replaces; copies only what changed (each checked); applies the database updates; refreshes the helper units and sudo rules the installer set up; and restarts only the helpers whose program changed. Files you edited on the server are listed and kept in the backup; to keep your version instead, use <span class="kw">--keep-local</span>, or list files you always run in your own version in <span class="kw">/etc/bpq-dashboard/update-keep.txt</span> (one path per line). <span class="kw">--dry-run</span> shows the plan without changing anything; every run prints its own <span class="kw">--rollback</span> command. The update is run over SSH (it needs root); this page only checks for a new release.</div>
     </div><div class="cmd-tag green">update</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>cd ~ &amp;&amp; wget <span class="flag">-O</span> bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v<span id="verLatest1">X.Y.Z</span>.zip &amp;&amp; unzip <span class="flag">-o</span> bpq-dashboard.zip
@@ -1877,8 +1877,11 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
   const API = '/admin/maintenance-api.php';
   const H = { 'Content-Type': 'application/json', 'X-BPQ-Dashboard': '1' };
   function setSt(el, cls, txt) { el.className = 'editor-status ' + cls; el.textContent = txt; }
-  async function call(action, method, body) {
-    const r = await fetch(API + '?action=' + encodeURIComponent(action), method === 'POST'
+  // v1.5.20: extra query options go in their own argument (was appended to
+  // the action and then encoded, so "Check again" asked for an unknown action)
+  async function call(action, method, body, query) {
+    const qs = '?action=' + encodeURIComponent(action) + (query ? '&' + new URLSearchParams(query).toString() : '');
+    const r = await fetch(API + qs, method === 'POST'
       ? { method: 'POST', headers: H, body: JSON.stringify(body || {}), cache: 'no-store' }
       : { cache: 'no-store' });
     let j = null; try { j = await r.json(); } catch (e) {}
@@ -1904,8 +1907,8 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
   window.pfStatus = async function (refresh) {
     const info = document.getElementById('pfInfo'), line = document.getElementById('pfStatusLine');
     if (!info) return;
-    const j = await call('forms_status' + (refresh ? '&refresh=1' : ''), 'GET');
-    if (!j.ok) { info.textContent = j.error || 'Status not available'; return; }
+    const j = await call('forms_status', 'GET', null, refresh ? { refresh: 1 } : null);
+    if (!j.ok) { info.textContent = j.error || 'Status not available'; setSt(line, 'err', 'Check failed'); return; }
     const lat = j.latest || {};
     info.innerHTML =
       'Installed: <b>' + (j.installed ? esc(j.pages) + ' pages' : 'not installed') + '</b>' +
@@ -1941,8 +1944,8 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
   window.verStatus = async function (refresh) {
     const info = document.getElementById('verInfo'), line = document.getElementById('verLine');
     if (!info) return;
-    const j = await call('version_status' + (refresh ? '&refresh=1' : ''), 'GET');
-    if (!j.ok) { info.textContent = j.error || 'Not available'; return; }
+    const j = await call('version_status', 'GET', null, refresh ? { refresh: 1 } : null);
+    if (!j.ok) { info.textContent = j.error || 'Not available'; setSt(line, 'err', 'Check failed'); return; }
     info.innerHTML = 'Installed: <b>' + esc(j.installed || 'unknown') + '</b>' +
       (j.installed_how ? ' <span style="opacity:.7">(' + esc(j.installed_how) + ')</span>' : '') + '<br>' +
       'Latest release: ' + (j.latest ? '<b>' + esc(j.latest) + '</b>' : esc(j.error_latest || 'unknown'));

@@ -1,7 +1,7 @@
 <?php
 /**
  * includes/bbs-login.php — one BBS login for every page and job (2026-11-01)
- * BPQ Dashboard v1.5.19
+ * BPQ Dashboard v1.5.20
  *
  * Logs in on an open telnet socket and leaves the session at the BBS prompt.
  *

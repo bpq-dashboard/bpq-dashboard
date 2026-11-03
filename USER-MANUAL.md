@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.19**
+**Version 1.5.20**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -80,6 +80,11 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.20
+
+- **Maintenance page:** the *Check for a new release* and PKTNET *Check again* buttons work (they answered "Unknown action").
+- **`update.sh`:** the dry run also lists the systemd units and sudo rules it would refresh; an update never adds the admin-password sudo rule by itself; a keep list (`/etc/bpq-dashboard/update-keep.txt`) or `--keep-local` keeps files you run in your own version.
 
 ### In v1.5.19
 
@@ -262,14 +267,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.19.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.20.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.19
+cd bpq-dashboard-1.5.20
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -451,7 +456,7 @@ Since v1.5.19 every release has **`update.sh`**, which updates your dashboard in
    ```bash
    sudo bash update.sh --dry-run
    ```
-   It finds your dashboard (`/var/www/bpq-dashboard`, or the folder your nginx/Apache site serves; add `--web-root /path` if it asks) and lists the files it will update, add and remove.
+   It finds your dashboard (`/var/www/bpq-dashboard`, or the folder your nginx/Apache site serves; add `--web-root /path` if it asks) and lists the files it will update, add and remove, plus any systemd unit or sudo-rules file it would refresh (compare one first with the `diff` command it prints). The admin-password sudo rule is only kept where you already set it up; it is never added by an update.
 3. Update:
    ```bash
    sudo bash update.sh
@@ -462,7 +467,7 @@ Since v1.5.19 every release has **`update.sh`**, which updates your dashboard in
 
 **What it does:** backs up every file it replaces or removes to `/root/bpq-dashboard-update-<date>/` (with a restore script and a log); copies the new and changed files, keeping owner and mode, and checks each one; removes files the release dropped (old PDFs, retired pages); applies the database updates in `sql/migrations.list` (each is safe to repeat); refreshes the systemd units and sudo rules the installer set up, only where they changed (a unit you wrote yourself is left alone); restarts only the helper services whose program or unit changed; and records the version in `VERSION` and `MANIFEST.md5`. Maintenance → *Install check, updates & backups* shows the installed and latest versions.
 
-**Files you edited on the server** (from v1.5.19 on it can tell, using the installed `MANIFEST.md5`) are listed before it starts; they are replaced with the new version and your copy stays in the backup.
+**Files you edited on the server** (from v1.5.19 on it can tell, using the installed `MANIFEST.md5`) are listed before it starts; they are replaced with the new version and your copy stays in the backup. To keep them instead, run it with `--keep-local`. Files you always run in your own version go in a keep list, `/etc/bpq-dashboard/update-keep.txt` (one path per line relative to the dashboard folder, e.g. `callsign-lookup.php` or `scripts/wp_*.py`; `#` starts a comment): they are never replaced or removed, and every plan lists them so you can compare them with the CHANGELOG. The same list can name a hand-tuned unit or the sudo rules file to keep: `/etc/systemd/system/bpq-chat.service`, `/etc/sudoers.d/www-data-tools`.
 
 **Undo:** the last lines it prints include the exact command, e.g. `sudo bash update.sh --rollback /root/bpq-dashboard-update-20261115-101500`. It puts back every file, unit and sudo rule as it was. Database updates stay (they only add tables and columns, which the older version ignores).
 
@@ -1683,10 +1688,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.19-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.20-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.19 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.20 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

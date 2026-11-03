@@ -12,6 +12,12 @@
 #      --web-root DIR   the dashboard's folder (default: found automatically)
 #      --yes            don't ask before updating
 #      --force          allow re-installing the same or an older version
+#      --keep-local     don't replace files changed on this server since the
+#                       last update (they're listed in the plan)
+#      --keep-list FILE paths never to replace or remove (default:
+#                       /etc/bpq-dashboard/update-keep.txt if it exists);
+#                       also /etc/systemd/system/<unit> and
+#                       /etc/sudoers.d/www-data-tools to keep those
 #      --rollback DIR   undo an update (DIR = its backup folder, printed at
 #                       the end of every update)
 #
@@ -53,15 +59,17 @@ die()  { echo; echo "${RED}${BOLD}Stopped: $*${NC}"; exit 1; }
 WARNS=(); FAILS=()
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DRY=n; YES=n; FORCE=n; WEB_ROOT=""; ROLLBACK=""
+DRY=n; YES=n; FORCE=n; WEB_ROOT=""; ROLLBACK=""; KEEP_LOCAL=n; KEEP_FILE=/etc/bpq-dashboard/update-keep.txt
 while (( $# )); do
     case "$1" in
         --dry-run) DRY=y ;;
         --yes|-y)  YES=y ;;
         --force)   FORCE=y ;;
+        --keep-local) KEEP_LOCAL=y ;;
+        --keep-list) shift; KEEP_FILE="${1:-}"; [[ -f "$KEEP_FILE" ]] || { echo "keep list $KEEP_FILE not found"; exit 1; } ;;
         --web-root) shift; WEB_ROOT="${1:-}" ;;
         --rollback) shift; ROLLBACK="${1:-}" ;;
-        -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,48p' "$0"; exit 0 ;;
         *) die "unknown option $1 (try --help)" ;;
     esac
     shift
@@ -145,6 +153,18 @@ protected() {
     esac
     return 1
 }
+# The station's own keep list (v1.5.20): files a station deliberately runs in
+# its own version. One path per line, relative to the web folder; shell
+# wildcards allowed; # starts a comment. Kept files are never replaced or
+# removed. Keep it outside the web folder, root-owned.
+KEEP_PATS=()
+if [[ -f "$KEEP_FILE" ]]; then
+    while IFS= read -r l; do
+        l="${l%%#*}"; l="${l#"${l%%[![:space:]]*}"}"; l="${l%"${l##*[![:space:]]}"}"
+        [[ -n "$l" ]] && KEEP_PATS+=("$l")
+    done < "$KEEP_FILE"
+fi
+kept() { local p; for p in "${KEEP_PATS[@]}"; do [[ "$1" == $p ]] && return 0; done; return 1; }
 # Files the installer adjusts after copying (paths, callsign): never "edited by hand"
 adjusted() { [[ "$1" =~ ^[^/]+\.(service|timer)$ || "$1" == vara-logger.sh ]]; }
 
@@ -152,22 +172,29 @@ declare -A NEWSUM OLDSUM
 while read -r sum f; do NEWSUM["$f"]="$sum"; done < "$SRC/MANIFEST.md5"
 if [[ -n "$OLD_MAN" ]]; then while read -r sum f; do OLDSUM["$f"]="$sum"; done < "$OLD_MAN"; fi
 
-ADD=(); REPL=(); LOCAL=(); REMOVE=(); SAME=0
+ADD=(); REPL=(); LOCAL=(); REMOVE=(); KEPT=(); SAME=0
 for f in $(printf '%s\n' "${!NEWSUM[@]}" | sort); do
     protected "$f" && continue
     live="$WEB_ROOT/$f"
+    if kept "$f"; then
+        [[ -e "$live" && "$(md5sum < "$live" | cut -d' ' -f1)" == "${NEWSUM[$f]}" ]] && { SAME=$((SAME+1)); continue; }
+        KEPT+=("$f"); continue
+    fi
     if [[ ! -e "$live" ]]; then ADD+=("$f"); continue; fi
     cur=$(md5sum < "$live" | cut -d' ' -f1)
     if [[ "$cur" == "${NEWSUM[$f]}" ]]; then SAME=$((SAME+1)); continue; fi
     if adjusted "$f" && [[ "$cur" == "$(adjust_stream "$f" < "$SRC/$f" | md5sum | cut -d' ' -f1)" ]]; then SAME=$((SAME+1)); continue; fi
     REPL+=("$f")
-    if [[ -n "$OLD_MAN" && -n "${OLDSUM[$f]:-}" && "$cur" != "${OLDSUM[$f]}" ]] && ! adjusted "$f"; then LOCAL+=("$f"); fi
+    if [[ -n "$OLD_MAN" && -n "${OLDSUM[$f]:-}" && "$cur" != "${OLDSUM[$f]}" ]] && ! adjusted "$f"; then
+        if [[ $KEEP_LOCAL == y ]]; then unset 'REPL[-1]'; KEPT+=("$f"); else LOCAL+=("$f"); fi
+    fi
 done
 # Dropped by this release: in the old manifest, not in the new one
 if [[ -n "$OLD_MAN" ]]; then
     for f in "${!OLDSUM[@]}"; do
         [[ -n "${NEWSUM[$f]:-}" ]] && continue
         protected "$f" && continue
+        kept "$f" && continue
         [[ -e "$WEB_ROOT/$f" ]] && REMOVE+=("$f")
     done
 fi
@@ -175,6 +202,7 @@ fi
 for p in "$WEB_ROOT"/BPQ-Dashboard-v*-User-Guide.pdf "$WEB_ROOT"/BPQ-Dashboard-v*-Manual.pdf; do
     [[ -e "$p" ]] || continue
     b=$(basename "$p"); [[ -n "${NEWSUM[$b]:-}" ]] && continue
+    kept "$b" && continue
     [[ " ${REMOVE[*]:-} " == *" $b "* ]] || REMOVE+=("$b")
 done
 
@@ -182,20 +210,59 @@ hdr "Plan"
 say "$SAME file(s) already up to date, ${#REPL[@]} to update, ${#ADD[@]} new, ${#REMOVE[@]} to remove (kept in the backup)"
 (( ${#ADD[@]} ))    && say "New: ${DIM}$(printf '%s ' "${ADD[@]}")${NC}"
 (( ${#REMOVE[@]} )) && say "Removed by this release: ${DIM}$(printf '%s ' "${REMOVE[@]}")${NC}"
+if (( ${#KEPT[@]} )); then
+    say "${BOLD}Kept as they are${NC} ($( [[ $KEEP_LOCAL == y ]] && echo "--keep-local" )$( [[ $KEEP_LOCAL == y && ${#KEEP_PATS[@]} -gt 0 ]] && echo ", " )$( (( ${#KEEP_PATS[@]} )) && echo "keep list $KEEP_FILE" )): ${DIM}$(printf '%s ' "${KEPT[@]}")${NC}"
+    say "  They differ from $NEW_VER; check them against the CHANGELOG when you have time."
+fi
 if (( ${#LOCAL[@]} )); then
     warn "These files were changed on this server since $OLD_VER was installed. They are backed up, then replaced:"
     for f in "${LOCAL[@]}"; do say "     $f"; done
-    say "  (Re-apply a change by hand afterwards if you still need it; the backup keeps your copy.)"
+    say "  (Re-apply a change by hand afterwards if you still need it; the backup keeps your copy."
+    say "   To keep them instead: --keep-local, or list them in $KEEP_FILE.)"
 elif [[ -z "$OLD_MAN" ]]; then
     say "${DIM}No MANIFEST.md5 from the installed version (before v1.5.19), so hand edits can't be told apart; every replaced file is in the backup.${NC}"
 fi
 for t in nginx-bpq-dashboard.conf bpq-dashboard.conf nginx-maintenance-block.conf; do
-    if [[ " ${REPL[*]:-} ${ADD[*]:-} " == *" $t "* ]]; then
+    # only when the template itself changed between the two releases
+    if [[ -n "${OLDSUM[$t]:-}" && -n "${NEWSUM[$t]:-}" && "${OLDSUM[$t]}" != "${NEWSUM[$t]}" ]]; then
         say "${YLW}Note:${NC} the web-server template $t changed in this release. Your live site file is NOT changed;"
         say "      see CHANGELOG.md ($NEW_VER) for anything to add to it."
         break
     fi
 done
+
+# Units and sudo rules this update would refresh (shown so hand-tuned ones
+# can be checked first; a unit not run from this folder is never touched)
+# The package's sudo rules for this station. The one rule that changes
+# something (Maintenance > Change admin password) is kept only where the
+# station already has it; adding it is the sysop's choice (Manual §11).
+sudo_want() {
+    if grep -qs 'bpq-dashboard-set-admin-password' /etc/sudoers.d/*; then
+        sed "s/^www-data /$WEB_USER /" "$SRC/www-data-tools.sudoers"
+    else
+        sed "s/^www-data /$WEB_USER /" "$SRC/www-data-tools.sudoers" | grep -v '^[^#].*bpq-dashboard-set-admin-password'
+    fi
+}
+unit_want() { sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|^User=www-data$|User=$WEB_USER|; s|^Group=www-data$|Group=$WEB_GROUP|" "$1"; }
+ours_unit() {   # $1 = unit name
+    local live="/etc/systemd/system/$1"
+    grep -q -- "$WEB_ROOT" "$live" 2>/dev/null && return 0
+    [[ "$1" == *.timer ]] && grep -q -- "$WEB_ROOT" "/etc/systemd/system/${1%.timer}.service" 2>/dev/null
+}
+PLAN_UNITS=()
+for unit in "$SRC"/*.service "$SRC"/*.timer; do
+    u=$(basename "$unit"); [[ -f "/etc/systemd/system/$u" ]] || continue
+    ours_unit "$u" || continue
+    kept "/etc/systemd/system/$u" && { say "Kept (keep list): /etc/systemd/system/$u"; continue; }
+    [[ "$(unit_want "$unit")" != "$(cat "/etc/systemd/system/$u")" ]] && PLAN_UNITS+=("$u")
+done
+(( ${#PLAN_UNITS[@]} )) && say "Systemd units to refresh: ${DIM}${PLAN_UNITS[*]}${NC}  (see the difference: diff /etc/systemd/system/NAME $SRC/NAME)"
+if kept /etc/sudoers.d/www-data-tools; then
+    say "Kept (keep list): /etc/sudoers.d/www-data-tools"
+elif [[ -f /etc/sudoers.d/www-data-tools && -f "$SRC/www-data-tools.sudoers" ]] && \
+   ! cmp -s <(sudo_want) /etc/sudoers.d/www-data-tools; then
+    say "Sudo rules to refresh: /etc/sudoers.d/www-data-tools  (see: diff /etc/sudoers.d/www-data-tools $SRC/www-data-tools.sudoers)"
+fi
 
 if (( ${#REPL[@]} + ${#ADD[@]} + ${#REMOVE[@]} == 0 )) && [[ $FORCE != y ]]; then
     echo; ok "Nothing to copy: every file already matches $NEW_VER."
@@ -233,6 +300,7 @@ if [[ -f "$BK/units-added.txt" ]]; then
     while read -r u; do systemctl disable --now "\$u" >/dev/null 2>&1; rm -f "/etc/systemd/system/\$u"; done < "$BK/units-added.txt"
 fi
 for s in "$BK"/etc/sudoers.d/*; do [[ -e "\$s" ]] && cp -p "\$s" /etc/sudoers.d/; done
+[[ -f "$BK/new-root-files.txt" ]] && while read -r f; do rm -f "\$f"; done < "$BK/new-root-files.txt"
 [[ -e "$BK/etc/bpq-dashboard-set-admin-password" ]] && cp -p "$BK/etc/bpq-dashboard-set-admin-password" /usr/local/sbin/
 systemctl daemon-reload
 for s in bpq-telnet bpq-chat bpq-aprs bpq-vara vara-logger vara-validator rig-history-poller; do
@@ -329,9 +397,9 @@ for unit in "$SRC"/*.service "$SRC"/*.timer; do
     u=$(basename "$unit"); live="/etc/systemd/system/$u"
     [[ -f "$live" ]] || continue
     # Only units the dashboard's installer set up (they run from this folder)
-    grep -q -- "$WEB_ROOT" "$live" || { [[ "$u" == *.timer ]] && [[ -f "/etc/systemd/system/${u%.timer}.service" ]] && grep -q -- "$WEB_ROOT" "/etc/systemd/system/${u%.timer}.service"; } || {
-        say "${DIM}$u: your own unit (not run from $WEB_ROOT) — left as it is${NC}"; continue; }
-    want=$(sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|^User=www-data$|User=$WEB_USER|; s|^Group=www-data$|Group=$WEB_GROUP|" "$unit")
+    ours_unit "$u" || { say "${DIM}$u: your own unit (not run from $WEB_ROOT) — left as it is${NC}"; continue; }
+    kept "/etc/systemd/system/$u" && { say "${DIM}$u: on your keep list — left as it is${NC}"; continue; }
+    want=$(unit_want "$unit")
     if [[ "$want" != "$(cat "$live")" ]]; then
         mkdir -p "$BK/etc/systemd"; cp -p "$live" "$BK/etc/systemd/"
         printf '%s\n' "$want" > "$live"; UNITS_CHANGED+=("${u}"); ok "Updated $u"
@@ -372,8 +440,8 @@ done
 
 # ── Sudo rules (only if the installer's file is there) ─────────────────────
 SUDO_LIVE=/etc/sudoers.d/www-data-tools
-if [[ -f "$SUDO_LIVE" && -f "$SRC/www-data-tools.sudoers" ]]; then
-    TMP=$(mktemp); sed "s/^www-data /$WEB_USER /" "$SRC/www-data-tools.sudoers" > "$TMP"
+if [[ -f "$SUDO_LIVE" && -f "$SRC/www-data-tools.sudoers" ]] && ! kept "$SUDO_LIVE"; then
+    TMP=$(mktemp); sudo_want > "$TMP"
     if ! cmp -s "$TMP" "$SUDO_LIVE"; then
         if visudo -cf "$TMP" >/dev/null 2>&1; then
             mkdir -p "$BK/etc/sudoers.d"; cp -p "$SUDO_LIVE" "$BK/etc/sudoers.d/"
@@ -385,7 +453,7 @@ fi
 if grep -qs 'bpq-dashboard-set-admin-password' /etc/sudoers.d/* && [[ -f "$SRC/tools/set-admin-password" ]]; then
     H=/usr/local/sbin/bpq-dashboard-set-admin-password
     if ! cmp -s "$SRC/tools/set-admin-password" "$H"; then
-        [[ -e "$H" ]] && cp -p "$H" "$BK/etc/"
+        if [[ -e "$H" ]]; then cp -p "$H" "$BK/etc/"; else echo "$H" >> "$BK/new-root-files.txt"; fi
         install -o root -g root -m 755 "$SRC/tools/set-admin-password" "$H" && ok "Admin-password helper updated ($H)"
     fi
 fi

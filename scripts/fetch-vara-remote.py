@@ -41,7 +41,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpq_db_config  # noqa: E402
 
-VERSION = '1.5.19'
+VERSION = '1.5.20'
 WEB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATUS_FILE = os.path.join(WEB_ROOT, 'cache', 'vara-remote-status.json')
 MAX_BYTES = 200 * 1024 * 1024      # refuse anything absurd

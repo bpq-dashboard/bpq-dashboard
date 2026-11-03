@@ -4,6 +4,32 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.20] - 2026-11-03
+
+### Fixed
+- **Maintenance page: "⟳ Check for a new release" and "⟳ Check again"
+  (PKTNET forms) answered "Unknown action".** The page added `&refresh=1`
+  to the action name and then encoded it, so the server saw one unknown
+  action (`version_status&refresh=1`). The first check when the page opens
+  was fine. Options now go as their own query parameters; a failed check
+  also clears the old "Up to date" note. (`admin/bpq-maintenance.html`)
+- **`update.sh`:** the `--dry-run` plan now also lists the systemd units and
+  the sudo-rules file it would refresh, with the `diff` command to compare
+  them first. Refreshing `/etc/sudoers.d/www-data-tools` no longer adds the
+  admin-password rule on a station that never chose it (kept only where it
+  is already set up); a helper it newly installs is removed again by
+  `--rollback`.
+- **`update.sh` keep list:** a station can list files it deliberately runs
+  in its own version in `/etc/bpq-dashboard/update-keep.txt` (one path per
+  line, wildcards, `#` comments; or `--keep-list FILE`), or keep everything
+  changed on the server since the last update with `--keep-local`. Kept
+  files are never replaced or removed and are listed in the plan. The list
+  can also name `/etc/systemd/system/<unit>` or
+  `/etc/sudoers.d/www-data-tools` to keep a hand-tuned unit or rules file.
+- `update.sh`: the "web-server template changed" note now appears only when
+  the template really changed between the installed and the new release.
+- First release installed on the station with `update.sh`.
+
 ## [1.5.19] - 2026-11-02
 
 The release the first Linux Mint and Ubuntu installs asked for. Thanks to
