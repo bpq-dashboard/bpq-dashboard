@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.18**
+**Version 1.5.19**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -70,7 +70,7 @@ Most sysops are all three. Read everything that applies to you.
 24. What runs behind the pages
 25. Where your settings are kept
 26. Common messages and what they mean
-27. Known limitations in v1.5.18
+27. Known limitations in v1.5.19
 28. Keyboard shortcuts
 29. Page URL reference
 30. Getting help
@@ -132,7 +132,7 @@ Every page loads the same bar at the top.
 
 On a phone (narrower than about 770 pixels) the links fold behind the **☰** button; the admin pages are listed under an *Admin* heading at the bottom of that menu.
 
-**Rig** and **RF Power** appear only when flrig was set up during installation. Install Check and Health Check aren't in the menu; open them by address (Section 29).
+**Optional pages** (v1.5.19): Telnet, Chat, APRS, VARA, Rig and RF Power appear only if your station uses them. The installer asks page by page (step 9); a page switched off is hidden from the menu, its helper service isn't installed, and its files stay, so it can be switched on later (Admin → Maintenance → *Optional pages*; the switches are `'pages'` and `'radio' => 'enabled'` in `config.php`). Opened by its address anyway, a hidden page still works and says it is switched off. Install Check and Health Check aren't in the menu; open them by address (Section 29).
 
 > 🔧 After an update, press **Ctrl+Shift+R** (⌘+Shift+R on a Mac) once on any page. The menu is cached by the browser and only refreshes when its version number changes.
 
@@ -443,6 +443,8 @@ The search box filters the **folder you're in** by from, to, subject and message
 4. **Subject** (BPQ keeps 60 characters) and **Body** (plain text).
 5. Click **Send**. The BBS stores the message and forwards it on its normal schedule.
 
+**Signature** (v1.5.19): set one in **Preferences** and it is added to every new message when the Compose window opens, so you can change or delete it before sending. Optionally also on replies (placed above the quoted message) and with the usual `-- ` line in front. It is never added to Quick Check-In, NTS radiograms or PKTNET forms, whose formats are fixed. Plain text, up to 10 lines; it is kept on the server, so every browser and device uses the same one.
+
 **Send via SMTP** sends to an internet e-mail address through BPQ's own Internet (ISP) Gateway; the dashboard adds the `smtp:` prefix. Use it only after the gateway is set up and tested in BPQ — on an unconfigured gateway BPQ has hung the whole node on a single message.
 
 ### Selecting several messages
@@ -496,7 +498,7 @@ NTS traffic is filed into **NTS** automatically, with an unread count. **📄 NT
 ### Net check-ins and forms
 
 - **✅ Quick Check-In** — a short form (name, callsign, location, band/mode, net address — `PKTNET@USA` by default) that builds a check-in message and opens it in Compose.
-- **📻 PKTNET Forms** — opens the TPRFN HTML Forms by N3MEL (ICS, weather, radiogram, check-in and bulletin forms that produce packet-ready text). The installer downloads them into `pktnet-forms/`; if the button shows "not found", run `sudo bash scripts/fetch-forms.sh` in the dashboard folder.
+- **📻 PKTNET Forms** — opens the TPRFN HTML Forms by N3MEL (ICS, weather, radiogram, check-in and bulletin forms that produce packet-ready text). The installer downloads them into `pktnet-forms/`. To get the author's latest version, use **Admin → Maintenance → Email Client → PKTNET forms → Update forms** (v1.5.19; it shows the installed and latest versions, and **Undo** puts the previous copy back). If the button shows "not found", run `sudo bash scripts/fetch-forms.sh` in the dashboard folder.
 
 ### Address book
 
@@ -504,7 +506,7 @@ NTS traffic is filed into **NTS** automatically, with an unread count. **📄 NT
 
 ### Preferences
 
-**Settings → Preferences…** holds the auto-fetch interval, *Max messages per list*, *Open messages in*, *Body fetching*, **Forget killed list** (the dashboard remembers what you killed so BPQ's listing doesn't bring it back until BPQ's housekeeping removes it), **Muted bulletin groups**, **Clean up Bulletin folders** (repairs group folders with damaged names from an old bug) and **Run retention cleanup now**. Preferences are kept in this browser.
+**Settings → Preferences…** holds the auto-fetch interval, *Max messages per list*, *Open messages in*, *Body fetching*, **Forget killed list** (the dashboard remembers what you killed so BPQ's listing doesn't bring it back until BPQ's housekeeping removes it), **Muted bulletin groups**, **Clean up Bulletin folders** (repairs group folders with damaged names from an old bug), **Run retention cleanup now** and the **Signature** (v1.5.19, see *Composing*). Preferences are kept in this browser, except the signature, which is kept on the server.
 
 ### Forwarding details
 
@@ -711,7 +713,8 @@ Per-station traffic from BPQ's own traffic reports: who connects, how many messa
 
 - It reads BPQ's `Traffic_YYMMDD.txt` reports. Many BBSes write one per week (named after the week's start date); then the newest days appear only after BPQ writes the next report.
 - BPQ writes the reports in the LinBPQ folder itself. The parser looks in the dashboard's `logs/` folder and in `paths.linbpq` from `config.php` (since v1.5.18; before that only `logs/`, so stations whose `logs/` link points at LinBPQ's `logs` subfolder had an empty page). To load older reports once: `sudo -u www-data python3 /var/www/bpq-dashboard/scripts/parse-traffic-report.py --backfill`.
-- Still empty? The parser's log (`/var/log/bpq-dashboard/parse-traffic-report.log`) says which folders it searched when it finds no reports.
+- Still empty? The page says why (v1.5.19): no report in the range yet, and where the parser looks. The parser's log (`/var/log/bpq-dashboard/parse-traffic-report.log`, Admin → Logs → *Traffic parser*) says which folders it searched, and Install Check's **Traffic reports** row shows where reports were found. On a LinBPQ folder inside a home folder the web server needs read access to that folder (Section 27, *Home folders*).
+- The installer loads the reports already on the machine once (v1.5.19), so a new install shows past weeks straight away.
 - The **Messages** card and the Message Distribution chart count Personal and bulletin messages only; NTS traffic (T) is in the per-station table but not in those two.
 - "(DB)" in the status line means the database copy is in use (`parse-traffic-report.py`, every 5 minutes).
 - A sudden drop for one partner usually means its link or schedule has stopped; check RF Connections and the System Logs for that call.
@@ -776,6 +779,7 @@ Who connected to your node, and how, from BPQ's `ConnectLog_YYMMDD.log` files. B
 
 ### Tips
 
+- **Empty page?** BPQ writes `ConnectLog_YYMMDD.log` only with `LogAllConnects=1` in the main section of `bpq32.cfg` (before the first PORT). The page says so when it finds no files (v1.5.19), and Install Check has a *LogAllConnects=1* / *ConnectLog files* row. Add the line, restart LinBPQ, and new connections appear.
 - Many short connects from one station usually mean a poor link or a script retrying.
 - A station showing **Multiple** reaches you by more than one route (e.g. VARA and NET/ROM).
 
@@ -901,15 +905,19 @@ Commands use the installer's defaults (`/var/www/bpq-dashboard`, database `bpqda
 ### What's on the page
 
 - **Health check** — one command that shows every dashboard service (nginx, PHP, MariaDB, LinBPQ, the helper daemons, vara-logger, rig-history-poller), what breaks when each is down, the bulletin clean-up timer, the parser schedule and listening ports.
-- **Admin login** — tests that the login is required, how to change or add admin users, and a check that private files (`config.php`, `db-config.php`, `scripts/`, `data/`, backups, the journal) never download.
+- **Admin login** — tests that the login is required, **Change admin password** (v1.5.19: current password, new one twice, 12 characters or more; it changes the login you opened the page with, and your browser then asks for the new one), adding or removing admin users over SSH, and a check that private files (`config.php`, `db-config.php`, `scripts/`, `data/`, backups, the journal) never download.
+- **Optional pages** (v1.5.19) — which `config.php` switch hides each optional page and the command that installs its helper, to add a page you left out at install time.
+- **Firewall setup** (v1.5.19) — why a firewall helps on a packet station, and `tools/setup-firewall.sh`: it asks about each port (home network only or anywhere), always keeps your SSH session open, shows every rule and asks before switching ufw on; `--dry-run` only prints the rules. Undo: `sudo ufw disable` or `sudo ufw reset`. The same commands by hand for sysops who prefer them.
+- **LinBPQ in a home folder** (v1.5.19) — the narrow access fix (ACLs) for Ubuntu 21.04+ / Mint 21+, and how to test it as the web server.
 - **Database & credentials** — test the database login exactly the way the pages and the parsers use it, file permissions for `db-config.php`, backups (kept outside the web root) and changing the database password.
 - **Log parsers** — dry runs and rebuilds for the RF Connections, Traffic and System Logs parsers, and how to tell whether they're keeping up.
-- **Email Client database** — the schema check that 📌 pinned folders need, counts of saved message text and kept-after-kill copies, folder sizes, what the "⚠ killed on BBS" label really means, and the NTS and bulletin-folder diagnostics.
+- **Email Client database** — **PKTNET forms**: installed vs the author's latest version, **Update forms** and **Undo** (v1.5.19); the schema check that 📌 pinned folders need, counts of saved message text and kept-after-kill copies, folder sizes, what the "⚠ killed on BBS" label really means, and the NTS and bulletin-folder diagnostics.
 - **Bulletin retention** — preview, run or review the daily 14-day clean-up.
 - **NTS forwarding report, RF forwarding queue, Rig Status & RF Power Monitor (flrig), VARA HF Terminal, VARA callsign validator, White Pages clean-up, YAPP, LinBPQ sysop commands** — troubleshooting for each feature.
 - **Propagation scheduler & storm monitor** — only if you run them.
 - **Forwarding partners editor** — edits `data/partners.json`, which the propagation scheduler and storm monitor read. Enter the BBS password from `config.php` and load; every save keeps the previous file in `data/backups/`. Five wrong passwords in 15 minutes lock it for the rest of the 15 minutes. (The partner tiles on the RF Connections page are a separate list, saved by that page in `data/stations/partners.json`.)
 - **Firewall & Audit sudo rules, Chat, APRS map & beacon, callsign lookups** — installing and testing the read-only sudo rules, the chat daemon's status, APRS-IS / beacon status and the CARTO key, and the QRZ login test.
+- **Install check, updates & backups** — the installed version and the latest release (⟳ *Check for a new release*), and the three commands that update in place with `update.sh` (v1.5.19; `--dry-run` first, `--rollback` to undo).
 - **Web server & PHP, Permissions, updates & backups, disk** — including which nginx file is really live and why `set-permissions.sh` is for first installs only.
 
 ### ⚙ Dashboard Settings
@@ -946,6 +954,7 @@ Shows which ports on the server can be reached, and from where.
 
 - **Needs the read-only sudo rules** (`www-data-tools.sudoers`; `install.sh` offers to install them, or see the Installation Manual §11). Without them the page says what it couldn't read instead of showing zeros.
 - **Station ports** — BPQ telnet / FBB (8010 / 8011 by default) send passwords unencrypted, and MariaDB, flrig and the dashboard's WebSockets should never be public. If one shows Public, close it or allow it only from your LAN.
+- **No firewall yet?** `sudo bash /var/www/bpq-dashboard/tools/setup-firewall.sh` sets up ufw with questions for each port (v1.5.19; the installer offers it as an optional last step). See Maintenance → *Firewall setup*.
 - Reachability is worked out from the rules (including ufw and fail2ban chains); a port forward on your router is still needed for anything to arrive from outside.
 
 ---
@@ -959,10 +968,10 @@ Reads the server's logs from the browser, no SSH needed.
 ### What you see
 
 - **Log list**, by group:
-  - **Dashboard services** — bpq-telnet (Telnet Client and YAPP; passwords are redacted), bpq-vara, the message-text job, the Email Client's BBS sessions, the Dashboard log (NWS Post to BBS), NWS auto-post.
+  - **Dashboard services** — bpq-telnet (Telnet Client and YAPP; passwords are redacted), bpq-vara, the message-text job, the Email Client's BBS sessions, the Dashboard log (NWS Post to BBS), NWS auto-post. Since v1.5.19 these are in `/var/log/bpq-dashboard/`, not LinBPQ's logs folder; until a new file has something in it, the viewer shows the older copy in `logs/`.
   - **Log parsers** — RF Connections, Traffic and System Logs parsers (every 5 minutes).
   - **Forwarding tools** — prop-scheduler, storm monitor, connect watchdog and its state, White Pages auto-clean (only if you run them).
-  - **VARA** — the VARA session log (config.php `logs.vara_file`) and the callsign validator.
+  - **VARA** — the VARA session log (config.php `logs.vara_file`), **VARA download** (v1.5.19, when the log comes from the TPRFN server) and the callsign validator.
   - **BPQ Node** — today's BBS, TCP, Connect and CMS logs, and earlier BBS logs by date.
   - **System** — the web-server error log (PHP errors land here too) and the auth log.
   Each entry shows its size and last change; hover for what it is and where it lives. Logs for features you don't use say **not used here**.
@@ -997,12 +1006,12 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 **Logs & updates:** security updates waiting; /var/log size; log rotation for the dashboard's own logs; each log parser scheduled, running and error-free.
 
-**Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status; APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry.
+**Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status (a service whose page is switched off in `config.php 'pages'` shows as *not in use*, v1.5.19); the VARA log download from the TPRFN server, when used (last good download under 30 minutes); APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry.
 
 ### Reading the results
 
 - ✅ **OK**, ⚠️ **Warn** (worth a look), 🔴 **Critical** (fix soon).
-- ℹ️ **Info** — something that isn't installed (an optional service), a dashboard service you switched off (*switched off*: installed but disabled, e.g. bpq-chat on a station without BPQ Chat), or something the page couldn't check (for example the sudo rules are missing). Info rows don't count towards the score.
+- ℹ️ **Info** — something that isn't installed (an optional service), a page you chose not to use at install time (*not in use*), a dashboard service you switched off (*switched off*: installed but disabled, e.g. bpq-chat on a station without BPQ Chat), or something the page couldn't check (for example the sudo rules are missing). Info rows don't count towards the score.
 - A dashboard service that is **enabled but not running** is 🔴 Critical: it's meant to run and has failed or keeps restarting. Its row gives the `journalctl` command that shows why. To stop using a service instead: `sudo systemctl disable --now <name>`.
 - Click a row for the detail and the **recommended action**. Run it over SSH, then **⟳ Re-run Audit**.
 
@@ -1029,7 +1038,9 @@ Runs dozens of checks on this install and reports each one with what it found an
 - PHP-FPM's socket is found for any PHP version (8.5 included), and every `fastcgi_pass` in the site file names a socket that exists
 - the web server's site file serves this folder, the admin folder and the station-acting pages are behind the login, and the login reaches PHP
 - LinBPQ is reachable, with mail and chat enabled, and the FLRIG `RADIO` block is readable
-- the VARA HF log arrives: the server listens for syslog on UDP 514 and the `.vara` file has had a line in the last 7 days (warnings only — VARA HF is optional)
+- the VARA HF log arrives: the server listens for syslog on UDP 514 and the `.vara` file has had a line in the last 7 days (warnings only — VARA HF is optional); or, for a log downloaded from the TPRFN server, the last good download (v1.5.19)
+- (v1.5.19) the LinBPQ folder can be listed by the web server, with the exact ACL commands for your path when it can't (home folders); the dashboard's own log folder `/var/log/bpq-dashboard` is writable; where BPQ's weekly Traffic reports were found; `LogAllConnects=1` (or ConnectLog files) for the Connect page; suggested PHP package names match the PHP version you run
+- rows for pages switched off in `config.php 'pages'` (Chat, APRS, the VARA callsign check) are passed as *not used* instead of failing (v1.5.19)
 
 It shows a score and a fix for each failure; work down the red items first. Some checks can't see root-only things (such as root's crontab) and say so.
 
@@ -1054,11 +1065,13 @@ The pages are only the front. These parts on the server do the work; when a page
 | `bpq-chat` | The station's permanent chat connection | Chat Client |
 | `bpq-aprs` | APRS-IS connection, station cache, BBS beacon | APRS Map |
 | `bpq-vara` | VARA HF session bridge (WebSocket, port 8767 on 127.0.0.1) | VARA HF Terminal |
-| `vara-logger` | Writes the VARA log the RF parser reads | RF Connections |
-| `vara-validator` (optional) | Checks callsigns of VARA connections | — (log in the Log Viewer) |
+| `vara-logger` | Writes the VARA log the RF parser reads (when VARA HF sends its syslog to this server) | RF Connections |
+| `vara-validator` (optional) | Checks callsigns of VARA connections; runs as the web user, settings in `config.php 'vara_validator'` (v1.5.19) | — (log in the Log Viewer) |
 | `rig-history-poller` (flrig installs) | Records power/SWR every minute (3 s during TX) | RF Power Monitor |
 
-Check any of them with `sudo systemctl status NAME` and its recent log with `sudo journalctl -u NAME -n 50`.
+Check any of them with `sudo systemctl status NAME` and its recent log with `sudo journalctl -u NAME -n 50`. The installer installs only the helpers of the pages you chose (v1.5.19); one whose page is switched off shows as *not in use* in System Audit.
+
+The dashboard's own log files (bpq-telnet, bpq-vara, vara-validator, the Email Client, the message-text job, NWS posting, the forwarding tools) are in `/var/log/bpq-dashboard/` (v1.5.19; `config.php paths.app_logs`), rotated weekly by `/etc/logrotate.d/bpq-dashboard`. Before v1.5.19 they were written into the `logs` folder, i.e. LinBPQ's own logs folder.
 
 ### Timers
 
@@ -1067,6 +1080,7 @@ Check any of them with `sudo systemctl status NAME` and its recent log with `sud
 | `message-bodies.timer` | every 5 minutes | Saves the text of new BBS messages to the database |
 | `bulletin-retention.timer` | daily | Deletes unpinned bulletins older than 14 days |
 | `nws-auto-post.timer` (optional) | every 5 minutes | Posts new NWS Warnings/Watches for your state as bulletins |
+| `vara-remote.timer` (optional, v1.5.19) | every 5 minutes (:03, :08 …) | Downloads the new part of your VARA HF log from the TPRFN server (`config.php 'vara_remote'`) |
 
 ### Log parsers (`/etc/cron.d/bpq-dashboard`, every 5 minutes)
 
@@ -1094,11 +1108,11 @@ Some choices follow you to every browser; others stay in the browser where you m
 
 | Kept on the server (shared by every browser) | Kept in this browser only |
 |---|---|
-| Email Client folders, rules, address book, 📌 pins, read state of filed messages, all saved messages | Email Client preferences (auto-fetch, list size, pop-up/pane, body fetching), muted groups, column widths, Archived flags, the killed list |
+| Email Client folders, rules, address book, 📌 pins, read state of filed messages, all saved messages, the signature (v1.5.19) | Email Client preferences (auto-fetch, list size, pop-up/pane, body fetching), muted groups, column widths, Archived flags, the killed list |
 | APRS BBS station info and beacon settings | Theme (and the Chat and APRS pages' own theme) |
 | RF Connections forwarding partners and saved station locations | NWS callsign, destination, auto-refresh and the Post All password |
 | The propagation scheduler's partners (`data/partners.json`) and ⚙ Dashboard Settings (`data/settings.json`) | Telnet session log, YAPP *Received recently*, Chat callsign |
-| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types) | Maintenance page *Your install* values |
+| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the optional pages (`pages`, `radio.enabled`) and the VARA log source (`vara_remote`) | Maintenance page *Your install* values |
 | Which NWS alerts were already posted automatically (`cache/nws-auto-post-state.json`) | |
 
 Clearing a browser's site data resets the right-hand column for that browser only; nothing on the server is lost.
@@ -1118,6 +1132,11 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"Login refused: check bbs.user / bbs.pass …"* (Email Client, message-bodies, forwarding queue) | BPQ answered the password with an error or asked again | Make `bbs.user` / `bbs.pass` in `config.php` match the `USER=` line in `bpq32.cfg` |
 | *"Login failed: nothing came back after the password"* / *"No BBS prompt after 'bbs'"* | BPQ went silent after the login, or the BBS application has another name | Check LinBPQ is running and `bbs.alias` in `config.php` is your BBS's application name (`APPLICATION` line in `bpq32.cfg`) |
 | *"Login failed"* (Email Client, message-bodies; v1.5.17 and earlier) | BPQ's greeting after the login had no `}` | Update to v1.5.18 or later |
+| *"This page is switched off for this station"* | You opened a page that is switched off in `config.php` | Nothing, or switch it on (Maintenance → *Optional pages*) |
+| *"No BPQ connect logs found …"* (Connect Log) | BPQ isn't writing ConnectLog files | Add `LogAllConnects=1` to `bpq32.cfg`'s main section, restart LinBPQ (Section 15) |
+| *"No BPQ Traffic reports for the last N days"* (Traffic) | No `Traffic_*.txt` in the range yet, or the parser can't find them | Section 13, *Tips* |
+| *"The current password is wrong"* / *"Not changed: the sudo rule for the helper is missing"* (Maintenance, Change admin password) | Wrong current password (5 tries per 15 minutes), or the v1.5.19 helper isn't installed | Retype it; or install the helper and sudo rule (Maintenance → *sudo rules*), or use `sudo htpasswd -B` over SSH |
+| *"VARA log download failing"* (System Audit) / *HTTP 404* in the VARA download log | The TPRFN server has no file at that address, or it can't be reached | Check `vara_remote.url` with the TPRFN admin; the last good copy is kept |
 | **429 Too Many Requests** | The web server's rate limit: too many requests in a burst | Wait a few seconds; repeated 429s are in *Installation Manual* §12 |
 | **503 Service Temporarily Unavailable** | Usually an older config's rate limit, or PHP down | *Installation Manual* §12 |
 | **500 Internal Server Error** on every admin-login page | The web server can't read its admin login file (`/etc/nginx/.bpq-mgmt-auth` must be `root:www-data 640`) | `sudo chown root:www-data /etc/nginx/.bpq-mgmt-auth && sudo chmod 640 /etc/nginx/.bpq-mgmt-auth`; *Installation Manual* §12 |
@@ -1126,7 +1145,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"Chat daemon not connected"* | `bpq-chat` isn't connected to BPQ | `sudo systemctl restart bpq-chat` |
 | *"WebSocket error — check: sudo systemctl status bpq-vara"* | The VARA page can't reach its service | Section 7. If the service stopped, `sudo journalctl -u bpq-vara -n 20` says why (e.g. no VARA port found, `bbs` login not set) |
 | *"flrig offline"* | The server can't reach flrig | Section 16 |
-| *"No VARA Log File Found"* (RF Connections) | No VARA log yet, and no database data | VARA HF's Syslog setting, the rsyslog receiver and `vara-logger` (*Installation Manual* §10.11); Install Check's *VARA HF log* rows say which step is missing |
+| *"No VARA Log File Found"* (RF Connections) | No VARA log yet, and no database data | VARA HF's Syslog setting, the rsyslog receiver and `vara-logger` (*Installation Manual* §10.11), or the TPRFN download (`vara_remote`, v1.5.19); Install Check's *VARA HF log* rows say which step is missing |
 | "API KEY REQUIRED" across the APRS map | No CARTO key | Section 8, *Map tiles* |
 | A page looks old or its menu is missing an item after an update | Browser cache | Ctrl+Shift+R |
 | *"Failed to load: JSON.parse: unexpected end of data"* (Log Viewer, v1.5.16 and earlier) | The log held characters that weren't valid UTF-8 (raw BBS text), so the server sent an empty reply | Update to v1.5.17 or later, then Ctrl+Shift+R |
@@ -1138,7 +1157,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.18
+## 27. Known limitations in v1.5.19
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1149,6 +1168,8 @@ These affect what you see in this release. Each says what to do meanwhile.
 - **RF Power Monitor watt-hours** always read 0 (flrig has no energy reading).
 - **Traffic Report's Messages card** leaves out NTS traffic (Section 13).
 - **The NWS page doesn't know which alerts were posted automatically**, so it can't stop you posting one again by hand.
+- **Behind a reverse proxy** (dashboard on its own port, v1.5.19), the dashboard sees every visitor as 127.0.0.1: per-address limits (wrong-password lock-outs) then count all visitors together. Its own host name or port is needed; a sub-path (`/dashboard/`) doesn't work, because the pages use absolute links.
+- **Home folders:** on Ubuntu 21.04+ / Mint 21+ a LinBPQ folder inside `/home/<user>` needs the access fix the installer offers (Maintenance → *LinBPQ in a home folder*); `bpq32.cfg` stays unreadable to the dashboard on purpose, so Install Check's bpq32.cfg rows are skipped there.
 
 ---
 
@@ -1196,7 +1217,9 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.18-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.19-User-Guide.pdf` | None |
+
+If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
 ## 30. Getting help
 
@@ -1214,10 +1237,14 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 - **GitHub** — https://github.com/bpq-dashboard/bpq-dashboard
 - **Issues** — report bugs and request features via GitHub Issues (security problems: see SECURITY.md instead)
 
+### Updating
+
+From v1.5.19 a new release updates your install in place: unzip it and run `sudo bash update.sh` in its folder (`--dry-run` shows the plan first). Your settings, data and web-server config are kept, every replaced file is backed up, and it prints the command that undoes it. Details: *Installation Manual* §4, *Updating to a newer version*; Maintenance shows when a new release is out.
+
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.18 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.19 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1232,6 +1259,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.18 — User Guide**
+**73 — BPQ Dashboard v1.5.19 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

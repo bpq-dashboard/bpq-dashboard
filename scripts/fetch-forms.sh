@@ -13,6 +13,12 @@
 #          moved to /tmp, never left in the web root).
 # Source:  FORMS_REPO=<repo URL> to use a different copy of the suite.
 #          FORMS_REF=<branch> to try a specific branch first.
+# Keep:    FORMS_PREV_DIR=<folder> keeps the replaced copy there as
+#          <folder>/pktnet-forms.prev (one copy; the Maintenance page's
+#          "Undo" puts it back). Default: /tmp/pktnet-forms.prev-<date>.
+# v1.5.19: the new copy is built next to the old one and swapped in with a
+# rename, and pktnet-forms/.source records the author's commit (GitHub), so
+# the Maintenance page can show installed vs latest.
 # ─────────────────────────────────────────────────────────────────────────
 set -u
 
@@ -23,7 +29,7 @@ WEB_ROOT=""; FORCE=0
 for a in "$@"; do
     case "$a" in
         --force) FORCE=1 ;;
-        -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
         *) WEB_ROOT="$a" ;;
     esac
 done
@@ -37,6 +43,24 @@ fi
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 got=""
+
+# The author's latest commit (GitHub repositories), recorded in .source
+COMMIT=""; COMMIT_DATE=""
+if [[ "$FORMS_REPO" =~ ^https://github\.com/([^/]+)/([^/]+)$ ]] && command -v curl >/dev/null; then
+    API_JSON="$(curl -fsSL --max-time 20 -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/commits?per_page=1${FORMS_REF:+&sha=$FORMS_REF}" 2>/dev/null)"
+    if [[ -n "$API_JSON" ]] && command -v python3 >/dev/null; then
+        read -r COMMIT COMMIT_DATE < <(printf '%s' "$API_JSON" | python3 -c 'import json,sys
+try:
+    c=json.load(sys.stdin)[0]; print(c["sha"][:12], c["commit"]["committer"]["date"])
+except Exception: print("", "")' 2>/dev/null)
+    fi
+fi
+
+# No API answer: ask git for the newest commit instead (v1.5.19)
+if [[ -z "$COMMIT" ]] && command -v git >/dev/null; then
+    COMMIT="$(GIT_TERMINAL_PROMPT=0 timeout 25 git ls-remote "$FORMS_REPO.git" HEAD 2>/dev/null | awk '{print substr($1,1,12); exit}')"
+fi
 
 # 1) Archive download: Gitea/Forgejo (/archive/<ref>.tar.gz) and GitHub
 #    (/archive/refs/heads/<ref>.tar.gz) layouts, main then master.
@@ -55,6 +79,10 @@ fi
 # 2) git clone, if git is installed
 if [[ -z "$got" ]] && command -v git >/dev/null; then
     if GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 "$FORMS_REPO.git" "$TMP/x" 2>/dev/null; then
+        if [[ -z "$COMMIT" ]]; then   # commit from the clone itself (v1.5.19)
+            COMMIT="$(git -C "$TMP/x" rev-parse --short=12 HEAD 2>/dev/null)"
+            COMMIT_DATE="$(git -C "$TMP/x" log -1 --format=%cI 2>/dev/null)"
+        fi
         rm -rf "$TMP/x/.git"; got="git clone"
     fi
 fi
@@ -75,27 +103,39 @@ if [[ -z "$INDEX" ]]; then
 fi
 SRC="$(dirname "$INDEX")"
 
-if [[ -e "$TARGET" ]]; then
-    PREV="/tmp/pktnet-forms.prev-$(date +%Y%m%d-%H%M%S)"
-    mv "$TARGET" "$PREV" && echo "Previous forms moved to $PREV"
-fi
-mkdir -p "$TARGET"
-cp -a "$SRC/." "$TARGET/"
-rm -rf "$TARGET/.git" "$TARGET/.github" "$TARGET/.gitea" "$TARGET/.forgejo"
+# Build the new copy next to the old one, then swap with two renames
+NEW="$WEB_ROOT/.pktnet-forms.new-$$"
+rm -rf "$NEW"; mkdir -p "$NEW" || { echo "ERROR: can't write in $WEB_ROOT" >&2; exit 1; }
+cp -a "$SRC/." "$NEW/"
+rm -rf "$NEW/.git" "$NEW/.github" "$NEW/.gitea" "$NEW/.forgejo"
 # Folder names must match the case the index links use (2026-10-19): the
 # suite ships General/ ICS/ Weather/ but index.html links general/ ics/
 # weather/, which works on Windows and macOS but is a 404 on Linux. Rename
 # any folder the index links to under a different case; nothing to do once
 # the two agree.
-for linked in $(grep -oE 'href="[^":/?#]+/' "$TARGET/index.html" | sed 's/^href="//; s#/$##' | sort -u); do
-    [[ -d "$TARGET/$linked" ]] && continue
-    actual="$(find "$TARGET" -mindepth 1 -maxdepth 1 -type d -iname "$linked" -printf '%f\n' | head -1)"
+for linked in $(grep -oE 'href="[^":/?#]+/' "$NEW/index.html" | sed 's/^href="//; s#/$##' | sort -u); do
+    [[ -d "$NEW/$linked" ]] && continue
+    actual="$(find "$NEW" -mindepth 1 -maxdepth 1 -type d -iname "$linked" -printf '%f\n' | head -1)"
     if [[ -n "$actual" ]]; then
-        mv "$TARGET/$actual" "$TARGET/$linked" && echo "Renamed folder $actual/ to $linked/ to match the index links"
+        mv "$NEW/$actual" "$NEW/$linked" && echo "Renamed folder $actual/ to $linked/ to match the index links"
     fi
 done
+printf 'source=%s\nmethod=%s\nfetched=%s\ncommit=%s\ncommit_date=%s\n' "$FORMS_REPO" "$got" "$(date -u +%FT%TZ)" "$COMMIT" "$COMMIT_DATE" > "$NEW/.source"
 
-printf 'source=%s\nmethod=%s\nfetched=%s\n' "$FORMS_REPO" "$got" "$(date -u +%FT%TZ)" > "$TARGET/.source"
+if [[ -e "$TARGET" ]]; then
+    if [[ -n "${FORMS_PREV_DIR:-}" ]]; then
+        PREV="${FORMS_PREV_DIR%/}/pktnet-forms.prev"
+        rm -rf "$PREV"
+    else
+        PREV="/tmp/pktnet-forms.prev-$(date +%Y%m%d-%H%M%S)"
+    fi
+    if mv "$TARGET" "$PREV"; then
+        echo "Previous forms moved to $PREV"
+    else
+        rm -rf "$NEW"; echo "ERROR: could not move the old forms out of the way" >&2; exit 1
+    fi
+fi
+mv "$NEW" "$TARGET" || { echo "ERROR: could not put the new forms in place" >&2; [[ -n "${PREV:-}" ]] && mv "$PREV" "$TARGET"; exit 1; }
 
 # Same owner as the web root; plain static-file permissions.
 owner="$(stat -c '%U:%G' "$WEB_ROOT")"

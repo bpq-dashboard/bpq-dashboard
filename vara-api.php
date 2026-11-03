@@ -1,7 +1,7 @@
 <?php
 /**
  * vara-api.php — VARA HF Terminal API
- * BPQ Dashboard v1.5.18
+ * BPQ Dashboard v1.5.19
  *
  * Radio-agnostic version — supports Yaesu, Icom, Kenwood, Elecraft via flrig
  *

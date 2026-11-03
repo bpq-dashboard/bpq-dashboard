@@ -128,6 +128,24 @@ def default_logs_dir():
     return p.rstrip('/') if p else os.path.join(os.path.dirname(_HERE), 'logs')
 
 
+def app_log_dir():
+    """Where the dashboard writes ITS OWN logs (v1.5.19): config.php
+    paths.app_logs, else /var/log/bpq-dashboard, if writable; else the old
+    <paths.logs> folder. Until v1.5.18 these went into <web root>/logs, which
+    is linked to LinBPQ's logs folder; where the web user may only read that
+    folder, bpq-telnet and bpq-vara stopped at start (N3MEL, 2026-10-31)."""
+    p = load_config_section('paths').get('app_logs') or ''
+    for d in (p, '/var/log/bpq-dashboard'):
+        d = (d or '').rstrip('/')
+        if d and os.path.isdir(d) and os.access(d, os.W_OK):
+            return d
+    return default_logs_dir()
+
+
+def app_log_path(filename):
+    return os.path.join(app_log_dir(), os.path.basename(filename))
+
+
 def default_linbpq_path(filename):
     """<config.php paths.linbpq>/<filename>, else ./<filename> (cron jobs
     usually `cd` into the LinBPQ directory first)."""

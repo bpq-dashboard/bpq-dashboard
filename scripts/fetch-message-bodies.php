@@ -81,7 +81,7 @@ define('BPQ_MESSAGES_LIB', true);
 require $webRoot . '/bbs-messages.php';     // $config, sendCmd, waitFor, parseMessageList, bpqTelnetLock …
 require_once $webRoot . '/message-db.php';  // tprfn_db(), msgdb_archive_messages(), msgdb_get_keep_folders()
 
-$config['log_file'] = $webRoot . '/logs/message-bodies.log';
+$config['log_file'] = bpq_app_log('message-bodies.log');   // v1.5.19: /var/log/bpq-dashboard
 $bulletinPolicy = $opt['bulletins'] ?? getConfig('messages', 'bulletin_text', 'all');
 if (!in_array($bulletinPolicy, ['all', 'pinned', 'none'], true)) $bulletinPolicy = 'all';
 $listCount = 200;

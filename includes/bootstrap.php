@@ -236,7 +236,9 @@ function dashboardLog($level, $message, $context = []) {
     $configLevel = $levels[$CONFIG['logging']['level'] ?? 'info'] ?? 1;
     if (($levels[$level] ?? 1) < $configLevel) return;
     
-    $logFile = $CONFIG['logging']['file'] ?? './logs/dashboard.log';
+    // v1.5.19: default in /var/log/bpq-dashboard (includes/station-config.php)
+    if (!function_exists('bpq_app_log')) require_once __DIR__ . '/station-config.php';
+    $logFile = $CONFIG['logging']['file'] ?? bpq_app_log('dashboard.log');
     $maxSize = $CONFIG['logging']['max_size'] ?? 5242880;
     if (file_exists($logFile) && filesize($logFile) > $maxSize) @rename($logFile, $logFile . '.old');
     

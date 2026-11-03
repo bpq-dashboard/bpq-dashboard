@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.18 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.19 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -80,7 +80,7 @@ fi
 if [[ ! -f "$SCRIPT_DIR/config.php.example" ]] || \
    [[ ! -f "$SCRIPT_DIR/bbs-messages.html" ]]; then
     die "Could not find the dashboard files. Are you running this script
-   from the folder where you unzipped BPQ-Dashboard-v1.5.18.zip?
+   from the folder where you unzipped BPQ-Dashboard-v1.5.19.zip?
 
    Current folder: $SCRIPT_DIR"
 fi
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.18 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.19 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -103,8 +103,8 @@ Welcome! This installer will set up the BPQ Dashboard on your Linux
 server. It will:
 
   ${BOLD}1.${NC} Ask you a few questions about your station and node
-  ${BOLD}2.${NC} Detect whether you already have a web server installed
-       (nginx or Apache). If not, it will install nginx.
+  ${BOLD}2.${NC} Ask which web server to use (nginx or Apache) and its port.
+       If this machine already serves other sites, they are left alone.
   ${BOLD}3.${NC} Install PHP and Python 3 if they aren't already present
   ${BOLD}4.${NC} Install MariaDB, the database behind the Email Client and the
        fast RF Connections / Traffic / System Logs pages (recommended —
@@ -113,9 +113,11 @@ server. It will:
   ${BOLD}6.${NC} Copy the dashboard files to /var/www/bpq-dashboard/
   ${BOLD}7.${NC} Generate a config.php with your station settings
   ${BOLD}8.${NC} Configure the web server (with the private files locked away)
-  ${BOLD}9.${NC} Link your LinBPQ logs folder and set up the helper services
- ${BOLD}10.${NC} Schedule the log parsers and the daily bulletin clean-up
- ${BOLD}11.${NC} Show you the web address of your dashboard
+  ${BOLD}9.${NC} Ask which optional pages you use (Telnet, Chat, APRS, VARA, Rig)
+ ${BOLD}10.${NC} Link your LinBPQ logs folder (and fix access to it if needed)
+       and set up the helper services for your pages
+ ${BOLD}11.${NC} Schedule the log parsers and the daily bulletin clean-up
+ ${BOLD}12.${NC} Offer a basic firewall (optional) and show your dashboard's address
 
 ${BOLD}Time required:${NC} 5 to 15 minutes depending on your internet speed.
 
@@ -243,32 +245,64 @@ fi
 # 2026-10-27: VARA HF's session log for RF Connections arrives as syslog
 # (UDP 514). Debian 12 doesn't install rsyslog, and nothing received UDP
 # syslog before this question. Installation Manual §10.11.
-VARA_SYSLOG="n"; VARA_IP=""
-ask "Receive VARA HF's log for the RF Connections page? (recommended if you run VARA HF)"
-explain "RF Connections is built from VARA HF's session log. The registered VARA HF"
-explain "sends it as syslog: VARA Settings > VARA Setup > tick Syslog, Syslog Host ="
-explain "this server's IP address, port 514, Station Name = H-<VARA call-SSID>"
-explain "(e.g. H-${INPUT_CALL}-7). The installer sets this server up to receive it"
-explain "(rsyslog on UDP 514, accepting only the VARA computer)."
-if yesno "Set up the VARA HF log receiver?" Y; then
-    while true; do
-        ask "IP address of the computer running VARA HF (Enter = VARA runs on this server):"
-        explain "Usually a Windows PC on your network, e.g. 192.168.1.50. Give it a fixed"
-        explain "address (DHCP reservation in your router) so this stays right."
-        read -r VARA_IP
-        VARA_IP=$(echo "$VARA_IP" | tr -d '[:space:]')
-        if [[ -z "$VARA_IP" ]]; then VARA_IP="127.0.0.1"; break; fi
-        if [[ "$VARA_IP" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] \
-           && (( BASH_REMATCH[1] <= 255 && BASH_REMATCH[2] <= 255 && BASH_REMATCH[3] <= 255 && BASH_REMATCH[4] <= 255 )); then
-            break
+# v1.5.19: TPRFN stations whose VARA HF sends its syslog to the TPRFN server
+# can have the dashboard download their log from there instead (vara-remote).
+VARA_SYSLOG="n"; VARA_IP=""; VARA_REMOTE="n"; VARA_REMOTE_URL=""
+INPUT_CALL_LC=$(echo "$INPUT_CALL" | tr '[:upper:]' '[:lower:]')
+ask "Where should RF Connections get your VARA HF log?"
+explain "RF Connections is built from VARA HF's session log, which the registered"
+explain "VARA HF sends as syslog (VARA Settings > VARA Setup > Syslog)."
+explain "  1 = VARA HF sends it to THIS server (the installer sets up the receiver)"
+explain "  2 = VARA HF sends it to the TPRFN server, which keeps a copy for you"
+explain "      (the dashboard downloads it every 5 minutes)"
+explain "  3 = Not used (no VARA HF here; RF Connections stays empty)"
+read -r -p "  Choose 1, 2 or 3 [1]: " _vsrc
+case "${_vsrc:-1}" in
+    2)
+        VARA_REMOTE="y"
+        while true; do
+            ask "Web address of your VARA log on the TPRFN server:"
+            explain "The TPRFN server admin sets this file up for your station and gives you the"
+            explain "address; it ends in /${INPUT_CALL_LC}.vara. Check it opens in a browser first:"
+            explain "it should show lines with VARAHF in them. Enter = skip (set it later in"
+            explain "config.php 'vara_remote')."
+            read -r VARA_REMOTE_URL || VARA_REMOTE_URL=""
+            VARA_REMOTE_URL=$(echo "$VARA_REMOTE_URL" | tr -d '[:space:]')
+            [[ -z "$VARA_REMOTE_URL" ]] && break
+            [[ "$VARA_REMOTE_URL" =~ ^https?://[^[:space:]\'\"]+$ ]] && break
+            echo "  '$VARA_REMOTE_URL' is not a web address (https://...). Try again, or press ENTER to skip."
+        done
+        if [[ -z "$VARA_REMOTE_URL" ]]; then
+            VARA_REMOTE="n"
+            warn "No TPRFN address given - VARA log download left off (config.php 'vara_remote', Installation Manual §10.11)"
+        else
+        ok "VARA HF log: downloaded every 5 minutes from $VARA_REMOTE_URL"
         fi
-        echo "  '$VARA_IP' is not an IPv4 address (like 192.168.1.50). Try again, or press ENTER for this server."
-    done
-    VARA_SYSLOG="y"
-    ok "VARA HF log: received from $( [[ "$VARA_IP" == "127.0.0.1" ]] && echo "this server" || echo "$VARA_IP" ) on UDP 514"
-else
-    ok "VARA HF log receiver: skipped (Installation Manual §10.11 to set it up later)"
-fi
+        ;;
+    3)
+        ok "VARA HF log: not used (Installation Manual §10.11 to set it up later)"
+        ;;
+    *)
+        explain "In VARA HF: tick Syslog, Syslog Host = this server's IP address, port 514,"
+        explain "Station Name = H-<VARA call-SSID> (e.g. H-${INPUT_CALL}-7). The installer"
+        explain "sets up rsyslog on UDP 514, accepting only the VARA computer."
+        while true; do
+            ask "IP address of the computer running VARA HF (Enter = VARA runs on this server):"
+            explain "Usually a Windows PC on your network, e.g. 192.168.1.50. Give it a fixed"
+            explain "address (DHCP reservation in your router) so this stays right."
+            read -r VARA_IP
+            VARA_IP=$(echo "$VARA_IP" | tr -d '[:space:]')
+            if [[ -z "$VARA_IP" ]]; then VARA_IP="127.0.0.1"; break; fi
+            if [[ "$VARA_IP" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] \
+               && (( BASH_REMATCH[1] <= 255 && BASH_REMATCH[2] <= 255 && BASH_REMATCH[3] <= 255 && BASH_REMATCH[4] <= 255 )); then
+                break
+            fi
+            echo "  '$VARA_IP' is not an IPv4 address (like 192.168.1.50). Try again, or press ENTER for this server."
+        done
+        VARA_SYSLOG="y"
+        ok "VARA HF log: received from $( [[ "$VARA_IP" == "127.0.0.1" ]] && echo "this server" || echo "$VARA_IP" ) on UDP 514"
+        ;;
+esac
 
 # ============================================================================
 hdr "STEP 2 — Tell me about your BPQ node"
@@ -326,28 +360,133 @@ hdr "STEP 4 — Detect or install a web server"
 
 WEBSERVER=""
 WEB_USER="www-data"
+# v1.5.19 (K5DAT): the sysop chooses the web server and port. When the
+# machine already serves other sites (e.g. nginx as a reverse proxy), the
+# installer adds the dashboard as its own site on its own port and leaves
+# every existing site, default site and port alone.
+WEB_PORT="80"; WEB_BIND=""; WEB_SERVER_NAME="_"; WEB_SHARED="n"; APACHE_FRESH="n"; NGINX_FRESH="n"
 
-if systemctl is-active --quiet nginx 2>/dev/null; then
-    WEBSERVER="nginx"
-    ok "Detected nginx — running"
-elif command -v nginx >/dev/null 2>&1; then
-    WEBSERVER="nginx"
-    ok "Detected nginx — installed but not running; will start it"
-elif systemctl is-active --quiet apache2 2>/dev/null; then
-    WEBSERVER="apache2"
-    ok "Detected Apache (apache2) — running"
-elif command -v apache2 >/dev/null 2>&1; then
-    WEBSERVER="apache2"
-    ok "Detected Apache (apache2) — installed but not running; will start it"
+nginx_present()  { systemctl is-active --quiet nginx 2>/dev/null || command -v nginx >/dev/null 2>&1; }
+apache_present() { systemctl is-active --quiet apache2 2>/dev/null || command -v apache2 >/dev/null 2>&1; }
+# Sites other than the stock default and an earlier bpq-dashboard
+nginx_other_sites() {
+    local f out=()
+    for f in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf; do
+        [[ -e "$f" ]] || continue
+        case "$(basename "$f")" in default|bpq-dashboard|bpq-dashboard.conf) continue ;; esac
+        grep -qs 'server[[:space:]]*{' "$f" && out+=("$(basename "$f")")
+    done
+    echo "${out[*]:-}"
+}
+apache_other_sites() {
+    local f out=()
+    for f in /etc/apache2/sites-enabled/*.conf; do
+        [[ -e "$f" ]] || continue
+        case "$(basename "$f")" in 000-default.conf|bpq-dashboard.conf) continue ;; esac
+        out+=("$(basename "$f")")
+    done
+    echo "${out[*]:-}"
+}
+port_in_use() { ss -Hltn "sport = :$1" 2>/dev/null | grep -q .; }
+
+DEF_WS="1"
+if ! nginx_present && apache_present; then DEF_WS="2"; fi
+HAVE_NGINX=$(nginx_present && echo y || echo n); HAVE_APACHE=$(apache_present && echo y || echo n)
+NGINX_OTHERS=$( [[ "$HAVE_NGINX" == "y" ]] && nginx_other_sites ); APACHE_OTHERS=$( [[ "$HAVE_APACHE" == "y" ]] && apache_other_sites )
+say "Found: nginx $( [[ "$HAVE_NGINX" == "y" ]] && echo "installed${NGINX_OTHERS:+ (other sites: $NGINX_OTHERS)}" || echo "not installed" );" \
+    "Apache $( [[ "$HAVE_APACHE" == "y" ]] && echo "installed${APACHE_OTHERS:+ (other sites: $APACHE_OTHERS)}" || echo "not installed" )"
+ask "Which web server should run the dashboard?"
+explain "  1 = nginx (recommended; installed if it isn't here)"
+explain "  2 = Apache (installed if it isn't here)"
+explain "If this machine already uses one of them for other sites (for example nginx"
+explain "as a reverse proxy), the installer adds the dashboard as a separate site and"
+explain "does not change your existing sites."
+read -r -p "  Choose 1 or 2 [$DEF_WS]: " _ws
+[[ "${_ws:-$DEF_WS}" == "2" ]] && WEBSERVER="apache2" || WEBSERVER="nginx"
+
+# Shared machine: the chosen server has other sites, or the other server runs
+if [[ "$WEBSERVER" == "nginx" ]]; then
+    [[ -n "$NGINX_OTHERS" ]] || systemctl is-active --quiet apache2 2>/dev/null && WEB_SHARED="y"
 else
-    say "No web server detected. Will install nginx."
-    if apt-get install -y -qq nginx; then
-        WEBSERVER="nginx"
-        ok "Installed nginx"
-    else
-        err "Failed to install nginx"
-        die "Cannot continue without a web server. Check the log."
+    [[ -n "$APACHE_OTHERS" ]] || systemctl is-active --quiet nginx 2>/dev/null && WEB_SHARED="y"
+fi
+if [[ "$WEB_SHARED" == "y" ]]; then
+    explain "This machine already serves other sites, so the dashboard gets its own port"
+    explain "and nothing that is there now is changed (no default site removed, port 80"
+    explain "left to what uses it). Your reverse proxy can then forward to it."
+    DEF_PORT="8080"
+else
+    DEF_PORT="80"
+fi
+while true; do
+    ask "Port for the dashboard [$DEF_PORT]:"
+    read -r WEB_PORT || die "No answer (input closed) at the port question."
+    WEB_PORT="${WEB_PORT:-$DEF_PORT}"
+    if [[ ! "$WEB_PORT" =~ ^[0-9]+$ ]] || (( WEB_PORT < 1 || WEB_PORT > 65535 )); then
+        echo "  '$WEB_PORT' is not a port number."; continue
     fi
+    # In use by something other than the server we're about to configure on 80
+    if port_in_use "$WEB_PORT" && ! { [[ "$WEB_SHARED" == "n" ]] && [[ "$WEB_PORT" == "80" ]]; }; then
+        echo "  Port $WEB_PORT is already in use on this machine: $(ss -Hltnp "sport = :$WEB_PORT" 2>/dev/null | grep -o 'users:(("[^"]*' | head -1 | cut -d'"' -f2)"
+        echo "  Choose another (e.g. 8080, 8081)."; continue
+    fi
+    break
+done
+[[ "$WEB_PORT" != "80" ]] && WEB_SHARED="y"
+if [[ "$WEB_SHARED" == "y" ]]; then
+    if yesno "Reach the dashboard only through your reverse proxy on this machine (listen on 127.0.0.1)?" N; then
+        WEB_BIND="127.0.0.1"
+    fi
+fi
+ok "Web server: $WEBSERVER, port $WEB_PORT$( [[ -n "$WEB_BIND" ]] && echo " on 127.0.0.1 only" )$( [[ "$WEB_SHARED" == "y" ]] && echo "; existing sites left as they are" )"
+
+if [[ "$WEBSERVER" == "nginx" ]]; then
+    if ! command -v nginx >/dev/null 2>&1; then
+        say "Installing nginx..."
+        NGINX_FRESH="y"
+        POLICY_RCD=""   # don't start it on port 80 while another server holds it
+        if port_in_use 80 && [[ ! -e /usr/sbin/policy-rc.d ]]; then
+            printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && chmod 755 /usr/sbin/policy-rc.d && POLICY_RCD=y
+        fi
+        apt-get install -y -qq nginx; _rc=$?
+        [[ -n "$POLICY_RCD" ]] && rm -f /usr/sbin/policy-rc.d
+        (( _rc == 0 )) && ok "Installed nginx" || die "Failed to install nginx. Check the log."
+    else
+        ok "nginx is installed"
+    fi
+else
+    if ! command -v apache2 >/dev/null 2>&1; then
+        say "Installing Apache..."
+        APACHE_FRESH="y"
+        # Don't let the package start Apache on port 80 while another server
+        # holds it (the start would fail and leave apt in an error state).
+        POLICY_RCD=""
+        if port_in_use 80 && [[ ! -e /usr/sbin/policy-rc.d ]]; then
+            printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && chmod 755 /usr/sbin/policy-rc.d && POLICY_RCD=y
+        fi
+        apt-get install -y -qq apache2; _rc=$?
+        [[ -n "$POLICY_RCD" ]] && rm -f /usr/sbin/policy-rc.d
+        (( _rc == 0 )) && ok "Installed Apache" || die "Failed to install Apache. Check the log."
+    else
+        ok "Apache is installed"
+    fi
+    # Apache on another port: Listen there and stop listening on 80 only if
+    # the installer just put Apache here (an existing Apache keeps its ports).
+    if [[ "$WEB_PORT" != "80" || -n "$WEB_BIND" ]]; then
+        LISTEN_LINE="Listen ${WEB_BIND:+$WEB_BIND:}$WEB_PORT"
+        if [[ "$APACHE_FRESH" == "y" ]]; then
+            sed -i -E 's/^([[:space:]]*Listen[[:space:]]+80)[[:space:]]*$/# \1   # BPQ Dashboard install.sh: port 80 belongs to another web server/' /etc/apache2/ports.conf
+            a2dissite 000-default >/dev/null 2>&1 || true
+        fi
+        grep -qxF "$LISTEN_LINE" /etc/apache2/ports.conf || echo "$LISTEN_LINE   # BPQ Dashboard (install.sh)" >> /etc/apache2/ports.conf
+        ok "Apache listens on ${WEB_BIND:+$WEB_BIND:}$WEB_PORT (/etc/apache2/ports.conf)"
+    fi
+fi
+
+# A just-installed nginx's stock site listens on 80; with another server on
+# 80 it would stop nginx starting at all. It is ours to remove.
+if [[ "$WEBSERVER" == "nginx" && "$NGINX_FRESH" == "y" && "$WEB_SHARED" == "y" ]]; then
+    rm -f /etc/nginx/sites-enabled/default
 fi
 
 # Make sure it's running and enabled
@@ -519,16 +658,8 @@ SQL
         say "Loading database schemas..."
         SCHEMA_OK=0
         SCHEMA_TOTAL=0
-        for SCHEMA_FILE in \
-            "$SCRIPT_DIR/sql/2026-07-messages-schema.sql" \
-            "$SCRIPT_DIR/data/rf-connections-schema.sql" \
-            "$SCRIPT_DIR/data/prop-decisions-schema.sql" \
-            "$SCRIPT_DIR/data/sessions-stations-schema.sql" \
-            "$SCRIPT_DIR/data/traffic-schema.sql" \
-            "$SCRIPT_DIR/data/system-logs-schema.sql" \
-            "$SCRIPT_DIR/sql/2026-09-21-rf-messages-medium.sql" \
-            "$SCRIPT_DIR/sql/2026-09-26-message-keep-and-bodies.sql" \
-            "$SCRIPT_DIR/sql/2026-10-06-rf-messages-delivery.sql"   # 2026-10-25: was missing — Forwarded Messages Via/Status
+        # v1.5.19: the list lives in sql/migrations.list (update.sh uses it too)
+        for SCHEMA_FILE in $(grep -vE '^[[:space:]]*(#|$)' "$SCRIPT_DIR/sql/migrations.list" | sed "s|^|$SCRIPT_DIR/|")
         do
             [[ -f "$SCHEMA_FILE" ]] || continue
             SCHEMA_TOTAL=$((SCHEMA_TOTAL + 1))
@@ -645,7 +776,7 @@ mkdir -p "$WEB_ROOT" && ok "Created $WEB_ROOT" || err "mkdir failed"
 
 say "Copying dashboard files (this is the biggest step — may take 10 seconds)..."
 # Copy everything except the installer itself and these utility scripts
-rsync -a --exclude='install.sh' \
+rsync -a --exclude='install.sh' --exclude='update.sh' \
          --exclude='*.log' \
          --exclude='.git' --exclude='private' \
          --exclude='docs/SESSION-JOURNAL.md' \
@@ -655,6 +786,27 @@ rsync -a --exclude='install.sh' \
 # Make sure cache and logs subdirs exist (some are empty in the archive)
 mkdir -p "$WEB_ROOT/cache" "$WEB_ROOT/logs" "$WEB_ROOT/data/backups" \
          "$WEB_ROOT/cache/aprs" "$WEB_ROOT/cache/chat-sessions" "$WEB_ROOT/cache/network"
+# v1.5.19: the dashboard's own logs (daemons, Email Client, message-text job,
+# NWS posting) go here, not into LinBPQ's logs folder (which the web user may
+# only be allowed to read). Rotated weekly (/etc/logrotate.d/bpq-dashboard).
+mkdir -p /var/log/bpq-dashboard && chown "$WEB_USER:$WEB_USER" /var/log/bpq-dashboard && chmod 750 /var/log/bpq-dashboard \
+    && ok "Dashboard log folder: /var/log/bpq-dashboard"
+# Kept copies the web user makes (the PKTNET forms replaced by an update, for
+# Undo) live outside the web folder (v1.5.19)
+mkdir -p /var/lib/bpq-dashboard && chown "$WEB_USER:$WEB_USER" /var/lib/bpq-dashboard && chmod 750 /var/lib/bpq-dashboard
+cat > /etc/logrotate.d/bpq-dashboard <<'LOGROTATE'
+# BPQ Dashboard's own logs (install.sh). Not LinBPQ's logs, and not the .vara
+# file (the RF Connections parser reads it by position).
+/var/log/bpq-dashboard/*.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+LOGROTATE
 # Partners list used by the admin Partners editor (starts empty)
 [[ -f "$WEB_ROOT/data/partners.json" ]] || echo '{"partners":[]}' > "$WEB_ROOT/data/partners.json"
 
@@ -693,14 +845,55 @@ find "$WEB_ROOT" -name "*.sh" -exec chmod 755 {} \;
 find "$WEB_ROOT" -name "*.py" -exec chmod 755 {} \;
 
 # ============================================================================
-hdr "STEP 9 — flrig (rig control)"
+hdr "STEP 9 — Choose your pages (and flrig for the Rig pages)"
 # ============================================================================
 
+# v1.5.19 (N3MEL): only the pages the station uses get their helper service,
+# and the menu hides the others (config.php 'pages'). The files stay, so a
+# page can be switched on later: Maintenance > Optional pages.
 echo
 echo "${BOLD}About this:${NC}"
-echo "Rig Status and RF Power Monitor both read live frequency/power/SWR from"
-echo "your radio via flrig, not directly — flrig acts as the bridge between"
-echo "the dashboard and whatever radio you have."
+echo "Most pages need nothing extra. A few need a small helper program (a"
+echo "systemd service) and something on your station. Answer N for a page you"
+echo "don't use: its helper isn't installed and the page is hidden from the menu."
+echo "You can switch any of them on later (Maintenance > Optional pages)."
+echo
+PAGE_TELNET="n"; PAGE_CHAT="n"; PAGE_APRS="n"; PAGE_VARA="n"; PAGE_VALIDATOR="n"
+BPQCFG_FILE="$INPUT_LINBPQ_DIR/bpq32.cfg"
+bpqcfg_has() { [[ -r "$BPQCFG_FILE" ]] && grep -qiE "$1" "$BPQCFG_FILE"; }
+
+explain "Telnet Client: the node, BBS and Chat in your browser, with YAPP file transfer."
+yesno "Use the Telnet Client page?" Y && PAGE_TELNET="y"
+
+DEF_CHAT="N"
+{ [[ -f "$INPUT_LINBPQ_DIR/chatconfig.cfg" ]] || bpqcfg_has '^[[:space:]]*(LINCHAT|APPLICATION.*CHAT)'; } && DEF_CHAT="Y"
+explain "Chat: BPQ Chat in your browser. Needs BPQ's own Chat server in this LinBPQ"
+explain "$( [[ "$DEF_CHAT" == "Y" ]] && echo "(found in $INPUT_LINBPQ_DIR)." || echo "(not found in $INPUT_LINBPQ_DIR: answer N if you use another chat hub).")"
+yesno "Use the Chat page?" "$DEF_CHAT" && PAGE_CHAT="y"
+
+explain "APRS map: stations around you from APRS-IS (receive-only until you add a"
+explain "passcode). Answer N if you run APRS with another program and don't want it here."
+yesno "Use the APRS map page?" Y && PAGE_APRS="y"
+
+DEF_VARA="N"
+bpqcfg_has '^[[:space:]]*(DRIVER|DLLNAME)[[:space:]]*=[[:space:]]*VARA' && DEF_VARA="Y"
+[[ -r "$BPQCFG_FILE" ]] || DEF_VARA="Y"
+explain "VARA HF Terminal: keyboard-to-keyboard VARA HF sessions through your BPQ"
+explain "VARA port (needs VARA HF and a DRIVER=VARA port in bpq32.cfg)."
+yesno "Use the VARA HF Terminal page?" "$DEF_VARA" && PAGE_VARA="y"
+
+explain "VARA callsign check (advanced): a small proxy between BPQ and VARA HF that"
+explain "drops incoming calls with an invalid callsign. Needs a change to your VARA"
+explain "port in bpq32.cfg (shown at the end). Most stations answer N."
+yesno "Use the VARA callsign check?" N && PAGE_VALIDATOR="y"
+ok "Pages: Telnet $PAGE_TELNET, Chat $PAGE_CHAT, APRS $PAGE_APRS, VARA HF Terminal $PAGE_VARA, callsign check $PAGE_VALIDATOR"
+
+echo
+echo "${BOLD}Rig Status and RF Power Monitor:${NC}"
+echo "Both read live frequency/power/SWR from your radio via flrig, not directly"
+echo "— flrig acts as the bridge between the dashboard and whatever radio you have."
+echo "Not using flrig? Answer N: only these two pages are left out. Everything"
+echo "else works without it, including BPQ's own CAT control of the radio."
 echo
 
 FLRIG_HOST="127.0.0.1"
@@ -794,26 +987,12 @@ FLRIGSVC
         fi
     fi
 else
-    warn "Skipping flrig — the Rig Status and RF Power Monitor pages are not installed"
-    warn "(both need flrig). To add them later, re-run this script and answer Y here."
+    ok "No flrig — Rig Status and RF Power Monitor are hidden from the menu"
+    say "(config.php 'radio' => 'enabled' => false). To add them later: Maintenance > Optional pages."
 fi
-
-# 2026-10-05: Rig Status and RF Power Monitor only work through flrig, so
-# without it they are left out entirely (pages, nav links, history poller)
-# rather than installed as pages that can only show "flrig offline".
-if [[ "$FLRIG_MODE" == "skip" ]]; then
-    for f in rig-status.html rf-power-monitor.html \
-             rig-history-poller.service scripts/rig-history-poller.php; do
-        rm -f "$WEB_ROOT/$f"
-    done
-    if sed -i -e '/href="\/rig-status\.html"/d' -e '/href="\/rf-power-monitor\.html"/d' \
-          "$WEB_ROOT/_nav.html"; then
-        chown "$WEB_USER:$WEB_USER" "$WEB_ROOT/_nav.html"
-        ok "Rig Status / RF Power Monitor left out (no flrig)"
-    else
-        warn "Could not remove the Rig / RF Power links from $WEB_ROOT/_nav.html"
-    fi
-fi
+# v1.5.19: the Rig pages are no longer deleted when flrig is skipped (that
+# made adding a radio later need a reinstall); radio.enabled = false hides
+# them and rig-history-poller is simply not installed.
 
 # ============================================================================
 hdr "STEP 10 — Generate config.php"
@@ -893,16 +1072,42 @@ return [
         'scripts' => '$WEB_ROOT/scripts/',
         'datalog' => '$WEB_ROOT/logs/',
         'linbpq'  => '$INPUT_LINBPQ_DIR',
+        'app_logs' => '/var/log/bpq-dashboard',   // the dashboard's own logs (not LinBPQ's folder)
     ],
     'logs' => [
-        'vara_file' => '$INPUT_CALL_LC.vara',
+        'vara_file' => '$( [[ "$VARA_REMOTE" == "y" ]] && echo "/var/log/bpq-dashboard/$INPUT_CALL_LC.vara" || echo "$INPUT_CALL_LC.vara" )',
+    ],
+    // Optional pages (install.sh step 9). false = helper not installed, page
+    // hidden from the menu. Switch on later: Maintenance > Optional pages.
+    'pages' => [
+        'telnet'         => $( [[ "$PAGE_TELNET" == "y" ]] && echo true || echo false ),
+        'chat'           => $( [[ "$PAGE_CHAT" == "y" ]] && echo true || echo false ),
+        'aprs'           => $( [[ "$PAGE_APRS" == "y" ]] && echo true || echo false ),
+        'vara'           => $( [[ "$PAGE_VARA" == "y" ]] && echo true || echo false ),
+        'vara_validator' => $( [[ "$PAGE_VALIDATOR" == "y" ]] && echo true || echo false ),
+    ],
+    // VARA HF log downloaded from the TPRFN server (vara-remote.timer, every
+    // 5 minutes) into logs.vara_file above, instead of vara-logger.
+    'vara_remote' => [
+        'enabled' => $( [[ "$VARA_REMOTE" == "y" ]] && echo true || echo false ),
+        'url'     => '$VARA_REMOTE_URL',
+    ],
+    // VARA callsign check (vara-validator): BPQ's VARA port connects to
+    // listen_host:listen_cmd_port/+1; it forwards to VARA HF at vara_host.
+    'vara_validator' => [
+        'vara_host'        => '127.0.0.1',
+        'vara_cmd_port'    => 8300,      // VARA HF's own command port (data = +1)
+        'listen_host'      => '127.0.0.1',
+        'listen_cmd_port'  => 9025,      // point bpq32.cfg's VARA port ADDR here
+        'allow'            => [],        // callsigns always accepted
+        'deny'             => ['NOCALL', 'TEST', 'N0CALL', 'INVALID'],
     ],
     'vara' => [                 // VARA HF Terminal (bpq-vara service)
         'bpq_port' => 0,        // BPQ port number of your VARA HF port; 0 = found in bpq32.cfg
         // 'user' => '', 'pass' => '',   // BPQ login for it, if not the 'bbs' one above
     ],
     'radio' => [
-        'enabled'    => $( [[ "$FLRIG_MODE" == "skip" ]] && echo "false" || echo "true" ),   // false = no flrig: Rig pages not installed
+        'enabled'    => $( [[ "$FLRIG_MODE" == "skip" ]] && echo "false" || echo "true" ),   // false = no flrig: Rig pages hidden, no history poller
         'flrig_host' => '$FLRIG_HOST',
         'flrig_port' => $FLRIG_PORT,
         'bpq_radio'  => 0,      // bpq32.cfg RADIO number for the Rig page scan list; 0 = the FLRIG block
@@ -919,11 +1124,22 @@ hdr "STEP 11 — Configure the web server"
 # ============================================================================
 
 if [[ "$WEBSERVER" == "nginx" ]]; then
+    # v1.5.19: default_server only when the dashboard has nginx (port 80) to
+    # itself; on a shared machine its own port, no default_server.
+    if [[ "$WEB_SHARED" == "y" ]]; then
+        NGINX_LISTEN="${WEB_BIND:+$WEB_BIND:}$WEB_PORT"
+    else
+        NGINX_LISTEN="$WEB_PORT default_server"
+    fi
+    if [[ "$WEB_SHARED" == "y" && -d /etc/nginx ]]; then
+        NGINX_BK="/root/nginx-before-bpq-dashboard-$(date +%Y%m%d-%H%M%S).tgz"
+        tar czf "$NGINX_BK" -C /etc nginx 2>/dev/null && ok "Backed up /etc/nginx to $NGINX_BK"
+    fi
     say "Writing nginx site config to /etc/nginx/sites-available/bpq-dashboard ..."
     cat > /etc/nginx/sites-available/bpq-dashboard <<NGINX
 server {
-    listen 80 default_server;
-    server_name _;
+    listen $NGINX_LISTEN;
+    server_name $WEB_SERVER_NAME;
     root $WEB_ROOT;
     index bpq-rf-connections.html index.html index.php;
 
@@ -1111,25 +1327,28 @@ server {
 }
 NGINX
 
-    # Disable default site if present (only on a fresh nginx install)
-    [[ -f /etc/nginx/sites-enabled/default ]] && \
-        rm -f /etc/nginx/sites-enabled/default && \
-        say "Removed default nginx site"
+    # Disable nginx's stock default site — only when the dashboard has nginx
+    # to itself (v1.5.19: never on a machine that serves other sites)
+    if [[ "$WEB_SHARED" != "y" && -e /etc/nginx/sites-enabled/default ]]; then
+        rm -f /etc/nginx/sites-enabled/default && say "Removed default nginx site"
+    fi
 
     # Enable our site
     ln -sf /etc/nginx/sites-available/bpq-dashboard \
            /etc/nginx/sites-enabled/bpq-dashboard
 
     if nginx -t 2>/dev/null; then
-        systemctl reload nginx && ok "nginx configured and reloaded"
+        systemctl reload nginx && ok "nginx configured and reloaded (dashboard on port $WEB_PORT)"
     else
-        err "nginx config test failed. See: sudo nginx -t"
+        err "nginx config test failed — the dashboard site was taken out again so your other sites keep working."
+        err "See: sudo nginx -t   (the site file stays in /etc/nginx/sites-available/bpq-dashboard)"
+        rm -f /etc/nginx/sites-enabled/bpq-dashboard
     fi
 
 elif [[ "$WEBSERVER" == "apache2" ]]; then
     say "Writing Apache site config to /etc/apache2/sites-available/bpq-dashboard.conf ..."
     cat > /etc/apache2/sites-available/bpq-dashboard.conf <<APACHE
-<VirtualHost *:80>
+<VirtualHost ${WEB_BIND:-*}:$WEB_PORT>
     DocumentRoot $WEB_ROOT
     DirectoryIndex bpq-rf-connections.html index.html index.php
 
@@ -1258,13 +1477,18 @@ APACHE
     a2enmod rewrite >/dev/null 2>&1
     a2enmod auth_basic authn_file authz_user headers >/dev/null 2>&1
     a2enmod proxy proxy_http proxy_wstunnel >/dev/null 2>&1   # /ws/telnet, /ws/vara (2026-10-25)
-    a2dissite 000-default >/dev/null 2>&1 || true
+    # The stock site only goes when the dashboard has Apache on port 80 to
+    # itself (v1.5.19: an Apache that serves other sites keeps them all)
+    if [[ "$WEB_SHARED" != "y" ]]; then a2dissite 000-default >/dev/null 2>&1 || true; fi
     a2ensite bpq-dashboard >/dev/null 2>&1
 
     if apache2ctl configtest 2>/dev/null; then
-        systemctl reload apache2 && ok "Apache configured and reloaded"
+        systemctl reload apache2 2>/dev/null || systemctl restart apache2
+        systemctl is-active --quiet apache2 && ok "Apache configured and running (dashboard on port $WEB_PORT)" \
+            || err "Apache did not start. See: sudo systemctl status apache2"
     else
-        err "Apache config test failed. See: sudo apache2ctl configtest"
+        err "Apache config test failed — the dashboard site was taken out again. See: sudo apache2ctl configtest"
+        a2dissite bpq-dashboard >/dev/null 2>&1
     fi
 fi
 
@@ -1274,14 +1498,15 @@ fi
 sleep 2   # the reload finishes a moment after systemctl returns
 http_code() { curl -s -o /dev/null -m 15 -w '%{http_code}' -A 'Mozilla/5.0 (install.sh)' "$@" 2>/dev/null; }
 if command -v curl >/dev/null 2>&1; then
-    CODE=$(http_code http://127.0.0.1/api/config.php)
+    WEB_TEST="http://${WEB_BIND:-127.0.0.1}:$WEB_PORT"
+    CODE=$(http_code $WEB_TEST/api/config.php)
     case "$CODE" in
         200) ok "PHP answers through the web server (api/config.php → 200)" ;;
         502|504) err "PHP pages answer $CODE — the web server can't reach PHP-FPM at $PHP_FPM_SOCK."
              err "Check: ls -l /run/php/ ; then fix fastcgi_pass in /etc/nginx/sites-available/bpq-dashboard" ;;
         *)   warn "api/config.php answered ${CODE:-nothing} (expected 200). See the web server error log." ;;
     esac
-    CODE=$(http_code http://127.0.0.1/admin/bpq-maintenance.html)
+    CODE=$(http_code $WEB_TEST/admin/bpq-maintenance.html)
     case "$CODE" in
         401) ok "Admin pages ask for the login (no login → 401)" ;;
         500) err "Admin pages answer 500 — the web server can't read $ADMIN_HTPASSWD."
@@ -1293,7 +1518,7 @@ if command -v curl >/dev/null 2>&1; then
     # command line, so it never shows in the process list.
     ESC_PASS=${ADMIN_PASS//\\/\\\\}; ESC_PASS=${ESC_PASS//\"/\\\"}
     ESC_USER=${ADMIN_USER//\\/\\\\}; ESC_USER=${ESC_USER//\"/\\\"}
-    CODE=$(printf 'user = "%s:%s"\n' "$ESC_USER" "$ESC_PASS" | http_code -K - http://127.0.0.1/admin/bpq-maintenance.html)
+    CODE=$(printf 'user = "%s:%s"\n' "$ESC_USER" "$ESC_PASS" | http_code -K - $WEB_TEST/admin/bpq-maintenance.html)
     unset ESC_PASS ESC_USER
     if [[ "$CODE" == "200" ]]; then
         ok "Admin login works (user $ADMIN_USER → 200)"
@@ -1302,6 +1527,44 @@ if command -v curl >/dev/null 2>&1; then
     fi
 else
     warn "curl not installed — skipped the web smoke test. Open /admin/bpq-maintenance.html in a browser."
+fi
+
+# v1.5.19 (K5DAT): dashboard on its own port next to other sites — write the
+# reverse-proxy block for the sysop's own nginx (not applied: their config).
+if [[ "$WEB_SHARED" == "y" ]]; then
+    PROXY_TXT=/root/bpq-dashboard-reverse-proxy.txt
+    cat > "$PROXY_TXT" <<PROXY
+# BPQ Dashboard behind your own reverse proxy (install.sh, $(date +%F)).
+# The dashboard runs on $WEBSERVER at ${WEB_BIND:-127.0.0.1}:$WEB_PORT. Give it its OWN host name
+# (e.g. dashboard.example.org) or port: its pages use absolute links (/_nav.html,
+# /admin/...), so a sub-path like /dashboard/ does not work.
+# nginx example (put inside the server { } block for that host name):
+
+    location / {
+        proxy_pass         http://${WEB_BIND:-127.0.0.1}:$WEB_PORT;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 120s;          # Email Client fetches can take a while
+        client_max_body_size 10M;
+    }
+    # Telnet Client and VARA HF Terminal (WebSocket)
+    location /ws/ {
+        proxy_pass         http://${WEB_BIND:-127.0.0.1}:$WEB_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host       \$host;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+    }
+
+# The admin login (Basic Auth) is checked by the dashboard's $WEBSERVER, so the
+# proxy just passes it through. Then: sudo nginx -t && sudo systemctl reload nginx
+PROXY
+    chmod 600 "$PROXY_TXT"
+    ok "Reverse-proxy example for your nginx written to $PROXY_TXT (not applied)"
 fi
 
 # ============================================================================
@@ -1331,45 +1594,127 @@ else
     mkdir -p "$WEB_ROOT/logs"
 fi
 
-# ============================================================================
-hdr "STEP 13 — Install systemd services for helper daemons (optional)"
-# ============================================================================
-
-echo
-echo "The dashboard ships with a few helper daemons (small Python programs"
-echo "that run in the background):"
-echo
-echo "  • bpq-telnet  — keeps a connection open to BPQ for live commands"
-echo "  • bpq-chat    — bridges the BPQ chat node to the web UI"
-echo "  • bpq-aprs    — feeds APRS data to the APRS page"
-echo "  • bpq-vara    — VARA HF Terminal page: connects it to your VARA port"
-[[ "$FLRIG_MODE" != "skip" ]] && \
-echo "  • rig-history-poller — records TX power / SWR for the Rig and RF Power charts"
-echo
-echo "You can install them now (they only start if you run 'systemctl"
-echo "enable' on them) or skip and add them later by hand."
-echo
-
-if yesno "Install systemd unit files for the helper daemons?" Y; then
-    # vara-logger.sh writes the VARA log the RF Connections parser reads
-    sed -i "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|yourcall\.vara|$INPUT_CALL_LC.vara|g" \
-        "$WEB_ROOT/vara-logger.sh" 2>/dev/null
-    DAEMONS="bpq-telnet bpq-chat bpq-aprs bpq-vara vara-logger"
-    [[ "$FLRIG_MODE" != "skip" ]] && DAEMONS="$DAEMONS rig-history-poller"
-    for svc in $DAEMONS; do
-        UNIT="$WEB_ROOT/${svc}.service"
-        if [[ -f "$UNIT" ]]; then
-            # Fix up paths inside the unit file
-            sed -i "s|/var/www/bpq-dashboard|$WEB_ROOT|g" "$UNIT"
-            cp "$UNIT" "/etc/systemd/system/$(basename "$UNIT")"
-            ok "Installed $(basename "$UNIT")"
+# v1.5.19 (N3MEL, Linux Mint): a LinBPQ folder inside a private home folder
+# (Ubuntu 21.04+, Mint 21+ make /home/<user> 750) is invisible to the web
+# user: every log page stays empty. Check it the way the web server sees it,
+# and offer the narrow fix: pass-through (x) on each parent folder, list +
+# read on the LinBPQ folder (BPQ writes Traffic_*.txt there) and its logs.
+# bpq32.cfg itself stays closed (it holds the BPQ passwords).
+if [[ -d "$INPUT_LINBPQ_DIR" ]]; then
+    as_web() { sudo -u "$WEB_USER" "$@" 2>/dev/null; }
+    NEED_ACL="n"
+    as_web test -x "$INPUT_LINBPQ_DIR" && as_web test -r "$INPUT_LINBPQ_DIR" || NEED_ACL="y"
+    [[ -d "$BPQ_LOGS_DIR" ]] && { as_web test -r "$BPQ_LOGS_DIR" && as_web test -x "$BPQ_LOGS_DIR" || NEED_ACL="y"; }
+    if [[ "$NEED_ACL" == "n" ]]; then
+        ok "The web server can reach $INPUT_LINBPQ_DIR and its logs"
+    else
+        warn "The web server ($WEB_USER) can't reach $INPUT_LINBPQ_DIR or its logs folder — the log pages would stay empty."
+        explain "Usual cause: LinBPQ is inside a private home folder (Ubuntu 21.04+, Linux Mint 21+)."
+        explain "The fix gives $WEB_USER only: pass-through on the folders above LinBPQ, read on"
+        explain "the LinBPQ folder list and its logs. It can't read the rest of your home folder,"
+        explain "and bpq32.cfg (your BPQ passwords) stays closed."
+        if yesno "Apply that fix now (setfacl)?" Y; then
+            command -v setfacl >/dev/null 2>&1 || apt-get install -y -qq acl >/dev/null 2>&1
+            ACL_OK=y
+            _d="$INPUT_LINBPQ_DIR"
+            while [[ "$_d" != "/" && -n "$_d" ]]; do
+                _d=$(dirname "$_d")
+                [[ "$_d" == "/" ]] && break
+                as_web test -x "$_d" || setfacl -m "u:$WEB_USER:x" "$_d" || ACL_OK=n
+            done
+            setfacl -m "u:$WEB_USER:rx" "$INPUT_LINBPQ_DIR" || ACL_OK=n
+            if [[ -d "$BPQ_LOGS_DIR" ]]; then
+                setfacl -R -m "u:$WEB_USER:rX" "$BPQ_LOGS_DIR" || ACL_OK=n
+                setfacl -d -m "u:$WEB_USER:rX" "$BPQ_LOGS_DIR" || ACL_OK=n   # files LinBPQ writes later
+            fi
+            # Weekly Traffic reports (Traffic_*.txt) live in the LinBPQ folder itself
+            for _t in "$INPUT_LINBPQ_DIR"/Traffic_*.txt; do
+                [[ -e "$_t" ]] && { as_web test -r "$_t" || setfacl -m "u:$WEB_USER:r" "$_t"; }
+            done
+            if [[ "$ACL_OK" == "y" ]] && as_web test -r "$INPUT_LINBPQ_DIR" && { [[ ! -d "$BPQ_LOGS_DIR" ]] || as_web test -r "$BPQ_LOGS_DIR"; }; then
+                ok "Web server can now read $INPUT_LINBPQ_DIR and its logs (ACLs; undo: sudo setfacl -b <folder>)"
+            else
+                err "The access fix didn't work everywhere. Install Check shows which folder; see the User Guide, Troubleshooting."
+            fi
+        else
+            say "Skipped. Later: Maintenance page > 'LinBPQ in a home folder', or the Installation Manual."
         fi
-    done
-    systemctl daemon-reload
-    say "Daemons are installed but NOT started. Enable each one when you're"
-    say "ready, e.g.:    sudo systemctl enable --now bpq-telnet"
-else
-    say "Skipping daemon services."
+    fi
+fi
+
+# ============================================================================
+hdr "STEP 13 — Helper services for the pages you chose"
+# ============================================================================
+
+echo
+echo "Helper services for the pages you chose in step 9 (small programs that run"
+echo "in the background as $WEB_USER):"
+echo
+DAEMONS=""
+[[ "$PAGE_TELNET" == "y" ]]    && DAEMONS="$DAEMONS bpq-telnet"    && echo "  • bpq-telnet  — Telnet Client page (connects to BPQ for you)"
+[[ "$PAGE_CHAT" == "y" ]]      && DAEMONS="$DAEMONS bpq-chat"      && echo "  • bpq-chat    — Chat page (bridges BPQ Chat to the browser)"
+[[ "$PAGE_APRS" == "y" ]]      && DAEMONS="$DAEMONS bpq-aprs"      && echo "  • bpq-aprs    — APRS map (APRS-IS feed)"
+[[ "$PAGE_VARA" == "y" ]]      && DAEMONS="$DAEMONS bpq-vara"      && echo "  • bpq-vara    — VARA HF Terminal page"
+[[ -z "$DAEMONS" ]] && echo "  (none — you chose no page that needs one)"
+EXTRA=""
+[[ "$VARA_SYSLOG" == "y" ]]    && EXTRA="$EXTRA vara-logger"        && echo "  • vara-logger — writes VARA HF's log for RF Connections (started below)"
+[[ "$PAGE_VALIDATOR" == "y" ]] && EXTRA="$EXTRA vara-validator"     && echo "  • vara-validator — VARA callsign check (installed, started after your bpq32.cfg change)"
+[[ "$FLRIG_MODE" != "skip" ]]  && EXTRA="$EXTRA rig-history-poller" && echo "  • rig-history-poller — TX power / SWR history (started once flrig works)"
+echo
+
+# vara-logger.sh writes the VARA log the RF Connections parser reads
+sed -i "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|yourcall\.vara|$INPUT_CALL_LC.vara|g" \
+    "$WEB_ROOT/vara-logger.sh" 2>/dev/null
+for svc in $DAEMONS $EXTRA; do
+    UNIT="$WEB_ROOT/${svc}.service"
+    if [[ -f "$UNIT" ]]; then
+        sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|^User=www-data|User=$WEB_USER|" "$UNIT" > "/etc/systemd/system/${svc}.service"
+        ok "Installed ${svc}.service"
+    else
+        warn "$UNIT not found — ${svc} not installed"
+    fi
+done
+systemctl daemon-reload
+if [[ -n "$DAEMONS" ]]; then
+    explain "They need LinBPQ running; until it is, they retry by themselves."
+    if yesno "Start the page helpers now (and at every boot)?" Y; then
+        for svc in $DAEMONS; do
+            systemctl enable --now "$svc" >/dev/null 2>&1 && ok "$svc started" || warn "$svc didn't start — check: sudo journalctl -u $svc -n 20"
+        done
+    else
+        say "Not started. Later, e.g.:    sudo systemctl enable --now bpq-telnet"
+    fi
+fi
+# Helpers of pages switched off: if an earlier install left them running, stop them
+for svc in bpq-telnet bpq-chat bpq-aprs bpq-vara vara-validator; do
+    [[ " $DAEMONS $EXTRA " == *" $svc "* ]] && continue
+    if systemctl is-enabled --quiet "$svc" 2>/dev/null; then
+        systemctl disable --now "$svc" >/dev/null 2>&1 && say "Switched off $svc (its page is not chosen)"
+    fi
+done
+
+# VARA callsign check: installed, not started — BPQ's VARA port must point at it first
+if [[ "$PAGE_VALIDATOR" == "y" ]]; then
+    say "VARA callsign check: change the VARA HF port in bpq32.cfg so BPQ connects to the"
+    say "check instead of VARA HF (ADDR 127.0.0.1 9025 — the check forwards to VARA HF on"
+    say "127.0.0.1:8300; both are config.php 'vara_validator'). Then restart LinBPQ and:"
+    say "    sudo systemctl enable --now vara-validator"
+fi
+
+# v1.5.19: VARA HF log downloaded from the TPRFN server (step 1, option 2)
+for unit in vara-remote.service vara-remote.timer; do
+    [[ -f "$WEB_ROOT/$unit" ]] && sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|^User=www-data|User=$WEB_USER|" "$WEB_ROOT/$unit" > "/etc/systemd/system/$unit"
+done
+systemctl daemon-reload
+if [[ "$VARA_REMOTE" == "y" ]]; then
+    if sudo -u "$WEB_USER" /usr/bin/python3 "$WEB_ROOT/scripts/fetch-vara-remote.py" --verbose; then
+        ok "Downloaded your VARA log from $VARA_REMOTE_URL"
+    else
+        warn "Couldn't download $VARA_REMOTE_URL yet — the timer keeps trying every 5 minutes (Log Viewer → VARA download)"
+    fi
+    systemctl enable --now vara-remote.timer >/dev/null 2>&1 \
+        && ok "VARA log download every 5 minutes (vara-remote.timer)" \
+        || warn "Could not enable vara-remote.timer — run: sudo systemctl enable --now vara-remote.timer"
 fi
 
 # ============================================================================
@@ -1389,6 +1734,17 @@ if [[ "$INSTALL_DB" == "y" ]]; then
 */5 * * * * $WEB_USER /usr/bin/python3 $WEB_ROOT/scripts/parse-system-logs.py >> /var/log/bpq-dashboard/parse-system-logs.log 2>&1
 CRON
     chmod 644 /etc/cron.d/bpq-dashboard && ok "Log parsers scheduled (/etc/cron.d/bpq-dashboard)"
+    # v1.5.19: load the Traffic reports BPQ has already written (weekly
+    # Traffic_*.txt, usually in the LinBPQ folder), so the page isn't empty
+    # until next week.
+    say "Loading the BPQ Traffic reports already on this machine (one-off)..."
+    TRAFFIC_OUT=$(sudo -u "$WEB_USER" /usr/bin/python3 "$WEB_ROOT/scripts/parse-traffic-report.py" --backfill 2>&1 | tail -3)
+    echo "$TRAFFIC_OUT" | sed 's/^/     /'
+    if echo "$TRAFFIC_OUT" | grep -q 'Processed [1-9]'; then
+        ok "Traffic reports loaded"
+    else
+        warn "No Traffic reports loaded yet — BPQ writes one a week (Traffic_*.txt). The Traffic page explains where it looked."
+    fi
     for unit in bulletin-retention.service bulletin-retention.timer message-bodies.service message-bodies.timer; do
         if [[ -f "$WEB_ROOT/$unit" ]]; then
             sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g" "$WEB_ROOT/$unit" > "/etc/systemd/system/$unit"
@@ -1497,7 +1853,15 @@ if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
     explain "The Firewall Status and System Audit admin pages read the firewall,"
     explain "fail2ban and listening ports through a few read-only sudo rules"
     explain "(listed in www-data-tools.sudoers). They can't change anything."
+    explain "One more rule (v1.5.19) lets the Maintenance page change the admin"
+    explain "login's password, through a small root-owned helper in /usr/local/sbin."
     if yesno "Install those sudo rules (/etc/sudoers.d/www-data-tools)?" Y; then
+        # The helper must be root-owned and outside the web folder (the web
+        # user can write there, so a sudo rule pointing into it = root).
+        if [[ -f "$WEB_ROOT/tools/set-admin-password" ]]; then
+            install -o root -g root -m 755 "$WEB_ROOT/tools/set-admin-password" /usr/local/sbin/bpq-dashboard-set-admin-password \
+                && ok "Admin-password helper: /usr/local/sbin/bpq-dashboard-set-admin-password"
+        fi
         TMP_SUDO=$(mktemp)
         sed "s/^www-data /$WEB_USER /" "$WEB_ROOT/www-data-tools.sudoers" > "$TMP_SUDO"
         if visudo -cf "$TMP_SUDO" >/dev/null 2>&1; then
@@ -1509,6 +1873,27 @@ if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
         rm -f "$TMP_SUDO"
     else
         say "Skipped. Later: sudo cp $WEB_ROOT/www-data-tools.sudoers /etc/sudoers.d/www-data-tools && sudo chmod 440 /etc/sudoers.d/www-data-tools"
+    fi
+fi
+
+# ============================================================================
+hdr "STEP 16 — Firewall (optional)"
+# ============================================================================
+# v1.5.19: never required. tools/setup-firewall.sh asks about each port,
+# shows every rule and asks again before switching ufw on; it always keeps
+# the SSH session you are using open. It can be run any time later.
+FW_DONE="n"
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    ok "A firewall (ufw) is already on — left as it is. To check the dashboard's ports: sudo bash $WEB_ROOT/tools/setup-firewall.sh --dry-run"
+    FW_DONE="y"
+else
+    explain "BPQ's telnet and FBB ports send passwords in clear text, and the dashboard"
+    explain "can send mail and transmit as your station. A basic firewall keeps those"
+    explain "to your home network unless you choose otherwise. You can do this later."
+    if yesno "Set up a basic firewall (ufw) now?" N; then
+        bash "$WEB_ROOT/tools/setup-firewall.sh" && FW_DONE="y"
+    else
+        say "Skipped. Later: sudo bash $WEB_ROOT/tools/setup-firewall.sh  (Maintenance > Firewall)"
     fi
 fi
 
@@ -1540,15 +1925,38 @@ if (( FAIL > 0 )); then
     echo
 fi
 
+# Pages left out, and how to add them later (v1.5.19)
+LEFT_OUT=()
+[[ "$PAGE_TELNET" == "y" ]] || LEFT_OUT+=("Telnet Client")
+[[ "$PAGE_CHAT" == "y" ]]   || LEFT_OUT+=("Chat")
+[[ "$PAGE_APRS" == "y" ]]   || LEFT_OUT+=("APRS map")
+[[ "$PAGE_VARA" == "y" ]]   || LEFT_OUT+=("VARA HF Terminal")
+[[ "$FLRIG_MODE" != "skip" ]] || LEFT_OUT+=("Rig Status" "RF Power Monitor")
+if (( ${#LEFT_OUT[@]} )); then
+    echo "${BOLD}Pages left out:${NC} $(IFS=,; echo "${LEFT_OUT[*]}" | sed 's/,/, /g')"
+    echo "   ${DIM}Hidden from the menu. To add one later: Maintenance > Optional pages.${NC}"
+    echo
+fi
+if [[ "$WEB_SHARED" == "y" ]]; then
+    echo "${BOLD}Other sites on this machine:${NC} left as they were. The dashboard is on port $WEB_PORT$( [[ -n "$WEB_BIND" ]] && echo " (127.0.0.1 only)" )."
+    echo "   ${DIM}Reverse-proxy example for your nginx: /root/bpq-dashboard-reverse-proxy.txt${NC}"
+    echo
+fi
+[[ "$FW_DONE" == "y" ]] || { echo "${BOLD}Firewall:${NC} not set up. When you're ready: sudo bash $WEB_ROOT/tools/setup-firewall.sh"; echo; }
+WEB_URL="http://$SERVER_IP$( [[ "$WEB_PORT" != "80" ]] && echo ":$WEB_PORT" )"
+[[ -n "$WEB_BIND" ]] && WEB_URL="http://127.0.0.1:$WEB_PORT  (through your reverse proxy from other machines)"
+
 cat <<EOF
 ${BOLD}Open your dashboard:${NC}
 
-   ${CYN}http://$SERVER_IP/${NC}                           ← home (RF Connections page)
-   ${CYN}http://$SERVER_IP/bpq-system-logs.html${NC}       ← live BPQ logs
-   ${CYN}http://$SERVER_IP/nws-dashboard.html${NC}         ← NWS weather alerts$( [[ "$NWS_AUTO" == "y" ]] && echo " (auto-posting $NWS_STATE to $NWS_DEST)" )
-   ${CYN}http://$SERVER_IP/bbs-messages.html${NC}          ← BBS messages
-   ${CYN}http://$SERVER_IP/admin/system-audit.html${NC}    ← server health check (admin login)
-   ${CYN}http://$SERVER_IP/install-check.php${NC}          ← installation self-test (admin login)
+   ${CYN}$WEB_URL${NC}
+   ${DIM}Then add these to the address:${NC}
+   ${CYN}/${NC}                           ← home (RF Connections page)
+   ${CYN}/bpq-system-logs.html${NC}       ← live BPQ logs
+   ${CYN}/nws-dashboard.html${NC}         ← NWS weather alerts$( [[ "$NWS_AUTO" == "y" ]] && echo " (auto-posting $NWS_STATE to $NWS_DEST)" )
+   ${CYN}/bbs-messages.html${NC}          ← BBS messages
+   ${CYN}/admin/system-audit.html${NC}    ← server health check (admin login)
+   ${CYN}/install-check.php${NC}          ← installation self-test (admin login)
 
 ${BOLD}Configuration file:${NC}
    $CFG
@@ -1570,8 +1978,8 @@ ${BOLD}Next steps:${NC}
    2. If pages load but charts are empty, give it 5 minutes for the
       helper daemons to gather data
    3. Open install-check.php (above) — every red line shows how to fix it
-   4. See USER-MANUAL.md, section 4 ("After installing"), to switch on
-      the helper daemons, the VARA logger and APRS
+   4. See USER-MANUAL.md, section 4 ("After installing"), for VARA HF,
+      APRS and the optional pages
 
 73 and good luck with the dashboard!
 EOF

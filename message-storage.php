@@ -61,6 +61,11 @@ try {
                 echo json_encode(['success' => true, 'unread' => msgdb_get_setting('unread', (object)[])]);
                 break;
 
+            case 'signature':   // v1.5.19 (N3MEL): signature line for new mail
+                echo json_encode(['success' => true, 'signature' => msgdb_get_setting('signature',
+                    ['enabled' => false, 'text' => '', 'replies' => true, 'separator' => true])]);
+                break;
+
             case 'folders':
                 // keepFolders (2026-09-26): names pinned "keep after BBS kill".
                 // Separate key so `folders` stays a plain name list for
@@ -208,6 +213,19 @@ try {
                 if (!is_array($rulesData)) apiError('Invalid rules data');
                 msgdb_set_setting('rules', $rulesData);
                 echo json_encode(['success' => true, 'count' => count($rulesData)]);
+                break;
+
+            case 'saveSignature':   // v1.5.19: plain text, at most 10 lines / 1000 characters
+                $sg = $input['signature'] ?? [];
+                if (!is_array($sg)) apiError('Invalid signature');
+                $txt = str_replace(["\r\n", "\r"], "\n", (string)($sg['text'] ?? ''));
+                $txt = preg_replace('/[^\P{C}\n\t]/u', '', $txt) ?? '';   // no control characters
+                $lines = array_slice(explode("\n", rtrim($txt)), 0, 10);
+                $txt = mb_substr(implode("\n", $lines), 0, 1000);
+                $sig = ['enabled' => !empty($sg['enabled']) && trim($txt) !== '', 'text' => $txt,
+                        'replies' => !empty($sg['replies']), 'separator' => !empty($sg['separator'])];
+                msgdb_set_setting('signature', $sig);
+                echo json_encode(['success' => true, 'signature' => $sig]);
                 break;
 
             case 'saveUnread':

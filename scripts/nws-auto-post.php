@@ -71,7 +71,7 @@ $_SERVER['PHP_SELF']       = $_SERVER['PHP_SELF'] ?? '/scripts/nws-auto-post.php
 define('BPQ_MESSAGES_LIB', true);
 require $webRoot . '/bbs-messages.php';   // $config, sendMessage(), bpqTelnetLock(), logMessage()
 
-$config['log_file'] = $webRoot . '/logs/nws-auto-post.log';
+$config['log_file'] = bpq_app_log('nws-auto-post.log');   // v1.5.19: /var/log/bpq-dashboard
 
 $ap = (array)getConfig('nws', 'auto_post', []);
 $S = [

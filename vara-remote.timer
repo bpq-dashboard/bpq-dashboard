@@ -1,0 +1,11 @@
+[Unit]
+Description=BPQ Dashboard: VARA HF log from the TPRFN server, every 5 minutes
+
+[Timer]
+# :03, :08, :13 ... — two minutes after the TPRFN server rebuilds the file
+OnCalendar=*:03/5
+Persistent=true
+RandomizedDelaySec=20
+
+[Install]
+WantedBy=timers.target

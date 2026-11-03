@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.18**
+**Version 1.5.19**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -80,6 +80,22 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.19
+
+From the first Linux Mint and Ubuntu installs (N3MEL, KG9NI) and requests from sysops (K5DAT and others):
+
+- **Choose your pages.** The installer asks which optional pages the station uses (Telnet Client, Chat, APRS map, VARA HF Terminal, VARA callsign check; Rig Status and RF Power Monitor follow the flrig question). Only their helper services are installed and started; the others are hidden from the menu (`config.php 'pages'`, `'radio' => 'enabled'`) and can be switched on later (Maintenance → *Optional pages*). The Rig pages are no longer deleted when you skip flrig.
+- **Web server and port of your choice** (thanks K5DAT). nginx or Apache, on port 80 or its own port. On a machine that already serves other sites (for example nginx as a reverse proxy), existing sites, the default site and port 80 are left alone, `/etc/nginx` is backed up first, and a reverse-proxy example is written to `/root/bpq-dashboard-reverse-proxy.txt` (§4, *Step 5*).
+- **LinBPQ in a home folder** (Ubuntu 21.04+, Mint 21+): the installer checks that the web server can reach the LinBPQ folder and its logs, and offers the narrow access fix (ACLs). Install Check prints the commands for your path.
+- **The dashboard's own logs** (bpq-telnet, bpq-vara, Email Client, message-text job, NWS posting, forwarding tools) are written to `/var/log/bpq-dashboard/`, not LinBPQ's logs folder; on stations where the web user could only read that folder, bpq-telnet and bpq-vara used to stop at start. Weekly log rotation is installed.
+- **VARA log from the TPRFN server:** TPRFN stations whose VARA HF sends its syslog to the TPRFN server can have the dashboard download it every 5 minutes (`vara-remote.timer`, §10.11) instead of running a receiver.
+- **Firewall, optional:** `tools/setup-firewall.sh` sets up ufw with a question per port and never locks out your SSH session; the installer offers it at the end (default No). See §11.
+- **In-place updates:** every release from now on has `update.sh`: `sudo bash update.sh` in the unzipped new release updates your install without a reinstall, keeps your settings and data, backs up what it replaces, and prints a one-line rollback (§4, *Updating*). Maintenance shows when a new release is out.
+- **Maintenance page:** *Change admin password* (no SSH needed), *PKTNET forms* update with Undo, *Optional pages*, *Firewall setup* and *LinBPQ in a home folder* sections.
+- **Email Client signature** (thanks N3MEL): Preferences → Signature, added to new messages (and optionally replies), kept on the server.
+- **vara-validator** runs on any station: as the web user from the dashboard folder, settings in `config.php 'vara_validator'` (§10.9).
+- **Clearer empty pages:** Traffic and Connect Log say why they're empty (no weekly report yet; `LogAllConnects=1` missing), and Install Check has rows for both. The installer loads the Traffic reports already on the machine. Install Check suggests PHP packages for the PHP version you run.
 
 ### In v1.5.18
 
@@ -225,11 +241,13 @@ The installer asks these questions. Having the answers ready makes it quick.
 | Latitude / longitude | Decimal degrees. **South and West are negative** | Google Maps: right-click your location, click the numbers to copy them | `41.7148` / `-72.7272` |
 | CARTO map key *(optional, press Enter to skip)* | The free key for the APRS map | See **Step 10 — Get a CARTO map key**. You can add it later | `cb1_xxxx_x_xxxxxxxx…` |
 | Automatic NWS bulletins *(optional, default No)* | If Yes: your **2-letter state code**, the bulletin address (default `WX@` + state) and Warnings + Watches or Warnings only | The address should be a flood area your forwarding partners carry. See §10.4. You can turn it on later | `GA`, `WX@GA`, `1` |
-| VARA HF log receiver *(default Yes)* | If Yes: the **IP address of the computer running VARA HF** (Enter = VARA runs on this server) | Then in VARA HF: Settings → VARA Setup → Syslog on, Host = this server, port 514, Station Name `H-<call-SSID>` (§10.11). Skip if you don't run VARA HF | `192.168.1.50` |
+| Where RF Connections gets your VARA HF log *(1, 2 or 3; default 1)* | **1** = VARA HF sends its syslog to this server: then the **IP address of the computer running VARA HF** (Enter = this server). **2** = it goes to the TPRFN server: then the web address of your file there, as the TPRFN server admin gives it (ends in `/<call>.vara`). **3** = no VARA HF | For 1, in VARA HF: Settings → VARA Setup → Syslog on, Host = this server, port 514, Station Name `H-<call-SSID>` (§10.11). For 2, ask the TPRFN server admin to set up your file first | `1`, `192.168.1.50` |
 | BPQ telnet port | A number | In `bpq32.cfg`, the Telnet port section, `TCPPORT=` | `8010` |
 | BPQ sysop username *(default `SYSOP`)* | First field of your `USER=` line | `bpq32.cfg`, e.g. `USER=John,secret,W1AW-4,NODE,SYSOP` | `John` |
 | BPQ sysop password | Second field of that same line | as above | `secret` |
 | Folder containing `bpq32.cfg` *(default `/opt/linbpq`)* | The LinBPQ folder. It should have a `logs` folder inside | Wherever you installed LinBPQ | `/home/pi/linbpq` |
+| Web server *(1 = nginx, 2 = Apache)* and port *(default 80, or 8080 when the machine already serves other sites)* | The one you want the dashboard on. On a machine with your own sites or a reverse proxy, a free port such as `8080`, optionally on 127.0.0.1 only | `sudo ss -ltnp` lists ports in use | `2`, `8080` |
+| Optional pages *(yes/no each)* | Telnet Client, Chat, APRS map, VARA HF Terminal, VARA callsign check | Answer N for a page you don't use (e.g. Chat if you use another chat hub, APRS if you run APRSIS32) | |
 | Database password | **Invent a new one**, or just press Enter and one is made for you | — | |
 | Admin username / password | **Invent them.** This is the *admin login*: it protects the admin pages and everything that acts as your station (Email Client, Chat, posting, sending) | — | `admin` / something strong |
 | flrig *(if you use it)* | Whether flrig runs on this computer (then the radio's serial port) or another one (its address and port, default 12345) | flrig's Config → Setup → XML-RPC | `/dev/ttyUSB0` or `192.168.1.20` |
@@ -244,14 +262,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.18.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.19.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.18
+cd bpq-dashboard-1.5.19
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -276,9 +294,14 @@ Some questions are **yes/no**. The capital letter is the default:
 |---|---|
 | Use it for the dashboard? *(MariaDB already installed)* / Install MariaDB now? | **Y** (the Email Client and the fast pages need it) |
 | Back it up and reinstall fresh? *(only if the dashboard was installed before)* | **Y** |
-| Set up flrig now (for Rig Status / RF Power Monitor)? | **Y** if you use flrig, then answer whether it runs on this server. **n** leaves out the Rig Status and RF Power Monitor pages (both need flrig) |
-| Install systemd unit files for the helper daemons? | **Y** |
-| Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need |
+| Which web server should run the dashboard? / Port | See Step 2. If the machine already serves other sites, the installer says so and leaves them alone |
+| Reach the dashboard only through your reverse proxy (listen on 127.0.0.1)? *(only when sharing the machine)* | **y** if you will forward to it from your own nginx; **n** to open it on that port from your network too |
+| Use the Telnet Client / Chat / APRS map / VARA HF Terminal / VARA callsign check page? | **Y** for the pages you use. **N** hides a page and skips its helper; add it later (Maintenance → *Optional pages*) |
+| Set up flrig now (for Rig Status / RF Power Monitor)? | **Y** if you use flrig, then answer whether it runs on this server. **n** hides the Rig Status and RF Power Monitor pages (both need flrig); everything else, including BPQ's own CAT control of the radio, works without it |
+| Apply that fix now (setfacl)? *(only if the web server can't reach your LinBPQ folder)* | **Y** — gives the web server read access to the LinBPQ folder and its logs only (§12, *LinBPQ in a home folder*) |
+| Start the page helpers now (and at every boot)? | **Y** |
+| Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need, plus the Maintenance page's *Change admin password* helper |
+| Set up a basic firewall (ufw) now? *(default No)* | **N** to do it later; **y** runs `tools/setup-firewall.sh` (§11) |
 
 The whole run takes 5–15 minutes, mostly downloading. Everything the installer does is also written to a log file named on the first screen (`/tmp/bpq-dashboard-install-….log`).
 
@@ -313,7 +336,7 @@ The first number (for example `192.168.1.50`) is its address. On any computer, p
 http://192.168.1.50/
 ```
 
-(use your own number). The **RF Connections** page should appear. Bookmark it.
+(use your own number; if you chose another port, add it: `http://192.168.1.50:8080/`). The **RF Connections** page should appear. Bookmark it.
 
 #### Step 8 — Run the self-test
 
@@ -325,11 +348,11 @@ http://192.168.1.50/install-check.php
 
 Log in with the **admin username and password** you invented. The page checks everything the dashboard needs and shows each item in green, amber or red. **Every red item shows the exact command that fixes it.**
 
-At this point it is normal to see red for the *daemon heartbeat* lines, because the helper services aren't switched on yet. That's the next step.
+A *daemon heartbeat* line can stay red for a minute or two while the helpers connect to LinBPQ. Pages you switched off are passed as *not used*.
 
-#### Step 9 — Switch on the helper services
+#### Step 9 — The helper services
 
-Small background programs power the live pages. Turn on the ones you want:
+Small background programs power the live pages. Since v1.5.19 the installer installs and starts the ones for the pages you chose; this table is for checking them, or for turning one on later (also Maintenance → *Optional pages*, which first installs the unit file):
 
 | Service | What it's for | Turn it on |
 |---|---|---|
@@ -337,7 +360,8 @@ Small background programs power the live pages. Turn on the ones you want:
 | `bpq-chat` | Chat page | `sudo systemctl enable --now bpq-chat` |
 | `bpq-aprs` | APRS map | `sudo systemctl enable --now bpq-aprs` |
 | `bpq-vara` | VARA HF Terminal page | `sudo systemctl enable --now bpq-vara` |
-| `vara-logger` | Records VARA HF activity for the RF Connections page (see §10.11) | `sudo systemctl enable --now vara-logger` |
+| `vara-logger` | Records VARA HF activity for the RF Connections page when VARA HF sends its syslog to this server (see §10.11) | `sudo systemctl enable --now vara-logger` |
+| `vara-remote.timer` | Downloads your VARA log from the TPRFN server instead (§10.11) | `sudo systemctl enable --now vara-remote.timer` |
 | `rig-history-poller` *(flrig installs)* | Records power and SWR for the RF Power Monitor | `sudo systemctl enable --now rig-history-poller` |
 
 To check one is running, for example `bpq-aprs`:
@@ -348,7 +372,7 @@ systemctl status bpq-aprs
 
 Look for **active (running)** in green. Press **q** to get back to the prompt.
 
-The installer already scheduled the **log parsers**, which fill the RF Connections, Traffic and System Logs pages every 5 minutes, the **message-text job** (`message-bodies.timer`, saves new BBS messages' text every 5 minutes) and a **daily clean-up** that deletes bulletins older than 14 days, except in groups you pin with 📌 in the Email Client. (All of these need the database.) Pages may look empty for the first few minutes. If you said Yes to automatic NWS bulletins, `nws-auto-post.timer` is running too (no database needed); see §10.4.
+The installer already scheduled the **log parsers** (and loaded the weekly Traffic reports already on the machine), which fill the RF Connections, Traffic and System Logs pages every 5 minutes, the **message-text job** (`message-bodies.timer`, saves new BBS messages' text every 5 minutes) and a **daily clean-up** that deletes bulletins older than 14 days, except in groups you pin with 📌 in the Email Client. (All of these need the database.) Pages may look empty for the first few minutes. If you said Yes to automatic NWS bulletins, `nws-auto-post.timer` is running too (no database needed); see §10.4.
 
 ##### Telnet and VARA pages
 
@@ -414,11 +438,37 @@ If the stamp is still there with a key set, check in CARTO's dashboard that the 
 
 ### Updating to a newer version
 
-1. Download and unzip the new version exactly as in Step 3.
-2. Run `sudo bash install.sh` again and give the same answers.
-3. Answer **Y** to *"Back it up and reinstall fresh?"*.
+Since v1.5.19 every release has **`update.sh`**, which updates your dashboard in place: no reinstall, no questions, nothing to re-enter. It also works on an install of an older version.
 
-Your database, with all messages and history, is kept and updated automatically. The previous installation is saved as `/var/www/bpq-dashboard.backup-<date>`. **Re-apply any optional settings** from Step 10: you can copy them from the old `config.php` inside that backup folder.
+1. Download and unzip the new version as in Step 3 (use its version number):
+   ```bash
+   cd ~
+   wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/vX.Y.Z.zip
+   unzip -o bpq-dashboard.zip
+   cd bpq-dashboard-X.Y.Z
+   ```
+2. Look at what it will do (changes nothing):
+   ```bash
+   sudo bash update.sh --dry-run
+   ```
+   It finds your dashboard (`/var/www/bpq-dashboard`, or the folder your nginx/Apache site serves; add `--web-root /path` if it asks) and lists the files it will update, add and remove.
+3. Update:
+   ```bash
+   sudo bash update.sh
+   ```
+4. Press **Ctrl+Shift+R** on each page once (the menu is cached), then open Install Check.
+
+**What it keeps:** `config.php` (and `db-config.php` etc.), `data/` (partners, settings, saved stations), `cache/`, the `logs` link to LinBPQ, `pktnet-forms/`, `img/`, `yapp-files/`, everything in the database, your nginx or Apache site file, your firewall, and everything outside the dashboard folder.
+
+**What it does:** backs up every file it replaces or removes to `/root/bpq-dashboard-update-<date>/` (with a restore script and a log); copies the new and changed files, keeping owner and mode, and checks each one; removes files the release dropped (old PDFs, retired pages); applies the database updates in `sql/migrations.list` (each is safe to repeat); refreshes the systemd units and sudo rules the installer set up, only where they changed (a unit you wrote yourself is left alone); restarts only the helper services whose program or unit changed; and records the version in `VERSION` and `MANIFEST.md5`. Maintenance → *Install check, updates & backups* shows the installed and latest versions.
+
+**Files you edited on the server** (from v1.5.19 on it can tell, using the installed `MANIFEST.md5`) are listed before it starts; they are replaced with the new version and your copy stays in the backup.
+
+**Undo:** the last lines it prints include the exact command, e.g. `sudo bash update.sh --rollback /root/bpq-dashboard-update-20261115-101500`. It puts back every file, unit and sudo rule as it was. Database updates stay (they only add tables and columns, which the older version ignores).
+
+**When the web-server template changed** (`nginx-bpq-dashboard.conf`, `bpq-dashboard.conf`), `update.sh` says so but doesn't touch your live site file; the CHANGELOG says what to add.
+
+**A full reinstall** is still possible: run the new version's `sudo bash install.sh`, give the same answers, and answer **Y** to *"Back it up and reinstall fresh?"*. Your database is kept; `config.php` is written new, so re-apply optional settings (Step 10) from the old `config.php` in `/var/www/bpq-dashboard.backup-<date>`.
 
 **Coming from an older version?** These one-time steps bring earlier history into features added since then. Each is safe to run again. Use your real backup folder name and callsign (`W` is the web folder):
 
@@ -449,6 +499,11 @@ W=/var/www/bpq-dashboard
 - **Telnet and VARA pages, NetROM list** (2026-10-25): the reinstall writes the new site file and the new scripts read `config.php`. If you had edited `scripts/bpq-vara-daemon.py` or `bpq-nodes-api.php` by hand, check `config.php`'s `bbs` login and `station.node` (and `vara.bpq_port` if your VARA port isn't found), then `sudo systemctl restart bpq-vara`. Both pages now ask for the admin login.
 - **NTS Report login and power switch (2026-10-27):** the reinstall writes the new site file, which puts `nts-forwarding-report.php` behind the admin login; with a hand-made site file the report answers "needs the dashboard admin login" until you add it to the login locations (compare `nginx-bpq-dashboard.conf`). If Rig Status showed your power switch without a `smartplug` section in `config.php` (the old built-in `192.168.1.100`, `admin`/`admin`), add the section with those values.
 - **VARA HF log on Debian 12 / Ubuntu 24.04 (2026-10-27):** rsyslog there writes timestamps the parsers didn't read, so RF Connections stayed empty; the new `vara-logger.sh` converts them — after updating, `sudo systemctl restart vara-logger`. If the installer never asked you about the VARA HF log receiver, set it up with §10.11 steps 1–3.
+- **v1.5.19 (from 1.5.18 or earlier):**
+  - The dashboard's own logs move to `/var/log/bpq-dashboard/`. A reinstall creates it; by hand: `sudo mkdir -p /var/log/bpq-dashboard /var/lib/bpq-dashboard && sudo chown www-data:www-data /var/log/bpq-dashboard /var/lib/bpq-dashboard && sudo chmod 750 /var/log/bpq-dashboard /var/lib/bpq-dashboard`, then restart `bpq-telnet` and `bpq-vara`. Older log files stay in `logs/`; the Log Viewer shows them until the new ones fill.
+  - Optional pages: an existing `config.php` has no `'pages'` section, so every page stays on. Add one to hide pages you don't use (Maintenance → *Optional pages*). If an earlier install left Rig Status / RF Power Monitor out (no flrig), they come back as files but stay hidden while `'radio' => ['enabled' => false]`.
+  - `vara-validator`: the new unit runs as `www-data` from the dashboard folder and reads `config.php 'vara_validator'` (§10.9). If you run the old copy in `/usr/local/bin`, keep it until you have copied your settings into `config.php`.
+  - The Maintenance page's *Change admin password* needs the helper in `/usr/local/sbin` and its sudo rule (§11, *Configure sudoers*); a reinstall offers both.
 - **Apache installs from before 2026-10-25:** the installer didn't hook PHP-FPM into Apache, so PHP pages were sent as text and nothing that reads data worked. Re-running the installer fixes it; by hand: `sudo a2enmod proxy_fcgi setenvif proxy proxy_http proxy_wstunnel && sudo a2enconf php*-fpm && sudo systemctl reload apache2`.
 
 ---
@@ -520,7 +575,7 @@ At minimum, set:
 | `cors.allowed_origins` | Other web sites allowed to call the dashboard from a browser. Leave empty unless you need it; the dashboard's own pages don't | `['https://club.example.org']` |
 | `map.carto_key` | Free CARTO key for the APRS map tiles (see Part A, Step 10 — *Get a CARTO map key*). Without it the map is stamped "API KEY REQUIRED" | `'cb1_xxxx_x_…'` |
 | `paths.linbpq` | Your LinBPQ directory (`bpq32.cfg`, `WP.cfg`, `linmail.cfg`) | `'/home/linbpq'` |
-| `logs.vara_file` | Your VARA log file name inside `paths.logs` | `'w1aw.vara'` |
+| `logs.vara_file` | Your VARA log file name inside `paths.logs`, or a full path (the TPRFN download uses `/var/log/bpq-dashboard/<call>.vara`) | `'w1aw.vara'` |
 | `bbs.host` | LinBPQ host | `'127.0.0.1'` |
 | `bbs.port` | LinBPQ telnet port | `8010` |
 | `bbs.user` | Your BPQ sysop user | `'W1AW'` |
@@ -533,7 +588,11 @@ At minimum, set:
 | `smartplug` | Optional network power switch for Rig Status: `host`, `user`, `pass`, `outlet` (§10.7). `host` empty = none; nothing is contacted | `'host' => ''` |
 | `radio.flrig_host` | flrig host IP | `'192.168.1.100'` |
 | `radio.flrig_port` | flrig XML-RPC port | `12345` |
-| `radio.enabled` | `false` when flrig was skipped (Rig pages not installed) | `true` |
+| `radio.enabled` | `false` when flrig was skipped: Rig Status and RF Power Monitor hidden from the menu, no history poller | `true` |
+| `pages` | Optional pages (v1.5.19): `telnet`, `chat`, `aprs`, `vara`, `vara_validator`; `false` hides the page from the menu (install its helper only for pages that are `true`). Missing = on | `['chat' => false, 'aprs' => false]` |
+| `paths.app_logs` | Where the dashboard writes its own logs (v1.5.19; must exist and be writable by the web user) | `'/var/log/bpq-dashboard'` |
+| `vara_remote` | VARA HF log downloaded from the TPRFN server (§10.11): `enabled`, `url` | `['enabled' => true, 'url' => 'https://<TPRFN server>/w1aw.vara']` |
+| `vara_validator` | VARA callsign check settings (§10.9) | |
 | `radio.bpq_radio` | bpq32.cfg RADIO number for the Rig page scan list; `0` = the block with an FLRIG line | `0` |
 | `radio.max_power` | Highest TX power (W) the Rig page may set; `0` = the radio's maximum | `50` |
 | `radio.min_power` / `radio.model` | Lowest TX power (default 1); force a radio profile instead of auto-detect | `5` / `'FTdx3000'` |
@@ -549,7 +608,12 @@ Link LinBPQ's **logs** folder. Never link the whole LinBPQ folder: `bpq32.cfg` h
 ```bash
 sudo rm -rf $W/logs
 sudo ln -s /path/to/linbpq/logs $W/logs
+sudo mkdir -p /var/log/bpq-dashboard /var/lib/bpq-dashboard     # the dashboard's own logs; kept copies (v1.5.19)
+sudo chown www-data:www-data /var/log/bpq-dashboard /var/lib/bpq-dashboard
+sudo chmod 750 /var/log/bpq-dashboard /var/lib/bpq-dashboard
 ```
+
+LinBPQ inside a home folder (Ubuntu 21.04+, Mint 21+)? Give the web server access as in §12, *LinBPQ in a home folder*, then check: `sudo -u www-data ls /path/to/linbpq/logs | head -3`.
 
 **6. Web server**
 
@@ -570,6 +634,26 @@ ls /run/php/
 SITE=/etc/nginx/sites-available/bpq-dashboard     # your site file
 sudo sed -i 's|php8.3-fpm.sock|php8.5-fpm.sock|g' $SITE   # your version
 ```
+
+**On a machine that already runs nginx for other sites** (a reverse proxy, K5DAT's case): don't replace its default site. Either add the dashboard as its own `server { }` block with its own `listen` port or `server_name` (from `nginx-bpq-dashboard.conf`, without `default_server`), or run it under Apache on another port and forward to it. Apache on port 8080, reachable only through your nginx:
+
+```bash
+sudo apt install -y apache2 libapache2-mod-fcgid      # if port 80 is nginx's, Apache's first start fails until the next lines
+sudo sed -i 's/^Listen 80$/# Listen 80/' /etc/apache2/ports.conf
+echo 'Listen 127.0.0.1:8080' | sudo tee -a /etc/apache2/ports.conf
+sudo a2dissite 000-default
+```
+
+then write the site as `install.sh` does (its Apache block, with `<VirtualHost 127.0.0.1:8080>`), and in your nginx's server block for the dashboard's host name:
+
+```nginx
+location /     { proxy_pass http://127.0.0.1:8080; proxy_set_header Host $host;
+                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_read_timeout 120s; }
+location /ws/  { proxy_pass http://127.0.0.1:8080; proxy_http_version 1.1;
+                 proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_read_timeout 7200s; }
+```
+
+The guided installer (v1.5.19) does all of this when you choose Apache and port 8080 on such a machine, backs up `/etc/nginx` and writes the proxy block to `/root/bpq-dashboard-reverse-proxy.txt`. Give the dashboard its own host name or port: a sub-path such as `/dashboard/` doesn't work.
 
 Both templates have the `/ws/telnet` and `/ws/vara` blocks: `nginx-bpq-dashboard.conf` puts them and the two pages behind the admin login, like the installer; `bpq-dashboard.conf` limits `/ws/telnet` to private addresses and puts `/ws/vara` behind the admin login as well.
 
@@ -595,19 +679,26 @@ for u in bulletin-retention.service bulletin-retention.timer message-bodies.serv
   sed "s|/var/www/bpq-dashboard|$W|g" $W/$u | sudo tee /etc/systemd/system/$u >/dev/null
 done
 sudo systemctl daemon-reload && sudo systemctl enable --now bulletin-retention.timer message-bodies.timer
+sudo -u www-data python3 $W/scripts/parse-traffic-report.py --backfill     # load the Traffic reports already there, once
+```
+
+Log rotation for the dashboard's own logs (v1.5.19):
+
+```bash
+printf '/var/log/bpq-dashboard/*.log {\n    weekly\n    rotate 8\n    compress\n    delaycompress\n    missingok\n    notifempty\n    copytruncate\n}\n' | sudo tee /etc/logrotate.d/bpq-dashboard
 ```
 
 `message-bodies.timer` saves the text of new BBS messages to the database every 5 minutes, whether or not the Email Client is open (BPQ can remove bulletins within days). Bulletins: `'messages' => ['bulletin_text' => 'all']` in config.php; `'pinned'` saves only groups pinned 📌, `'none'` none. To fetch text for messages already in the database once: `sudo -u www-data php $W/scripts/fetch-message-bodies.php --backfill`.
 
 `--days 8` matters: some BPQ versions write the traffic report weekly rather than daily.
 
-**9. Helper services**
+**9. Helper services** (only for the pages you use; set the others to `false` in `config.php 'pages'`)
 
 ```bash
 sudo cp $W/bpq-telnet.service $W/bpq-chat.service $W/bpq-aprs.service $W/bpq-vara.service $W/vara-logger.service /etc/systemd/system/
 sudo cp $W/rig-history-poller.service /etc/systemd/system/     # only with flrig
 sudo systemctl daemon-reload
-sudo systemctl enable --now bpq-telnet bpq-chat bpq-aprs bpq-vara vara-logger
+sudo systemctl enable --now bpq-telnet bpq-chat bpq-aprs bpq-vara vara-logger   # leave out the ones you don't use
 sudo systemctl enable --now rig-history-poller                  # only with flrig
 ```
 
@@ -641,10 +732,10 @@ The **User Guide** describes every page in detail. In short, with what each need
 
 | Page | Address | Login | Needs |
 |---|---|---|---|
-| RF Connections (home) | `/` or `/bpq-rf-connections.html` | none (saving partners/locations: admin) | `vara-logger`, `parse-vara-log.py`, BBS logs |
+| RF Connections (home) | `/` or `/bpq-rf-connections.html` | none (saving partners/locations: admin) | `vara-logger` or `vara-remote.timer` (§10.11), `parse-vara-log.py`, BBS logs |
 | Traffic Report | `/bpq-traffic.html` | none | `Traffic_*.txt`, `parse-traffic-report.py` |
 | System Logs | `/bpq-system-logs.html` | none | BBS/TCP/CMS logs, `parse-system-logs.py`; optional `nodes-rtt.sh` (§10.12) |
-| Connect Log | `/bpq-connect-log.html` | none | `ConnectLog_*.log` |
+| Connect Log | `/bpq-connect-log.html` | none | `ConnectLog_*.log` (`LogAllConnects=1` in `bpq32.cfg`) |
 | Message Monitor | `/bpq-email-monitor.html` | none (reading bulletins: admin) | BBS and TCP logs |
 | Email Client | `/bbs-messages.html` | admin | database, `bbs` login in `config.php`, `message-bodies.timer`, `bulletin-retention.timer` |
 | NWS Weather | `/nws-dashboard.html` | none (posting: admin) | api.weather.gov; `bbs` login for posting |
@@ -654,8 +745,10 @@ The **User Guide** describes every page in detail. In short, with what each need
 | Telnet Client | `/bpq-telnet.html` | admin + your BPQ login | `bpq-telnet`; `bpq-nodes-api.php` for the nodes list (`bbs` login, `station.node`) |
 | Rig Status | `/rig-status.html` | none (controls: BBS password) | flrig; optional `smartplug` |
 | RF Power Monitor | `/rf-power-monitor.html` | none | flrig, `rig-history-poller` |
-| Maintenance, Firewall Status, Log Viewer, System Audit | `/admin/…` | admin | sudo rules (§11) for Firewall/Audit |
+| Maintenance, Firewall Status, Log Viewer, System Audit | `/admin/…` | admin | sudo rules (§11) for Firewall/Audit and for *Change admin password* |
 | Install Check, Health Check | `/install-check.php`, `/health-check.php` | admin | — |
+
+Chat, APRS Map, VARA HF Terminal, Telnet Client, Rig Status and RF Power Monitor are **optional pages** (v1.5.19): switched off in `config.php 'pages'` (or `'radio' => 'enabled'`) they are hidden from the menu and their helper isn't needed.
 
 All admin pages live in `/admin/`; one web-server login protects the folder, its APIs, Install Check and Health Check, and the PHP refuses the station-acting endpoints unless that login was checked.
 
@@ -793,7 +886,7 @@ Set up:
 Schedule it in root's crontab (it edits `linmail.cfg` and restarts LinBPQ):
 
 ```
-0 6 */2 * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/prop-scheduler.py --apply >> /var/www/bpq-dashboard/logs/prop-scheduler.log 2>&1
+0 6 */2 * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/prop-scheduler.py --apply >> /var/log/bpq-dashboard/prop-scheduler-cron.log 2>&1
 ```
 
 **Optional decision history:** the installer loads the `prop_decisions` table, where the scheduler records each decision (time, Kp/SFI, band). For a manual install: `sudo mysql bpqdash < /var/www/bpq-dashboard/data/prop-decisions-schema.sql`.
@@ -810,7 +903,7 @@ sudo python3 /var/www/bpq-dashboard/scripts/storm-monitor.py --restore   # put n
 Root's crontab:
 
 ```
-0 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/storm-monitor.py >> /var/www/bpq-dashboard/logs/storm-monitor.log 2>&1
+0 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/storm-monitor.py >> /var/log/bpq-dashboard/storm-monitor-cron.log 2>&1
 ```
 
 It doesn't post weather bulletins; NWS posting is done from the NWS page (§10.4).
@@ -824,7 +917,7 @@ The NWS page needs no setup to show alerts: it reads api.weather.gov directly in
 - `features.nws_post` (on by default; forced off in public mode);
 - the admin login.
 
-Posts are logged in `logs/dashboard.log` (Log Viewer → *Dashboard log*). `nws-config.php.example` is left over from an older version and isn't read.
+Posts are logged in `/var/log/bpq-dashboard/dashboard.log` (Log Viewer → *Dashboard log*; `logs/dashboard.log` before v1.5.19). `nws-config.php.example` is left over from an older version and isn't read.
 
 **Automatic posting (optional).** `scripts/nws-auto-post.php`, run every 5 minutes by `nws-auto-post.timer`, posts new Warnings and Watches for one state as bulletins (`SB`, through the Email Client's send code and BBS lock). It posts the **first issue** of each alert only (no updates, extensions or cancellations), skips anything that has already ended, never posts the same alert twice (`cache/nws-auto-post-state.json`), and combines a watch that several NWS offices each issued into one bulletin (waiting `watch_hold_minutes` for their pieces). Settings are `'nws' => ['auto_post' => [...]]` in `config.php` (see `config.php.example`); nothing posts until `enabled` is `true` and `area` is a state code. It does not depend on `features.nws_post` or public mode.
 
@@ -952,51 +1045,54 @@ A transparent TCP proxy that sits between BPQ32 and your VARA HF modem to **reje
 ```
    VARA HF (Windows or Wine)  e.g. 127.0.0.1:8300/8301
             ↑  validator forwards here after callsign check
-   [validator] listening on 0.0.0.0:9025/9026
+   [validator] listening on 127.0.0.1:9025/9026  (config.php)
             ↑  BPQ32 connects to validator instead of VARA directly
    BPQ32 (Linux)
 ```
 
-**Validation rules (configurable):**
+**Validation rules:**
 
-- ITU Radio Regulations Appendix 42 callsign format
-- Optional MariaDB allowlist of permitted base callsigns
-- Optional length and structure checks
+- ITU Radio Regulations Appendix 42 callsign format (prefix, digit, suffix; SSID and /portable removed first)
+- an allow list (always accepted) and a deny list (always refused, default `NOCALL TEST N0CALL INVALID`)
 
-**Install:**
+**Install** (v1.5.19: the installer's page question *VARA callsign check* does steps 1–2; it runs as the web user from the dashboard folder and logs to `/var/log/bpq-dashboard/vara-validator.log`):
 
 ```bash
-# 1. Configure the validator (point upstream at your VARA host/ports)
-sudo nano /var/www/bpq-dashboard/scripts/vara-callsign-validator.py
-# Edit VARA_HOST / VARA_CMD_PORT / VARA_DATA_PORT (where VARA really is) and
-# PROXY_CMD_PORT / PROXY_DATA_PORT (what BPQ connects to, default 9025/9026).
-# Its log is /var/log/vara-validator.log — the service user must be able to write it.
+# 1. Settings: config.php
+sudo nano /var/www/bpq-dashboard/config.php
+#   'vara_validator' => [
+#       'vara_host'       => '127.0.0.1',  // where VARA HF listens (its command port; data = +1)
+#       'vara_cmd_port'   => 8300,
+#       'listen_host'     => '127.0.0.1',  // where BPQ connects ('0.0.0.0' only if BPQ is on another machine)
+#       'listen_cmd_port' => 9025,         // data = 9026
+#       'allow' => [], 'deny' => ['NOCALL', 'TEST', 'N0CALL', 'INVALID'],
+#   ],
+#   and 'pages' => ['vara_validator' => true, ...]
 
-# 2. Install the systemd service. The unit file names /usr/local/bin and
-#    User=pi; point it at the script in the dashboard and a user that exists:
-sed -e 's|/usr/local/bin/vara-callsign-validator.py|/var/www/bpq-dashboard/scripts/vara-callsign-validator.py|' \
-    -e 's|^User=pi|User=www-data|' /var/www/bpq-dashboard/vara-validator.service \
+# 2. The service
+sed 's|/var/www/bpq-dashboard|/var/www/bpq-dashboard|g' /var/www/bpq-dashboard/vara-validator.service \
   | sudo tee /etc/systemd/system/vara-validator.service >/dev/null
 sudo systemctl daemon-reload
-sudo systemctl enable vara-validator
-sudo systemctl start vara-validator
+sudo systemctl enable --now vara-validator
 
 # 3. Point BPQ32 at the validator instead of VARA directly:
-#    In bpq32.cfg, point the VARA port's address at the validator
-#    (127.0.0.1 and PROXY_CMD_PORT) instead of at VARA itself.
+#    In bpq32.cfg, the VARA port's ADDR line becomes 127.0.0.1 9025
+#    (listen_host / listen_cmd_port) instead of VARA HF's own address.
 
 # 4. Restart LinBPQ (your service name, e.g. bpq or linbpq) to pick up the new target.
 sudo systemctl restart bpq
 ```
 
+Before v1.5.19 the unit said `User=pi` and `/usr/local/bin/vara-callsign-validator.py`, and the settings were inside the script; copy any you changed into `config.php`, install the new unit, and delete the old copy in `/usr/local/bin`.
+
 **Verify:**
 
 ```bash
-# Watch the validator log to see incoming connection attempts and their verdicts
-sudo journalctl -u vara-validator -f
+ss -tlnp | grep -E ':902[56]\b'                                  # listening
+sudo tail -f /var/log/bpq-dashboard/vara-validator.log           # verdicts (Log Viewer → VARA Validator)
 ```
 
-Rejected callsigns log a line like `REJECT: callsign='ABC123' reason='format'` and the TCP connection is dropped before BPQ32 receives a CONNECT event.
+Each incoming connection logs `ACCEPTED` or `REJECTED` with the callsign and the reason; a rejected one is dropped before BPQ32 receives a CONNECT event.
 
 ### 10.10 Winlink White Pages cleanup tools
 
@@ -1107,6 +1203,21 @@ The lines start with the time and `H-<your call-SSID> VARAHF`. Within 5 minutes 
 
 **If nothing arrives:** VARA's Syslog box ticked and the Host/port right; the VARA computer's address is the one allowed (rsyslog and firewall); a Windows firewall on the VARA computer isn't blocking outgoing UDP 514; `sudo systemctl status rsyslog vara-logger`.
 
+**TPRFN stations: the log from the TPRFN server (v1.5.19).** If your VARA HF sends its syslog to the TPRFN server instead of this machine, the server keeps a copy for your station (`https://<TPRFN server>/<call>.vara`; the TPRFN server admin sets it up and gives you the address) and the dashboard downloads it. No receiver, rsyslog rule or vara-logger here. The installer does this when you choose **2** at the VARA log question; by hand:
+
+```bash
+sudo nano /var/www/bpq-dashboard/config.php
+#   'vara_remote' => ['enabled' => true, 'url' => 'https://<TPRFN server>/w1aw.vara'],
+#   'logs'        => ['vara_file' => '/var/log/bpq-dashboard/w1aw.vara'],
+W=/var/www/bpq-dashboard
+sed "s|/var/www/bpq-dashboard|$W|g" $W/vara-remote.service | sudo tee /etc/systemd/system/vara-remote.service >/dev/null
+sudo cp $W/vara-remote.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now vara-remote.timer
+sudo -u www-data python3 $W/scripts/fetch-vara-remote.py -v      # test now
+```
+
+Every 5 minutes (at :03, :08 …, two minutes after the server rebuilds the file) it fetches only the new part, writes through a temporary file and keeps the last good copy if the server can't be reached; if the server's file got shorter it fetches it all again. It sends a `BPQ-Dashboard/<version> (<CALL>)` user agent (the server's bot filter refuses plain curl). Log: `/var/log/bpq-dashboard/vara-remote.log` (Log Viewer → VARA download); Install Check and System Audit show the last good download. *HTTP 404* = no file for your call on the server yet.
+
 ### 10.12 NetROM RTT collection
 
 `nodes-rtt.sh` (in the dashboard folder) logs in to the node, runs `n t` and writes the NetROM nodes with their round-trip times to `logs/nodesrtt.txt`. `parse-system-logs.py` loads it; System Logs shows the RTT on the *Internet Connected Stations* tiles.
@@ -1171,6 +1282,16 @@ If the dashboard can be reached from outside your home network:
    ```
 3. Read `SECURITY.md` (in the dashboard folder). It lists everything that matters for running the dashboard safely and how to report a security problem.
 
+**No firewall yet? (v1.5.19)** `tools/setup-firewall.sh` sets up ufw for a packet station. It asks: your home network (detected, you confirm it), SSH from home only or anywhere, the dashboard from home only or anywhere, BPQ telnet/FBB from home only or anywhere (for forwarding partners who connect in). BPQ's web-management port stays home-only; VARA HF's syslog (UDP 514, from the VARA computer) and BPQ AXIP/AXUDP ports from `bpq32.cfg` are added by themselves. The address of the SSH session you run it from is always allowed, so you can't lock yourself out. It shows every rule and asks again before switching ufw on, and offers fail2ban. On a server where ufw is already on, it only adds the rules that are missing.
+
+```bash
+sudo bash /var/www/bpq-dashboard/tools/setup-firewall.sh --dry-run   # questions + the rules, nothing changed
+sudo bash /var/www/bpq-dashboard/tools/setup-firewall.sh             # the real run
+sudo ufw status numbered                                             # check;  undo: sudo ufw disable  (or ufw reset)
+```
+
+The installer offers it as its last step (default No).
+
 ### Protect the data directory (Apache only)
 
 The nginx configuration from the installer already refuses `/data/`. On Apache:
@@ -1183,7 +1304,7 @@ echo "deny from all" | sudo tee /var/www/bpq-dashboard/data/.htaccess
 
 - Linux user password: `passwd`
 - BPQ BBS password — change in bpq32.cfg AND update config.php to match
-- Dashboard admin login (Email Client, Chat, admin pages, Install Check, Health Check) — `sudo htpasswd -B /etc/nginx/.bpq-mgmt-auth admin` (use your admin user name; it asks for the new password)
+- Dashboard admin login (Email Client, Chat, admin pages, Install Check, Health Check) — Maintenance → *Admin login* → **Change admin password** (v1.5.19), or over SSH `sudo htpasswd -B /etc/nginx/.bpq-mgmt-auth admin` (use your admin user name; it asks for the new password)
 
 ### Configure sudoers for www-data
 
@@ -1205,6 +1326,20 @@ www-data ALL=(root) NOPASSWD: /usr/bin/fail2ban-client status *
 www-data ALL=(root) NOPASSWD: /usr/bin/ss -tlnp
 www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -t
 ```
+
+v1.5.19 adds one rule that changes something: the Maintenance page's *Change admin password*. It may only run a small root-owned helper, which changes the password of an admin login already in `/etc/nginx/.bpq-mgmt-auth` (password on stdin, never logged):
+
+```
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-set-admin-password *
+```
+
+The helper must be a root-owned copy outside the web folder (the web user can write in the web folder, so a sudo rule pointing there would hand it root):
+
+```bash
+sudo install -o root -g root -m 755 /var/www/bpq-dashboard/tools/set-admin-password /usr/local/sbin/bpq-dashboard-set-admin-password
+```
+
+Without the helper or the rule, the page says so and shows the `htpasswd` command instead.
 
 > Both `status` and `status *` lines are needed: in sudoers `*` needs at least one argument, so it doesn't cover bare `status` (the jail list).
 >
@@ -1318,7 +1453,7 @@ sudo systemctl restart 'php*-fpm'
 Up to v1.5.16 the Log Viewer's PHP sent an empty reply for any log holding bytes that aren't valid UTF-8 — usually the BBS-session logs (Message text job, Email Client (BBS), Dashboard log). Fixed in v1.5.17 (`admin/log-viewer-api.php` 1.3.1): those bytes show as **�**. Update `admin/log-viewer-api.php` and `admin/log-viewer.html`, then reload with Ctrl+Shift+R. To see which lines of a log have such bytes:
 
 ```bash
-LANG=C.UTF-8 grep -naxv '.*' /var/www/bpq-dashboard/logs/bbs-messages.log | head
+LANG=C.UTF-8 grep -naxv '.*' /var/log/bpq-dashboard/bbs-messages.log | head
 ```
 
 If the page now says *"Empty reply from the server"* or *"Server reply was not JSON"*, the PHP error is in the web-server error log (above).
@@ -1327,7 +1462,7 @@ If the page now says *"Empty reply from the server"* or *"Server reply was not J
 
 - Are you in FBB mode? YAPP requires BPQ's FBB port (8011 by default), not the standard telnet port. If yours is different and the dashboard can't read `bpq32.cfg`, set `'fbb_port' => N` in the `bbs` section of `config.php` and restart bpq-telnet.
 - Is bpq-telnet daemon running? `sudo systemctl status bpq-telnet`
-- Check `/var/www/bpq-dashboard/logs/bpq-telnet-daemon.log` for protocol errors (Admin → Logs → bpq-telnet).
+- Check `/var/log/bpq-dashboard/bpq-telnet-daemon.log` for protocol errors (Admin → Logs → bpq-telnet).
 
 ### Telnet or VARA page can't connect
 
@@ -1390,6 +1525,27 @@ sudo -u www-data ls /var/www/bpq-dashboard/logs/
 sudo -u www-data cat /var/www/bpq-dashboard/logs/log_$(date +%y%m%d)_BBS.txt | head -3
 ```
 
+`Permission denied` with LinBPQ inside a home folder: see the next section.
+
+### LinBPQ in a home folder (Ubuntu 21.04+, Linux Mint 21+)
+
+These systems make `/home/<user>` private, so the web server can't see a LinBPQ folder inside it: every log page stays empty, Traffic finds no reports. The installer (v1.5.19) checks this and offers the fix; Install Check's *LinBPQ folder* row prints these commands for your path. Example for `/home/n3mel/linbpq`:
+
+```bash
+sudo apt install -y acl
+sudo setfacl -m u:www-data:x /home/n3mel                     # pass through only
+sudo setfacl -m u:www-data:rx /home/n3mel/linbpq             # list the LinBPQ folder (Traffic_*.txt live here)
+sudo setfacl -R -m u:www-data:rX /home/n3mel/linbpq/logs     # read the logs
+sudo setfacl -d -m u:www-data:rX /home/n3mel/linbpq/logs     # ... and the ones LinBPQ writes later
+sudo -u www-data ls /home/n3mel/linbpq/logs | tail -3        # test
+```
+
+The web server can't read anything else in the home folder, and `bpq32.cfg` (your BPQ passwords) stays closed; give it read on that one file only if you need the Rig page scan list or the VARA HF Terminal without `vara.bpq_port`. Don't `chmod 755` the home folder or add `www-data` to your group: both open the whole home folder. Undo with `sudo setfacl -b <folder>`. Since v1.5.19 the dashboard writes its own logs to `/var/log/bpq-dashboard`, so it no longer needs write access to LinBPQ's logs folder.
+
+### Connect Log page is empty
+
+BPQ writes `ConnectLog_YYMMDD.log` only with `LogAllConnects=1` in the main section of `bpq32.cfg` (before the first `PORT`). Add it, restart LinBPQ, and new connections appear. (`LOGGING=1` on the telnet port writes `Telnet_*.log`, which this page doesn't read.)
+
 ### Permission denied on cache or data directories
 
 ```bash
@@ -1430,7 +1586,9 @@ Hard-refresh the page (Ctrl+Shift+R). If still no response, clear the `bpq-dark-
 |---|---|
 | `/var/www/bpq-dashboard/` | Dashboard web root |
 | `/var/www/bpq-dashboard/config.php` | Main configuration (mode 640); `db-config.php` optionally holds the database login |
-| `/var/www/bpq-dashboard/logs` | Link to LinBPQ's `logs` folder (BPQ logs, the VARA log, `nodesrtt.txt`, the daemon logs) |
+| `/var/www/bpq-dashboard/logs` | Link to LinBPQ's `logs` folder (BPQ logs, the VARA log, `nodesrtt.txt`) |
+| `/var/log/bpq-dashboard/` | The dashboard's own logs: daemons, Email Client, message-text job, NWS posting, parsers, forwarding tools, VARA download (v1.5.19) |
+| `/var/lib/bpq-dashboard/` | Copies the dashboard keeps (the PKTNET forms replaced by an update, for Undo) |
 | `/var/www/bpq-dashboard/cache/` | Runtime state — managed automatically |
 | `/var/www/bpq-dashboard/data/` | Partners lists, BBS station info, saved locations, backups |
 | `/var/www/bpq-dashboard/yapp-files/` | Files received by YAPP (behind the admin login) |
@@ -1454,7 +1612,7 @@ sudo systemctl restart bpq-telnet
 
 # Logs
 sudo journalctl -u bpq-telnet -n 50 --no-pager
-tail -50 /var/www/bpq-dashboard/logs/bpq-telnet-daemon.log
+tail -50 /var/log/bpq-dashboard/bpq-telnet-daemon.log
 ```
 
 ### Services and timers
@@ -1475,6 +1633,7 @@ tail -50 /var/www/bpq-dashboard/logs/bpq-telnet-daemon.log
 | message-bodies.timer | Saves message text every 5 minutes | Email Client |
 | bulletin-retention.timer | Daily 14-day bulletin clean-up | Email Client |
 | nws-auto-post.timer *(optional)* | Posts new NWS Warnings/Watches for your state every 5 minutes | Automatic NWS bulletins (§10.4) |
+| vara-remote.timer *(optional, v1.5.19)* | Downloads the VARA log from the TPRFN server every 5 minutes | RF Connections on TPRFN stations (§10.11) |
 
 ### Complete crontab reference
 
@@ -1486,8 +1645,8 @@ tail -50 /var/www/bpq-dashboard/logs/bpq-telnet-daemon.log
 
 # Optional — root's crontab (sudo crontab -e)
 */5 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/connect-watchdog.py
-0 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/storm-monitor.py >> /var/www/bpq-dashboard/logs/storm-monitor.log 2>&1
-0 6 */2 * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/prop-scheduler.py --apply >> /var/www/bpq-dashboard/logs/prop-scheduler.log 2>&1
+0 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/storm-monitor.py >> /var/log/bpq-dashboard/storm-monitor-cron.log 2>&1
+0 6 */2 * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/prop-scheduler.py --apply >> /var/log/bpq-dashboard/prop-scheduler-cron.log 2>&1
 */10 * * * * /var/www/bpq-dashboard/nodes-rtt.sh
 0 2 * * 0 DASHBOARD_DIR=/var/www/bpq-dashboard /var/www/bpq-dashboard/scripts/archive-bpq-data.sh >> /var/log/bpq-archive.log 2>&1
 0 3 * * 0 find /var/www/bpq-dashboard/yapp-files/ -mtime +30 -type f -delete
@@ -1524,10 +1683,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.18-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.19-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.18 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.19 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

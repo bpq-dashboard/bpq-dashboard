@@ -65,7 +65,7 @@ CONFIG = {
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\storm-monitor.log'
-        if IS_WINDOWS else os.path.join(_LOGS_DIR, 'storm-monitor.log')
+        if IS_WINDOWS else bpq_db_config.app_log_path('storm-monitor.log')   # v1.5.19: not LinBPQ's logs folder
     ),
     'backup_dir': (
         'C:\\UniServerZ\\www\\bpq\\scripts\\prop-backups'
@@ -215,8 +215,8 @@ def apply_settings_json():
         if p.get('bpq_stop_cmd'):  CONFIG['bpq_stop_cmd']  = p['bpq_stop_cmd']
         if p.get('bpq_start_cmd'): CONFIG['bpq_start_cmd'] = p['bpq_start_cmd']
         if p.get('backup_dir'):    CONFIG['backup_dir']    = p['backup_dir']
-        if p.get('log_dir'):
-            CONFIG['log_file'] = os.path.join(p['log_dir'], 'storm-monitor.log')
+        if p.get('log_dir'):   # (v1.5.19: the tool's own log stays in app_log_dir())
+            pass
 
     if 'storm_monitor' in s:
         sm = s['storm_monitor']

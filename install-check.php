@@ -1,6 +1,6 @@
 <?php
 /**
- * BPQ Dashboard v1.5.18 — Post-Installation Check
+ * BPQ Dashboard v1.5.19 — Post-Installation Check
  * Checks every component installed by bpq-dashboard-install.sh
  * Access: https://your.domain/install-check.php  (behind the admin login)
  *
@@ -68,12 +68,20 @@ if (fileOk("$BASE/config.php")) {
     if (!is_array($cfg)) $cfg = [];
 }
 
+// Optional pages switched off in config.php 'pages' (v1.5.19): their checks
+// are skipped rather than failed.
+require_once __DIR__ . '/includes/station-config.php';
+$pagesOn = bpq_pages();
+$varaRemote = !empty($cfg['vara_remote']['enabled']);
+
 // ═══════════════════════════════════════════════════════════════════
 // 1. PHP ENVIRONMENT
 // ═══════════════════════════════════════════════════════════════════
 $phpver = phpversion();
+// v1.5.19: package names follow the PHP this station runs (was always php8.3-…)
+$phpPkg = 'php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
 chk('PHP Environment','PHP ≥ 8.0', version_compare($phpver,'8.0','>='),
-    "PHP $phpver", 'sudo apt install php8.3-fpm');
+    "PHP $phpver", 'sudo apt install php-fpm');
 
 // Detect active FPM. 2026-10-30: was a fixed 8.4…8.1 list, so PHP 8.5
 // (Ubuntu, KG9NI) failed this row. Prefer the version running this page.
@@ -99,10 +107,10 @@ foreach (['json'=>true,'curl'=>true,'sockets'=>true,'mbstring'=>true,
         chkPass('PHP Environment',"Extension: $ext", 'Loaded');
     } elseif ($req) {
         chkFail('PHP Environment',"Extension: $ext", 'Missing — required',
-            "sudo apt install php8.3-$ext");
+            "sudo apt install $phpPkg-" . ($ext === 'pdo_mysql' ? 'mysql' : ($ext === 'pdo' ? 'common' : $ext)) . " && sudo systemctl restart $phpPkg-fpm");
     } else {
         chkWarn('PHP Environment',"Extension: $ext", 'Missing — recommended',
-            "sudo apt install php8.3-$ext");
+            "sudo apt install $phpPkg-$ext && sudo systemctl restart $phpPkg-fpm");
     }
 }
 
@@ -274,7 +282,7 @@ foreach (['rig-status.html' => 'Rig Status', 'rf-power-monitor.html' => 'RF Powe
             fileOk("$BASE/$f") ? 'Present' : 'Missing',
             "sudo cp $f $BASE/$f && sudo chown www-data:www-data $BASE/$f");
     } else {
-        chkPass('Dashboard HTML',"$label ($f)", 'Not installed — no flrig (config.php radio.enabled = false)');
+        chkPass('Dashboard HTML',"$label ($f)", 'Switched off — no flrig (config.php radio.enabled = false); hidden from the menu');
     }
 }
 
@@ -353,6 +361,37 @@ foreach ($dirs as $dir => $label) {
             "sudo chown -R www-data:www-data $fp && sudo chmod 775 $fp");
     } else {
         chkPass('Directories',"$label ($dir)", 'Present and writable');
+    }
+}
+
+// v1.5.19: the dashboard's own logs (daemons, Email Client, message-text job)
+$appDir = bpq_app_log_dir();
+$appWant = rtrim((string)($cfg['paths']['app_logs'] ?? '/var/log/bpq-dashboard'), '/');
+chk('Directories', "Dashboard's own logs ($appWant)", $appDir === $appWant,
+    $appDir === $appWant ? 'Present and writable'
+        : "Not there or not writable — they go to $appDir instead" . (strpos($appDir, '/logs') !== false ? " (LinBPQ's logs folder; bpq-telnet / bpq-vara stop if they can't write there)" : ''),
+    "sudo mkdir -p $appWant && sudo chown www-data:www-data $appWant && sudo chmod 750 $appWant", true);
+
+// v1.5.19 (N3MEL): LinBPQ inside a private home folder (Ubuntu 21.04+, Mint 21+)
+$lb = rtrim((string)($cfg['paths']['linbpq'] ?? ''), '/');
+if ($lb !== '') {
+    $lbOk = is_dir($lb) && is_readable($lb) && is_executable($lb);
+    $lbLogs = "$lb/logs";
+    $lbLogsOk = !is_dir($lbLogs) || (is_readable($lbLogs) && is_executable($lbLogs));
+    if ($lbOk && $lbLogsOk) {
+        chkPass('Directories', "LinBPQ folder ($lb)", 'The web server can list it' . (is_dir($lbLogs) ? ' and read its logs' : ''));
+    } else {
+        // Build the narrow ACL fix: x on each parent, rx on the folder, rX on logs
+        $fix = ['sudo apt install -y acl'];
+        $parents = [];
+        for ($d = dirname($lb); $d !== '/' && $d !== '.' && $d !== ''; $d = dirname($d)) $parents[] = $d;
+        if ($parents) $fix[] = 'sudo setfacl -m u:www-data:x ' . implode(' ', array_reverse($parents));
+        $fix[] = "sudo setfacl -m u:www-data:rx $lb";
+        $fix[] = "sudo setfacl -R -m u:www-data:rX $lbLogs && sudo setfacl -d -m u:www-data:rX $lbLogs";
+        chkFail('Directories', "LinBPQ folder ($lb)",
+            !file_exists($lb) && !is_link($lb) ? 'Not found, or a folder above it is closed to the web server (private home folder?)'
+                : (!$lbOk ? 'The web server can\'t list it — log pages and Traffic stay empty (private home folder?)' : 'The web server can\'t read its logs folder'),
+            implode("\n", $fix) . "\n# bpq32.cfg stays closed (BPQ passwords). Undo: sudo setfacl -b <folder>");
     }
 }
 
@@ -519,7 +558,12 @@ $daemons = [
     ],
 ];
 
+$daemonPage = ['bpq-chat' => 'chat', 'bpq-aprs' => 'aprs'];
 foreach ($daemons as $svc => $d) {
+    if (isset($daemonPage[$svc]) && !$pagesOn[$daemonPage[$svc]]) {   // v1.5.19
+        chkPass('Daemons', "{$d['label']}", "Not used — its page is switched off (config.php 'pages')");
+        continue;
+    }
     // Service file
     chk('Daemons',"{$d['label']} — service file", fileOk($d['service_file']),
         fileOk($d['service_file']) ? 'Present' : 'Missing — run installer first',
@@ -554,6 +598,10 @@ $optDaemons = [
 ];
 foreach ($optDaemons as $svc => $label) {
     $sf = "/etc/systemd/system/$svc.service";
+    if (!$pagesOn['vara_validator'] && !fileOk($sf)) {   // v1.5.19
+        chkPass('Daemons', $label, "Not used (config.php 'pages' => 'vara_validator' => false)");
+        continue;
+    }
     if (fileOk($sf)) {
         chkWarn('Daemons',"$label — installed but status unknown",
             'Check: sudo systemctl status '.$svc,
@@ -569,12 +617,25 @@ foreach ($optDaemons as $svc => $label) {
 // VARA HF sends syslog (UDP 514) -> rsyslog -> /var/log/syslog ->
 // vara-logger -> logs/<vara_file>. Warnings only: VARA HF is optional.
 $udp514 = preg_match('/:514\s/', (string)shell_exec('ss -uln 2>/dev/null')) === 1;
+// v1.5.19: VARA log downloaded from the TPRFN server instead (vara-remote.timer)
+if ($varaRemote) {
+    $vrs = hbData("$BASE/cache/vara-remote-status.json");
+    $vrUrl = (string)($cfg['vara_remote']['url'] ?? '');
+    $vrOk = !empty($vrs['last_success']) && (time() - (int)$vrs['last_success']) < 1800;
+    chk('Daemons', 'VARA HF log — download from the TPRFN server', $vrOk,
+        empty($vrs) ? "No download yet from $vrUrl"
+        : ($vrOk ? 'Last download ' . round((time() - (int)$vrs['last_success']) / 60) . " min ago from $vrUrl (" . (int)($vrs['bytes'] ?? 0) . ' bytes)'
+                 : 'Last good download ' . (!empty($vrs['last_success']) ? round((time() - (int)$vrs['last_success']) / 60) . ' min ago' : 'never')
+                   . (!empty($vrs['error']) ? '; last error: ' . $vrs['error'] : '')),
+        'sudo systemctl enable --now vara-remote.timer; test: sudo -u www-data python3 ' . $BASE . '/scripts/fetch-vara-remote.py -v (Log Viewer → VARA download)');
+} else
 chk('Daemons', 'VARA HF log — syslog receiver (UDP 514)', $udp514,
     $udp514 ? 'This server listens for syslog on UDP 514'
             : 'Nothing listens on UDP 514 — VARA HF\'s log can\'t arrive',
     'Re-run install.sh and answer Yes to the VARA HF log question, or set up rsyslog by hand (Installation Manual §10.11)', true);
-$vfName = basename((string)($cfg['logs']['vara_file'] ?? ''));
-$vfDir  = rtrim((string)($cfg['paths']['logs'] ?? "$BASE/logs"), '/');
+$vfRaw  = (string)($cfg['logs']['vara_file'] ?? '');
+$vfName = basename($vfRaw);
+$vfDir  = ($vfRaw !== '' && $vfRaw[0] === '/') ? dirname($vfRaw) : rtrim((string)($cfg['paths']['logs'] ?? "$BASE/logs"), '/');
 if ($vfName !== '') {
     $vf  = "$vfDir/$vfName";
     $vSz = fileOk($vf) ? (int)@filesize($vf) : -1;
@@ -618,12 +679,21 @@ if ($bpqCfg) {
     foreach (['LINMAIL' => 'mail', 'LINCHAT' => 'chat'] as $kw => $arg) {
         $inCfg = preg_match('/^\s*' . $kw . '\b/mi', $bc) > 0;
         $inCmd = preg_match('/\b' . $arg . '\b/', $bpqArgs) > 0;
+        if ($kw === 'LINCHAT' && !$pagesOn['chat']) {   // v1.5.19
+            chkPass('LinBPQ', 'LINCHAT', "Not needed — the Chat page is switched off (config.php 'pages')");
+            continue;
+        }
         chk('LinBPQ', "$kw enabled", $inCfg || $inCmd,
             $inCfg ? "$kw line in bpq32.cfg" : ($inCmd ? "\"$arg\" on the running linbpq command line" : 'Not in bpq32.cfg and not on the linbpq command line'),
             "Add $kw to bpq32.cfg, or start linbpq with \"$arg\" (then restart LinBPQ)");
     }
     chk('LinBPQ','BBS APPLICATION', preg_match('/^APPLICATION.*BBS/mi',$bc)>0,  '', 'Add APPLICATION line for BBS');
-    chk('LinBPQ','CHAT APPLICATION',preg_match('/^APPLICATION.*CHAT/mi',$bc)>0, '', 'Add APPLICATION line for CHAT');
+    if ($pagesOn['chat'])
+        chk('LinBPQ','CHAT APPLICATION',preg_match('/^APPLICATION.*CHAT/mi',$bc)>0, '', 'Add APPLICATION line for CHAT');
+    // v1.5.19 (N3MEL): the Connect page needs BPQ's ConnectLog files
+    chk('LinBPQ','LogAllConnects=1 (Connect page)', preg_match('/^\s*LogAllConnects\s*=\s*1/mi', $bc) > 0,
+        preg_match('/^\s*LogAllConnects\s*=\s*1/mi', $bc) ? 'BPQ writes ConnectLog_YYMMDD.log' : 'Not set — BPQ writes no ConnectLog files, so the Connect page stays empty',
+        'Add LogAllConnects=1 to the main section of bpq32.cfg (before the first PORT), then restart LinBPQ', true);
     chk('LinBPQ','TCPPORT in config', preg_match('/^\s*TCPPORT\s*=/mi',$bc)>0,
         'TCPPORT setting in bpq32.cfg telnet port section',
         'Set TCPPORT=8010 in the PORT/DRIVER=TELNET section', true);
@@ -660,9 +730,26 @@ if ($bpqCfg) {
     }
 } else {
     chkWarn('LinBPQ','bpq32.cfg not readable',
-        'Not found or not readable by web server — checks skipped',
-        'Manual check required: ensure LINMAIL, LINCHAT, and correct APPLICATION lines are present');
+        'Not found or not readable by web server — checks skipped (normal when LinBPQ is in a home folder: bpq32.cfg holds your BPQ passwords)',
+        'Manual check required: ensure LINMAIL' . ($pagesOn['chat'] ? ', LINCHAT' : '') . ', LogAllConnects=1 and correct APPLICATION lines are present');
+    // Without bpq32.cfg: ConnectLog files present at all?
+    $cl = glob(rtrim((string)($cfg['paths']['logs'] ?? "$BASE/logs"), '/') . '/ConnectLog_*.log') ?: [];
+    chk('LinBPQ','ConnectLog files (Connect page)', count($cl) > 0,
+        $cl ? count($cl) . ' ConnectLog file(s)' : 'None in the logs folder — the Connect page stays empty',
+        'Add LogAllConnects=1 to the main section of bpq32.cfg, then restart LinBPQ', true);
 }
+
+// v1.5.19: BPQ's weekly Traffic reports (Traffic_YYMMDD.txt): usually in the
+// LinBPQ folder itself, sometimes in logs/. The Traffic parser looks in both.
+$trDirs = array_values(array_unique(array_filter([
+    rtrim((string)($cfg['paths']['logs'] ?? "$BASE/logs"), '/'),
+    rtrim((string)($cfg['paths']['linbpq'] ?? ''), '/'),
+])));
+$trFound = [];
+foreach ($trDirs as $d) { $n = count(glob("$d/Traffic_*.txt") ?: []); if ($n) $trFound[] = "$n in $d"; }
+chk('LinBPQ','Traffic reports (Traffic_*.txt)', (bool)$trFound,
+    $trFound ? implode('; ', $trFound) : 'None found in ' . implode(' or ', $trDirs) . ' (or the web server can\'t list those folders)',
+    'BPQ writes one a week (Saturdays). If they exist but aren\'t found: the LinBPQ folder needs read access for the web user (Maintenance > LinBPQ in a home folder)', true);
 
 // ═══════════════════════════════════════════════════════════════════
 // 9. NETWORK CONNECTIVITY
@@ -690,7 +777,13 @@ $service_files = [
     '/etc/systemd/system/bpq-aprs.service'       => 'BPQ APRS daemon',
     '/etc/systemd/system/vara-validator.service'  => 'VARA callsign validator',
 ];
+$sfPage = ['bpq-chat.service' => 'chat', 'bpq-aprs.service' => 'aprs', 'vara-validator.service' => 'vara_validator'];
 foreach ($service_files as $sf => $label) {
+    $bn0 = basename($sf);
+    if (isset($sfPage[$bn0]) && !$pagesOn[$sfPage[$bn0]] && !file_exists($sf)) {   // v1.5.19
+        chkPass('Services', "$label service file", "Not used — its page is switched off (config.php 'pages')");
+        continue;
+    }
     if (!file_exists($sf)) {
         $optional = strpos($sf, 'vara-validator') !== false;
         ($optional ? 'chkWarn' : 'chkFail')('Services', "$label service file" . ($optional ? ' (optional)' : ''), 'Missing: '.$sf,
@@ -713,7 +806,7 @@ foreach ($service_files as $sf => $label) {
                 chkPass('Services', "$label ExecStart path", $sp);
         }
         // www-data user
-        if ($bn !== 'vara-validator.service') {
+        if (true) {   // v1.5.19: vara-validator runs as www-data too
             $hasUser = strpos($svc,'www-data') !== false;
             if (!$hasUser)
                 chkFail('Services', "$label User=www-data", 'Not set — daemon may lack cache write access',
@@ -810,11 +903,13 @@ else
 // ═══════════════════════════════════════════════════════════════════
 // 12. LOG FILES
 // ═══════════════════════════════════════════════════════════════════
-foreach ([
+$logList = [
     '/var/log/connect-watchdog.log' => 'Connect watchdog',
-    '/var/log/vara-validator.log'   => 'VARA validator',
     '/var/log/wp-auto-clean.log'    => 'WP auto-clean',
-] as $lf => $label) {
+];
+// v1.5.19: vara-validator logs to the dashboard's own log folder
+if ($pagesOn['vara_validator']) $logList[bpq_app_log('vara-validator.log')] = 'VARA validator';
+foreach ($logList as $lf => $label) {
     if (!file_exists($lf))
         chkWarn('Log Files',"$label log ($lf)", 'Not yet created — normal if script never ran',
             "sudo touch $lf && sudo chmod 644 $lf");
@@ -868,7 +963,7 @@ function renderPage($results,$pass,$fail,$warn,$score,$sc) {
 $total = $pass+$fail+$warn; ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BPQ Dashboard v1.5.18 — Install Check</title>
+<title>BPQ Dashboard v1.5.19 — Install Check</title>
 <style>
 :root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;
       --acc:#4a9eff;--grn:#3fb950;--red:#f85149;--org:#d29922;--pur:#bc8cff;}
@@ -914,7 +1009,7 @@ h1{font-size:20px;color:var(--acc);margin-bottom:4px;}
         color:var(--org);font-size:12px;text-align:center;line-height:1.8;}
 .footer strong{color:var(--red);}
 </style></head><body>
-<h1>🔧 BPQ Dashboard v1.5.18 — Post-Installation Check</h1>
+<h1>🔧 BPQ Dashboard v1.5.19 — Post-Installation Check</h1>
 <p class="sub"><?=date('Y-m-d H:i:s T')?> · PHP <?=phpversion()?> · <?=htmlspecialchars(php_uname('n'))?></p>
 
 <div class="card">
@@ -962,7 +1057,7 @@ foreach ($cats as $cat => $items):
 <div class="footer">
     <strong>⚠ Security reminder:</strong> Remove this file when done troubleshooting.<br>
     <code>sudo rm <?=htmlspecialchars($GLOBALS['BASE'])?>/install-check.php</code><br>
-    BPQ Dashboard v1.5.18 · Access: <?=htmlspecialchars("https://".($_SERVER['HTTP_HOST'] ?? 'your-server')."/install-check.php")?> (admin login)
+    BPQ Dashboard v1.5.19 · Access: <?=htmlspecialchars("https://".($_SERVER['HTTP_HOST'] ?? 'your-server')."/install-check.php")?> (admin login)
 </div>
 </body></html>
 <?php }

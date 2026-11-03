@@ -79,7 +79,7 @@ CONFIG = {
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\prop-scheduler.log'
-        if IS_WINDOWS else os.path.join(_LOGS_DIR, 'prop-scheduler.log')
+        if IS_WINDOWS else bpq_db_config.app_log_path('prop-scheduler.log')   # v1.5.19: not LinBPQ's logs folder
     ),
 
     # Home station
@@ -297,8 +297,7 @@ def apply_settings_json():
         if p.get('bpq_stop_cmd'):  CONFIG['bpq_stop_cmd'] = p['bpq_stop_cmd']
         if p.get('bpq_start_cmd'): CONFIG['bpq_start_cmd']= p['bpq_start_cmd']
         if p.get('backup_dir'):    CONFIG['backup_dir']   = p['backup_dir']
-        if p.get('log_dir'):
-            CONFIG['log_file']   = os.path.join(p['log_dir'], 'prop-scheduler.log')
+        if p.get('log_dir'):   # (v1.5.19: the tool's own log stays in app_log_dir())
             CONFIG['vara_log']   = os.path.join(
                 p['log_dir'],
                 (CONFIG.get('home_call', 'yourcall') + '.vara').lower()

@@ -28,6 +28,18 @@ $LOG_DIR    = rtrim($cfg['paths']['logs']     ?? $WEB_ROOT . '/logs', '/');
 $SCRIPTS    = $cfg['paths']['scripts']   ?? $WEB_ROOT . '/scripts';
 $CALL       = strtolower($cfg['station']['callsign'] ?? 'bpq');
 
+// The dashboard's own logs (v1.5.19): /var/log/bpq-dashboard (bpq_app_log_dir),
+// else where older versions wrote them (logs/, i.e. LinBPQ's logs folder).
+// The newer of the two copies is shown, so history from before the update
+// stays visible until the new file has something in it.
+$APP_DIR = bpq_app_log_dir();
+$appLog = function (string $file) use ($APP_DIR, $LOG_DIR): string {
+    $new = "$APP_DIR/$file"; $old = "$LOG_DIR/$file";
+    if ($APP_DIR === $LOG_DIR || !file_exists($old)) return $new;
+    if (!file_exists($new) || filesize($new) === 0) return $old;
+    return $new;
+};
+
 // Web server error log: the installer's own file first
 $webserverLog = '/var/log/nginx/error.log';
 foreach (['/var/log/nginx/bpq-dashboard.error.log', '/var/log/nginx/error.log',
@@ -53,25 +65,26 @@ $VARA_PATH = $VARA_FILE[0] === '/' ? $VARA_FILE : $LOG_DIR . '/' . $VARA_FILE;
 // "not used here" rather than missing when the file doesn't exist.
 $LOGS = [
     // Dashboard services and jobs
-    'bpq-telnet'       => ['path' => "$LOG_DIR/bpq-telnet-daemon.log",           'label' => 'bpq-telnet daemon',   'group' => 'Dashboard services', 'color' => 'blue',   'desc' => 'Telnet Client page and YAPP transfers (passwords are redacted)'],
-    'bpq-vara'         => ['path' => "$LOG_DIR/bpq-vara-daemon.log",             'label' => 'bpq-vara daemon',     'group' => 'Dashboard services', 'color' => 'blue',   'desc' => 'VARA HF Terminal sessions', 'opt' => 'Only if bpq-vara is installed'],
-    'message-bodies'   => ['path' => "$LOG_DIR/message-bodies.log",              'label' => 'Message text job',    'group' => 'Dashboard services', 'color' => 'green',  'desc' => 'message-bodies.timer: BBS login and per-message results', 'opt' => 'Needs the database and message-bodies.timer'],
-    'bbs-messages'     => ['path' => "$LOG_DIR/bbs-messages.log",                'label' => 'Email Client (BBS)',  'group' => 'Dashboard services', 'color' => 'green',  'desc' => 'BBS sessions made by the Email Client (bbs-messages.php)', 'opt' => 'Appears after the first Get Mail (or at config.php logging.file if set)'],
-    'dashboard'        => ['path' => "$LOG_DIR/dashboard.log",                   'label' => 'Dashboard log',       'group' => 'Dashboard services', 'color' => 'green',  'desc' => 'NWS alerts posted to the BBS (nws-bbs-post.php)', 'opt' => 'Appears after the first NWS Post to BBS (or at config.php logging.file if set)'],
-    'nws-auto-post'    => ['path' => "$LOG_DIR/nws-auto-post.log",               'label' => 'NWS auto-post',       'group' => 'Dashboard services', 'color' => 'amber',  'desc' => 'nws-auto-post.timer: Warnings/Watches posted as bulletins, and the BBS dialogue', 'opt' => 'Only if nws-auto-post.timer is enabled'],
+    'bpq-telnet'       => ['path' => $appLog('bpq-telnet-daemon.log'),           'label' => 'bpq-telnet daemon',   'group' => 'Dashboard services', 'color' => 'blue',   'desc' => 'Telnet Client page and YAPP transfers (passwords are redacted)'],
+    'bpq-vara'         => ['path' => $appLog('bpq-vara-daemon.log'),             'label' => 'bpq-vara daemon',     'group' => 'Dashboard services', 'color' => 'blue',   'desc' => 'VARA HF Terminal sessions', 'opt' => 'Only if bpq-vara is installed'],
+    'message-bodies'   => ['path' => $appLog('message-bodies.log'),              'label' => 'Message text job',    'group' => 'Dashboard services', 'color' => 'green',  'desc' => 'message-bodies.timer: BBS login and per-message results', 'opt' => 'Needs the database and message-bodies.timer'],
+    'bbs-messages'     => ['path' => $appLog('bbs-messages.log'),                'label' => 'Email Client (BBS)',  'group' => 'Dashboard services', 'color' => 'green',  'desc' => 'BBS sessions made by the Email Client (bbs-messages.php)', 'opt' => 'Appears after the first Get Mail (or at config.php logging.file if set)'],
+    'dashboard'        => ['path' => $appLog('dashboard.log'),                   'label' => 'Dashboard log',       'group' => 'Dashboard services', 'color' => 'green',  'desc' => 'NWS alerts posted to the BBS (nws-bbs-post.php)', 'opt' => 'Appears after the first NWS Post to BBS (or at config.php logging.file if set)'],
+    'nws-auto-post'    => ['path' => $appLog('nws-auto-post.log'),               'label' => 'NWS auto-post',       'group' => 'Dashboard services', 'color' => 'amber',  'desc' => 'nws-auto-post.timer: Warnings/Watches posted as bulletins, and the BBS dialogue', 'opt' => 'Only if nws-auto-post.timer is enabled'],
     // Log parsers (cron)
     'parse-vara-log'   => ['path' => $parserLog('parse-vara-log'),              'label' => 'RF Connections parser', 'group' => 'Log parsers',     'color' => 'cyan',   'desc' => 'parse-vara-log.py, every 5 minutes', 'opt' => 'Needs the database (install.sh step 14)'],
     'parse-traffic'    => ['path' => $parserLog('parse-traffic-report'),        'label' => 'Traffic parser',      'group' => 'Log parsers',        'color' => 'cyan',   'desc' => 'parse-traffic-report.py, every 5 minutes', 'opt' => 'Needs the database (install.sh step 14)'],
     'parse-system'     => ['path' => $parserLog('parse-system-logs'),           'label' => 'System Logs parser',  'group' => 'Log parsers',        'color' => 'cyan',   'desc' => 'parse-system-logs.py, every 5 minutes', 'opt' => 'Needs the database (install.sh step 14)'],
     // Optional forwarding tools
-    'prop-scheduler'   => ['path' => "$LOG_DIR/prop-scheduler.log",              'label' => 'Prop Scheduler',      'group' => 'Forwarding tools',   'color' => 'blue',   'desc' => 'Propagation-based forwarding schedule updates', 'opt' => 'Only if prop-scheduler.py is scheduled'],
-    'storm-monitor'    => ['path' => "$LOG_DIR/storm-monitor.log",               'label' => 'Storm Monitor',       'group' => 'Forwarding tools',   'color' => 'amber',  'desc' => 'Kp-based forwarding suspend / restore', 'opt' => 'Only if storm-monitor.py is scheduled'],
-    'connect-watchdog' => ['path' => "$LOG_DIR/connect-watchdog.log",            'label' => 'Connect Watchdog',    'group' => 'Forwarding tools',   'color' => 'amber',  'desc' => 'Failed connect detection and pause / restore', 'opt' => 'Only if connect-watchdog.py is scheduled'],
+    'prop-scheduler'   => ['path' => $appLog('prop-scheduler.log'),              'label' => 'Prop Scheduler',      'group' => 'Forwarding tools',   'color' => 'blue',   'desc' => 'Propagation-based forwarding schedule updates', 'opt' => 'Only if prop-scheduler.py is scheduled'],
+    'storm-monitor'    => ['path' => $appLog('storm-monitor.log'),               'label' => 'Storm Monitor',       'group' => 'Forwarding tools',   'color' => 'amber',  'desc' => 'Kp-based forwarding suspend / restore', 'opt' => 'Only if storm-monitor.py is scheduled'],
+    'connect-watchdog' => ['path' => $appLog('connect-watchdog.log'),            'label' => 'Connect Watchdog',    'group' => 'Forwarding tools',   'color' => 'amber',  'desc' => 'Failed connect detection and pause / restore', 'opt' => 'Only if connect-watchdog.py is scheduled'],
     'watchdog-state'   => ['path' => "$WEB_ROOT/cache/watchdog-state.json",      'label' => 'Watchdog State',      'group' => 'Forwarding tools',   'color' => 'amber',  'desc' => 'Current connect-watchdog pause state (JSON)', 'opt' => 'Only if connect-watchdog.py is scheduled'],
     'wp-auto-clean'    => ['path' => '/var/log/wp-auto-clean.log',               'label' => 'WP Auto Clean',       'group' => 'Forwarding tools',   'color' => 'green',  'desc' => 'White Pages automatic clean-up (wp_manager.py --auto-clean)', 'opt' => 'Only if the wp_manager cron line is set up'],
     // VARA
     'vara-sessions'    => ['path' => $VARA_PATH,                                 'label' => 'VARA Sessions',       'group' => 'VARA',               'color' => 'purple', 'desc' => 'Raw VARA HF session log written by vara-logger (config.php logs.vara_file)', 'opt' => 'Only with VARA HF and vara-logger'],
-    'vara-validator'   => ['path' => '/var/log/vara-validator.log',              'label' => 'VARA Validator',      'group' => 'VARA',               'color' => 'purple', 'desc' => 'Callsign validator ACCEPTED / REJECTED lines', 'opt' => 'Only if vara-validator is installed'],
+    'vara-remote'      => ['path' => $appLog('vara-remote.log'),                'label' => 'VARA download',       'group' => 'VARA',               'color' => 'purple', 'desc' => 'vara-remote.timer: VARA HF log downloaded from the TPRFN server', 'opt' => 'Only if config.php vara_remote is on'],
+    'vara-validator'   => ['path' => file_exists('/var/log/vara-validator.log') ? '/var/log/vara-validator.log' : $appLog('vara-validator.log'),              'label' => 'VARA Validator',      'group' => 'VARA',               'color' => 'purple', 'desc' => 'Callsign validator ACCEPTED / REJECTED lines', 'opt' => 'Only if vara-validator is installed'],
     // LinBPQ's own logs (dated, in the logs folder)
     'bbs-today'        => ['path' => null, 'dir' => $LOG_DIR, 'fmt' => 'log_%y%m%d_BBS.txt',      'label' => 'BBS Log (Today)',     'group' => 'BPQ Node', 'color' => 'cyan', 'desc' => "Today's BPQ BBS log (UTC)", 'dynamic' => 'today'],
     'bbs-archive'      => ['path' => null, 'dir' => $LOG_DIR,                                      'label' => 'BBS Log (Archive)',   'group' => 'BPQ Node', 'color' => 'cyan', 'desc' => 'Earlier BPQ BBS logs — select a date', 'dynamic' => 'archive'],

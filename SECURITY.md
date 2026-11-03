@@ -45,8 +45,11 @@ internet without both.** In detail:
 3. **Use HTTPS** whenever the dashboard is reachable from outside your LAN,
    so the login and your mail aren't sent in clear text
    (`sudo certbot --nginx -d your.domain`).
-4. **Check the firewall, IPv6 included.** The installer doesn't change your
-   firewall. Many home connections now give the server a public IPv6 address
+4. **Check the firewall, IPv6 included.** The installer changes your
+   firewall only if you ask it to (its optional last step, v1.5.19, which runs
+   `tools/setup-firewall.sh`: one question per port, home network only or
+   anywhere, and it never locks out the SSH session you run it from; run it
+   any time, `--dry-run` first to see the rules). Many home connections now give the server a public IPv6 address
    that bypasses the router's port forwarding, and LinBPQ listens on all
    addresses by default. Make sure only 80/443 (and anything you mean to
    share, such as forwarding ports) are open, for both `iptables` and
@@ -74,7 +77,15 @@ internet without both.** In detail:
    `'cors' => ['allow_all' => false, 'allowed_origins' => ['https://club.example.org']]`.
    To make the Email Client read-only (no Send, Forward or Kill), set
    `'features' => ['bbs_write' => false, …]`.
-8. **Use different passwords** for the admin login, the BBS sysop account,
+8. **The one sudo rule that changes something** (v1.5.19): the Maintenance
+   page's *Change admin password* runs `/usr/local/sbin/bpq-dashboard-set-admin-password`
+   through sudo. It must be a root-owned copy outside the web folder (the
+   web user can write in the web folder, so a sudo rule pointing there would
+   give it root); it changes only an existing admin login, takes the password
+   on stdin and logs no secret. The page checks the current password first
+   and locks for 15 minutes after 5 wrong tries. Leave the rule out of
+   `/etc/sudoers.d/www-data-tools` if you'd rather change it over SSH.
+9. **Use different passwords** for the admin login, the BBS sysop account,
    the database and anything else on the network (Wi-Fi, router). LinBPQ's
    own Telnet logs record login lines; keep them out of the web root.
 

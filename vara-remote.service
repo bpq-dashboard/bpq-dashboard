@@ -1,0 +1,13 @@
+[Unit]
+Description=BPQ Dashboard: download the VARA HF log from the TPRFN server
+Documentation=file:///var/www/bpq-dashboard/USER-GUIDE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/python3 /var/www/bpq-dashboard/scripts/fetch-vara-remote.py --verbose
+StandardOutput=append:/var/log/bpq-dashboard/vara-remote.log
+StandardError=append:/var/log/bpq-dashboard/vara-remote.log

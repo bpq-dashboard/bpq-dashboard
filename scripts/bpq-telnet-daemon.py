@@ -42,7 +42,7 @@ WEB_ROOT = next((p for p in _candidates if _os.path.isdir(p)), '/var/www/html/bp
 
 STATE_DIR  = WEB_ROOT + '/cache/telnet-sessions'
 DAEMON_FILE= STATE_DIR + '/telnet-daemon.json'
-LOG_FILE   = WEB_ROOT + '/logs/bpq-telnet-daemon.log'
+LOG_FILE   = None   # set below (_app_log_file), v1.5.19
 YAPP_DIR   = WEB_ROOT + '/yapp-files'   # received YAPP files land here
 WS_HOST    = '127.0.0.1'
 WS_PORT    = 8765          # WebSocket port — nginx proxies /ws/telnet here
@@ -100,18 +100,36 @@ for _p in _station_bpq_ports():
         ALLOWED_PORTS.append(_p)
 
 # ── Logging ────────────────────────────────────────────────────────
+def _app_log_file(name):
+    """v1.5.19: the daemon's own log goes to /var/log/bpq-dashboard (made by
+    the installer, owned by the web user), not <web root>/logs, which is
+    LinBPQ's logs folder and may be read-only to the web user (N3MEL:
+    PermissionError at start). Old folder only if the new one isn't there."""
+    for d in ('/var/log/bpq-dashboard', WEB_ROOT + '/logs'):
+        if os.path.isdir(d) and os.access(d, os.W_OK):
+            return os.path.join(d, name)
+    return None
+
+
+def _log_handlers(path):
+    hs = [logging.StreamHandler(sys.stdout)]   # the journal always gets it
+    if path:
+        try:
+            hs.insert(0, logging.FileHandler(path))
+        except OSError as e:
+            sys.stderr.write(f"Log file {path} not writable ({e}); logging to the journal only\n")
+    return hs
+
+
 Path(STATE_DIR).mkdir(parents=True, exist_ok=True)
-Path(WEB_ROOT + '/logs').mkdir(parents=True, exist_ok=True)
 Path(YAPP_DIR).mkdir(parents=True, exist_ok=True)
+LOG_FILE = _app_log_file('bpq-telnet-daemon.log')
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=_log_handlers(LOG_FILE)
 )
 log = logging.getLogger('bpq-telnet')
 
@@ -183,7 +201,8 @@ logging.getLogger('websockets').setLevel(logging.INFO)
 for _h in logging.getLogger().handlers:      # root handlers: covers every logger
     _h.addFilter(REDACT)
 try:
-    os.chmod(LOG_FILE, 0o640)                # not world-readable
+    if LOG_FILE:
+        os.chmod(LOG_FILE, 0o640)            # not world-readable
 except OSError:
     pass
 

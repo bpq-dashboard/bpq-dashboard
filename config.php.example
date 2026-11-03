@@ -139,13 +139,28 @@ return [
         'scripts' => '/var/www/bpq-dashboard/scripts/',
         'datalog' => '/var/www/bpq-dashboard/logs/',
         'linbpq'  => '/home/linbpq',        // Your LinBPQ directory (bpq32.cfg, WP.cfg, linmail.cfg)
+        'app_logs' => '/var/log/bpq-dashboard', // v1.5.19: the dashboard's OWN logs (daemons, Email
+                                            //   Client, message-text job); not LinBPQ's logs folder
+    ],
+
+    // ---- Optional pages (v1.5.19) ----
+    // false = hidden from the menu and its helper service not needed. A page
+    // left out of this list counts as on. Rig Status / RF Power Monitor follow
+    // 'radio' => 'enabled'. Switching on later: Maintenance > Optional pages.
+    'pages' => [
+        'telnet'         => true,   // Telnet Client (bpq-telnet)
+        'chat'           => true,   // Chat (bpq-chat; needs BPQ Chat in this LinBPQ)
+        'aprs'           => true,   // APRS map (bpq-aprs)
+        'vara'           => true,   // VARA HF Terminal (bpq-vara)
+        'vara_validator' => false,  // VARA callsign check (vara-validator), see 'vara_validator' below
     ],
 
     // ---- Rig control via flrig (Rig Status, RF Power Monitor) ----
-    // Both pages need flrig. install.sh leaves them out when you skip flrig
-    // (enabled => false); to add them later, re-run install.sh.
+    // Both pages need flrig. install.sh sets enabled => false when you skip
+    // flrig; the pages are then hidden (v1.5.19: no longer deleted). To add
+    // them later: set up flrig, set enabled => true (Maintenance > Optional pages).
     'radio' => [
-        'enabled'    => true,           // false = no flrig: Rig pages not installed
+        'enabled'    => true,           // false = no flrig: Rig pages hidden from the menu, no history poller
         'flrig_host' => '127.0.0.1',    // machine running flrig
         'flrig_port' => 12345,          // flrig XML-RPC port (Config > Setup > XML-RPC Server)
         'bpq_radio'  => 0,              // bpq32.cfg RADIO number whose scan list the Rig page
@@ -175,10 +190,32 @@ return [
         // 'user' => '', 'pass' => '',      // a different BPQ login for the VARA terminal (optional)
     ],
 
+    // ---- VARA callsign check (scripts/vara-callsign-validator.py, v1.5.19) ----
+    // A proxy between BPQ and VARA HF that drops calls with invalid callsigns.
+    // BPQ's VARA port ADDR points at listen_host:listen_cmd_port; the proxy
+    // forwards to VARA HF at vara_host:vara_cmd_port (data ports = +1).
+    'vara_validator' => [
+        'vara_host'       => '127.0.0.1',
+        'vara_cmd_port'   => 8300,
+        'listen_host'     => '127.0.0.1',     // '0.0.0.0' only if BPQ runs on another machine
+        'listen_cmd_port' => 9025,
+        'allow'           => [],              // callsigns always accepted
+        'deny'            => ['NOCALL', 'TEST', 'N0CALL', 'INVALID'],
+    ],
+
     // ---- VARA log file ----
-    // Path under 'paths.logs' where your VARA modem appends its log.
-    // The default convention is <yourcall-lowercase>.vara
+    // Path under 'paths.logs' where your VARA modem appends its log, or a
+    // full path. The default convention is <yourcall-lowercase>.vara
     'logs' => [
         'vara_file' => 'yourcall.vara',
+    ],
+
+    // ---- VARA log from the TPRFN server (v1.5.19) ----
+    // TPRFN stations whose VARA HF sends its syslog to the TPRFN server:
+    // vara-remote.timer downloads it every 5 minutes into logs.vara_file
+    // (use a full path such as /var/log/bpq-dashboard/yourcall.vara).
+    'vara_remote' => [
+        'enabled' => false,
+        'url'     => '',                      // the address the TPRFN server admin gives you, e.g. 'https://<server>/yourcall.vara'
     ],
 ];

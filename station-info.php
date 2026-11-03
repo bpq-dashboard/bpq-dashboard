@@ -41,4 +41,7 @@ echo json_encode([
     // mode. Port numbers only (they are reachable on the station anyway).
     'bpq_telnet_port' => bpq_bbs_ports()['telnet'],
     'bpq_fbb_port'    => bpq_bbs_ports()['fbb'],
+    // 2026-11-02 (v1.5.19): menu keys of the optional pages switched off in
+    // config.php ('pages', 'radio' => 'enabled'); the menu hides them.
+    'pages_off'       => bpq_pages_off(),
 ]);

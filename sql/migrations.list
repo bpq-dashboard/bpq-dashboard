@@ -1,0 +1,13 @@
+# Database files, in order, loaded by install.sh (new database) and update.sh
+# (every update). Every file must be safe to run again on a database that
+# already has it (CREATE TABLE IF NOT EXISTS, guarded ALTERs). Add new
+# migrations at the end. Paths are relative to the package folder.
+sql/2026-07-messages-schema.sql
+data/rf-connections-schema.sql
+data/prop-decisions-schema.sql
+data/sessions-stations-schema.sql
+data/traffic-schema.sql
+data/system-logs-schema.sql
+sql/2026-09-21-rf-messages-medium.sql
+sql/2026-09-26-message-keep-and-bodies.sql
+sql/2026-10-06-rf-messages-delivery.sql

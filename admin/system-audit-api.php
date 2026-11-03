@@ -570,7 +570,9 @@ foreach ((glob('/etc/logrotate.d/*') ?: []) as $lrf) {
 }
 $own = [];
 foreach (['dashboard.log','bbs-messages.log','message-bodies.log','nws-auto-post.log','bpq-telnet-daemon.log','bpq-vara-daemon.log','prop-scheduler.log','storm-monitor.log','connect-watchdog.log'] as $f) {
-    if (file_exists("$LOG_DIR/$f")) $own[] = "$LOG_DIR/$f";
+    // v1.5.19: these now live in /var/log/bpq-dashboard (covered by its *.log);
+    // only copies still written into LinBPQ's logs folder need naming
+    if (file_exists("$LOG_DIR/$f") && bpq_app_log_dir() === $LOG_DIR) $own[] = "$LOG_DIR/$f";
 }
 $parserLogs = glob('/var/log/bpq-dashboard/*.log') ?: [];
 if ($lrFiles) {
@@ -663,11 +665,28 @@ $daemons = [
     ['vara-validator','the callsign check in front of VARA HF',       null, 0, true],
 ];
 if ($radioOn) $daemons[] = ['rig-history-poller', 'round-the-clock TX power / SWR history (RF Power charts)', null, 0, true];
+// v1.5.19: pages the station switched off in config.php 'pages' (installer
+// page choices). Their helper is 'not in use', whatever its state, unless it
+// is running anyway. With the VARA log fetched from the TPRFN server
+// ('vara_remote'), vara-logger isn't needed.
+$pagesOn  = bpq_pages();
+$unitPage = ['bpq-telnet' => 'telnet', 'bpq-chat' => 'chat', 'bpq-aprs' => 'aprs',
+             'bpq-vara' => 'vara', 'vara-validator' => 'vara_validator'];
+$varaRemote = !empty($cfg['vara_remote']['enabled']);
 foreach ($daemons as [$u, $what, $hb, $maxAge, $optional]) {
     [$inst, $act, $en] = unit_state("$u.service");
+    $pageOff = (isset($unitPage[$u]) && !$pagesOn[$unitPage[$u]]) || ($u === 'vara-logger' && $varaRemote);
+    if ($pageOff && $act !== 'active') {
+        $findings[] = finding("svc-$u",'application','info',"$u not in use",
+            $u === 'vara-logger'
+                ? "The VARA HF log comes from the TPRFN server (config.php 'vara_remote'), so vara-logger isn't needed."
+                : "The page it serves ($what) is switched off in config.php 'pages', so $u isn't needed.",
+            'To use it: Maintenance > Optional pages.');
+        continue;
+    }
     if (!$inst) {
         $findings[] = finding("svc-$u",'application','info',"$u not installed",
-            "No $u.service, so " . ($optional ? "$what is not in use (optional)." : "$what won't work. The installer asks about it in step 13; skip this if you don't use that page."),
+            "No $u.service, so " . ($optional ? "$what is not in use (optional)." : "$what won't work. The installer asks about it in step 9; skip this if you don't use that page."),
             "sudo sed 's|/var/www/bpq-dashboard|$WEB_ROOT|g' $WEB_ROOT/$u.service | sudo tee /etc/systemd/system/$u.service >/dev/null && sudo systemctl daemon-reload && sudo systemctl enable --now $u");
         continue;
     }
@@ -772,6 +791,28 @@ if (!empty($nwsAuto['enabled'])) {
         } else {
             $findings[] = finding('timer-nws-auto-post','application','ok','nws-auto-post.timer active', ucfirst($what) . '. Last run: ' . ($last ?: 'not yet') . '.');
         }
+    }
+}
+
+// v1.5.19: VARA HF log downloaded from the TPRFN server (config.php vara_remote)
+if (!empty($cfg['vara_remote']['enabled'])) {
+    [$inst, $act] = unit_state('vara-remote.timer');
+    $vrs = json_file("$CACHE_DIR/vara-remote-status.json") ?: [];
+    $age = !empty($vrs['last_success']) ? time() - (int)$vrs['last_success'] : null;
+    $url = (string)($cfg['vara_remote']['url'] ?? '');
+    if (!$inst || $act !== 'active') {
+        $findings[] = finding('timer-vara-remote','application','warn','VARA log download is ' . ($inst ? $act : 'not installed'),
+            "config.php vara_remote is on, but vara-remote.timer isn't running, so RF Connections gets nothing new from $url.",
+            $inst ? 'sudo systemctl enable --now vara-remote.timer'
+                  : "sudo sed 's|/var/www/bpq-dashboard|$WEB_ROOT|g' $WEB_ROOT/vara-remote.service | sudo tee /etc/systemd/system/vara-remote.service >/dev/null && sudo cp $WEB_ROOT/vara-remote.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now vara-remote.timer");
+    } elseif ($age === null || $age > 1800) {
+        $findings[] = finding('timer-vara-remote','application','warn','VARA log download failing',
+            ($age === null ? 'No successful download yet' : 'Last good download ' . round($age / 60) . ' min ago') . " from $url"
+            . (!empty($vrs['error']) ? '. Last error: ' . $vrs['error'] : '') . '. RF Connections shows the last good copy.',
+            'Log Viewer → VARA download; test: sudo -u www-data python3 ' . $WEB_ROOT . '/scripts/fetch-vara-remote.py -v');
+    } else {
+        $findings[] = finding('timer-vara-remote','application','ok','VARA log download working',
+            'Last download ' . round($age / 60) . " min ago from $url (" . (int)($vrs['bytes'] ?? 0) . ' bytes).');
     }
 }
 

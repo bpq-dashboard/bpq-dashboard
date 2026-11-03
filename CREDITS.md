@@ -44,12 +44,15 @@ reported, clearly and patiently, everything that didn't work:
   Telnet Client's fixed ports, Traffic reports in the LinBPQ folder, the
   private home-folder access on Mint/Ubuntu, `linbpq64` in System Audit and
   more (fixed in v1.5.18). His setup (no local BPQ Chat, APRS through
-  APRSIS32) also led to the coming installer option to choose which pages and
-  helper services a station installs.
+  APRSIS32) also led to the installer's choice of pages and helper
+  services, and he asked for the Email Client's signature line (v1.5.19).
 - **Ernie, KG9NI** — the first Ubuntu / PHP 8.5 install (2026-10). His
   report, with the exact log lines and his own fixes, found the installer's
   PHP-FPM socket and admin-login file problems (fixed in v1.5.16) and Install
   Check's PHP-version gap. His feedback shaped the same page-choice work.
+- **Lee, K5DAT** — asked, before installing, whether the dashboard could run
+  under Apache next to the nginx he already uses as a reverse proxy, without
+  touching it. That became v1.5.19's web-server and port choice.
 
 ## Also built on
 

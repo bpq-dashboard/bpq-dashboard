@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 bpq-vara-daemon.py — WebSocket to BPQ Telnet proxy for VARA HF terminal
-BPQ Dashboard v1.5.18
+BPQ Dashboard v1.5.19
 
 Bridges browser WebSocket connections to BPQ telnet (config.php 'bbs'),
 logging in and attaching to the VARA HF port for keyboard-to-keyboard
@@ -45,7 +45,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_ROOT    = os.path.dirname(_SCRIPT_DIR)      # scripts/ -> dashboard root
 STATE_DIR   = WEB_ROOT + '/cache/vara-sessions'
 DAEMON_FILE = STATE_DIR + '/vara-daemon.json'
-LOG_FILE    = WEB_ROOT + '/logs/bpq-vara-daemon.log'
+LOG_FILE    = None   # set below (_app_log_file), v1.5.19
 
 
 def _fatal(msg: str):
@@ -116,17 +116,35 @@ MAX_SESSIONS = 3
 SESSION_TIMEOUT = 7200       # 2 hour idle timeout
 
 # ── Logging ────────────────────────────────────────────────────────
+def _app_log_file(name):
+    """v1.5.19: the daemon's own log goes to /var/log/bpq-dashboard (made by
+    the installer, owned by the web user), not <web root>/logs, which is
+    LinBPQ's logs folder and may be read-only to the web user (N3MEL:
+    PermissionError at start). Old folder only if the new one isn't there."""
+    for d in ('/var/log/bpq-dashboard', WEB_ROOT + '/logs'):
+        if os.path.isdir(d) and os.access(d, os.W_OK):
+            return os.path.join(d, name)
+    return None
+
+
+def _log_handlers(path):
+    hs = [logging.StreamHandler(sys.stdout)]   # the journal always gets it
+    if path:
+        try:
+            hs.insert(0, logging.FileHandler(path))
+        except OSError as e:
+            sys.stderr.write(f"Log file {path} not writable ({e}); logging to the journal only\n")
+    return hs
+
+
 Path(STATE_DIR).mkdir(parents=True, exist_ok=True)
-Path(WEB_ROOT + '/logs').mkdir(parents=True, exist_ok=True)
+LOG_FILE = _app_log_file('bpq-vara-daemon.log')
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=_log_handlers(LOG_FILE)
 )
 log = logging.getLogger('bpq-vara')
 

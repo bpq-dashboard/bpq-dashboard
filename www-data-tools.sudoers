@@ -26,3 +26,9 @@ www-data ALL=(root) NOPASSWD: /usr/bin/ss -tlnp
 
 # nginx configuration test (reads the config, changes nothing)
 www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -t
+
+# v1.5.19: Maintenance page > Change admin password. The helper is a root-owned
+# copy in /usr/local/sbin (install.sh puts it there from tools/set-admin-password;
+# never point this at the web folder, which the web user can write). It changes
+# only an existing admin login, reads the password on stdin and logs no secret.
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-set-admin-password *

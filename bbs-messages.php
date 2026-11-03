@@ -14,6 +14,7 @@ ini_set('log_errors', 1);
 require_once __DIR__ . '/includes/bootstrap.php';
 require_once __DIR__ . '/includes/web-login.php';
 require_once __DIR__ . '/includes/bbs-login.php';   // shared BBS login (2026-11-01)
+require_once __DIR__ . '/includes/station-config.php';   // bpq_app_log() (v1.5.19)
 // Reads your mail and acts on the BBS as the sysop: admin login only (2026-10-04)
 // (CLI is exempt inside bpq_require_web_login(); scripts/fetch-message-bodies.php
 // includes this file with BPQ_MESSAGES_LIB defined to reuse the telnet helpers.)
@@ -34,7 +35,8 @@ $config = [
     // internally), unless the server's config.php separately overrode
     // ui.max_msg_count. Bumped to match so 200 actually means 200.
     'max_count'     => getConfig('ui', 'max_msg_count', 200),
-    'log_file'      => getConfig('logging', 'file', './logs/bbs-messages.log'),
+    // v1.5.19: /var/log/bpq-dashboard (bpq_app_log), not LinBPQ's logs folder
+    'log_file'      => getConfig('logging', 'file', bpq_app_log('bbs-messages.log')),
 ];
 
 // ===========================
@@ -134,7 +136,7 @@ if (!defined('BPQ_MESSAGES_LIB') && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST
 $config['bbs_alias'] = $config['bbs_alias'] ?? 'bbs';
 $config['default_count'] = $config['default_count'] ?? 20;
 $config['max_count'] = $config['max_count'] ?? 100;
-$config['log_file'] = $config['log_file'] ?? __DIR__ . '/logs/bbs-messages.log';
+$config['log_file'] = $config['log_file'] ?? bpq_app_log('bbs-messages.log');
 
 // ===========================
 // BBS-SPECIFIC HELPER FUNCTIONS

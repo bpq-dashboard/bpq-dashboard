@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * rig-history-poller.php — BPQ Dashboard v1.5.18
+ * rig-history-poller.php — BPQ Dashboard v1.5.19
  *
  * Keeps rig-history.jsonl populated with TX power / SWR samples
  * continuously, independent of whether anyone has rig-status.html or

@@ -1,6 +1,6 @@
 <?php
 /**
- * includes/bpq-radio.php — BPQ Dashboard v1.5.18
+ * includes/bpq-radio.php — BPQ Dashboard v1.5.19
  *
  * Reads the scan schedule of the FLRIG-controlled radio out of bpq32.cfg,
  * so the Rig Status page shows the frequencies LinBPQ really scans instead

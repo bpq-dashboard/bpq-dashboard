@@ -14,6 +14,7 @@
 // Load configuration and security
 require_once __DIR__ . '/includes/bootstrap.php';
 require_once __DIR__ . '/includes/web-login.php';
+require_once __DIR__ . '/includes/station-config.php';   // bpq_app_log() (v1.5.19)
 // Posts bulletins to the BBS as the station: admin login only (2026-10-04)
 bpq_require_web_login('Posting NWS bulletins');
 
@@ -32,7 +33,7 @@ $config = [
     'to_addr'   => nwsDefaultDestination(),
     'timeout'   => getConfig('bbs', 'timeout', 30),
     'enabled'   => isFeatureEnabled('nws_post'),
-    'log_file'  => getConfig('logging', 'file', './logs/dashboard.log'),
+    'log_file'  => getConfig('logging', 'file', bpq_app_log('dashboard.log')),   // v1.5.19: not LinBPQ's logs folder
 ];
 
 // ================================

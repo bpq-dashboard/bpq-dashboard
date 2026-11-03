@@ -231,6 +231,10 @@ if (is_dir($logsDir)) {
         count($bbsLogs) . ' file(s) found' . (count($bbsLogs) > 0 ? ' — e.g. ' . reset($bbsLogs) : ''),
         'Run the log sync script to copy BPQ log files into the logs/ directory');
     
+    // v1.5.19: a VARA log downloaded from the TPRFN server can live outside
+    // logs/ (logs.vara_file as a full path, e.g. /var/log/bpq-dashboard/<call>.vara)
+    $vfCfg = (string)((is_array($config ?? null) ? ($config['logs']['vara_file'] ?? '') : '') ?: '');
+    if ($vfCfg !== '' && $vfCfg[0] === '/' && is_readable($vfCfg)) $varaLogs[] = $vfCfg;
     $varaCount = count($varaLogs);
     if ($varaCount > 0) {
         check('VARA log file in logs/', true, $varaCount . ' file(s) — e.g. ' . reset($varaLogs), '');

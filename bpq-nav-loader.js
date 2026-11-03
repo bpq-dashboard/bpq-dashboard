@@ -18,11 +18,43 @@
     'use strict';
 
     // Cache-busting query param — bump when _nav.html changes.
-    var NAV_VERSION = '2026-11-01-1';   // 1.5.18: must equal the ?v= on every page's script tag (System Audit checks it)
+    var NAV_VERSION = '2026-11-02-1';   // 1.5.19: must equal the ?v= on every page's script tag (System Audit checks it)
 
     // Page keys that live inside the Admin dropdown — used to also light up
     // the Admin button when one of these pages is active.
     var ADMIN_KEYS = ['maint', 'firewall', 'logs', 'audit'];
+
+    // Optional pages switched off in config.php (v1.5.19): station-info.php
+    // lists their menu keys in 'pages_off'. Fetched alongside the menu, so
+    // hidden links disappear as soon as the menu appears.
+    var pagesOff = fetch('/station-info.php', { cache: 'default' })
+        .then(function(r) { return r.ok ? r.json() : {}; })
+        .then(function(j) { return (j && Array.isArray(j.pages_off)) ? j.pages_off : []; })
+        .catch(function() { return []; });
+
+    function hideOffPages() {
+        pagesOff.then(function(off) {
+            off.forEach(function(key) {
+                document.querySelectorAll('.bpq-nav-link[data-page="' + key + '"]').forEach(function(a) {
+                    a.style.display = 'none';
+                });
+            });
+            // Opened directly while switched off: say so, keep the page usable.
+            var here = document.body.getAttribute('data-nav-page');
+            if (here && off.indexOf(here) !== -1 && !document.getElementById('bpqPageOffNote')) {
+                var n = document.createElement('div');
+                n.id = 'bpqPageOffNote';
+                n.setAttribute('role', 'note');
+                n.style.cssText = 'margin:8px 16px;padding:8px 12px;border-radius:6px;' +
+                    'background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);font-size:13px;';
+                n.textContent = 'This page is switched off for this station, so it is hidden from the menu ' +
+                    '(config.php \'pages\' or \'radio\'). To use it, see Maintenance \u2192 Optional pages.';
+                var nav = document.querySelector('.bpq-nav');
+                if (nav && nav.parentNode) nav.parentNode.insertBefore(n, nav.nextSibling);
+                else document.body.insertBefore(n, document.body.firstChild);
+            }
+        });
+    }
 
     function injectNav() {
         fetch('/_nav.html?v=' + NAV_VERSION, { cache: 'force-cache' })
@@ -38,6 +70,7 @@
                     document.body.insertBefore(temp.firstChild, firstChild);
                 }
                 wireUp();
+                hideOffPages();
             })
             .catch(function(err) {
                 console.warn('[BPQ Nav] Failed to load _nav.html:', err.message);

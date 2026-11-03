@@ -12,7 +12,7 @@ Architecture:
 
     VARA HF on BPQHOST via Wine  (127.0.0.1 :8300/:8301)
             ^  outbound TCP from validator (loopback)
-    [this proxy on Linux, listening on 0.0.0.0:9025/:9026]
+    [this proxy on Linux, listening on 127.0.0.1:9025/:9026 (config.php)]
             ^  BPQ32 connects to validator
     BPQ32 on Linux
 
@@ -36,20 +36,48 @@ import re
 import sys
 
 # =============================================================================
-# CONFIGURATION
+# CONFIGURATION  (v1.5.19: from config.php 'vara_validator'; was hard-coded
+# for one station, ran as User=pi from /usr/local/bin, logged where the web
+# user couldn't write)
 # =============================================================================
+#   'vara_validator' => [
+#       'vara_host'       => '127.0.0.1',  // where VARA HF listens (its command port;
+#       'vara_cmd_port'   => 8300,         //   data = vara_data_port, default +1)
+#       'listen_host'     => '127.0.0.1',  // where BPQ connects: its VARA port ADDR
+#       'listen_cmd_port' => 9025,         //   (data = listen_data_port, default +1)
+#       'allow' => [], 'deny' => ['NOCALL', 'TEST', 'N0CALL', 'INVALID'],
+#   ],
+# Use listen_host '0.0.0.0' only if BPQ runs on another machine.
 
-VARA_HOST      = "127.0.0.1"   # local VARA HF on BPQHOST via Wine (was 192.168.1.100 before VARA HF was migrated)
-VARA_CMD_PORT  = 8300          # local VARA HF cmd port (was 9025 when on remote Windows)
-VARA_DATA_PORT = 8301          # local VARA HF data port (was 9026 when on remote Windows)
+import os as _os
+sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+try:
+    import bpq_db_config as _cfgmod   # noqa: E402
+    _VC = _cfgmod.load_config_section('vara_validator') or {}
+    _LOGDIR = _cfgmod.app_log_dir()
+except Exception:                      # running outside a dashboard folder
+    _VC, _LOGDIR = {}, '/var/log/bpq-dashboard'
 
-PROXY_CMD_PORT  = 9025
-PROXY_DATA_PORT = 9026
 
-LOG_FILE = "/var/log/vara-validator.log"
+def _int(key, default):
+    try:
+        return int(_VC.get(key, default))
+    except (TypeError, ValueError):
+        return default
 
-ALLOWLIST: set = set()
-DENYLIST:  set = {"NOCALL", "TEST", "N0CALL", "INVALID"}
+
+VARA_HOST      = str(_VC.get('vara_host') or '127.0.0.1')
+VARA_CMD_PORT  = _int('vara_cmd_port', 8300)
+VARA_DATA_PORT = _int('vara_data_port', VARA_CMD_PORT + 1)
+
+LISTEN_HOST     = str(_VC.get('listen_host') or '127.0.0.1')
+PROXY_CMD_PORT  = _int('listen_cmd_port', 9025)
+PROXY_DATA_PORT = _int('listen_data_port', PROXY_CMD_PORT + 1)
+
+LOG_FILE = _os.path.join(_LOGDIR, 'vara-validator.log')
+
+ALLOWLIST: set = {str(c).strip().upper() for c in (_VC.get('allow') or []) if str(c).strip()}
+DENYLIST:  set = {str(c).strip().upper() for c in (_VC.get('deny') or ['NOCALL', 'TEST', 'N0CALL', 'INVALID']) if str(c).strip()}
 
 # =============================================================================
 # ITU CALLSIGN VALIDATION
@@ -98,8 +126,8 @@ def setup_logging():
         fh = logging.FileHandler(LOG_FILE)
         fh.setFormatter(fmt)
         logger.addHandler(fh)
-    except PermissionError:
-        pass
+    except OSError:
+        pass   # journal only
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(fmt)
     logger.addHandler(sh)
@@ -269,9 +297,9 @@ def handle_data(bpq_sock, addr):
 def start_listener(port, handler, label):
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("0.0.0.0", port))
+    srv.bind((LISTEN_HOST, port))
     srv.listen(5)
-    log.info(f"{label} listening on 0.0.0.0:{port}")
+    log.info(f"{label} listening on {LISTEN_HOST}:{port}")
     while True:
         try:
             client_sock, addr = srv.accept()
@@ -288,7 +316,7 @@ def start_listener(port, handler, label):
 if __name__ == "__main__":
     log.info("=" * 60)
     log.info("VARA Callsign Validation Proxy starting")
-    log.info(f"  BPQ32 connects to:    0.0.0.0:{PROXY_CMD_PORT} / :{PROXY_DATA_PORT}")
+    log.info(f"  BPQ32 connects to:    {LISTEN_HOST}:{PROXY_CMD_PORT} / :{PROXY_DATA_PORT}")
     log.info(f"  Forwarding to VARA:   {VARA_HOST}:{VARA_CMD_PORT} / :{VARA_DATA_PORT}")
     log.info(f"  Allowlist entries: {len(ALLOWLIST)}")
     log.info(f"  Denylist entries:  {len(DENYLIST)}")

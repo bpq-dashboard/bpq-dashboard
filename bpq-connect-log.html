@@ -192,7 +192,7 @@
 <body class="min-h-screen" data-nav-page="connects">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-11-01-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-02-1"></script>
 
     
     <div class="p-2 sm:p-4 lg:p-8">
@@ -202,7 +202,7 @@
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">Connect Log</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.18</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.19</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">Connection Activity by Mode</p>
                 </div>
@@ -491,7 +491,9 @@ async function loadLogs() {
     allEntries.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
 
     if (allEntries.length === 0) {
-        setStatus('error', 'No connect log files found in logs/ directory');
+        setStatus('error', filesLoaded === 0
+            ? 'No BPQ connect logs found. BPQ writes them only with LogAllConnects=1 in bpq32.cfg (main section); add it and restart LinBPQ'
+            : 'No connections in the ' + filesLoaded + ' connect log file' + (filesLoaded > 1 ? 's' : '') + ' for this range');
     } else {
         setStatus('success', `Loaded ${allEntries.length} connections from ${filesLoaded} file${filesLoaded > 1 ? 's' : ''}`);
     }
@@ -703,7 +705,12 @@ function renderTopStations() {
     const tbody = document.getElementById('topStationsBody');
 
     if (sorted.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="py-8 text-center text-gray-400">No data</td></tr>';
+        // v1.5.19 (N3MEL): say why, instead of a bare "No data"
+        tbody.innerHTML = allEntries.length === 0
+            ? '<tr><td colspan="9" class="py-8 text-center text-gray-400">No BPQ connect logs found for this range.<br>' +
+              'BPQ writes <span class="font-mono">ConnectLog_YYMMDD.log</span> only with <b class="font-mono">LogAllConnects=1</b> in the main section of bpq32.cfg ' +
+              '(before the first PORT). Add it, restart LinBPQ, and new connections appear here.</td></tr>'
+            : '<tr><td colspan="9" class="py-8 text-center text-gray-400">No data</td></tr>';
         return;
     }
 

@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <body class="min-h-screen" data-nav-page="traffic">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-11-01-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-02-1"></script>
 
     
     <div class="p-2 sm:p-4 lg:p-8">
@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">Traffic Report</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.18</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.19</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">BBS Station Traffic Analytics</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -464,7 +464,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
             updateAll();
             updateStatus('success', stationArray.length + ' stations (' + days + ' days) (DB)');
+            if (stationArray.length === 0) showNoTrafficHelp(days);   // v1.5.19
             return true;
+        }
+
+        // v1.5.19 (N3MEL): an empty Traffic page said nothing about why.
+        // BPQ writes Traffic_YYMMDD.txt once a week (Saturday evening), in the
+        // LinBPQ folder itself on most stations; the parser looks there and in
+        // logs/ every 5 minutes.
+        function showNoTrafficHelp(days) {
+            const body = document.getElementById('stationTableBody');
+            if (!body) return;
+            body.innerHTML =
+                '<tr><td colspan="9" class="text-center py-8">' +
+                '<div class="text-amber-500 text-2xl mb-2">⚠️</div>' +
+                '<div class="text-gray-600 font-semibold mb-2">No BPQ Traffic reports for the last ' + days + ' days</div>' +
+                '<div class="text-gray-400 text-xs leading-relaxed">' +
+                'This page is built from BPQ\'s weekly Traffic reports, <span class="font-mono text-purple-600">Traffic_YYMMDD.txt</span>.<br>' +
+                'BPQ writes one each week (Saturday evening, named for the Sunday), usually in its <b>LinBPQ folder</b>.<br>' +
+                'Every 5 minutes the Traffic parser looks in the LinBPQ folder (config.php <span class="font-mono">paths.linbpq</span>) and in <span class="font-mono">logs/</span>.<br><br>' +
+                'Just installed? The first report appears after BPQ\'s next weekly run. Already have some?<br>' +
+                'Install Check → <b>Traffic reports</b> shows where they were found; Admin → Logs → <b>Traffic parser</b> shows where it looked.<br>' +
+                'Try a longer range (4W / 12W) above.' +
+                '</div></td></tr>';
+            const ts = document.getElementById('tableStats');
+            if (ts) ts.textContent = 'No data available';
         }
 
         // Generate filename for a date: Traffic_YYMMDD.txt (using UTC)
@@ -639,7 +663,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 // Show detailed warning AFTER updateStats so it doesn't get overwritten
                 updateStatus('error', 'No traffic files found');
-                document.getElementById('dateRange').textContent = '⚠️ No traffic report files found in logs folder';
+                document.getElementById('dateRange').textContent = '⚠️ No traffic report files found';
                 document.getElementById('stationTableBody').innerHTML = 
                     '<tr><td colspan="9" class="text-center py-8">' +
                     '<div class="text-amber-500 text-2xl mb-2">⚠️</div>' +
@@ -647,10 +671,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<div class="text-gray-400 text-xs leading-relaxed">' +
                     'This page requires BPQ32 weekly traffic report files to display station data.<br><br>' +
                     '<span class="text-gray-500 font-semibold">Required file:</span> <span class="font-mono font-semibold text-purple-600">Traffic_YYMMDD.txt</span><br>' +
-                    '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br>' +
+                    '<span class="text-gray-500 font-semibold">Location:</span> BPQ writes them in its LinBPQ folder; the parser loads them from there (config.php <span class="font-mono">paths.linbpq</span>) and from <span class="font-mono font-semibold text-purple-600">logs/</span><br>' +
                     '<span class="text-gray-500 font-semibold">Example:</span> <span class="font-mono text-gray-500">logs/Traffic_' + String(now.getUTCFullYear()).slice(-2) + String(now.getUTCMonth()+1).padStart(2,'0') + String(now.getUTCDate()).padStart(2,'0') + '.txt</span><br><br>' +
                     'BPQ32 generates these files automatically each week.<br>' +
-                    'Ensure they are being synced to the dashboard <span class="font-mono font-semibold">logs/</span> folder.' +
+                    'Install Check → <b>Traffic reports</b> shows where they were found.' +
                     '</div>' +
                     '</td></tr>';
                 document.getElementById('tableStats').textContent = 'No data available';
@@ -713,11 +737,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     '<div class="text-gray-400 text-xs leading-relaxed">' +
                     'This page requires BPQ32 weekly traffic report files to display station data.<br><br>' +
                     '<span class="text-gray-500 font-semibold">Required file:</span> <span class="font-mono font-semibold text-purple-600">Traffic_YYMMDD.txt</span><br>' +
-                    '<span class="text-gray-500 font-semibold">Location:</span> <span class="font-mono font-semibold text-purple-600">logs/</span> directory on the web server<br>' +
+                    '<span class="text-gray-500 font-semibold">Location:</span> BPQ writes them in its LinBPQ folder; the parser loads them from there (config.php <span class="font-mono">paths.linbpq</span>) and from <span class="font-mono font-semibold text-purple-600">logs/</span><br>' +
                     '<span class="text-gray-500 font-semibold">Search range:</span> <span class="font-semibold text-gray-500">' + fromStr + ' – ' + toStr + '</span><br>' +
                     '<span class="text-gray-500 font-semibold">Example:</span> <span class="font-mono text-gray-500">logs/Traffic_' + new Date().toISOString().slice(2,4) + String(now.getUTCMonth()+1).padStart(2,'0') + String(now.getUTCDate()).padStart(2,'0') + '.txt</span><br><br>' +
                     'BPQ32 generates these files automatically each week.<br>' +
-                    'Ensure they are being synced to the dashboard <span class="font-mono font-semibold">logs/</span> folder.' +
+                    'Install Check → <b>Traffic reports</b> shows where they were found.' +
                     '</div>' +
                     '</td></tr>';
                 document.getElementById('tableStats').textContent = 'No data available';

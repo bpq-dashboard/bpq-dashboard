@@ -4,6 +4,154 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.19] - 2026-11-02
+
+The release the first Linux Mint and Ubuntu installs asked for. Thanks to
+Glenn, N3MEL (page choices, home-folder access, logs, Traffic and Connect
+messages, the signature line, the PKTNET forms update), Ernie, KG9NI (Install
+Check's PHP packages), and Lee, K5DAT (web server and port of your choice,
+leaving an existing nginx alone).
+
+### Added — installer
+- **Choose your pages** (step 9): Telnet Client, Chat, APRS map, VARA HF
+  Terminal, VARA callsign check; Rig Status / RF Power Monitor follow the
+  flrig question. Answers go to new `config.php 'pages'`; only the chosen
+  pages' helpers are installed and started (step 13), helpers of pages not
+  chosen are switched off on a re-run. Chat and VARA defaults follow what
+  `bpq32.cfg` / `chatconfig.cfg` show.
+- **Web server and port** (step 4, K5DAT): nginx or Apache, port 80 or its
+  own port, optionally on 127.0.0.1 only. On a machine that already serves
+  other sites, existing sites, the default site and port 80 are left alone
+  (no `default_server`, stock site not removed), `/etc/nginx` is backed up to
+  `/root/`, a failed `nginx -t` / `apache2ctl configtest` takes the dashboard
+  site out again, and a reverse-proxy example is written to
+  `/root/bpq-dashboard-reverse-proxy.txt`. Installing Apache or nginx while
+  the other holds port 80 no longer fails (`policy-rc.d` during the install).
+  Smoke tests and the closing address use the chosen port.
+- **VARA log source** (step 1): this server (rsyslog + vara-logger), the
+  TPRFN server (new `vara_remote`, `vara-remote.timer`), or not used.
+- **Home-folder access check** (step 12): tests the LinBPQ folder and its
+  logs as the web user and offers the narrow ACL fix (x on parents, rx on the
+  LinBPQ folder, rX + default on logs, r on Traffic reports); bpq32.cfg stays
+  closed.
+- `/var/log/bpq-dashboard` and `/var/lib/bpq-dashboard` always created;
+  `/etc/logrotate.d/bpq-dashboard` installed; Traffic reports already on the
+  machine loaded once (`--backfill`).
+- **Optional firewall step** (step 16, default No) running the new
+  **`tools/setup-firewall.sh`**: questions per port (home network or
+  anywhere for SSH, dashboard, BPQ telnet/FBB; BPQ web management home-only),
+  VARA syslog senders and AXIP/AXUDP ports found automatically, the current
+  SSH session always allowed, every rule shown and confirmed before `ufw
+  enable`, adds only missing rules on an active ufw, `--dry-run`, offers
+  fail2ban. Summary lists pages left out and how to add them.
+
+### Changed
+- **Rig Status / RF Power Monitor are no longer deleted** when flrig is
+  skipped: `radio.enabled = false` hides them and rig-history-poller isn't
+  installed (adding a radio later no longer needs a reinstall).
+- **The menu hides switched-off pages** (`bpq-nav-loader.js` reads
+  `pages_off` from `station-info.php`; `bpq_pages()` /
+  `bpq_pages_off()` in `includes/station-config.php`). A switched-off page
+  opened directly shows a note. `NAV_VERSION` 2026-11-02-1.
+- **The dashboard's own logs go to `/var/log/bpq-dashboard/`**
+  (`paths.app_logs`; `bpq_app_log()` in PHP, `app_log_dir()` in
+  `bpq_db_config.py`), not LinBPQ's logs folder: bpq-telnet, bpq-vara (which
+  stopped at start where that folder was read-only, N3MEL), Email Client,
+  message-text job, NWS post / auto-post, dashboard.log, prop-scheduler,
+  storm-monitor, connect-watchdog, vara-validator. Falls back to the old
+  folder when the new one isn't there; the daemons log to the journal only
+  rather than stop when no file is writable. Log Viewer shows the older copy
+  until the new file has content.
+- **vara-validator runs on any station**: unit `User=www-data`, script from
+  `$WEB_ROOT/scripts`, settings from `config.php 'vara_validator'` (VARA
+  host/port, listen host/port, allow/deny), listens on 127.0.0.1 by default,
+  log in `/var/log/bpq-dashboard/`.
+- `scripts/fetch-forms.sh`: builds the new copy beside the old one and swaps
+  with renames, `FORMS_PREV_DIR` keeps the replaced copy, `.source` records
+  the author's commit.
+
+### Added — in-place updates
+- **`update.sh`** in every release from now on: `sudo bash update.sh` in the
+  unzipped new release updates an existing install (found automatically, or
+  `--web-root`) without a reinstall. Keeps config files, `data/`, `cache/`,
+  the logs link, `pktnet-forms/`, `img/`, `yapp-files/`, the database
+  contents and the web-server site file. Backs up every file it replaces or
+  removes to `/root/bpq-dashboard-update-<date>/` with `restore.sh` and a log
+  (`--rollback DIR`); copies with owner/mode kept and checks each md5;
+  removes files the release dropped; re-applies the installer's path and
+  callsign edits (`vara-logger.sh`, unit files); applies
+  `sql/migrations.list` (credentials from config.php / db-config.php through
+  a temporary option file); refreshes installer-made systemd units and the
+  sudo rules where they changed (own units left alone); restarts only helpers
+  whose program, module or unit changed; installs `vara-remote` when
+  config.php asks for it. `--dry-run`, `--yes`, `--force`. Refuses a
+  same/older version without `--force`. Works on 1.5.18 and earlier.
+- **`VERSION`** and **`MANIFEST.md5`** in every release
+  (`tools/make-manifest.py`); the installed copy lets the next update list
+  files edited on the server and files a release removed.
+- **`sql/migrations.list`**: the database files, shared by install.sh and
+  update.sh (the installer's list moved there).
+- Maintenance → *Install check, updates & backups*: installed vs latest
+  release (`maintenance-api.php version_status`, GitHub tags, cached 6 h)
+  and the update commands.
+- Tested: 1.5.18 → 1.5.19 → simulated 1.5.20 (hand edit listed and backed
+  up, dropped file removed, added file), both rollbacks (files identical to
+  before), database step on MariaDB (repeat-safe; password with `\` and `"`;
+  db-config.php precedence).
+
+### Added — pages and admin
+- **Email Client signature** (N3MEL): Preferences → Signature (on/off, text
+  up to 10 lines, also on replies, `-- ` line); stored on the server
+  (`message-storage.php` `signature` / `saveSignature`, `bpq_msg_settings`);
+  added when Compose opens, never to Quick Check-In.
+- **Maintenance → Change admin password**: `admin/maintenance-api.php`
+  checks the current password (`htpasswd -v`, 5 wrong tries / 15 min), then
+  runs the root-owned helper `/usr/local/sbin/bpq-dashboard-set-admin-password`
+  (from `tools/set-admin-password`) through one new sudo rule; changes only
+  the login of this request, password on stdin, never logged.
+- **Maintenance → PKTNET forms**: installed vs the author's latest commit,
+  **Update forms** and **Undo** (kept copy in `/var/lib/bpq-dashboard`).
+- **Maintenance** sections *Optional pages*, *Firewall setup*, *LinBPQ in a
+  home folder*; VARA download row; validator section rewritten; log paths.
+- **`scripts/fetch-vara-remote.py`** + `vara-remote.service/.timer`: the
+  station's VARA log from the TPRFN server every 5 minutes, only the new part
+  (HTTP Range), temp file + rename, full refetch when the server file shrank,
+  `BPQ-Dashboard/<ver> (<CALL>)` user agent, status in
+  `cache/vara-remote-status.json`.
+- **Traffic page** explains an empty range (weekly reports, where the parser
+  looks, Install Check row); **Connect Log** explains `LogAllConnects=1` when
+  there are no ConnectLog files.
+
+### Install Check / System Audit / Log Viewer
+- Install Check: PHP package names follow the running PHP (was always
+  php8.3-…, KG9NI); rows for switched-off pages pass as *not used* (LINCHAT,
+  CHAT APPLICATION, bpq-chat / bpq-aprs / validator); new rows *LinBPQ
+  folder* (with the ACL commands for the path), *Dashboard's own logs*,
+  *Traffic reports*, *LogAllConnects=1* / *ConnectLog files*, *VARA HF log —
+  download from the TPRFN server*; absolute `logs.vara_file` supported.
+- System Audit: a switched-off page's helper is *not in use* (Info);
+  vara-logger not needed with `vara_remote`; new *VARA log download* check;
+  logrotate advice covers `/var/log/bpq-dashboard`.
+- Log Viewer: dashboard logs from `/var/log/bpq-dashboard` (older copy in
+  `logs/` until the new one fills), new *VARA download* entry, validator log
+  in the new folder.
+
+### Docs
+- README: updating with update.sh.
+- User Guide: §2 (optional pages), §9 (signature, PKTNET forms update,
+  Preferences), §13 and §15 (empty-page explanations), §19 (Maintenance
+  sections, update card), §20, §21, §22, §23, §24 (services, timers, log
+  folder), §25, §26 (new messages), §27 (reverse proxy, home folders), §29
+  (own port), §30 (Updating).
+- Installation Manual: What's New, §4 Part A (questions and answers, helper
+  step, own port), *Updating* (rewritten around update.sh; v1.5.19 notes), Part B (new config keys, log
+  folders, nginx/Apache side by side, logrotate, backfill), §6, §10.9
+  (validator), §10.11 (TPRFN download), §11 (firewall script, admin-password
+  sudo rule), §12 (home folders, empty Connect Log), §13.
+- SECURITY.md (firewall step, the one non-read-only sudo rule),
+  `config.php.example` (`pages`, `paths.app_logs`, `vara_validator`,
+  `vara_remote`), `www-data-tools.sudoers`.
+
 ## [1.5.18] - 2026-11-01
 
 Fixes from the first Linux Mint install (N3MEL: Mint 22.3, LinBPQ in a home

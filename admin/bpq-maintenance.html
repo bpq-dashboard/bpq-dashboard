@@ -374,6 +374,18 @@
   .editor-status.ok   { color: var(--green); background: var(--green-dim); }
   .editor-status.err  { color: var(--red);   background: rgba(248,81,73,0.1); }
   .editor-status.info { color: var(--muted); }
+  /* v1.5.19: password and forms cards */
+  .mini-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin: 10px 0; }
+  .mini-form input { font-family: var(--mono); font-size: 0.8rem; padding: 6px 8px; border-radius: 5px;
+                     border: 1px solid var(--border2); background: var(--bg); color: var(--text); min-width: 0; }
+  .mini-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .kv { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); line-height: 1.7; overflow-wrap: anywhere; }
+  .kv b { color: var(--text); font-weight: 600; }
+  .opt-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 8px; }
+  .opt-table th, .opt-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border2); vertical-align: top; }
+  .opt-table code { font-family: var(--mono); font-size: 0.75rem; overflow-wrap: anywhere; }
+  @media (max-width: 700px) { .opt-table thead { display: none; } .opt-table td { display: block; border: 0; padding: 2px 0; }
+                              .opt-table tr { display: block; border-bottom: 1px solid var(--border2); padding: 6px 0; } }
   .auth-row {
     display: flex;
     align-items: center;
@@ -511,10 +523,10 @@
 <body data-nav-page="maint">
 <!-- Shared navigation (loaded from /_nav.html via /bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-11-01-1"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-02-1"></script>
 
 <!--
-  Maintenance reference — v1.5.18 (rebuilt 2026-10-03, checked against the code 2026-10-25)
+  Maintenance reference — v1.5.19 (rebuilt 2026-10-03, checked against the code 2026-10-25)
   This page must only be reachable after the admin login: it lives in
   /admin/, which nginx (location ^~ /admin/) or Apache (<Directory …/admin>)
   protects with /etc/nginx/.bpq-mgmt-auth. The status box below checks that.
@@ -524,7 +536,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.18 · updated November 2026
+    v1.5.19 · updated November 2026
   </div>
 </header>
 
@@ -555,7 +567,7 @@
     <button type="button" class="editor-btn reload" id="installReset">Reset to defaults</button></p>
 </details>
 
-<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#wp">Winlink White Pages clean-up</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
+<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#optional-pages">Optional pages</a><a href="#firewall-setup">Firewall setup</a><a href="#homefolder">LinBPQ in a home folder</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#wp">Winlink White Pages clean-up</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
 
 <div class="section" id="health">
   <h2 class="section-title green">Health check — is everything running?</h2>
@@ -628,9 +640,23 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <code>grep <span class="flag">-n</span> <span class="flag">-B1</span> <span class="flag">-A4</span> '/admin&gt;' /etc/apache2/sites-enabled/*.conf</code>
       <div class="cmd-label">Apache installs: the <span class="kw">&lt;Directory …/admin&gt;</span> block must have <span class="kw">AuthType Basic</span> and <span class="kw">Require valid-user</span>.</div>
     </div><div class="cmd-tag purple">apache</div></div>
+    <div class="cmd note" id="adminpw"><div class="cmd-inner">
+      <div class="note-head">Change admin password (the login you are using now)</div>
+      <div class="cmd-label">Changes the password of <b id="apwUser">the admin login you opened this page with</b>. 12 characters or more. Your browser then asks for the new one.
+        Needs the v1.5.19 helper and its sudo rule (install.sh installs both; by hand: see <a href="#sudo">sudo rules</a>). Over SSH instead: the next row.</div>
+      <form class="mini-form" id="apwForm" autocomplete="off" onsubmit="apwChange(event)">
+        <input type="password" id="apwCurrent" placeholder="Current password" autocomplete="current-password" aria-label="Current password" required>
+        <input type="password" id="apwNew" placeholder="New password (12+)" autocomplete="new-password" minlength="12" maxlength="128" aria-label="New password" required>
+        <input type="password" id="apwNew2" placeholder="New password again" autocomplete="new-password" minlength="12" maxlength="128" aria-label="New password again" required>
+      </form>
+      <div class="mini-row">
+        <button class="editor-btn save" type="submit" form="apwForm">🔑 Change password</button>
+        <span class="editor-status info" id="apwStatus" role="status"></span>
+      </div>
+    </div><div class="cmd-tag amber">change password</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code><span class="sudo">sudo</span> htpasswd <span class="flag">-B</span> /etc/nginx/.bpq-mgmt-auth ADMIN_USER</code>
-      <div class="cmd-label">Change a user's password (bcrypt). Prompts twice. Never add <span class="kw">-c</span> here: it wipes the file and every other user with it. Takes effect on the next request, no reload needed.</div>
+      <code><span class="sudo">sudo</span> htpasswd <span class="flag">-B</span> /etc/nginx/.bpq-mgmt-auth <span id="apwSshUser">ADMIN_USER</span></code>
+      <div class="cmd-label">Over SSH: change a user's password (bcrypt). Prompts twice. Never add <span class="kw">-c</span> here: it wipes the file and every other user with it. Takes effect on the next request, no reload needed.</div>
     </div><div class="cmd-tag amber">change password</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> htpasswd <span class="flag">-B</span> /etc/nginx/.bpq-mgmt-auth NEWUSER
@@ -664,13 +690,89 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
   </div>
 </div>
 
+<div class="section" id="optional-pages">
+  <h2 class="section-title green">Optional pages — switch a page on or off</h2>
+  <p class="intro">The installer (step 9, v1.5.19) asks which optional pages the station uses. A page switched off is hidden from the menu and its helper service is not installed; the page's files stay, so switching it on later is a line in config.php plus its service. Pages left out of <span class="kw">'pages'</span> count as on. Opened directly, a switched-off page still works and says it is hidden.</p>
+  <table class="opt-table">
+    <thead><tr><th>Page</th><th>config.php</th><th>Switch on (then reload the page)</th></tr></thead>
+    <tbody>
+      <tr><td>Telnet Client</td><td><code>'pages' =&gt; ['telnet' =&gt; true]</code></td><td><code>sudo sed 's|/var/www/bpq-dashboard|<var data-v="root">/var/www/bpq-dashboard</var>|g' <var data-v="root">/var/www/bpq-dashboard</var>/bpq-telnet.service | sudo tee /etc/systemd/system/bpq-telnet.service &gt;/dev/null &amp;&amp; sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now bpq-telnet</code></td></tr>
+      <tr><td>Chat</td><td><code>'chat' =&gt; true</code></td><td>Needs BPQ Chat in this LinBPQ (LINCHAT, APPLICATION …CHAT). Same commands with <code>bpq-chat</code>.</td></tr>
+      <tr><td>APRS map</td><td><code>'aprs' =&gt; true</code></td><td>Same commands with <code>bpq-aprs</code>. Login and passcode: config.php <code>'aprs'</code>.</td></tr>
+      <tr><td>VARA HF Terminal</td><td><code>'vara' =&gt; true</code></td><td>Needs a DRIVER=VARA port. Same commands with <code>bpq-vara</code>. See <a href="#vara">VARA HF Terminal</a>.</td></tr>
+      <tr><td>VARA callsign check</td><td><code>'vara_validator' =&gt; true</code></td><td>See <a href="#validator">VARA callsign validator</a> (bpq32.cfg change first).</td></tr>
+      <tr><td>Rig Status, RF Power Monitor</td><td><code>'radio' =&gt; ['enabled' =&gt; true]</code></td><td>Set up flrig (<code>flrig_host</code> / <code>flrig_port</code>), then optionally <code>rig-history-poller</code>: see <a href="#rig">Rig Status</a>.</td></tr>
+    </tbody>
+  </table>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> nano <var data-v="root">/var/www/bpq-dashboard</var>/config.php
+curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</var>/station-info.php | grep <span class="flag">-o</span> '"pages_off":[^]]*]'</code>
+      <div class="cmd-label">Edit the switch, then check what the menu hides (<span class="kw">pages_off</span>; the menu caches it for up to 5 minutes: Ctrl+Shift+R). To switch a page off: set it to <span class="kw">false</span> and <span class="kw">sudo systemctl disable --now &lt;its service&gt;</span>. System Audit then shows that service as <i>not in use</i>.</div>
+    </div><div class="cmd-tag green">switch</div></div>
+  </div>
+</div>
+
+<div class="section" id="firewall-setup">
+  <h2 class="section-title purple">Firewall setup (optional, v1.5.19)</h2>
+  <p class="intro">Why a firewall helps on a packet station: BPQ's telnet and FBB ports send passwords in clear text; the dashboard can send mail, post bulletins and transmit as the station; and a forwarded port, guest Wi-Fi or a router's UPnP can expose them without you noticing. <span class="kw">tools/setup-firewall.sh</span> sets up <span class="kw">ufw</span> for you. It asks before deciding anything: your home network (detected), SSH from home only or anywhere, the dashboard from home only or anywhere, BPQ telnet/FBB from home only or anywhere (forwarding partners). BPQ's web management port stays home-only; VARA HF's syslog (UDP 514) and BPQ AXIP/AXUDP ports are found by themselves. It always keeps the SSH session you run it from open, shows every rule and asks again before switching the firewall on. Run it as often as you like: on an active ufw it only adds what's missing.</p>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> bash <var data-v="root">/var/www/bpq-dashboard</var>/tools/setup-firewall.sh <span class="flag">--dry-run</span></code>
+      <div class="cmd-label">Asks the questions and prints the rules it would add. Changes nothing.</div>
+    </div><div class="cmd-tag blue">dry run</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> bash <var data-v="root">/var/www/bpq-dashboard</var>/tools/setup-firewall.sh</code>
+      <div class="cmd-label">The real run. Offers fail2ban at the end (recommended when SSH is open to anywhere). Then check <a href="/admin/firewall-status.html">Firewall</a> and <a href="/admin/system-audit.html">System Audit</a>.</div>
+    </div><div class="cmd-tag green">set up</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> ufw status numbered
+<span class="sudo">sudo</span> ufw delete NUMBER
+<span class="sudo">sudo</span> ufw disable          <span class="flag"># firewall off, rules kept</span>
+<span class="sudo">sudo</span> ufw reset            <span class="flag"># all rules removed</span></code>
+      <div class="cmd-label">Look, remove one rule, or undo everything.</div>
+    </div><div class="cmd-tag amber">undo</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> ufw default deny incoming; <span class="sudo">sudo</span> ufw default allow outgoing
+<span class="sudo">sudo</span> ufw allow from 192.168.1.0/24 to any port 22 proto tcp
+<span class="sudo">sudo</span> ufw allow from 192.168.1.0/24 to any port 80 proto tcp
+<span class="sudo">sudo</span> ufw allow from 192.168.1.0/24 to any port 8010 proto tcp     <span class="flag"># BPQ telnet (yours may be 8015)</span>
+<span class="sudo">sudo</span> ufw allow from 192.168.1.0/24 to any port 8008 proto tcp     <span class="flag"># BPQ web management</span>
+<span class="sudo">sudo</span> ufw enable</code>
+      <div class="cmd-label">By hand instead, for sysops who prefer it. Use your own home network and ports; open telnet/FBB (<span class="kw">ufw allow 8010/tcp</span>) only if partners connect in over the internet.</div>
+    </div><div class="cmd-tag cyan">by hand</div></div>
+  </div>
+</div>
+
+<div class="section" id="homefolder">
+  <h2 class="section-title amber">LinBPQ in a home folder (Ubuntu 21.04+, Linux Mint 21+)</h2>
+  <p class="intro">These systems keep <span class="kw">/home/&lt;user&gt;</span> private, so the web server can't see a LinBPQ folder inside it and every log page stays empty. The installer (v1.5.19) checks and offers this fix; Install Check's <i>LinBPQ folder</i> row prints the commands for your path. It gives the web user pass-through on the folders above LinBPQ and read on the LinBPQ folder list and its logs, nothing else; <span class="kw">bpq32.cfg</span> (your BPQ passwords) stays closed. Don't <span class="kw">chmod 755</span> the home folder or add www-data to your group: both open the whole home folder. Not needed for <span class="kw">/opt/linbpq</span>.</p>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> apt install <span class="flag">-y</span> acl
+<span class="sudo">sudo</span> setfacl <span class="flag">-m</span> u:www-data:x /home/<var data-v="homeuser">USER</var>
+<span class="sudo">sudo</span> setfacl <span class="flag">-m</span> u:www-data:rx <var data-v="linbpq">/opt/linbpq</var>
+<span class="sudo">sudo</span> setfacl <span class="flag">-R</span> <span class="flag">-m</span> u:www-data:rX <var data-v="linbpq">/opt/linbpq</var>/logs &amp;&amp; <span class="sudo">sudo</span> setfacl <span class="flag">-d</span> <span class="flag">-m</span> u:www-data:rX <var data-v="linbpq">/opt/linbpq</var>/logs</code>
+      <div class="cmd-label">With LinBPQ in e.g. <span class="kw">/home/n3mel/linbpq</span>: USER = n3mel and the LinBPQ folder above. The last line also covers log files LinBPQ writes later. Undo any of them: <span class="kw">sudo setfacl -b &lt;folder&gt;</span>.</div>
+    </div><div class="cmd-tag green">fix</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data ls <var data-v="linbpq">/opt/linbpq</var>/logs | tail <span class="flag">-3</span>; <span class="sudo">sudo</span> <span class="flag">-u</span> www-data ls <var data-v="linbpq">/opt/linbpq</var>/Traffic_*.txt | tail <span class="flag">-2</span></code>
+      <div class="cmd-label">Test as the web server: BPQ's dated logs, then the weekly Traffic reports (in the LinBPQ folder itself). <span class="kw">Permission denied</span> = a folder on the way is still closed.</div>
+    </div><div class="cmd-tag blue">test</div></div>
+    <div class="cmd note"><div class="cmd-inner">
+      <div class="note-head">The dashboard's own logs (v1.5.19)</div>
+      <div class="cmd-label">bpq-telnet, bpq-vara, the Email Client, the message-text job and NWS posting now write to <span class="kw">/var/log/bpq-dashboard/</span>, not into LinBPQ's logs folder, so the web user needs only <i>read</i> there. Older installs that gave it write access (<span class="kw">rwx</span> on <span class="kw">linbpq/logs</span>) can keep it or narrow it to <span class="kw">rX</span>.</div>
+    </div><div class="cmd-tag cyan">note</div></div>
+  </div>
+</div>
+
 <div class="section" id="sudo">
   <h2 class="section-title purple">Firewall &amp; System Audit — read-only sudo rules</h2>
-  <p class="intro">The <a href="/admin/firewall-status.html">Firewall</a> and <a href="/admin/system-audit.html">System Audit</a> pages read the firewall (IPv4 and IPv6), fail2ban, the listening ports and <span class="kw">nginx -t</span> through six read-only sudo rules in <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers</span>. <span class="kw">install.sh</span> offers to install them. Without them those rows say "not checked" (they never guess), and everything else on both pages still works.</p>
+  <p class="intro">The <a href="/admin/firewall-status.html">Firewall</a> and <a href="/admin/system-audit.html">System Audit</a> pages read the firewall (IPv4 and IPv6), fail2ban, the listening ports and <span class="kw">nginx -t</span> through read-only sudo rules (plus the admin-password helper, v1.5.19) in <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers</span>. <span class="kw">install.sh</span> offers to install them. Without them those rows say "not checked" (they never guess), and everything else on both pages still works.</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> cp <var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers /etc/sudoers.d/www-data-tools &amp;&amp; <span class="sudo">sudo</span> chmod 440 /etc/sudoers.d/www-data-tools &amp;&amp; <span class="sudo">sudo</span> visudo <span class="flag">-c</span></code>
-      <div class="cmd-label">Install or update the rules. <span class="kw">visudo -c</span> must say every file is <span class="kw">parsed OK</span>. Copy it again after an upgrade: a rule must match the command exactly, and the 2026-10-25 version replaced rules that no longer matched what the pages run (fail2ban-client is in /usr/bin; iptables now lists all chains so ufw and fail2ban rules are followed).</div>
+      <div class="cmd-label">Install or update the rules. <span class="kw">visudo -c</span> must say every file is <span class="kw">parsed OK</span>. v1.5.19 adds one rule that is not read-only: the <a href="#adminpw">Change admin password</a> helper, which needs its root-owned copy too: <span class="kw">sudo install -o root -g root -m 755 <var data-v="root">/var/www/bpq-dashboard</var>/tools/set-admin-password /usr/local/sbin/bpq-dashboard-set-admin-password</span> (never point sudo at the web folder: the web user can write there). Copy it again after an upgrade: a rule must match the command exactly, and the 2026-10-25 version replaced rules that no longer matched what the pages run (fail2ban-client is in /usr/bin; iptables now lists all chains so ufw and fail2ban rules are followed).</div>
     </div><div class="cmd-tag green">install</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data <span class="sudo">sudo</span> <span class="flag">-n</span> /usr/sbin/iptables <span class="flag">-L</span> <span class="flag">-n</span> <span class="flag">--line-numbers</span> <span class="flag">-v</span> | head <span class="flag">-3</span>
@@ -750,6 +852,10 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <div class="cmd-label">vara-logger feeds the VARA parser. The .vara file's time should move whenever VARA is active. If the parser reads the wrong file, check <span class="kw">logs.vara_file</span> in config.php.</div>
     </div><div class="cmd-tag cyan">source</div></div>
     <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/fetch-vara-remote.py <span class="flag">-v</span>; systemctl list-timers vara-remote.timer <span class="flag">--no-pager</span></code>
+      <div class="cmd-label">TPRFN stations whose VARA HF sends its syslog to the TPRFN server (v1.5.19, config.php <span class="kw">'vara_remote' =&gt; ['enabled' =&gt; true, 'url' =&gt; 'https://…/&lt;call&gt;.vara']</span>): <span class="kw">vara-remote.timer</span> downloads only the new part every 5 minutes into <span class="kw">logs.vara_file</span> (the installer uses <span class="kw">/var/log/bpq-dashboard/&lt;call&gt;.vara</span>), keeping the last good copy if the server can't be reached. No vara-logger needed. <span class="kw">HTTP 404</span> = the TPRFN admin hasn't set up your file yet; <span class="kw">403</span> = refused (the job sends a <span class="kw">BPQ-Dashboard/…</span> user agent). To switch it on later: set the two lines, then <span class="kw">sudo sed 's|/var/www/bpq-dashboard|<var data-v="root">/var/www/bpq-dashboard</var>|g' <var data-v="root">/var/www/bpq-dashboard</var>/vara-remote.service | sudo tee /etc/systemd/system/vara-remote.service &gt;/dev/null &amp;&amp; sudo cp <var data-v="root">/var/www/bpq-dashboard</var>/vara-remote.timer /etc/systemd/system/ &amp;&amp; sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable --now vara-remote.timer</span>. Log: Log Viewer → VARA download.</div>
+    </div><div class="cmd-tag cyan">from TPRFN</div></div>
+    <div class="cmd"><div class="cmd-inner">
       <code>ss <span class="flag">-uln</span> | grep <span class="flag">':514 '</span>; grep VARAHF /var/log/syslog | tail <span class="flag">-3</span>; cat /etc/rsyslog.d/10-bpq-dashboard-vara.conf</code>
       <div class="cmd-label">Is VARA HF's log arriving? VARA HF (registered) sends it as syslog: <span class="kw">Settings → VARA Setup → Syslog</span>, Host = this server, UDP port 514, Station Name <span class="kw">H-&lt;call-SSID&gt;</span>. The first command shows rsyslog listening on UDP 514; the second the newest VARA lines; the third which senders the installer's receiver accepts (<span class="kw">$AllowedSender</span>). Nothing in syslog: check VARA's Syslog settings, the allowed address and the firewall (UDP 514 from the VARA computer). Installation Manual §10.11.</div>
     </div><div class="cmd-tag cyan">syslog</div></div>
@@ -768,6 +874,18 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
   <h2 class="section-title blue">Email Client — message database</h2>
   <p class="intro">Personal, NTS and bulletin messages, folders and the address book live in MariaDB (<span class="kw">bpq_messages</span>, <span class="kw">bpq_msg_folders</span>, …) through <span class="kw">message-db.php</span>. Message text is saved too (every 5 minutes by <span class="kw">message-bodies.timer</span>, and when a message is opened), and folders pinned with 📌 keep their copies after a Kill on the BBS.</p>
   <div class="cmd-group">
+    <div class="cmd note" id="pktnetforms"><div class="cmd-inner">
+      <div class="note-head">PKTNET forms — update from the author's latest (v1.5.19)</div>
+      <div class="cmd-label">The Email Client's <b>PKTNET Forms</b> button opens the TPRFN Forms Suite by N3MEL and contributors, downloaded from the authors' repository (not part of the dashboard; their own terms, see CREDITS.md). <b>Update forms</b> downloads the latest and swaps it in; the copy it replaces is kept for <b>Undo</b>. Needs outbound HTTPS to GitHub from the server.</div>
+      <div class="kv" id="pfInfo">Checking…</div>
+      <div class="mini-row">
+        <button class="editor-btn save" id="pfUpdate" onclick="pfDo('forms_update')" disabled>⬇ Update forms</button>
+        <button class="editor-btn reload" id="pfUndo" onclick="pfDo('forms_undo')" disabled>↶ Undo</button>
+        <button class="editor-btn reload" onclick="pfStatus(true)">⟳ Check again</button>
+        <span class="editor-status info" id="pfStatusLine" role="status"></span>
+      </div>
+      <div class="cmd-label" style="margin-top:8px">Over SSH: <span class="kw">sudo bash <var data-v="root">/var/www/bpq-dashboard</var>/scripts/fetch-forms.sh --force</span> (old copy moved to /tmp).</div>
+    </div><div class="cmd-tag green">forms</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data php <span class="flag">-r</span> '$_SERVER["REQUEST_METHOD"]="GET"; $_SERVER["PHP_SELF"]="/message-storage.php"; $_GET["action"]="stats"; chdir("<var data-v="root">/var/www/bpq-dashboard</var>"); include "<var data-v="root">/var/www/bpq-dashboard</var>/message-storage.php";'</code>
       <div class="cmd-label">Calls the storage API directly on the server, bypassing the browser and login. Should print <span class="kw">success:true</span> with counts. Use it when the Email Client shows a storage or database error.</div>
@@ -794,7 +912,7 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
     </div><div class="cmd-tag blue">diagnose</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>systemctl list-timers message-bodies.timer <span class="flag">--no-pager</span>; <span class="sudo">sudo</span> journalctl <span class="flag">-u</span> message-bodies.service <span class="flag">-n</span> 12 <span class="flag">--no-pager</span></code>
-      <div class="cmd-label">The job that saves message text every 5 minutes, whether or not the Email Client is open. Each run ends with one line: listed, <span class="kw">text saved</span>, <span class="kw">not on BBS</span>, <span class="kw">number reused</span>, errors. Details per message: <span class="kw">logs/message-bodies.log</span>. Bulletins saved: config.php <span class="kw">'messages' =&gt; ['bulletin_text' =&gt; 'all']</span> (or <span class="kw">'pinned'</span>, <span class="kw">'none'</span>).</div>
+      <div class="cmd-label">The job that saves message text every 5 minutes, whether or not the Email Client is open. Each run ends with one line: listed, <span class="kw">text saved</span>, <span class="kw">not on BBS</span>, <span class="kw">number reused</span>, errors. Details per message: <span class="kw">/var/log/bpq-dashboard/message-bodies.log</span> (v1.5.19; was <span class="kw">logs/</span>). Bulletins saved: config.php <span class="kw">'messages' =&gt; ['bulletin_text' =&gt; 'all']</span> (or <span class="kw">'pinned'</span>, <span class="kw">'none'</span>).</div>
     </div><div class="cmd-tag cyan">status</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> systemd-run <span class="flag">--uid=</span>www-data <span class="flag">--gid=</span>www-data <span class="flag">--unit=</span>message-bodies-backfill php <var data-v="root">/var/www/bpq-dashboard</var>/scripts/fetch-message-bodies.php <span class="flag">--backfill</span>; <span class="sudo">sudo</span> journalctl <span class="flag">-u</span> message-bodies-backfill <span class="flag">-f</span></code>
@@ -814,7 +932,7 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
     </div><div class="cmd-tag amber">diagnose</div></div>
     <div class="cmd note"><div class="cmd-inner">
       <div class="note-head">"Login refused" / "Login failed" (Email Client, message-text job, forwarding queue)</div>
-      <div class="cmd-label">All three log in through <span class="kw">includes/bbs-login.php</span> (v1.5.18) with config.php <span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span>; it accepts a login that lands at the node (then sends <span class="kw">bbs.alias</span>) or straight in the BBS, whatever BPQ's greeting. The error names the step and BPQ's last line. <b>Login refused</b>: user/password don't match the <span class="kw">USER=</span> line in bpq32.cfg. <b>nothing came back after the password</b>: LinBPQ not answering on <span class="kw">bbs.port</span>. <b>No BBS prompt after 'bbs'</b>: set <span class="kw">bbs.alias</span> to the BBS's APPLICATION name. Test: <span class="kw">sudo -u www-data php …/scripts/fetch-message-bodies.php --dry-run --limit=1</span>; the dialogue is in <span class="kw">logs/message-bodies.log</span> (password never written).</div>
+      <div class="cmd-label">All three log in through <span class="kw">includes/bbs-login.php</span> (v1.5.18) with config.php <span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span>; it accepts a login that lands at the node (then sends <span class="kw">bbs.alias</span>) or straight in the BBS, whatever BPQ's greeting. The error names the step and BPQ's last line. <b>Login refused</b>: user/password don't match the <span class="kw">USER=</span> line in bpq32.cfg. <b>nothing came back after the password</b>: LinBPQ not answering on <span class="kw">bbs.port</span>. <b>No BBS prompt after 'bbs'</b>: set <span class="kw">bbs.alias</span> to the BBS's APPLICATION name. Test: <span class="kw">sudo -u www-data php …/scripts/fetch-message-bodies.php --dry-run --limit=1</span>; the dialogue is in <span class="kw">/var/log/bpq-dashboard/message-bodies.log</span> (password never written).</div>
     </div><div class="cmd-tag amber">troubleshoot</div></div>
     <div class="cmd note"><div class="cmd-inner">
       <div class="note-head">"The BBS is busy" / a wait before Get Mail</div>
@@ -848,7 +966,7 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> journalctl <span class="flag">-u</span> nws-auto-post.service <span class="flag">--since</span> today <span class="flag">--no-pager</span> | grep nws-auto-post:</code>
-      <div class="cmd-label">One summary line per run: active alerts, warnings/watches, already posted, holding (waiting for other offices' pieces of a watch), posted, failed. Posted bulletins: <span class="kw">posted to WX@…</span> lines. Full detail and the BBS dialogue: <span class="kw">logs/nws-auto-post.log</span> (Log Viewer → NWS auto-post).</div>
+      <div class="cmd-label">One summary line per run: active alerts, warnings/watches, already posted, holding (waiting for other offices' pieces of a watch), posted, failed. Posted bulletins: <span class="kw">posted to WX@…</span> lines. Full detail and the BBS dialogue: <span class="kw">/var/log/bpq-dashboard/nws-auto-post.log</span> (Log Viewer → NWS auto-post).</div>
     </div><div class="cmd-tag cyan">status</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data php <var data-v="root">/var/www/bpq-dashboard</var>/scripts/nws-auto-post.php <span class="flag">--dry-run</span></code>
@@ -951,11 +1069,11 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
 
 <div class="section" id="validator">
   <h2 class="section-title cyan">VARA callsign validator (optional)</h2>
-  <p class="intro">A small proxy between LinBPQ and VARA HF that only lets valid callsigns connect. BPQ connects to 127.0.0.1:9025/9026; the validator forwards to VARA on 8300/8301.</p>
+  <p class="intro">A small proxy between LinBPQ and VARA HF that only lets valid callsigns connect. BPQ connects to 127.0.0.1:9025/9026; the validator forwards to VARA on 8300/8301. v1.5.19: runs as the web user from <span class="kw">scripts/</span>, settings in config.php <span class="kw">'vara_validator'</span> (vara_host, vara_cmd_port, listen_host, listen_cmd_port, allow, deny), log in <span class="kw">/var/log/bpq-dashboard/vara-validator.log</span>. The installer offers it as "VARA callsign check" (step 9); BPQ's VARA port must then point at the proxy (<span class="kw">ADDR 127.0.0.1 9025</span>), and the proxy at VARA HF.</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
-      <code>tail <span class="flag">-f</span> /var/log/vara-validator.log</code>
-      <div class="cmd-label">Live ACCEPTED / REJECTED lines with the callsign and reason. Rejected today only: <span class="kw">grep REJECTED /var/log/vara-validator.log | grep $(date +%Y-%m-%d)</span>.</div>
+      <code>tail <span class="flag">-f</span> /var/log/bpq-dashboard/vara-validator.log</code>
+      <div class="cmd-label">Live ACCEPTED / REJECTED lines with the callsign and reason (Log Viewer → VARA Validator). Rejected today only: <span class="kw">grep REJECTED /var/log/bpq-dashboard/vara-validator.log | grep $(date +%Y-%m-%d)</span>. Installs before v1.5.19 logged to <span class="kw">/var/log/vara-validator.log</span>.</div>
     </div><div class="cmd-tag blue">log</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>ss <span class="flag">-tlnp</span> | grep <span class="flag">-E</span> ':902[56]\b'; nc <span class="flag">-zv</span> 127.0.0.1 8300</code>
@@ -966,8 +1084,12 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <div class="cmd-label">If the INPUT policy is DROP, the first rule must be <span class="kw">ACCEPT all -- lo</span>, or BPQ's connections to 127.0.0.1 are dropped silently. Add it with <span class="kw">sudo iptables -I INPUT 1 -i lo -j ACCEPT &amp;&amp; sudo netfilter-persistent save</span>.</div>
     </div><div class="cmd-tag amber">firewall</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code><span class="sudo">sudo</span> nano /usr/local/bin/vara-callsign-validator.py &amp;&amp; <span class="sudo">sudo</span> systemctl restart vara-validator</code>
-      <div class="cmd-label">Settings (VARA host/ports, ALLOWLIST, DENYLIST) are at the top of the script. Restart after every change. The service file's <span class="kw">User=</span> must be the account that runs LinBPQ.</div>
+      <code><span class="sudo">sudo</span> nano <var data-v="root">/var/www/bpq-dashboard</var>/config.php &amp;&amp; <span class="sudo">sudo</span> systemctl restart vara-validator</code>
+      <div class="cmd-label">Change <span class="kw">'vara_validator'</span> (VARA host/ports, where it listens, allow and deny lists), then restart. Use <span class="kw">listen_host '0.0.0.0'</span> only if BPQ runs on another machine.</div>
+    </div><div class="cmd-tag amber">edit</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> sed 's|/var/www/bpq-dashboard|<var data-v="root">/var/www/bpq-dashboard</var>|g' <var data-v="root">/var/www/bpq-dashboard</var>/vara-validator.service | <span class="sudo">sudo</span> tee /etc/systemd/system/vara-validator.service &gt;/dev/null &amp;&amp; <span class="sudo">sudo</span> systemctl daemon-reload &amp;&amp; <span class="sudo">sudo</span> systemctl enable <span class="flag">--now</span> vara-validator</code>
+      <div class="cmd-label">Install or update the service (v1.5.19 unit: <span class="kw">User=www-data</span>, script from the dashboard folder). Before v1.5.19 it said <span class="kw">User=pi</span> and <span class="kw">/usr/local/bin</span>, which only worked on one station; an old <span class="kw">/usr/local/bin/vara-callsign-validator.py</span> can be deleted once this runs.</div>
     </div><div class="cmd-tag amber">edit</div></div>
   </div>
 </div>
@@ -1140,7 +1262,7 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <div class="cmd-label">Size of the folder, and files older than 30 days. To delete those, run the same <span class="kw">find</span> with <span class="kw">-delete</span> in place of <span class="kw">-print</span> (or put it in a weekly cron).</div>
     </div><div class="cmd-tag amber">cleanup</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>tail -50 <var data-v="root">/var/www/bpq-dashboard</var>/logs/bpq-telnet-daemon.log | grep <span class="flag">-i</span> yapp</code>
+      <code>tail -50 /var/log/bpq-dashboard/bpq-telnet-daemon.log | grep <span class="flag">-i</span> yapp</code>
       <div class="cmd-label">Transfer log: state changes (wait_si → wait_hd → recv_data → done) and hex bytes. The first place to look when a transfer fails.</div>
     </div><div class="cmd-tag cyan">log</div></div>
     <div class="cmd"><div class="cmd-inner">
@@ -1190,7 +1312,7 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <div class="cmd-label">Recent web-server errors (500s, blank pages, permission problems). The first file is the installer's; hand-built sites usually log to the second.</div>
     </div><div class="cmd-tag blue">log</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code>LANG=C.UTF-8 grep <span class="flag">-naxv</span> '.*' <var data-v="root">/var/www/bpq-dashboard</var>/logs/bbs-messages.log | head</code>
+      <code>LANG=C.UTF-8 grep <span class="flag">-naxv</span> '.*' /var/log/bpq-dashboard/bbs-messages.log | head</code>
       <div class="cmd-label">Lines that aren't valid UTF-8 (raw BBS text). Since v1.5.17 the Log Viewer shows those bytes as <span class="kw">�</span>; before, such a log failed with <span class="kw">JSON.parse: unexpected end of data</span>. If the Log Viewer says <span class="kw">Empty reply from the server</span>, the PHP error is in the log above.</div>
     </div><div class="cmd-tag cyan">log viewer</div></div>
     <div class="cmd"><div class="cmd-inner">
@@ -1236,10 +1358,25 @@ curl <span class="flag">-s</span> <span class="flag">-o</span> /dev/null <span c
       <code><span class="sudo">sudo</span> mkdir <span class="flag">-p</span> /root/backup-$(date +%F) &amp;&amp; <span class="sudo">sudo</span> cp <span class="flag">-n</span> <span class="flag">-p</span> <var data-v="root">/var/www/bpq-dashboard</var>/FILE /root/backup-$(date +%F)/ &amp;&amp; ls <span class="flag">-l</span> /root/backup-$(date +%F)/</code>
       <div class="cmd-label">Back up a file before replacing it (replace FILE). Check the sizes listed match the <i>old</i> file before you copy anything new in. Files named <span class="kw">*.bak</span> inside the web root were downloadable before the 2026-09 nginx rules; keep them out anyway.</div>
     </div><div class="cmd-tag amber">backup</div></div>
+    <div class="cmd note" id="dashupdate"><div class="cmd-inner">
+      <div class="note-head">Update the dashboard (v1.5.19 and later)</div>
+      <div class="kv" id="verInfo">Checking…</div>
+      <div class="mini-row">
+        <button class="editor-btn reload" onclick="verStatus(true)">⟳ Check for a new release</button>
+        <span class="editor-status info" id="verLine" role="status"></span>
+      </div>
+      <div class="cmd-label" style="margin-top:8px"><span class="kw">update.sh</span> updates this install in place, no reinstall: it keeps config.php, data/, the database contents, the logs link, the PKTNET forms and your web-server and firewall settings; backs up every file it replaces; copies only what changed (each checked); applies the database updates; refreshes the helper units and sudo rules the installer set up; and restarts only the helpers whose program changed. Files you edited on the server are listed and kept in the backup. <span class="kw">--dry-run</span> shows the plan without changing anything; every run prints its own <span class="kw">--rollback</span> command. The update is run over SSH (it needs root); this page only checks for a new release.</div>
+    </div><div class="cmd-tag green">update</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>cd ~ &amp;&amp; wget <span class="flag">-O</span> bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v<span id="verLatest1">X.Y.Z</span>.zip &amp;&amp; unzip <span class="flag">-o</span> bpq-dashboard.zip
+cd bpq-dashboard-<span id="verLatest2">X.Y.Z</span> &amp;&amp; <span class="sudo">sudo</span> bash update.sh <span class="flag">--dry-run</span>
+<span class="sudo">sudo</span> bash update.sh</code>
+      <div class="cmd-label">Download the release, look at the plan, then update. Not at <span class="kw">/var/www/bpq-dashboard</span>? Add <span class="kw">--web-root <var data-v="root">/var/www/bpq-dashboard</var></span>. Undo: the <span class="kw">sudo bash update.sh --rollback /root/bpq-dashboard-update-…</span> line it prints at the end. Afterwards Ctrl+Shift+R on each page, then Install Check.</div>
+    </div><div class="cmd-tag blue">update</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>cd ~/bpq-dashboard-NEW-VERSION &amp;&amp; <span class="sudo">sudo</span> bash install.sh</code>
-      <div class="cmd-label">Upgrade: run the new version's installer and answer <b>Y</b> to the backup question. Your database and config are kept.</div>
-    </div><div class="cmd-tag blue">upgrade</div></div>
+      <div class="cmd-label">Full reinstall instead (or updating from v1.5.18 or earlier, whose packages have no <span class="kw">update.sh</span>: use the new release's update.sh, which works on those too). The installer asks every question again (answer <b>Y</b> to the backup question to keep the old folder); your database is kept, config.php is written new.</div>
+    </div><div class="cmd-tag amber">reinstall</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> bash <var data-v="root">/var/www/bpq-dashboard</var>/scripts/fetch-forms.sh <var data-v="root">/var/www/bpq-dashboard</var> <span class="flag">--force</span></code>
       <div class="cmd-label">Re-download the message forms used by the Email Client's forms button (the old copy moves to /tmp). Without <span class="kw">--force</span> an existing copy is kept.</div>
@@ -1733,6 +1870,88 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
   });
 });
 
+</script>
+<script>
+// v1.5.19: Change admin password + PKTNET forms (admin/maintenance-api.php)
+(function () {
+  const API = '/admin/maintenance-api.php';
+  const H = { 'Content-Type': 'application/json', 'X-BPQ-Dashboard': '1' };
+  function setSt(el, cls, txt) { el.className = 'editor-status ' + cls; el.textContent = txt; }
+  async function call(action, method, body) {
+    const r = await fetch(API + '?action=' + encodeURIComponent(action), method === 'POST'
+      ? { method: 'POST', headers: H, body: JSON.stringify(body || {}), cache: 'no-store' }
+      : { cache: 'no-store' });
+    let j = null; try { j = await r.json(); } catch (e) {}
+    if (!j) j = { ok: false, error: 'HTTP ' + r.status + (r.status === 404 ? ' (admin/maintenance-api.php not installed)' : '') };
+    return j;
+  }
+  window.apwChange = async function (ev) {
+    ev.preventDefault();
+    const st = document.getElementById('apwStatus');
+    const cur = document.getElementById('apwCurrent').value, n1 = document.getElementById('apwNew').value,
+          n2 = document.getElementById('apwNew2').value;
+    if (n1 !== n2) { setSt(st, 'err', 'The two new passwords differ'); return; }
+    if (n1.length < 12) { setSt(st, 'err', 'At least 12 characters'); return; }
+    setSt(st, 'info', 'Changing…');
+    const j = await call('admin_password', 'POST', { current: cur, new: n1 });
+    if (j.ok) {
+      document.getElementById('apwForm').reset();
+      setSt(st, 'ok', j.message || 'Changed');
+    } else setSt(st, 'err', j.error || 'Failed');
+  };
+  function fmtDate(s) { if (!s) return ''; const d = new Date(s); return isNaN(d) ? s : d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  window.pfStatus = async function (refresh) {
+    const info = document.getElementById('pfInfo'), line = document.getElementById('pfStatusLine');
+    if (!info) return;
+    const j = await call('forms_status' + (refresh ? '&refresh=1' : ''), 'GET');
+    if (!j.ok) { info.textContent = j.error || 'Status not available'; return; }
+    const lat = j.latest || {};
+    info.innerHTML =
+      'Installed: <b>' + (j.installed ? esc(j.pages) + ' pages' : 'not installed') + '</b>' +
+      (j.fetched ? ', downloaded ' + esc(fmtDate(j.fetched)) : '') +
+      (j.commit ? ', version <b>' + esc(j.commit) + '</b>' + (j.commit_date ? ' (' + esc(fmtDate(j.commit_date)) + ')' : '') : '') + '<br>' +
+      'Author\'s latest: ' + (lat.commit ? '<b>' + esc(lat.commit) + '</b>' + (lat.date ? ' (' + esc(fmtDate(lat.date)) + ')' : '') : esc(lat.error || 'unknown')) + '<br>' +
+      'Source: ' + esc(j.source) +
+      (j.can_undo ? '<br>Previous copy kept' + (j.prev_fetched ? ' (downloaded ' + esc(fmtDate(j.prev_fetched)) + ')' : '') : '');
+    document.getElementById('pfUpdate').disabled = !j.writable;
+    document.getElementById('pfUndo').disabled = !j.can_undo;
+    setSt(line, j.up_to_date ? 'ok' : 'info',
+      !j.writable ? 'The web server can\'t write the forms folder: use the SSH command below'
+      : j.up_to_date ? 'Up to date' : (lat.commit && j.installed ? 'A newer version is available' : (j.installed ? '' : 'Not installed yet')));
+  };
+  window.pfDo = async function (action) {
+    const line = document.getElementById('pfStatusLine');
+    if (action === 'forms_undo' && !confirm('Put the previous copy of the forms back?')) return;
+    setSt(line, 'info', action === 'forms_update' ? 'Downloading… (up to a minute)' : 'Putting the previous copy back…');
+    document.getElementById('pfUpdate').disabled = true; document.getElementById('pfUndo').disabled = true;
+    const j = await call(action, 'POST', {});
+    await pfStatus(false);
+    setSt(line, j.ok ? 'ok' : 'err', j.ok ? (action === 'forms_update' ? 'Updated' : 'Previous copy restored') : (j.error || 'Failed'));
+  };
+  // Fill in the login name and the SSH command
+  call('whoami', 'GET').then(j => {
+    if (j && j.ok && j.user) {
+      document.getElementById('apwUser').textContent = j.user;
+      document.getElementById('apwSshUser').textContent = j.user;
+    }
+  });
+  pfStatus(false);
+
+  window.verStatus = async function (refresh) {
+    const info = document.getElementById('verInfo'), line = document.getElementById('verLine');
+    if (!info) return;
+    const j = await call('version_status' + (refresh ? '&refresh=1' : ''), 'GET');
+    if (!j.ok) { info.textContent = j.error || 'Not available'; return; }
+    info.innerHTML = 'Installed: <b>' + esc(j.installed || 'unknown') + '</b>' +
+      (j.installed_how ? ' <span style="opacity:.7">(' + esc(j.installed_how) + ')</span>' : '') + '<br>' +
+      'Latest release: ' + (j.latest ? '<b>' + esc(j.latest) + '</b>' : esc(j.error_latest || 'unknown'));
+    if (j.latest) ['verLatest1', 'verLatest2'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = j.latest; });
+    setSt(line, j.update_available ? 'ok' : 'info',
+      j.update_available ? 'Update available: ' + j.latest + ' (commands below)' : (j.latest ? 'Up to date' : ''));
+  };
+  verStatus(false);
+})();
 </script>
 <script src="/shared/settings-modal.js"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
 </body>

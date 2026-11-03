@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </head>
 
 <body data-nav-page="bbs">
-<script src="bpq-nav-loader.js?v=2026-11-01-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-02-1"></script>
 
 <!-- Top control bar -->
 <div id="controlBar">
@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </label>
             <h2 id="listTitle" style="flex:1;">Personal &amp; Traffic</h2>
             <span class="meta" id="listMeta">0 messages</span>
-            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.18</span>
+            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.19</span>
         </div>
         <!-- Selection toolbar — only visible when ≥1 message is selected.
              Bulk actions: Move-to-folder dropdown, Mark Read, Archive, Kill,
@@ -742,6 +742,28 @@ document.addEventListener('DOMContentLoaded', function () {
                     <option value="eager" selected>Eager — fetch all bodies on Get Mail (instant clicks)</option>
                     <option value="lazy">Lazy — fetch body on click (faster Get Mail)</option>
                 </select>
+            </div>
+
+            <!-- v1.5.19 (N3MEL): signature, kept on the server so every
+                 browser and device uses the same one -->
+            <div class="form-group" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
+                <label style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="settingSigEnabled"> Signature on new messages
+                </label>
+                <textarea id="settingSigText" rows="3" maxlength="1000" spellcheck="false"
+                          placeholder="73, Glenn N3MEL&#10;TPRFN East"
+                          style="width:100%; margin-top:6px; font-family:var(--font-mono); font-size:12px;"></textarea>
+                <label style="display:flex; align-items:center; gap:8px; font-weight:normal; margin-top:6px;">
+                    <input type="checkbox" id="settingSigReplies"> Also on replies (above the quoted message)
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-weight:normal;">
+                    <input type="checkbox" id="settingSigSeparator"> Start with the usual "-- " line
+                </label>
+                <p style="font-size:11px; color: var(--text-muted); margin-top:6px;">
+                    Added once when the Compose window opens, so you can change or delete it before sending.
+                    Never added to NTS radiograms, PKTNET forms or Quick Check-In. Plain text, up to 10 lines.
+                    Saved on the server: the same in every browser.
+                </p>
             </div>
 
             <!-- Killed-message tracking — let user see and clear the list
@@ -1416,6 +1438,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Load rules only after folders are synced, so any folder a
         // rule targets already exists / gets created against a known-
         // good customFolders list rather than racing with it.
+        loadSignatureFromServer();   // v1.5.19
         loadRulesFromServer().then(() => {
             applyRulesToInboxes();
             // migrateLegacyBulletinFolders() used to run here too, but it
@@ -3652,6 +3675,10 @@ function renderMutedBulletinGroupsList() {
 
 function openSettingsModal() {
     applySettingsToUI();
+    document.getElementById('settingSigEnabled').checked   = !!emailSignature.enabled;
+    document.getElementById('settingSigText').value        = emailSignature.text || '';
+    document.getElementById('settingSigReplies').checked   = emailSignature.replies !== false;
+    document.getElementById('settingSigSeparator').checked = emailSignature.separator !== false;
     // Refresh the killed-message count for this modal session
     const killedCount = Object.keys(killedSet).length;
     document.getElementById('killedCount').textContent = String(killedCount);
@@ -3669,6 +3696,21 @@ function saveSettings() {
     stopAutoFetch();
     startAutoFetchIfEnabled();
     closeModal('settingsModal');
+    // Signature (server-side, v1.5.19)
+    const sig = {
+        enabled:   document.getElementById('settingSigEnabled').checked,
+        text:      document.getElementById('settingSigText').value,
+        replies:   document.getElementById('settingSigReplies').checked,
+        separator: document.getElementById('settingSigSeparator').checked,
+    };
+    if (JSON.stringify(sig) !== JSON.stringify({ enabled: !!emailSignature.enabled, text: emailSignature.text || '',
+            replies: emailSignature.replies !== false, separator: emailSignature.separator !== false })) {
+        postToStorageApi('saveSignature', { signature: sig }).then(r => {
+            if (r && r.success) { emailSignature = r.signature; showToast('Preferences and signature saved', 'success'); }
+            else showToast('Preferences saved, but the signature could not be saved: ' + ((r && r.error) || 'server error'), 'error');
+        });
+        return;
+    }
     showToast('Preferences saved', 'success');
 }
 
@@ -5852,6 +5894,7 @@ function actReply() {
         subject: selectedMsg.subject.startsWith('Re:') ? selectedMsg.subject : 'Re: ' + selectedMsg.subject,
         body: '\n\n----- Original -----\n' + (selectedMsg.body || ''),
         title: 'Reply',
+        kind: 'reply',
     });
 }
 
@@ -6522,6 +6565,7 @@ function generateCheckInAndCompose() {
     closeModal('checkInModal');
     openComposeModal({
         title: 'Net Check-In',
+        kind: 'fixed',   // fixed format: no signature (v1.5.19)
         to: netAddress,
         type: 'B',
         subject: [name, callsign, town, state].filter(Boolean).join(', '),
@@ -6532,12 +6576,36 @@ function generateCheckInAndCompose() {
 // ═══════════════════════════════════════════════════════════════
 // Compose / Reply
 // ═══════════════════════════════════════════════════════════════
+// v1.5.19 (N3MEL): signature from message-storage.php (action=signature),
+// shared by every browser. kind: 'new' (default), 'reply' (replies:
+// placed above the quoted text) or 'fixed' (NTS radiograms,
+// PKTNET forms, Quick Check-In: never a signature).
+let emailSignature = { enabled: false, text: '', replies: true, separator: true };
+async function loadSignatureFromServer() {
+    const d = await safeFetchJson(`${CONFIG.storageApiUrl}?action=signature`);
+    if (d && d.success && d.signature) emailSignature = Object.assign(emailSignature, d.signature);
+}
+function signatureBlock() {
+    const t = (emailSignature.text || '').replace(/\s+$/, '');
+    if (!emailSignature.enabled || !t) return '';
+    return (emailSignature.separator ? '-- \n' : '') + t;
+}
+function bodyWithSignature(body, kind) {
+    const sig = signatureBlock();
+    if (!sig || kind === 'fixed') return body;
+    if (kind === 'reply') {
+        if (!emailSignature.replies) return body;
+        return '\n\n' + sig + (body.startsWith('\n') ? body : '\n' + body);   // above the quoted message
+    }
+    return (body ? body.replace(/\s+$/, '') + '\n\n' : '\n\n') + sig;
+}
+
 function openComposeModal(opts = {}) {
     document.getElementById('composeTitle').textContent = opts.title || 'Compose Message';
     document.getElementById('composeTo').value      = opts.to      || '';
     document.getElementById('composeType').value    = opts.type    || 'P';
     document.getElementById('composeSubject').value = opts.subject || '';
-    document.getElementById('composeBody').value    = opts.body    || '';
+    document.getElementById('composeBody').value    = bodyWithSignature(opts.body || '', opts.kind || 'new');
     document.getElementById('composeSmtp').checked  = false;
     document.getElementById('composeTo').placeholder = 'CALL@CALL.STATE.USA.NOAM';
     document.getElementById('composeTo').style.textTransform = 'uppercase';
@@ -6547,6 +6615,7 @@ function openComposeModal(opts = {}) {
     renderRecentChips();
     hideAutocomplete();
     document.getElementById('composeModal').classList.remove('hidden');
+    try { const cb = document.getElementById('composeBody'); cb.setSelectionRange(0, 0); cb.scrollTop = 0; } catch (e) {}
 }
 
 function sendComposed() {

@@ -97,3 +97,61 @@ function bpq_bbs_ports(): array {
     return $ports;
 }
 
+
+/**
+ * Where the dashboard writes ITS OWN log files (v1.5.19, 2026-11-02).
+ * Until v1.5.18 they went into <web root>/logs, which the installer links to
+ * LinBPQ's own logs folder; where the web user can only read that folder
+ * (home-folder installs) bpq-telnet / bpq-vara crashed at start and the
+ * other logs were lost (N3MEL). Now: config.php paths.app_logs if set, else
+ * /var/log/bpq-dashboard (the installer creates it, owned by the web user),
+ * else the old <paths.logs> folder so nothing stops on an older install.
+ */
+function bpq_app_log_dir(): string {
+    static $dir = null;
+    if ($dir !== null) return $dir;
+    $p = bpq_config_section('paths');
+    foreach ([(string)($p['app_logs'] ?? ''), '/var/log/bpq-dashboard'] as $d) {
+        $d = rtrim($d, '/');
+        if ($d !== '' && is_dir($d) && is_writable($d)) return $dir = $d;
+    }
+    return $dir = rtrim((string)($p['logs'] ?? (dirname(__DIR__) . '/logs')), '/');
+}
+
+function bpq_app_log(string $file): string {
+    return bpq_app_log_dir() . '/' . basename($file);
+}
+
+/**
+ * Optional pages (v1.5.19). config.php 'pages' => ['telnet' => true, ...];
+ * a page left out of the list counts as ON, so older config.php files keep
+ * every page. Rig Status and RF Power Monitor follow 'radio' => ['enabled'].
+ * The menu hides pages that are off (bpq-nav-loader.js, via station-info.php);
+ * the files stay, so switching a page on later is a config change plus its
+ * helper service (Maintenance > Optional pages).
+ */
+function bpq_pages(): array {
+    $p = bpq_config_section('pages');
+    $on = function (string $k) use ($p): bool { return !array_key_exists($k, $p) || (bool)$p[$k]; };
+    $radio = bpq_config_section('radio');
+    $rig = !array_key_exists('enabled', $radio) || (bool)$radio['enabled'];
+    return [
+        'telnet'         => $on('telnet'),
+        'chat'           => $on('chat'),
+        'aprs'           => $on('aprs'),
+        'vara'           => $on('vara'),
+        'vara_validator' => $on('vara_validator'),
+        'rig'            => $rig,
+    ];
+}
+
+/** Menu keys (data-page in _nav.html) of the pages that are switched off. */
+function bpq_pages_off(): array {
+    $map = ['telnet' => ['telnet'], 'chat' => ['chat'], 'aprs' => ['aprs'],
+            'vara' => ['vara'], 'rig' => ['rig', 'rf-power']];
+    $off = [];
+    foreach (bpq_pages() as $k => $on) {
+        if (!$on && isset($map[$k])) $off = array_merge($off, $map[$k]);
+    }
+    return $off;
+}

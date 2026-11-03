@@ -56,7 +56,7 @@ CONFIG = {
     ),
     'log_file': (
         'C:\\UniServerZ\\www\\bpq\\logs\\connect-watchdog.log'
-        if IS_WINDOWS else os.path.join(bpq_db_config.default_logs_dir(), 'connect-watchdog.log')
+        if IS_WINDOWS else bpq_db_config.app_log_path('connect-watchdog.log')   # v1.5.19: not LinBPQ's logs folder
     ),
 
     # Detection settings
