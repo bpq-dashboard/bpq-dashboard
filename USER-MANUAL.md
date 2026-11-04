@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.20**
+**Version 1.5.21**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -80,6 +80,14 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.21
+
+Requests and a report from N3MEL:
+
+- **System Logs** no longer stops with "Maximum call stack size exceeded" on large logs (seen on iPad/Safari).
+- **RF Connections:** click a Failures row (Timeout, Channel Busy, No Data, Port in Use, Incoming Failed) to list those sessions in Recent Connections.
+- **Email Client:** Quick Check-In can send as a personal message (SP) to a net manager instead of the SB bulletin; message texts are read up to 10 per BBS login, so Get Mail with Eager body fetching is much quicker on a slow BBS.
 
 ### In v1.5.20
 
@@ -267,14 +275,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.20.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.21.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.20
+cd bpq-dashboard-1.5.21
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -1688,10 +1696,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.20-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.21-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.20 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.21 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

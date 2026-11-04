@@ -381,6 +381,66 @@ function fetchMessageBody($msgNum) {
 }
 
 // ===========================
+// FETCH SEVERAL BODIES IN ONE SESSION (v1.5.21, N3MEL)
+// ===========================
+// One connect + login for up to BULK_READ_MAX messages instead of one per
+// message. Each read stops at the BBS prompt seen at login ("de N0CALL>"),
+// not at the first '>' (bodies often quote with '>'), so one message can't
+// run into the next. If a read times out the session is closed and the
+// rest are marked failed; the page reads those one at a time.
+const BULK_READ_MAX = 20;
+
+function fetchMessageBodies(array $nums) {
+    global $config;
+    logMessage('=== Fetch Messages #' . implode(',', $nums) . ' (one session) ===');
+    $out = [];
+    $socket = @stream_socket_client(
+        "tcp://{$config['bbs_host']}:{$config['bbs_port']}",
+        $errno, $errstr, $config['timeout']
+    );
+    if (!$socket) {
+        logMessage("ERROR: Cannot connect - $errstr");
+        return ['success' => false, 'error' => "Cannot connect: $errstr"];
+    }
+    stream_set_timeout($socket, $config['timeout']);
+    try {
+        $login = bpq_bbs_login($socket, ['user' => $config['bbs_user'], 'pass' => $config['bbs_pass'], 'alias' => $config['bbs_alias']], 'logMessage');
+        // The prompt is the last line of the login reply, e.g. "de K1AJD>".
+        $clean  = rtrim(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $login));
+        $lines  = preg_split('/\r\n|\r|\n/', $clean);
+        $prompt = trim((string)end($lines));
+        if ($prompt === '' || substr($prompt, -1) !== '>' || strlen($prompt) > 40) $prompt = null;
+        $atPrompt = function ($b) use ($prompt) {
+            $t = rtrim(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $b));
+            if ($prompt !== null) return substr($t, -strlen($prompt)) === $prompt;
+            return (bool)preg_match('/\bde [A-Z0-9\/\-]+>$/i', $t);
+        };
+        $broken = false;
+        foreach ($nums as $n) {
+            if ($broken) { $out[] = ['number' => $n, 'success' => false, 'error' => 'session ended early']; continue; }
+            sendCmd($socket, "R $n");
+            // No known prompt: fall back to "quiet for 1.5 s after a '>'".
+            [$buf, $why] = bpq_bbs_login_read($socket, $atPrompt, 30, $prompt === null ? 1.5 : 0, 'logMessage');
+            if ($why === 'stop' || ($why === 'idle' && substr(rtrim($buf), -1) === '>')) {
+                $out[] = ['number' => $n, 'success' => true, 'body' => $buf ?: 'No content'];
+            } else {
+                $out[] = ['number' => $n, 'success' => false, 'error' => "no prompt after R $n ($why)"];
+                $broken = true;
+            }
+        }
+        sendCmd($socket, 'B');
+        usleep(300000);
+        fclose($socket);
+        logMessage('Disconnected');
+        return ['success' => true, 'messages' => $out, 'timestamp' => date('c')];
+    } catch (Exception $e) {
+        logMessage('ERROR: ' . $e->getMessage());
+        if (is_resource($socket)) { @fwrite($socket, "B\r\n"); @fclose($socket); }
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+// ===========================
 // FETCH BULLETINS
 // ===========================
 
@@ -1297,7 +1357,7 @@ logMessage("Request: action=$action, count=$count, msg=$msgNum");
 
 // Validate action
 $allowedActions = [
-    'list', 'read', 'bulletins', 'test',
+    'list', 'read', 'read_many', 'bulletins', 'test',
     // v2 — typed listings
     'list_personal', 'list_traffic', 'list_bulletins',
     // v2.1 — combined-session listing (preferred for v2 client)
@@ -1331,6 +1391,19 @@ switch ($action) {
         echo json_encode(fetchMessageBody($msgNum), JSON_INVALID_UTF8_SUBSTITUTE);
         break;
         
+    case 'read_many':   // v1.5.21: msgs=12,13,14 (one telnet session)
+        $nums = [];
+        foreach (explode(',', (string)($_GET['msgs'] ?? '')) as $x) {
+            $x = trim($x);
+            if ($x === '' || !ctype_digit($x) || !validateMsgNum((int)$x)) apiError('Invalid message number');
+            if (!in_array((int)$x, $nums, true)) $nums[] = (int)$x;
+        }
+        if (!$nums) apiError('No message numbers');
+        if (count($nums) > BULK_READ_MAX) apiError('At most ' . BULK_READ_MAX . ' messages per request');
+        @set_time_limit(30 + 15 * count($nums));   // long bodies over RF-linked BBS
+        echo json_encode(fetchMessageBodies($nums), JSON_INVALID_UTF8_SUBSTITUTE);
+        break;
+
     case 'bulletins':
         $address = $_GET['address'] ?? '';
         $bulletinCount = min(intval($_GET['count'] ?? 10), 100);

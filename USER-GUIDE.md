@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.20**
+**Version 1.5.21**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -70,7 +70,7 @@ Most sysops are all three. Read everything that applies to you.
 24. What runs behind the pages
 25. Where your settings are kept
 26. Common messages and what they mean
-27. Known limitations in v1.5.19
+27. Known limitations in v1.5.21
 28. Keyboard shortcuts
 29. Page URL reference
 30. Getting help
@@ -404,6 +404,7 @@ A webmail-style client for your BBS: Personal mail, NTS traffic and bulletins, w
 - **📨 Get Mail** asks the BBS for the newest Personal, NTS and bulletin listings (50 of each by default; Preferences → *Max messages per list*, up to 200).
 - **Auto-fetch** repeats this **every 5 minutes** by default. Change it, or turn it off, in Preferences → *Auto-fetch interval*.
 - With *Body fetching* on **Eager** (default), the page also reads every new message's text during Get Mail, so clicks open instantly. **Lazy** reads a message's text only when you open it, which makes Get Mail faster.
+- The listings take one BBS login. Since v1.5.21 the message texts are read up to 10 per login too (before, every message had its own login, which on a slow or RF-linked BBS added a few seconds each). A message that doesn't come back cleanly in a batch is read again on its own.
 - Separately, the server saves the text of new messages to the database every 5 minutes (`message-bodies.timer`), even when no browser is open. Which bulletins it saves is set by `messages.bulletin_text` in `config.php`: `all` (default), `pinned` (only 📌 groups) or `none`.
 
 The dashboard logs in to the BBS with `bbs.user` / `bbs.pass` from `config.php`. It works whether BPQ's `USER=` line lands that login at the node (then it types `bbs`, or `bbs.alias`) or straight in the BBS, and whatever BPQ's greeting looks like (since v1.5.18; before that the greeting had to contain a `}`). If the login fails, the message says which step and shows the last line BPQ sent (Section 26).
@@ -497,7 +498,7 @@ NTS traffic is filed into **NTS** automatically, with an unread count. **📄 NT
 
 ### Net check-ins and forms
 
-- **✅ Quick Check-In** — a short form (name, callsign, location, band/mode, net address — `PKTNET@USA` by default) that builds a check-in message and opens it in Compose.
+- **✅ Quick Check-In** — a short form (name, callsign, location, band/mode, where to send it) that builds a check-in message and opens it in Compose. By default it goes as a bulletin (SB) to `PKTNET@USA`; to check in with a net manager instead, put their call in **Send to** and choose **Send as: Personal (SP)** (v1.5.21, e.g. SP N3MEL). Both are remembered with your name and callsign.
 - **📻 PKTNET Forms** — opens the TPRFN HTML Forms by N3MEL (ICS, weather, radiogram, check-in and bulletin forms that produce packet-ready text). The installer downloads them into `pktnet-forms/`. To get the author's latest version, use **Admin → Maintenance → Email Client → PKTNET forms → Update forms** (v1.5.19; it shows the installed and latest versions, and **Undo** puts the previous copy back). If the button shows "not found", run `sudo bash scripts/fetch-forms.sh` in the dashboard folder.
 
 ### Address book
@@ -633,7 +634,7 @@ The main page: your VARA HF sessions, forwarding partners, forwarded messages an
 ### Cards
 
 - **RF Connections Status** — successful sessions, success rate, average bitrate.
-- **RF Connections Failures** — every failed VARA session in the range, split into Timeout (no prop), Channel Busy, No Data, Port in Use and Incoming Failed (plus Other when a failure had no recognised reason); the rows add up to the total. This is the complete RF failure count; System Logs' **Port in Use** counter is only one of these kinds.
+- **RF Connections Failures** — every failed VARA session in the range, split into Timeout (no prop), Channel Busy, No Data, Port in Use and Incoming Failed (plus Other when a failure had no recognised reason); the rows add up to the total. This is the complete RF failure count; System Logs' **Port in Use** counter is only one of these kinds. **Click a row** (or the big number for all failures) to list just those sessions in **Recent Connections** (v1.5.21): time, callsign, frequency, band and the reason in the Status column. Click **✕** on the chip by the heading to show everything again.
 - **RF Connections Avg S/N**.
 - **RF Connected Stations** — click for a table of every station, sortable, with its sessions and messages.
 
@@ -680,7 +681,7 @@ Every station you've connected with, coloured by success rate, plus your own sta
 - **Hourly RF Connections & Messages (UTC)** and **Hourly Band Activity (UTC)**.
 - **Band Summary** — sessions, success and failures per band.
 - **📡 VARA Channel Quality** — per band: average, median and best bitrate, the modulation tier that bitrate implies (BFSK/BPSK up to 32QAM), average S/N, and whether S/N and bitrate are rising or falling compared with earlier in the range.
-- **Recent Connections** — time, callsign, type, frequency, band, status, S/N, bitrate and TX/RX time, with a callsign search and pages.
+- **Recent Connections** — time, callsign, type, frequency, band, status, S/N, bitrate and TX/RX time, with a callsign search and pages. A Failures-card filter (above) narrows it to one kind of failure.
 
 ### How to use it
 
@@ -1157,7 +1158,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.19
+## 27. Known limitations in v1.5.21
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1217,7 +1218,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.20-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.21-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1244,7 +1245,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.20 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.21 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1259,6 +1260,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.20 — User Guide**
+**73 — BPQ Dashboard v1.5.21 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

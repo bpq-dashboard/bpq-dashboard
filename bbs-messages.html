@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </head>
 
 <body data-nav-page="bbs">
-<script src="bpq-nav-loader.js?v=2026-11-03-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-04-1"></script>
 
 <!-- Top control bar -->
 <div id="controlBar">
@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </label>
             <h2 id="listTitle" style="flex:1;">Personal &amp; Traffic</h2>
             <span class="meta" id="listMeta">0 messages</span>
-            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.20</span>
+            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.21</span>
         </div>
         <!-- Selection toolbar — only visible when ≥1 message is selected.
              Bulk actions: Move-to-folder dropdown, Mark Read, Archive, Kill,
@@ -910,12 +910,21 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
         <div class="modal-body">
             <div style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">
-                Fills out a check-in bulletin and hands it to Compose — nothing is sent until you review and hit Send there. Your name/callsign/location are remembered for next time.
+                Fills out a check-in message and hands it to Compose — nothing is sent until you review and hit Send there. Your name/callsign/location are remembered for next time.
             </div>
 
-            <div class="form-group">
-                <label>Net address (To)</label>
-                <input id="ciNetAddress" type="text" value="PKTNET@USA" style="text-transform:uppercase;">
+            <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
+                <div class="form-group">
+                    <label>Send to (net address or net manager's call)</label>
+                    <input id="ciNetAddress" type="text" value="PKTNET@USA" style="text-transform:uppercase;">
+                </div>
+                <div class="form-group">
+                    <label>Send as</label>
+                    <select id="ciMsgType" title="Bulletin (SB) for a net address such as PKTNET@USA; Personal (SP) to send it to one station, e.g. the net manager">
+                        <option value="B">Bulletin (SB)</option>
+                        <option value="P">Personal (SP)</option>
+                    </select>
+                </div>
             </div>
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -4298,24 +4307,44 @@ async function prefetchBodies(onlyNums = null) {
     let done = 0;
     let failed = 0;
     let bodyBatch = [];   // flushed to the DB every 10 bodies (saveBodies)
-    for (const m of needs) {
-        setStatus('fetching', `Loading bodies… ${done+1}/${needs.length}`);
+    // 2026-10-12: only keep a reply that is this message (BPQ header
+    // matches); "Message N not found" used to be saved as the body.
+    const accept = (m, d) => {
+        const hdr = d && d.success ? parseBpqReadHeader(d.body) : null;
+        if (hdr && sameMessage(m, hdr)) { m.body = d.body || ''; bodyBatch.push(m); return true; }
+        return false;
+    };
+    const readOne = async m => {
         const d = await safeFetchJson(`${CONFIG.apiUrl}?action=read&msg=${m.number}`);
-        // 2026-10-12: only keep a reply that is this message (BPQ header
-        // matches); "Message N not found" used to be saved as the body.
-        const hdr = d.success ? parseBpqReadHeader(d.body) : null;
-        if (d.success && hdr && sameMessage(m, hdr)) {
-            m.body = d.body || '';
-            bodyBatch.push(m);
-            if (bodyBatch.length >= 10) { await saveBodiesToDb(bodyBatch, true); bodyBatch = []; }
-        } else {
-            failed++;
-            console.warn(`prefetch: body failed for #${m.number}: ${d.error}`);
+        if (!accept(m, d)) { failed++; console.warn(`prefetch: body failed for #${m.number}: ${d.error}`); }
+    };
+    // v1.5.21 (N3MEL): up to 10 bodies per BBS login (action=read_many)
+    // instead of one login per message. Anything the batch didn't return
+    // cleanly is read on its own; an older server without read_many falls
+    // back to one-at-a-time for the rest of this run.
+    const BATCH = 10;
+    let bulk = true;
+    for (let i = 0; i < needs.length; i += BATCH) {
+        const group = needs.slice(i, i + BATCH);
+        setStatus('fetching', `Loading bodies… ${Math.min(done + group.length, needs.length)}/${needs.length}`);
+        let retry = group;
+        if (bulk && group.length > 1) {
+            const d = await safeFetchJson(`${CONFIG.apiUrl}?action=read_many&msgs=${group.map(m => m.number).join(',')}`);
+            if (d.success && Array.isArray(d.messages)) {
+                const byNum = new Map(d.messages.map(r => [Number(r.number), r]));
+                retry = group.filter(m => !accept(m, byNum.get(Number(m.number))));
+            } else if (/invalid action/i.test(d.error || '')) {
+                bulk = false;
+            }
         }
-        done++;
-        // Persist every 5 messages so progress isn't lost if the user
-        // navigates away mid-prefetch
-        if (done % 5 === 0) persistInboxes();
+        for (const m of retry) {
+            setStatus('fetching', `Loading bodies… ${done + 1}/${needs.length}`);
+            await readOne(m);
+        }
+        done += group.length;
+        if (bodyBatch.length >= 10) { await saveBodiesToDb(bodyBatch, true); bodyBatch = []; }
+        // Persist as we go so progress isn't lost if the user navigates away
+        persistInboxes();
     }
     persistInboxes();
     if (bodyBatch.length) await saveBodiesToDb(bodyBatch, true);
@@ -6519,6 +6548,7 @@ function openCheckInModal() {
     document.getElementById('ciState').value    = p.state || '';
     document.getElementById('ciGrid').value     = p.grid || '';
     document.getElementById('ciNetAddress').value = p.netAddress || 'PKTNET@USA';
+    document.getElementById('ciMsgType').value = p.msgType === 'P' ? 'P' : 'B';   // v1.5.21 (N3MEL)
     document.getElementById('checkInModal').classList.remove('hidden');
 }
 
@@ -6527,6 +6557,7 @@ function openCheckInModal() {
 // reviews and hits Send there. Format is original to this dashboard.
 function generateCheckInAndCompose() {
     const netAddress = document.getElementById('ciNetAddress').value.trim().toUpperCase();
+    const msgType  = document.getElementById('ciMsgType').value === 'P' ? 'P' : 'B';
     const name     = document.getElementById('ciName').value.trim();
     const callsign = document.getElementById('ciCallsign').value.trim().toUpperCase();
     const town     = document.getElementById('ciTown').value.trim();
@@ -6542,9 +6573,13 @@ function generateCheckInAndCompose() {
         showToast('Name and callsign are required', 'error');
         return;
     }
+    if (!netAddress) {
+        showToast('Enter where to send the check-in', 'error');
+        return;
+    }
 
     // Remember for next time
-    saveCheckInProfile({ name, callsign, town, state, grid, netAddress });
+    saveCheckInProfile({ name, callsign, town, state, grid, netAddress, msgType });
 
     const now = new Date();
     const dateTime = now.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
@@ -6567,7 +6602,7 @@ function generateCheckInAndCompose() {
         title: 'Net Check-In',
         kind: 'fixed',   // fixed format: no signature (v1.5.19)
         to: netAddress,
-        type: 'B',
+        type: msgType,   // v1.5.21: SB to the net, or SP to the net manager
         subject: [name, callsign, town, state].filter(Boolean).join(', '),
         body: lines.join('\n'),
     });

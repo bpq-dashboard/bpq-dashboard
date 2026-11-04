@@ -4,6 +4,38 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.21] - 2026-11-04
+
+From N3MEL's report after updating to 1.5.20.
+
+### Fixed
+- **System Logs: "Maximum call stack size exceeded"** (top right) on large
+  logs, seen on iPad/Safari. Lines were appended with `push(...lines)` and
+  the VARA bitrate range used `Math.min(...)`; both pass every item as a
+  function argument, which overflows the stack on big files. Now plain
+  loops. (`bpq-system-logs.html`)
+
+### Added
+- **RF Connections: Failures card rows are clickable.** Timeout, Channel
+  Busy, No Data, Port in Use and Incoming Failed (or the total) filter
+  Recent Connections to those sessions, with the reason in the Status
+  column; a chip by the heading clears the filter.
+  (`bpq-rf-connections.html`; User Guide §12)
+- **Email Client, Quick Check-In: "Send as"** Bulletin (SB, default) or
+  Personal (SP), remembered with the address — e.g. SP N3MEL to check in
+  with the net manager. (`bbs-messages.html`; User Guide §9)
+
+### Changed
+- **Email Client reads message texts up to 10 per BBS login** (new
+  `bbs-messages.php?action=read_many&msgs=…`, at most 20) instead of one
+  login per message. Each read stops at the BBS prompt seen at login, so
+  quoted `>` lines can't end a message early. Anything not returned
+  cleanly is read singly. (`bbs-messages.php`, `bbs-messages.html`;
+  User Guide §9)
+- User Guide: §9 Getting mail and Net check-ins, §12 Cards and Recent
+  Connections, §27 heading. Manual: What's New.
+- Nothing to do by hand: `sudo bash update.sh` applies it all.
+
 ## [1.5.20] - 2026-11-03
 
 ### Fixed

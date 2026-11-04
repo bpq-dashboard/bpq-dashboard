@@ -198,7 +198,7 @@
     <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
          Replaces the previously-duplicated <nav> block. The active link is
          driven by the data-nav-page attribute on <body>. -->
-    <script src="bpq-nav-loader.js?v=2026-11-03-1"></script>
+    <script src="bpq-nav-loader.js?v=2026-11-04-1"></script>
 
     <!-- ═══ GITHUB RIBBON — compact open-source notice ═════════════════════ -->
     <div id="githubBanner" style="
@@ -264,7 +264,7 @@
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">RF Connections</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.20</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.21</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">VARA HF Analytics with Frequency Tracking</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -301,13 +301,13 @@
                 </div>
                 <div class="stat-card bg-gradient-to-br from-red-50 to-red-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-red-200">
                     <div class="text-red-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">RF Connections Failures</div>
-                    <div id="failedConnections" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
+                    <div id="failedConnections" class="text-2xl sm:text-4xl font-bold text-gray-900 cursor-pointer hover:underline" onclick="showFailures('failed')" title="Click to list every failed connection below">0</div>
                     <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-red-200">
-                        <div class="flex justify-between"><span>Timeout (no prop):</span><span id="failedTimeout" class="font-semibold text-red-600">0</span></div>
-                        <div class="flex justify-between"><span>Channel Busy:</span><span id="failedChannelBusy" class="font-semibold text-orange-600">0</span></div>
-                        <div class="flex justify-between"><span>No Data:</span><span id="failedNoData" class="font-semibold text-gray-500">0</span></div>
-                        <div class="flex justify-between" title="Port already attached to another session (&quot;Error - Port in use&quot;). Same event the System Logs page shows as Port in Use, counted per failed session here."><span>Port in Use:</span><span id="failedPortSession" class="font-semibold text-yellow-700">0</span></div>
-                        <div class="flex justify-between"><span>Incoming Failed:</span><span id="failedIncoming" class="font-semibold text-purple-600">0</span></div>
+                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('timeout')" title="Click to list these connections below"><span>Timeout (no prop):</span><span id="failedTimeout" class="font-semibold text-red-600">0</span></div>
+                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('channelBusy')" title="Click to list these connections below"><span>Channel Busy:</span><span id="failedChannelBusy" class="font-semibold text-orange-600">0</span></div>
+                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('nodata')" title="Click to list these connections below"><span>No Data:</span><span id="failedNoData" class="font-semibold text-gray-500">0</span></div>
+                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('portInSession')" title="Port already attached to another session (&quot;Error - Port in use&quot;). Same event the System Logs page shows as Port in Use, counted per failed session here. Click to list them below."><span>Port in Use:</span><span id="failedPortSession" class="font-semibold text-yellow-700">0</span></div>
+                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('incoming')" title="Click to list these connections below"><span>Incoming Failed:</span><span id="failedIncoming" class="font-semibold text-purple-600">0</span></div>
                         <div id="failedOtherRow" class="flex justify-between hidden"><span>Other:</span><span id="failedOther" class="font-semibold text-gray-500">0</span></div>
                     </div>
                     <div id="failedByBand" class="text-xs text-gray-600 mt-2 pt-2 border-t border-red-200"></div>
@@ -638,7 +638,8 @@
 
             <div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:mb-4">
-                    <h2 class="text-lg sm:text-2xl font-bold gradient-text">Recent Connections</h2>
+                    <h2 class="text-lg sm:text-2xl font-bold gradient-text" id="recentConnectionsHeading">Recent Connections</h2>
+                    <span id="failFilterChip" class="hidden px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 cursor-pointer" onclick="showFailures(null)" title="Show all connections again"></span>
                     <div class="relative">
                         <input type="text" id="recentConnectionsSearch" placeholder="Search callsign..." 
                                class="w-full sm:w-64 px-4 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -5577,9 +5578,37 @@
             filterRecentConnections();
         }
         
+        // v1.5.21 (N3MEL): click a line of the Failures card to list those
+        // connections here. null = all, 'failed' = every failure, else a failureType.
+        let failFilter = null;
+        const FAIL_FILTER_LABEL = { failed: 'All failures', timeout: 'Timeout (no prop)', channelBusy: 'Channel Busy',
+            nodata: 'No Data', portInSession: 'Port in Use', incoming: 'Incoming Failed' };
+        const FAIL_SHORT = { timeout: 'timeout', channelBusy: 'busy', nodata: 'no data', portInSession: 'port in use',
+            incoming: 'incoming failed', incomingFailed: 'incoming failed' };
+        function failMatches(c) {
+            if (!failFilter) return true;
+            if (c.status === 'success') return false;
+            if (failFilter === 'failed') return true;
+            if (failFilter === 'incoming') return c.failureType === 'incoming' || c.failureType === 'incomingFailed';
+            return c.failureType === failFilter;
+        }
+        function showFailures(kind) {
+            failFilter = kind;
+            const chip = document.getElementById('failFilterChip');
+            if (chip) {
+                chip.textContent = kind ? '✗ ' + (FAIL_FILTER_LABEL[kind] || kind) + ' — show all ✕' : '';
+                chip.classList.toggle('hidden', !kind);
+            }
+            filterRecentConnections(true);
+            if (kind) {
+                const h = document.getElementById('recentConnectionsHeading');
+                if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
         function filterRecentConnections(resetPage = true) {
             const searchTerm = document.getElementById('recentConnectionsSearch').value.toUpperCase().trim();
-            filteredConnections = connections.slice().reverse();
+            filteredConnections = connections.slice().reverse().filter(failMatches);
             
             // Apply search filter if there's a search term
             if (searchTerm) {
@@ -5603,14 +5632,14 @@
             if (searchTerm) {
                 countEl.textContent = `Showing ${startNum}-${endNum} of ${filteredConnections.length} matches for "${searchTerm}" (${connections.length} total)`;
             } else {
-                countEl.textContent = `Showing ${startNum}-${endNum} of ${filteredConnections.length} connections`;
+                countEl.textContent = `Showing ${startNum}-${endNum} of ${filteredConnections.length} ` + (failFilter ? (failFilter === 'failed' ? 'failed' : (FAIL_FILTER_LABEL[failFilter] || 'failed')) + ' connections' : 'connections');
             }
             
             // Update pagination controls
             updatePaginationControls();
             
             document.getElementById('recentConnectionsTable').innerHTML = recent.length === 0 
-                ? '<tr><td colspan="10" class="px-4 py-8 text-center text-gray-500">' + (searchTerm ? 'No connections matching "' + searchTerm + '"' : 'No connections') + '</td></tr>' 
+                ? '<tr><td colspan="10" class="px-4 py-8 text-center text-gray-500">' + (searchTerm ? 'No connections matching "' + searchTerm + '"' :  (failFilter ? 'No connections of this kind in this range' : 'No connections')) + '</td></tr>' 
                 : recent.map((c, i) => {
                 const bitrateDisplay = c.status === 'success' && c.maxBps > 0 ? c.maxBps + ' bps' : '--';
                 const bitrateColor = c.maxBps >= 200 ? 'text-green-600' : (c.maxBps >= 100 ? 'text-blue-600' : 'text-gray-600');
@@ -5623,7 +5652,7 @@
                     '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.type === 'incoming' ? 'bg-blue-100 text-blue-700">⬇ In' : 'bg-orange-100 text-orange-700">⬆ Out') + '</span></td>' +
                     '<td class="px-3 py-2 text-xs font-mono text-gray-700">' + (c.freqMHz ? c.freqMHz.toFixed(4) + ' MHz' + (c.inferredFreq ? ' <span class="text-cyan-500" title="Inferred from nearby activity">~</span>' : '') : '--') + '</td>' +
                     '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-bold text-white" style="background:' + getBandColor(c.band) + '">' + c.band + '</span></td>' +
-                    '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.status === 'success' ? 'bg-green-100 text-green-700">✓' : 'bg-red-100 text-red-700">✗') + '</span></td>' +
+                    '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.status === 'success' ? 'bg-green-100 text-green-700">✓' : 'bg-red-100 text-red-700" title="' + (FAIL_SHORT[c.failureType] || 'failed') + '">✗' + (c.failureType && FAIL_SHORT[c.failureType] ? ' ' + FAIL_SHORT[c.failureType] : '')) + '</span></td>' +
                     '<td class="px-3 py-2 text-right text-xs ' + (c.snr !== undefined ? (c.snr >= 0 ? 'text-green-600' : 'text-orange-600') : 'text-gray-400') + '">' + (c.snr !== undefined ? c.snr.toFixed(1) : '--') + '</td>' +
                     '<td class="px-3 py-2 text-right text-xs font-semibold ' + bitrateColor + '">' + bitrateDisplay + '</td>' +
                     '<td class="px-3 py-2 text-right text-xs text-gray-600">' + c.txBytes + '/' + c.rxBytes + '</td>' +
@@ -7061,7 +7090,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.20 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.21 | HF Efficiency Report
                 </p>
             `;
             
