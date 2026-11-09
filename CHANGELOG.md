@@ -4,6 +4,12 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+### Docs
+- README and Installation Manual §4: the quick-install `wget` line still
+  downloaded `v1.5.26.zip`, a tag that was never published (404), then
+  `cd bpq-dashboard-1.5.33`. Now `v1.5.33.zip`. The version bump didn't
+  touch this line from 1.5.27 on.
+
 ## [1.5.33] - 2026-11-09
 
 ### Fixed

@@ -43,7 +43,7 @@ On the computer that already runs LinBPQ:
 ```bash
 sudo apt update && sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.26.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.33.zip
 unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.33
 sudo bash install.sh
 ```
