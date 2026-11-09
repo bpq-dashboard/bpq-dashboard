@@ -12,7 +12,7 @@ narrowed with --only:
   rms       CMSAccess_YYYYMMDD.log  -> rms_connections, rms_login_failures
   tcp       log_YYMMDD_TCP.txt      -> tcp_events
   nodesrtt  nodesrtt.txt (snapshot) -> net_nodes_rtt
-  mheard    MHSave.txt (snapshot)   -> net_mheard
+  mheard    MHSave.txt (snapshot) + live MHU via poll-mheard.php -> net_mheard
   rtknown   RTKnown.txt (snapshot)  -> net_rtknown
 
 SCOPE: this backs the page's STATS/CHARTS ONLY. The raw log viewer and
@@ -476,7 +476,7 @@ def parse_mheard_file(path):
             if pm:
                 current_port = int(pm.group(1))
                 continue
-            if not line or current_port < 1 or current_port > 5:
+            if not line or current_port < 1:   # v1.5.22: every BPQ port (was 1-5)
                 continue
             m = RE_MHEARD_ENTRY.match(line)
             if not m:
@@ -702,15 +702,84 @@ def run_tcp(conn, logs_dir, dates, verbose, dry_run):
     return files_processed, rows_written
 
 
+def poll_live_mheard(verbose=False):
+    """v1.5.25: LinBPQ's live MHeard lists via scripts/poll-mheard.php (logs
+    in to the node and runs MHU per port). {port: {CALL: datetime}} or None
+    when the poll is off or failed (then MHSave.txt alone is used)."""
+    import json, shutil, subprocess
+    php = shutil.which('php') or ('/usr/bin/php' if os.path.exists('/usr/bin/php') else None)
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'poll-mheard.php')
+    if not php or not os.path.isfile(script):
+        return None
+    try:
+        r = subprocess.run([php, script], capture_output=True, text=True, timeout=90)
+        data = json.loads((r.stdout or '').strip().splitlines()[-1])
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError) as e:
+        if verbose:
+            sys.stdout.write(f"  [mheard] live poll failed: {e}\n")
+        return None
+    if not data.get('ok'):
+        if verbose:
+            sys.stdout.write(f"  [mheard] live poll: {data.get('error')}\n")
+        return None
+    live = {}
+    for port, rows in (data.get('ports') or {}).items():
+        for row in rows:
+            try:
+                ts = dt.datetime.strptime(row['heard_at'], '%Y-%m-%d %H:%M:%S')
+            except (KeyError, ValueError):
+                continue
+            live.setdefault(int(port), {})[str(row.get('call', '')).upper()] = ts
+    if verbose:
+        sys.stdout.write(f"  [mheard] live poll: {sum(len(v) for v in live.values())} station(s) on {len(live)} port(s)\n")
+    return live
+
+
+def merge_live_mheard(rows, live):
+    """MHSave.txt rows + live MHU times: newest heard_at wins; bytes, status,
+    grid and frequency stay from MHSave.txt (MHU has none)."""
+    if not live:
+        return rows
+    by = {(r['port'], r['callsign']): r for r in rows}
+    for port, calls in live.items():
+        for call, ts in calls.items():
+            r = by.get((port, call))
+            if r is None:
+                r = {'port': port, 'callsign': call, 'heard_at': ts, 'bytes': 0,
+                     'status': 'none', 'grid': None, 'freq_mhz': None}
+                by[(port, call)] = r
+                rows.append(r)
+            elif r['heard_at'] is None or ts > r['heard_at']:
+                r['heard_at'] = ts
+    return rows
+
+
 def run_snapshot(conn, logs_dir, source, filename, parse_fn, table, columns,
-                 verbose, dry_run):
+                 verbose, dry_run, allow_missing=False):
     """Shared runner for the three snapshot sources — DELETE + INSERT
     (not TRUNCATE — see the comment below)."""
     path = os.path.join(logs_dir, filename)
+    # v1.5.22: LinBPQ writes MHSave.txt / RTKnown.txt into its OWN folder
+    # (config.php paths.linbpq), not the logs folder; a copy in the logs
+    # folder was left to old station scripts and went stale (K1AJD). Use
+    # whichever readable copy is newer.
+    lin = (bpq_db_config.load_config_section('paths').get('linbpq') or '').strip()
+    if lin:
+        alt = os.path.join(lin, filename)
+        try:
+            if os.access(alt, os.R_OK) and (not os.path.isfile(path)
+                                            or os.path.getmtime(alt) > os.path.getmtime(path)):
+                path = alt
+        except OSError:
+            pass
+    if verbose:
+        sys.stdout.write(f"  [{source}] reading {path}\n")
     if not os.path.isfile(path):
         if verbose:
-            sys.stdout.write(f"  [{source}] {filename}: not found, skipping\n")
-        return 0, 0
+            sys.stdout.write(f"  [{source}] {filename}: not found" + (", live list only\n" if allow_missing else ", skipping\n"))
+        if not allow_missing:
+            return 0, 0
+        path = None
 
     rows = parse_fn(path)
     now = dt.datetime.utcnow()
@@ -835,11 +904,18 @@ def main():
                 'net_nodes_rtt', ['callsign', 'full_call', 'rtt_sec', 'frames', 'polled_at'],
                 args.verbose, args.dry_run)
         if 'mheard' in sources:
+            # v1.5.25: MHSave.txt (written when LinBPQ stops) plus the live
+            # lists from the node; without a live poll the file alone, as before.
+            live = poll_live_mheard(args.verbose)
+            if live is None:
+                mh_parse = parse_mheard_file
+            else:
+                mh_parse = lambda path: merge_live_mheard(parse_mheard_file(path) if path else [], live)
             totals['mheard'] = run_snapshot(
-                conn, args.logs_dir, 'mheard', 'MHSave.txt', parse_mheard_file,
+                conn, args.logs_dir, 'mheard', 'MHSave.txt', mh_parse,
                 'net_mheard', ['port', 'callsign', 'heard_at', 'bytes', 'status',
                               'grid', 'freq_mhz', 'polled_at'],
-                args.verbose, args.dry_run)
+                args.verbose, args.dry_run, allow_missing=live is not None)
         if 'rtknown' in sources:
             totals['rtknown'] = run_snapshot(
                 conn, args.logs_dir, 'rtknown', 'RTKnown.txt', parse_rtknown_file,

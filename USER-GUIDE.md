@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.21**
+**Version 1.5.30**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -70,7 +70,7 @@ Most sysops are all three. Read everything that applies to you.
 24. What runs behind the pages
 25. Where your settings are kept
 26. Common messages and what they mean
-27. Known limitations in v1.5.21
+27. Known limitations in v1.5.25
 28. Keyboard shortcuts
 29. Page URL reference
 30. Getting help
@@ -634,9 +634,10 @@ The main page: your VARA HF sessions, forwarding partners, forwarded messages an
 ### Cards
 
 - **RF Connections Status** — successful sessions, success rate, average bitrate.
-- **RF Connections Failures** — every failed VARA session in the range, split into Timeout (no prop), Channel Busy, No Data, Port in Use and Incoming Failed (plus Other when a failure had no recognised reason); the rows add up to the total. This is the complete RF failure count; System Logs' **Port in Use** counter is only one of these kinds. **Click a row** (or the big number for all failures) to list just those sessions in **Recent Connections** (v1.5.21): time, callsign, frequency, band and the reason in the Status column. Click **✕** on the chip by the heading to show everything again.
+- **RF Connections Failures** — every failed VARA session in the range, split into Timeout (no prop), Channel Busy, No Data, Port in Use and Incoming Failed (plus Other when a failure had no recognised reason); the rows add up to the total. **Timeout (no prop)** is a call nobody answered: VARA ran all its tries ("Connecting to … 15/15") and never logged "Connected to", usually propagation or the other station being off the air. **No Data** is a link that did come up and then carried nothing (0 bytes both ways, no S/N). Before v1.5.30 unanswered calls were counted as No Data; update.sh moves them to Timeout. This is the complete RF failure count; System Logs' **Port in Use** counter is only one of these kinds. **Click a row** (or the big number for all failures) to list just those sessions in **Recent Connections** (v1.5.21): time, callsign, frequency, band and the reason in the Status column. Click **✕** on the chip by the heading to show everything again.
 - **RF Connections Avg S/N**.
 - **RF Connected Stations** — click for a table of every station, sortable, with its sessions and messages.
+- **VHF Connections Status** (v1.5.28; a badge under Refresh's status line in v1.5.23–1.5.27) — one block per LinBPQ port that uses a KISS-over-TCP sound modem (QtSoundModem, Direwolf), named from `bpq32.cfg`. 🟢 **On air**: the modem is running and LinBPQ is connected to it. 🟠 **LinBPQ not connected**: restart LinBPQ. 🔴 **Modem not running**: check the modem's service (e.g. `systemctl status qtsoundmodem`). Below: the newest station in BPQ's MHeard list for that port, the watched stations on that port (Section 14), ⚠ when quiet too long, and (v1.5.29) **Heard today** — every station heard on that port in the page's reporting period, newest first, with its UTC time: **Today** is 00:00Z to now; **7 / 30 / 90 Days** add the date and change the heading to "Heard last N days". A link mark 🔗 before a call means BPQ flags that station as having connected. BPQ's MHeard list keeps each station once, with the last time it was heard, so a station heard at 02:00Z and again at 14:00Z shows once, at 14:00Z; it is a list of stations, not of every frame or contact. Updates every minute; stations without such a port don't see the card (the row keeps four cards). Setting up such a port: *Installation Manual* §10.13; checks: Maintenance → *Sound modem*.
 
 ### 🌐 RF Forwarding Partners
 
@@ -652,6 +653,7 @@ Every message your BBS forwarded to or received from a partner, one row per part
 
 - **Filters** — partner, type (bulletin, personal, traffic), **Via** and **Status**.
 - **Via** — how it travelled: 📡 RF (VARA), 🔗 NET/ROM, 🛰 AXIP, 🌐 Telnet, 📻 AX.25 or "Port N". *RF only* is the default. Outbound messages are matched to the connect script in `bpq32.cfg`, so the column is right in both directions.
+- **📮 Winlink (CMS)** (v1.5.24) — your BBS's Winlink traffic with the CMS (forwarding partner **RMS**), by either route: 🌐 Telnet = over the internet, 📻 AX.25 (or 📡 RF) = through an RF gateway when the internet route failed (*Installation Manual* §10.14). The *To* column shows the route, e.g. `WINLINK@CMS` or `WINLINK@KP2L-10`; *From* is the sender BPQ logged. These rows aren't in *RF only*, which counts VARA HF partners.
 - **Status** — ✅ delivered (default), ⛔ rejected (the partner already had it), ⏸ deferred, or all offers. Most rejections are normal: partners refuse duplicates they've already received from someone else.
 - **Received** — when the transfer finished (UTC) and how long after the offer.
 - Counts everywhere on the page (partner tiles, cards, charts) are **delivered** messages, not offers.
@@ -741,7 +743,8 @@ Statistics and a searchable viewer for BPQ's daily logs, plus BPQ's live MHeard 
 - **Hourly Activity (UTC)**, **Event Distribution** and **Recent Errors (Last 10)** with *View All in Log*.
 - **Live Log Viewer** — the BBS log lines themselves: callsign search, event type (connections, disconnects, messages, errors), date range (today to 30 days), and 📄 **PDF Report**.
 - **Most Active Stations**.
-- **📻 Latest MHeard Stations** — stations BPQ has heard, one tab per BPQ port 1–5, with last heard and bytes (grid and frequency on tabs 3 and 4). See Section 27 about the tab names.
+- **📻 Latest MHeard Stations** — stations BPQ has heard, one tab per BPQ port, with last heard and bytes, and grid, band and frequency where BPQ records them (VARA/ARDOP ports). Since v1.5.22 the tabs are your own ports, named from the `ID=` line of each PORT in `bpq32.cfg` (e.g. "VHF Packet 1200"); a port that has heard stations but isn't in the file shows as "Port N". If the web server can't read `bpq32.cfg`, name them in `config.php` → `'system_logs' => ['port_names' => [4 => 'VHF 1200']]`. The list is live (v1.5.25): every 5 minutes the dashboard logs in to the node with `bbs.user` and reads `MHU` for each port, and merges that with BPQ's `MHSave.txt` (which keeps bytes, grid and frequency); a station heard a minute ago shows within about 5 minutes. Switch the live reading off on **Admin → Maintenance → Watched stations** (v1.5.26), or with `'system_logs' => ['live_mheard' => false]` in `config.php`.
+- **👁 Watched stations** (v1.5.25), above the tabs: stations you want to know have gone quiet, e.g. a Winlink gateway you use as a backup. 👁 green = heard within its limit; ⚠ amber = not heard for longer, or never. Listen only: nothing is transmitted. Set them on **Admin → Maintenance → Watched stations** (v1.5.26): callsign with SSID, the port (or any), and after how many hours to flag it. (Before v1.5.26: `config.php` → `'system_logs' => ['watch' => [['call' => 'KP2L-10', 'port' => 4, 'hours' => 6]]]`; that list is still used until the Maintenance page saves one.) A watched station on a sound-modem port is also shown in that port's block of RF Connections' *VHF Connections Status* card.
 - **🗺️ Known Stations Routing Table** — BPQ's known stations, searchable, filtered by age (24 hours, 7 days, 30 days, stale).
 
 ### How to use it
@@ -912,6 +915,7 @@ Commands use the installer's defaults (`/var/www/bpq-dashboard`, database `bpqda
 - **LinBPQ in a home folder** (v1.5.19) — the narrow access fix (ACLs) for Ubuntu 21.04+ / Mint 21+, and how to test it as the web server.
 - **Database & credentials** — test the database login exactly the way the pages and the parsers use it, file permissions for `db-config.php`, backups (kept outside the web root) and changing the database password.
 - **Log parsers** — dry runs and rebuilds for the RF Connections, Traffic and System Logs parsers, and how to tell whether they're keeping up.
+- **Watched stations** (v1.5.26) — add, change or remove the stations System Logs and RF Connections flag when they go quiet, see when each was last heard, and switch live MHeard on or off. Saved in `data/system-logs.json`.
 - **Email Client database** — **PKTNET forms**: installed vs the author's latest version, **Update forms** and **Undo** (v1.5.19); the schema check that 📌 pinned folders need, counts of saved message text and kept-after-kill copies, folder sizes, what the "⚠ killed on BBS" label really means, and the NTS and bulletin-folder diagnostics.
 - **Bulletin retention** — preview, run or review the daily 14-day clean-up.
 - **NTS forwarding report, RF forwarding queue, Rig Status & RF Power Monitor (flrig), VARA HF Terminal, VARA callsign validator, White Pages clean-up, YAPP, LinBPQ sysop commands** — troubleshooting for each feature.
@@ -1089,7 +1093,7 @@ The dashboard's own log files (bpq-telnet, bpq-vara, vara-validator, the Email C
 |---|---|---|
 | `parse-vara-log.py` | VARA sessions, forwarded messages | RF Connections |
 | `parse-traffic-report.py` | Traffic per station | Traffic Report |
-| `parse-system-logs.py` | Events, errors, RMS/TCP, MHeard, routing | System Logs |
+| `parse-system-logs.py` | Events, errors, RMS/TCP, MHeard (with the node's live list via `scripts/poll-mheard.php`, v1.5.25), routing | System Logs |
 
 Their logs are in `/var/log/bpq-dashboard/` and in the Log Viewer under *Log parsers*.
 
@@ -1113,7 +1117,7 @@ Some choices follow you to every browser; others stay in the browser where you m
 | APRS BBS station info and beacon settings | Theme (and the Chat and APRS pages' own theme) |
 | RF Connections forwarding partners and saved station locations | NWS callsign, destination, auto-refresh and the Post All password |
 | The propagation scheduler's partners (`data/partners.json`) and ⚙ Dashboard Settings (`data/settings.json`) | Telnet session log, YAPP *Received recently*, Chat callsign |
-| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the optional pages (`pages`, `radio.enabled`) and the VARA log source (`vara_remote`) | Maintenance page *Your install* values |
+| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the optional pages (`pages`, `radio.enabled`), the VARA log source (`vara_remote`), System Logs tab names (`system_logs.port_names`, v1.5.22), live MHeard on/off and watched stations (Maintenance → *Watched stations*, kept in `data/system-logs.json` since v1.5.26; or `system_logs.live_mheard` / `system_logs.watch` in `config.php`) | Maintenance page *Your install* values |
 | Which NWS alerts were already posted automatically (`cache/nws-auto-post-state.json`) | |
 
 Clearing a browser's site data resets the right-hand column for that browser only; nothing on the server is lost.
@@ -1158,13 +1162,12 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.21
+## 27. Known limitations in v1.5.25
 
 These affect what you see in this release. Each says what to do meanwhile.
 
 - **VARA retunes only `RADIO 2`.** Frequency changes and the End Session restore rewrite the `RADIO 2` block in `bpq32.cfg`; a station whose FLRIG radio has another number can't QSY from the page yet.
 - **VARA quick frequencies are fixed** (3.596, 7.103, 10.148, 14.103, 14.106 MHz). Type any other frequency in the box.
-- **System Logs MHeard tabs** are BPQ ports 1–5 with fixed names (Telnet Server, Internet, VARA HF, ARDOP, VHF 1200); read them by port number if your ports differ.
 - **The connect watchdog's settings** are in the script itself (*Installation Manual* §10.1); the propagation scheduler and storm monitor use ⚙ Dashboard Settings or the partners editor (Section 19).
 - **RF Power Monitor watt-hours** always read 0 (flrig has no energy reading).
 - **Traffic Report's Messages card** leaves out NTS traffic (Section 13).
@@ -1218,7 +1221,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.21-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.30-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1245,7 +1248,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.21 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.30 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1260,6 +1263,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.21 — User Guide**
+**73 — BPQ Dashboard v1.5.30 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

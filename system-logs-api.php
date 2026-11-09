@@ -54,6 +54,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/tprfn-db.php';
+require_once __DIR__ . '/includes/station-config.php';   // bpq_linbpq_ports() (v1.5.22)
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
@@ -291,7 +292,10 @@ function action_mheard(PDO $pdo): array {
         "SELECT port, callsign, heard_at, bytes, status, grid, freq_mhz, polled_at
          FROM net_mheard ORDER BY port, heard_at DESC"
     );
-    return ['heard' => $rows];
+    // v1.5.22: tab names from bpq32.cfg (ID=) instead of fixed ones
+    $ports = [];
+    foreach (bpq_linbpq_ports() as $n => $p) $ports[] = ['port' => $n, 'name' => $p['name'], 'kind' => $p['kind']];
+    return ['heard' => $rows, 'ports' => $ports, 'watch' => bpq_watch_status($pdo)];   // watch: v1.5.28
 }
 
 function action_rtknown(PDO $pdo): array {

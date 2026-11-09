@@ -155,6 +155,24 @@ return [
         'vara_validator' => false,  // VARA callsign check (vara-validator), see 'vara_validator' below
     ],
 
+    // ---- System Logs (v1.5.22) ----
+    // The MHeard tabs are named from the ID= lines of the PORT blocks in
+    // <paths.linbpq>/bpq32.cfg. Only if the web server can't read that file
+    // (or you want other names), name them here by BPQ port number:
+    // 'system_logs' => [
+    //     'port_names' => [1 => 'Telnet', 3 => 'VARA HF', 4 => 'VHF 1200'],
+    //     // v1.5.25: MHeard is read live from the node every 5 minutes
+    //     // (bbs.user / bbs.pass); false = MHSave.txt only
+    //     'live_mheard' => true,
+    //     // v1.5.25: listen-only watch: flag a station not heard for 'hours'
+    //     // ('port' optional). Shown on System Logs and the RF Connections badge.
+    //     // v1.5.26: easier on Admin → Maintenance → Watched stations (saved in
+    //     // data/system-logs.json, which then replaces this list).
+    //     'watch' => [
+    //         ['call' => 'N0CALL-10', 'port' => 4, 'hours' => 6],
+    //     ],
+    // ],
+
     // ---- Rig control via flrig (Rig Status, RF Power Monitor) ----
     // Both pages need flrig. install.sh sets enabled => false when you skip
     // flrig; the pages are then hidden (v1.5.19: no longer deleted). To add

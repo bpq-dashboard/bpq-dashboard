@@ -99,6 +99,132 @@ function bpq_bbs_ports(): array {
 
 
 /**
+ * LinBPQ's ports from <paths.linbpq>/bpq32.cfg (v1.5.22): [num => ['name', 'kind']].
+ * v1.5.23: KISS-over-TCP ports (TYPE=ASYNC with IPADDR + TCPPORT, e.g. a
+ * sound modem) also carry 'kiss_host' / 'kiss_port' for the server's own
+ * status checks; callers that answer the web must not pass those on.
+ * A port is a PORT ... ENDPORT block; its number is PORTNUM= if given, else
+ * its position (as BPQ does). 'name' is ID= (PORTS command text), 'kind' is
+ * 'net' for TELNET / AXIP drivers and 'rf' for everything else. Only names
+ * and kinds are meant for the browser: never addresses or passwords. Unreadable
+ * file -> []. config.php 'system_logs' => ['port_names' => [4 => 'VHF']]
+ * overrides or adds names (stations whose bpq32.cfg the web user can't read).
+ */
+function bpq_linbpq_ports(): array {
+    static $ports = null;
+    if ($ports !== null) return $ports;
+    $ports = [];
+    $dir = (string)(bpq_config_section('paths')['linbpq'] ?? '');
+    $file = rtrim($dir, '/') . '/bpq32.cfg';
+    if ($dir !== '' && is_readable($file)) {
+        $text = (string)@file_get_contents($file);
+        $text = preg_replace('#/\*.*?\*/#s', '', $text);                     // /* block comments */
+        $text = implode("\n", array_map(fn($l) => explode(';', $l, 2)[0], preg_split('/\r\n|\r|\n/', $text)));
+        if (preg_match_all('/^\s*PORT\b(.*?)^\s*ENDPORT\b/smi', $text, $mm)) {
+            $pos = 0;
+            foreach ($mm[1] as $blk) {
+                $pos++;
+                $num  = preg_match('/^\s*PORTNUM\s*=\s*(\d+)/mi', $blk, $m) ? (int)$m[1] : $pos;
+                $name = preg_match('/^\s*ID\s*=\s*(.+)$/mi', $blk, $m) ? trim($m[1]) : '';
+                $drv  = preg_match('/^\s*DRIVER\s*=\s*(\S+)/mi', $blk, $m) ? strtoupper($m[1]) : '';
+                $kind = in_array($drv, ['TELNET', 'BPQAXIP', 'AXIP'], true) ? 'net' : 'rf';
+                $ports[$num] = ['name' => mb_substr($name !== '' ? $name : "Port $num", 0, 40), 'kind' => $kind];
+                if (preg_match('/^\s*IPADDR\s*=\s*(\S+)/mi', $blk, $ip) && preg_match('/^\s*TCPPORT\s*=\s*(\d+)/mi', $blk, $tp)
+                    && !in_array($drv, ['TELNET', 'BPQAXIP', 'AXIP'], true)) {
+                    $ports[$num]['kiss_host'] = $ip[1];
+                    $ports[$num]['kiss_port'] = (int)$tp[1];
+                }
+            }
+        }
+    }
+    foreach ((array)(bpq_config_section('system_logs')['port_names'] ?? []) as $n => $name) {
+        $n = (int)$n;
+        if ($n < 1 || !is_string($name) || trim($name) === '') continue;
+        $ports[$n] = array_merge($ports[$n] ?? ['kind' => 'rf'], ['name' => mb_substr(trim($name), 0, 40)]);
+    }
+    ksort($ports);
+    return $ports;
+}
+
+/**
+ * System Logs settings saved from the Maintenance page (v1.5.26):
+ * <web root>/data/system-logs.json  {"watch": [...], "live_mheard": true}
+ * Written by admin/maintenance-api.php (admin login), never config.php,
+ * which holds passwords. null = never saved there.
+ */
+function bpq_system_logs_file(): string {
+    return dirname(__DIR__) . '/data/system-logs.json';
+}
+function bpq_system_logs_saved(): ?array {
+    $f = bpq_system_logs_file();
+    if (!is_readable($f)) return null;
+    $j = json_decode((string)@file_get_contents($f), true);
+    return is_array($j) ? $j : null;
+}
+/** Live MHeard polling on? Off when config.php OR the Maintenance page says false. */
+function bpq_live_mheard_on(): bool {
+    $c = bpq_config_section('system_logs');
+    if (array_key_exists('live_mheard', $c) && !$c['live_mheard']) return false;
+    $s = bpq_system_logs_saved();
+    return !($s !== null && array_key_exists('live_mheard', $s) && !$s['live_mheard']);
+}
+/** Where the watch list comes from: 'page' (Maintenance), 'config' or 'none'. */
+function bpq_watch_source(): string {
+    $s = bpq_system_logs_saved();
+    if ($s !== null && array_key_exists('watch', $s)) return 'page';
+    return (bpq_config_section('system_logs')['watch'] ?? null) ? 'config' : 'none';
+}
+
+/**
+ * Watched stations (v1.5.25): Maintenance page (data/system-logs.json, v1.5.26)
+ * or, until that is saved once, config.php 'system_logs' => ['watch' => [
+ *     ['call' => 'KP2L-10', 'port' => 4, 'hours' => 6], ...]]
+ * Listen-only check: when was the station last heard (net_mheard), and has
+ * it been quiet longer than 'hours'? 'port' optional (any port).
+ * -> [['call', 'port' (int|null), 'hours' (float)], ...]
+ */
+function bpq_watch_list(?array $from = null): array {
+    if ($from === null) {
+        $s = bpq_system_logs_saved();
+        $from = ($s !== null && array_key_exists('watch', $s))
+              ? (array)$s['watch'] : (array)(bpq_config_section('system_logs')['watch'] ?? []);
+    }
+    $out = []; $seen = [];
+    foreach ($from as $w) {
+        if (!is_array($w)) continue;
+        $call = strtoupper(trim((string)($w['call'] ?? '')));
+        if (!preg_match('/^[A-Z0-9]{1,6}(-\d{1,2})?$/', $call)) continue;
+        $port = isset($w['port']) && (int)$w['port'] > 0 ? (int)$w['port'] : null;
+        $hours = (float)($w['hours'] ?? 6);
+        $hours = $hours > 0 ? min($hours, 720.0) : 6.0;
+        $key = $call . '/' . ($port ?? '*');
+        if (isset($seen[$key]) || count($out) >= 20) continue;
+        $seen[$key] = true;
+        $out[] = ['call' => $call, 'port' => $port, 'hours' => $hours];
+    }
+    return $out;
+}
+
+/** Watch list with last heard (UTC 'Y-m-d H:i:s') and quiet flag, from net_mheard. */
+function bpq_watch_status(?PDO $pdo): array {
+    $out = [];
+    foreach (bpq_watch_list() as $w) {
+        $last = null;
+        if ($pdo) {
+            try {
+                $sql = 'SELECT MAX(heard_at) FROM net_mheard WHERE callsign = ?' . ($w['port'] ? ' AND port = ?' : '');
+                $st = $pdo->prepare($sql);
+                $st->execute($w['port'] ? [$w['call'], $w['port']] : [$w['call']]);
+                $last = $st->fetchColumn() ?: null;
+            } catch (Throwable $e) { $last = null; }
+        }
+        $ageH = $last ? (time() - strtotime($last . ' UTC')) / 3600 : null;
+        $out[] = $w + ['last_heard' => $last, 'quiet' => $ageH === null || $ageH > $w['hours']];
+    }
+    return $out;
+}
+
+/**
  * Where the dashboard writes ITS OWN log files (v1.5.19, 2026-11-02).
  * Until v1.5.18 they went into <web root>/logs, which the installer links to
  * LinBPQ's own logs folder; where the web user can only read that folder

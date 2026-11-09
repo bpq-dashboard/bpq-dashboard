@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS rf_connections (
     failure_reason  VARCHAR(64)     NULL,                -- set when status != success. Values written by
                                                            -- parse-vara-log.py: 'no_data', 'incoming_failed',
                                                            -- 'port_in_use', 'superseded', 'incomplete_no_disconnect',
-                                                           -- 'channel_busy' (BBS-log-correlated, added 2026-09-16)
+                                                           -- 'channel_busy' (BBS-log-correlated, added 2026-09-16),
+                                                           -- 'no_answer' (outgoing, never connected; v1.5.30)
 
     -- Bookkeeping
     log_line_no     INT UNSIGNED    NULL,                -- Where in the source log this session ends — useful for debug

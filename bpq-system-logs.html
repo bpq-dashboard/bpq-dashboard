@@ -394,7 +394,7 @@
 <body class="min-h-screen" data-nav-page="system">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-11-04-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-08-7"></script>
 
     <!-- Modern Navigation with gradient -->
     
@@ -406,7 +406,7 @@
                     <div class="text-center flex-1">
                         <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                             <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">System Logs</h1>
-                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.21</span>
+                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.30</span>
                         </div>
                         <p class="text-gray-600 text-sm sm:text-lg">Real-time event monitoring</p>
                         <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -665,132 +665,21 @@
                         </div>
                     </div>
                     
-                    <!-- Port Tabs -->
-                    <div class="flex flex-wrap gap-1 mb-3 border-b border-emerald-200 pb-2">
-                        <button onclick="showMHeardPort(1)" id="mhPortBtn1" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-emerald-500 text-white">Telnet Server</button>
-                        <button onclick="showMHeardPort(2)" id="mhPortBtn2" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300">Internet</button>
-                        <button onclick="showMHeardPort(3)" id="mhPortBtn3" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300">VARA HF</button>
-                        <button onclick="showMHeardPort(4)" id="mhPortBtn4" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300">ARDOP</button>
-                        <button onclick="showMHeardPort(5)" id="mhPortBtn5" class="mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300">VHF 1200</button>
+                    <!-- Port tabs, tables and counts are built from LinBPQ's own port
+                         list (bpq32.cfg ID= lines) by renderMHeardTabs() (v1.5.22; until
+                         1.5.28 five fixed tabs named for one station's ports). -->
+                    <!-- v1.5.25: watched stations (config.php system_logs.watch) -->
+                    <div id="mhWatch" class="hidden flex flex-wrap gap-2 mb-2 text-xs"></div>
+                    <div id="mhTabs" class="flex flex-wrap gap-1 mb-3 border-b border-emerald-200 pb-2"></div>
+                    <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
+                        <table class="w-full text-xs">
+                            <thead id="mheardHead" class="bg-emerald-100 sticky top-0"></thead>
+                            <tbody id="mheardList" class="divide-y divide-emerald-100">
+                                <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
                     </div>
-                    
-                    <!-- Port Content Areas -->
-                    <div id="mheardPort1" class="mheard-port-content">
-                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
-                            <table class="w-full text-xs">
-                                <thead class="bg-emerald-100 sticky top-0">
-                                    <tr>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
-                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
-                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mheardList1" class="divide-y divide-emerald-100">
-                                    <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div id="mheardPort2" class="mheard-port-content hidden">
-                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
-                            <table class="w-full text-xs">
-                                <thead class="bg-emerald-100 sticky top-0">
-                                    <tr>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
-                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
-                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mheardList2" class="divide-y divide-emerald-100">
-                                    <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div id="mheardPort3" class="mheard-port-content hidden">
-                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
-                            <table class="w-full text-xs">
-                                <thead class="bg-emerald-100 sticky top-0">
-                                    <tr>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
-                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
-                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Grid</th>
-                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Freq (MHz)</th>
-                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mheardList3" class="divide-y divide-emerald-100">
-                                    <tr><td colspan="6" class="text-center py-4 text-gray-400">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <div id="mheardPort4" class="mheard-port-content hidden">
-                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
-                            <table class="w-full text-xs">
-                                <thead class="bg-emerald-100 sticky top-0">
-                                    <tr>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
-                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
-                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Grid</th>
-                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Freq (MHz)</th>
-                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mheardList4" class="divide-y divide-emerald-100">
-                                    <tr><td colspan="6" class="text-center py-4 text-gray-400">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div id="mheardPort5" class="mheard-port-content hidden">
-                        <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
-                            <table class="w-full text-xs">
-                                <thead class="bg-emerald-100 sticky top-0">
-                                    <tr>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Callsign</th>
-                                        <th class="px-2 py-1 text-left font-semibold text-emerald-800">Last Heard (UTC)</th>
-                                        <th class="px-2 py-1 text-right font-semibold text-emerald-800">Bytes</th>
-                                        <th class="px-2 py-1 text-center font-semibold text-emerald-800">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mheardList5" class="divide-y divide-emerald-100">
-                                    <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Port Statistics -->
-                    <div class="mt-3 pt-3 border-t border-emerald-200 grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-                        <div class="text-center">
-                            <span class="text-emerald-600 font-bold" id="mhCount1">0</span>
-                            <span class="text-gray-500"> Telnet</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-emerald-600 font-bold" id="mhCount2">0</span>
-                            <span class="text-gray-500"> Internet</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-emerald-600 font-bold" id="mhCount3">0</span>
-                            <span class="text-gray-500"> VARA HF</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-emerald-600 font-bold" id="mhCount4">0</span>
-                            <span class="text-gray-500"> ARDOP</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-emerald-600 font-bold" id="mhCount5">0</span>
-                            <span class="text-gray-500"> VHF 1200</span>
-                        </div>
-                    </div>
+                    <div id="mhCounts" class="mt-3 pt-3 border-t border-emerald-200 flex flex-wrap justify-around gap-2 text-xs"></div>
                 </div>
             </div>
 
@@ -3041,7 +2930,7 @@
             doc.setTextColor(150);
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
-            doc.text(`BPQ Dashboard v1.5.21 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            doc.text(`BPQ Dashboard v1.5.30 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
             
             // Generate filename
             const dateStr = new Date().toISOString().slice(0, 10);
@@ -3373,17 +3262,72 @@
         // =========================================================================
         
         const MHEARD_FILE = './logs/MHSave.txt';
-        let mheardData = { 1: [], 2: [], 3: [], 4: [] };
-        let currentMHPort = 1;
-        
+        // v1.5.22: ports come from LinBPQ's bpq32.cfg (system-logs-api.php
+        // ?action=mheard -> ports: [{port, name, kind}]); any port that has
+        // heard stations but isn't listed is shown as "Port N".
+        let mheardData = {};          // port -> [entries]
+        let mheardPorts = [];         // [{port, name, kind}] from the server
+        let currentMHPort = null;
+
         // Band color lookup for MHeard RF port display
         const BAND_COLORS = {
             '160m': '#8b5cf6', '80m': '#6366f1', '60m': '#3b82f6', '40m': '#0ea5e9',
             '30m': '#14b8a6', '20m': '#22c55e', '17m': '#84cc16', '15m': '#eab308',
-            '12m': '#f97316', '10m': '#ef4444'
+            '12m': '#f97316', '10m': '#ef4444', '6m': '#db2777', '2m': '#7c3aed',
+            '1.25m': '#0891b2', '70cm': '#b45309'
         };
         function getBandColor(b) { return BAND_COLORS[b] || '#6b7280'; }
-        
+        const mhEsc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+        function mhPortList() {
+            const byNum = new Map(mheardPorts.map(p => [Number(p.port), p]));
+            for (const k of Object.keys(mheardData)) {
+                const n = Number(k);
+                if (!byNum.has(n) && mheardData[k].length) byNum.set(n, { port: n, name: `Port ${n}`, kind: '' });
+            }
+            return [...byNum.values()].sort((a, b) => a.port - b.port);
+        }
+        // Grid / frequency columns only where BPQ records them (VARA/ARDOP
+        // ports); VHF packet MHeard entries have neither.
+        function mhIsRf(p) {
+            return (mheardData[p.port] || []).some(x => x.grid || x.freq);
+        }
+
+        // v1.5.25: listen-only watch — when was each watched station last
+        // heard, and has it been quiet longer than its limit?
+        function mhAgo(s) {
+            if (!s) return 'never heard';
+            const m = Math.max(0, Math.round((Date.now() - new Date(s.replace(' ', 'T') + 'Z').getTime()) / 60000));
+            return 'heard ' + (m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`);
+        }
+        function renderMHeardWatch(list) {
+            const box = document.getElementById('mhWatch');
+            if (!list.length) { box.classList.add('hidden'); return; }
+            const pname = n => { const p = mheardPorts.find(x => Number(x.port) === Number(n)); return p ? p.name : `port ${n}`; };
+            box.innerHTML = list.map(w => {
+                const cls = w.quiet ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                const tip = `Watched (listen only): flagged when not heard for ${w.hours} h` + (w.port ? ` on ${pname(w.port)}` : '');
+                return `<span class="px-2 py-0.5 rounded border font-semibold ${cls}" title="${mhEsc(tip)}">${w.quiet ? '⚠' : '👁'} ${mhEsc(w.call)}${w.port ? ' · ' + mhEsc(pname(w.port)) : ''}: ${mhAgo(w.last_heard)}</span>`;
+            }).join('');
+            box.classList.remove('hidden');
+        }
+
+        function renderMHeardTabs() {
+            const list = mhPortList();
+            if (currentMHPort === null || !list.some(p => p.port === currentMHPort)) {
+                // open on the first port that has heard something (else the first port)
+                const first = list.find(p => (mheardData[p.port] || []).length) || list[0];
+                currentMHPort = first ? first.port : null;
+            }
+            const on  = 'mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-emerald-500 text-white';
+            const off = 'mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+            document.getElementById('mhTabs').innerHTML = list.length
+                ? list.map(p => `<button onclick="showMHeardPort(${p.port})" class="${p.port === currentMHPort ? on : off}" title="LinBPQ port ${p.port}">${mhEsc(p.name)}</button>`).join('')
+                : '<span class="text-xs text-gray-400">No ports found</span>';
+            document.getElementById('mhCounts').innerHTML = list.map(p =>
+                `<div class="text-center"><span class="text-emerald-600 font-bold">${(mheardData[p.port] || []).length}</span><span class="text-gray-500"> ${mhEsc(p.name)}</span></div>`).join('');
+        }
+
         // DB-backed path first (system-logs migration, 2026-09-21) — falls
         // back to fetching+parsing MHSave.txt directly if the API's
         // unavailable, same convention as loadSystemLogsStatsFromApi().
@@ -3397,12 +3341,13 @@
                     if (resp.ok) {
                         const json = await resp.json();
                         if (json.ok && json.data && Array.isArray(json.data.heard)) {
-                            mheardData = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+                            mheardData = {};
+                            if (Array.isArray(json.data.ports)) mheardPorts = json.data.ports;
                             for (const row of json.data.heard) {
                                 const port = parseInt(row.port);
-                                if (!mheardData[port]) continue;
+                                if (!(port > 0)) continue;
                                 const date = new Date(row.heard_at.replace(' ', 'T') + 'Z');
-                                mheardData[port].push({
+                                (mheardData[port] = mheardData[port] || []).push({
                                     timestamp: Math.floor(date.getTime() / 1000),
                                     bytes: parseInt(row.bytes) || 0,
                                     callsign: row.callsign,
@@ -3414,10 +3359,9 @@
                                     freq: row.freq_mhz !== null ? parseFloat(row.freq_mhz) : null,
                                 });
                             }
-                            for (let port = 1; port <= 5; port++) {
-                                document.getElementById(`mhCount${port}`).textContent = mheardData[port].length;
-                            }
+                            renderMHeardTabs();
                             renderMHeardPort(currentMHPort);
+                            renderMHeardWatch(json.data.watch || []);
                             statusEl.textContent = `Updated ${new Date().toLocaleTimeString()} (DB)`;
                             return;
                         }
@@ -3443,11 +3387,7 @@
                 
                 const text = await response.text();
                 mheardData = parseMHeardFile(text);
-                
-                for (let port = 1; port <= 5; port++) {
-                    document.getElementById(`mhCount${port}`).textContent = mheardData[port].length;
-                }
-                
+                renderMHeardTabs();
                 renderMHeardPort(currentMHPort);
                 
                 const now = new Date();
@@ -3456,18 +3396,15 @@
             } catch (error) {
                 console.error('Error loading MHeard data:', error);
                 statusEl.textContent = 'File not found';
-                
-                for (let port = 1; port <= 5; port++) {
-                    const tbody = document.getElementById(`mheardList${port}`);
-                    const cols = (port === 3 || port === 4) ? 6 : 4;
-                    tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center py-4 text-gray-400">MHSave.txt not found in logs folder</td></tr>`;
-                    document.getElementById(`mhCount${port}`).textContent = '0';
-                }
+                mheardData = {};
+                renderMHeardTabs();
+                document.getElementById('mheardHead').innerHTML = '';
+                document.getElementById('mheardList').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">MHSave.txt not found in logs folder</td></tr>';
             }
         }
         
         function parseMHeardFile(text) {
-            const data = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+            const data = {};
             let currentPort = 0;
             
             const lines = text.split('\n');
@@ -3481,7 +3418,7 @@
                     continue;
                 }
                 
-                if (!trimmed || currentPort < 1 || currentPort > 5) continue;
+                if (!trimmed || currentPort < 1) continue;
                 
                 const match = trimmed.match(/^(\d+)\s+(\d+)\s+(\S+)\s+([+!])?\s*(\w{3})\s+(\d{1,2})\s+(\d{1,2}:\d{2}:\d{2})\s+\|([^|]*)\|(.*)$/);
                 
@@ -3515,7 +3452,7 @@
                             parseInt(timeParts[0]), parseInt(timeParts[1]), parseInt(timeParts[2])));
                     }
                     
-                    data[currentPort].push(entry);
+                    (data[currentPort] = data[currentPort] || []).push(entry);
                 }
             }
             
@@ -3524,70 +3461,54 @@
         
         function showMHeardPort(port) {
             currentMHPort = port;
-            
-            for (let p = 1; p <= 5; p++) {
-                const btn = document.getElementById(`mhPortBtn${p}`);
-                btn.className = p === port
-                    ? 'mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-emerald-500 text-white'
-                    : 'mh-port-btn px-3 py-1 text-xs font-semibold rounded-t transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
-                document.getElementById(`mheardPort${p}`).classList.toggle('hidden', p !== port);
-            }
-            
+            renderMHeardTabs();
             renderMHeardPort(port);
         }
         
         function renderMHeardPort(port) {
-            const tbody = document.getElementById(`mheardList${port}`);
+            const head = document.getElementById('mheardHead');
+            const tbody = document.getElementById('mheardList');
+            const p = mhPortList().find(x => x.port === port);
+            if (!p) { head.innerHTML = ''; tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">No stations heard</td></tr>'; return; }
+            const rf = mhIsRf(p);
+            const th = (t, al) => `<th class="px-2 py-1 text-${al} font-semibold text-emerald-800">${t}</th>`;
+            head.innerHTML = '<tr>' + th('Callsign', 'left') + th('Last Heard (UTC)', 'left') + th('Bytes', 'right')
+                + (rf ? th('Grid', 'center') + th('Freq (MHz)', 'right') : '') + th('Status', 'center') + '</tr>';
             const entries = mheardData[port] || [];
+            const cols = rf ? 6 : 4;
             
             if (entries.length === 0) {
-                const cols = (port === 3 || port === 4) ? 6 : 4;
                 tbody.innerHTML = `<tr><td colspan="${cols}" class="text-center py-4 text-gray-400">No stations heard on this port</td></tr>`;
                 return;
             }
             
             const sorted = [...entries].sort((a, b) => b.timestamp - a.timestamp);
             
-            if (port === 3 || port === 4) {
-                tbody.innerHTML = sorted.map(entry => {
-                    const statusIcon = entry.connected ? '✅' : (entry.failed ? '❌' : '⚪');
-                    const statusTitle = entry.connected ? 'Connected' : (entry.failed ? 'Failed/Heard' : 'Heard');
+            tbody.innerHTML = sorted.map(entry => {
+                const statusIcon = entry.connected ? '✅' : (entry.failed ? '❌' : '⚪');
+                const statusTitle = entry.connected ? 'Connected' : (entry.failed ? (rf ? 'Failed/Heard' : 'Failed') : 'Heard');
+                const dtStr = formatMHeardDate(entry.date);
+                let rfCells = '';
+                if (rf) {
                     const freqStr = entry.freq ? entry.freq.toFixed(4) : '-';
                     const band = entry.freq ? getBandFromFreq(entry.freq) : '';
                     const bandColor = band ? getBandColor(band) : '#888';
-                    const gridStr = entry.grid || '-';
-                    const dtStr = formatMHeardDate(entry.date);
-                    
-                    return `
-                        <tr class="hover:bg-emerald-50">
-                            <td class="px-2 py-1 font-mono font-semibold text-emerald-700">${entry.callsign}</td>
-                            <td class="px-2 py-1 text-gray-600 text-xs">${dtStr}</td>
-                            <td class="px-2 py-1 text-right text-gray-600">${formatBytes(entry.bytes)}</td>
-                            <td class="px-2 py-1 text-center font-mono text-gray-500">${gridStr}</td>
-                            <td class="px-2 py-1 text-right">
-                                ${band ? `<span class="px-1 py-0.5 rounded text-white text-xs" style="background:${bandColor}">${band}</span>` : ''}
-                                <span class="text-gray-600 ml-1">${freqStr}</span>
-                            </td>
-                            <td class="px-2 py-1 text-center" title="${statusTitle}">${statusIcon}</td>
-                        </tr>
-                    `;
-                }).join('');
-            } else {
-                tbody.innerHTML = sorted.map(entry => {
-                    const statusIcon = entry.connected ? '✅' : (entry.failed ? '❌' : '⚪');
-                    const statusTitle = entry.connected ? 'Connected' : (entry.failed ? 'Failed' : 'Heard');
-                    const dtStr = formatMHeardDate(entry.date);
-                    
-                    return `
-                        <tr class="hover:bg-emerald-50">
-                            <td class="px-2 py-1 font-mono font-semibold text-emerald-700">${entry.callsign}</td>
-                            <td class="px-2 py-1 text-gray-600 text-xs">${dtStr}</td>
-                            <td class="px-2 py-1 text-right text-gray-600">${formatBytes(entry.bytes)}</td>
-                            <td class="px-2 py-1 text-center" title="${statusTitle}">${statusIcon}</td>
-                        </tr>
-                    `;
-                }).join('');
-            }
+                    rfCells = `
+                        <td class="px-2 py-1 text-center font-mono text-gray-500">${mhEsc(entry.grid || '-')}</td>
+                        <td class="px-2 py-1 text-right">
+                            ${band ? `<span class="px-1 py-0.5 rounded text-white text-xs" style="background:${bandColor}">${band}</span>` : ''}
+                            <span class="text-gray-600 ml-1">${freqStr}</span>
+                        </td>`;
+                }
+                return `
+                    <tr class="hover:bg-emerald-50">
+                        <td class="px-2 py-1 font-mono font-semibold text-emerald-700">${mhEsc(entry.callsign)}</td>
+                        <td class="px-2 py-1 text-gray-600 text-xs">${dtStr}</td>
+                        <td class="px-2 py-1 text-right text-gray-600">${formatBytes(entry.bytes)}</td>${rfCells}
+                        <td class="px-2 py-1 text-center" title="${statusTitle}">${statusIcon}</td>
+                    </tr>
+                `;
+            }).join('');
         }
         
         function getBandFromFreq(freqMHz) {
@@ -3601,6 +3522,10 @@
             if (freqMHz >= 21.0 && freqMHz <= 21.45) return '15m';
             if (freqMHz >= 24.89 && freqMHz <= 24.99) return '12m';
             if (freqMHz >= 28.0 && freqMHz <= 29.7) return '10m';
+            if (freqMHz >= 50.0 && freqMHz <= 54.0) return '6m';      // v1.5.22: VHF/UHF ports
+            if (freqMHz >= 144.0 && freqMHz <= 148.0) return '2m';
+            if (freqMHz >= 222.0 && freqMHz <= 225.0) return '1.25m';
+            if (freqMHz >= 420.0 && freqMHz <= 450.0) return '70cm';
             return '';
         }
         

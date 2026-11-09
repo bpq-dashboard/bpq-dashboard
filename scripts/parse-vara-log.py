@@ -111,8 +111,10 @@ RE_CONNECTING        = re.compile(r'Connecting to ([A-Z0-9-]+)\.\.\.\s+(\d+)/(\d
 RE_CONNECTED_OUT     = re.compile(r'Connected to ([A-Z0-9-]+)\s+VARA HF', re.I)
 RE_INCOMING          = re.compile(r'VARAHF\s+([A-Z0-9-]+)\s+connected\s+VARA HF', re.I)
 RE_SNR               = re.compile(r'([A-Z0-9-]+)\s+Average S/N:\s+([-\d.]+)\s+dB', re.I)
+# v1.5.30: VARA may add a reason, "Disconnected (Timeout)  TX: ...";
+# before, such lines didn't match and the session was left open.
 RE_DISCONNECTED      = re.compile(
-    r'Disconnected\s+TX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+'
+    r'Disconnected(?:\s*\([^)]*\))?\s+TX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+'
     r'RX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+'
     r'Session Time:\s+(\d+):(\d+)', re.I)
 RE_INCOMING_FAILED   = re.compile(r'Incoming Connection failed', re.I)
@@ -176,6 +178,18 @@ RE_BBS_MSG_FC = re.compile(
     r'^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+([><])([A-Z0-9-]*)\s+FC\s+EM\s+'
     r'([A-Z0-9_.-]+)\s+(\d+)\s+(\d+)\s+([A-Z0-9]+)\s+([A-Z0-9@#._-]+)\s+([A-Z0-9@#._-]+)\s+([BPT])',
     re.I)
+# v1.5.24: Winlink B2F proposals (BBS <-> CMS, the RMS forwarding partner)
+# carry no from / to / type:
+#      "261108 12:15:08 >RMS       FC EM 7229_K1AJD 277 237 0"
+#       date   time     dir partner   FC EM mid    size csize 0
+# The sender comes from the "?RMS  B2 From K1AJD" line before it; the "to"
+# is recorded as the first hop of the connect script (CMS over the
+# internet, or the RF gateway after ELSE, e.g. KP2L-10).
+RE_BBS_MSG_B2F = re.compile(
+    r'^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+([><])([A-Z0-9-]*)\s+FC\s+(?:EM|CM)\s+'
+    r'([A-Z0-9_.-]+)\s+(\d+)\s+(\d+)\s+\d+\s*$',
+    re.I)
+RE_B2_FROM = re.compile(r'^B2 From(?: Finally)?\s+([A-Z0-9/-]+)\s*$', re.I)
 
 # 5. CONNECT-MODE LOOKUP — BPQ writes a *separate* log
 #    (ConnectLog_YYMMDD.log, one file per day) recording every connect
@@ -760,7 +774,7 @@ def lookup_mode_for_message(connect_index, msg_time, partner_raw,
 
 RE_BBS_LINE = re.compile(r'^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+([|<>])(\S+)\s+(.*?)\s*$')
 RE_SCRIPT_ATTACH = re.compile(r'^ATTACH\s+(\d+)\b', re.I)
-RE_SCRIPT_C_PORT = re.compile(r'^C(?:ONNECT)?\s+(\d+)\s+\S+', re.I)
+RE_SCRIPT_C_PORT = re.compile(r'^C(?:ONNECT)?\s+(\d+)\s+(\S+)', re.I)
 RE_SCRIPT_C_CALL = re.compile(r'^C(?:ONNECT)?\s+([A-Z0-9][A-Z0-9:-]*)\s*$', re.I)
 
 # Max time an outbound BBS session is held open waiting for its
@@ -1047,15 +1061,26 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
                                 if b_rest.upper().startswith('CONNECTING TO BBS'):
                                     ts = _line_ts(b_date, b_h, b_m, b_s)
                                     if ts:
+                                        # v1.5.24: a new attempt while the previous
+                                        # one is still open (connect script "ELSE":
+                                        # 'c cms' failed, now 'C 4 KP2L-10') — the
+                                        # old attempt's "Disconnected" line comes
+                                        # AFTER this one and must not end it.
+                                        prev = sessions.get(b_key)
+                                        stale = (prev.get('stale', 0) + 1) if (prev and prev['type'] == 'out') else 0
                                         sessions[b_key] = {'type': 'out', 'start': ts,
                                                            'port': None, 'netrom': False,
-                                                           'hop_done': False}
+                                                           'hop_done': False, 'stale': stale}
                                 elif 'INCOMING CONNECT FROM' in b_rest.upper():
                                     ts = _line_ts(b_date, b_h, b_m, b_s)
                                     if ts:
                                         sessions[b_key] = {'type': 'in', 'start': ts}
                                 elif b_rest.upper().endswith('DISCONNECTED'):
-                                    sessions.pop(b_key, None)
+                                    cur = sessions.get(b_key)
+                                    if cur and cur.get('stale'):
+                                        cur['stale'] -= 1   # the earlier attempt's line
+                                    else:
+                                        sessions.pop(b_key, None)
                             elif b_dir == '>':
                                 s = sessions.get(b_key)
                                 if s and s['type'] == 'out' and not s['hop_done']:
@@ -1066,10 +1091,12 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
                                         s['port'] = int(ma.group(1))  # later "C <call>" uses it
                                     elif mp:
                                         s['port'] = int(mp.group(1))
+                                        s['hop_call'] = mp.group(2).upper()
                                         s['hop_done'] = True
                                     elif mc:
                                         if s['port'] is None:
                                             s['netrom'] = True
+                                        s['hop_call'] = mc.group(1).upper()
                                         s['hop_done'] = True
 
                     # ── FBB protocol tracking (2026-10-06) ───────────────
@@ -1104,6 +1131,13 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
                             if st:
                                 st['out_pending'].clear()
                                 st['in_pending'].clear()
+                                st['b2_from'] = None   # Winlink sender is per session (v1.5.24)
+                        continue
+                    if p_dir == '?':
+                        bf = RE_B2_FROM.match(p_rest)
+                        if bf:
+                            proto.setdefault(p_key, {'out_pending': [], 'in_pending': [],
+                                                     'out_await': [], 'in_await': []})['b2_from'] = bf.group(1).upper()
                         continue
                     if p_dir not in '<>' or not p_up.startswith('F'):
                         continue
@@ -1151,18 +1185,32 @@ def build_forwarded_messages(bbs_log_dir, since=None, until=None, verbose=False,
 
                     fa = RE_BBS_MSG_FA.match(line)
                     fc = None if fa else RE_BBS_MSG_FC.match(line)
-                    if not fa and not fc:
+                    b2 = None if (fa or fc) else RE_BBS_MSG_B2F.match(line)
+                    if not fa and not fc and not b2:
                         continue
 
                     if fa:
                         (date, hh, mm, ss, direction_char, partner, msg_type,
                          from_call, to_area, category, bid, size) = fa.groups()
                         size_bytes = int(size)
-                    else:
+                    elif fc:
                         (date, hh, mm, ss, direction_char, partner, bid,
                          orig_size, comp_size, from_call, to_area, category,
                          msg_type) = fc.groups()
                         size_bytes = int(orig_size)
+                    else:
+                        # Winlink B2F (v1.5.24): personal mail; "to" = the
+                        # route it took (CMS, or the RF gateway's call).
+                        (date, hh, mm, ss, direction_char, partner, bid,
+                         orig_size, comp_size) = b2.groups()
+                        size_bytes = int(orig_size)
+                        msg_type = 'P'
+                        category = 'WINLINK'
+                        from_call = (st.get('b2_from') or '') if direction_char == '>' else ''
+                        s_ = sessions.get(partner.upper())
+                        to_area = ((s_ or {}).get('hop_call') or 'CMS') if direction_char == '>' else 'CMS'
+                        if direction_char == '<' and s_ and s_.get('hop_call'):
+                            from_call = s_['hop_call']   # received via this route
 
                     msg_time = p_ts
                     direction = 'out' if direction_char == '>' else 'in'
@@ -1542,7 +1590,14 @@ class SessionParser:
         session['rx_max_bps'] = rx_bps
         session['status'] = 'success' if is_success else 'failed'
         if not is_success:
-            session['failure_reason'] = 'no_data'
+            # v1.5.30: an outgoing call that never got "Connected to" is
+            # nobody answering (all 15 tries, ~45 s), shown as Timeout
+            # (no prop); 'no_data' is kept for a link that came up and
+            # then carried nothing.
+            if self.curr.get('direction') == 'outgoing' and not self.curr.get('confirmed'):
+                session['failure_reason'] = 'no_answer'
+            else:
+                session['failure_reason'] = 'no_data'
         self.curr = None
         return session
 

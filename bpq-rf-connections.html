@@ -30,6 +30,8 @@
         .status-success { background-color: #10b981; }
         .status-error { background-color: #ef4444; }
         .status-loading { background-color: #f59e0b; animation: pulse 2s infinite; }
+        .status-warn { background-color: #f59e0b; }
+        .status-unknown { background-color: #9ca3af; }
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
         .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
@@ -198,7 +200,7 @@
     <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
          Replaces the previously-duplicated <nav> block. The active link is
          driven by the data-nav-page attribute on <body>. -->
-    <script src="bpq-nav-loader.js?v=2026-11-04-1"></script>
+    <script src="bpq-nav-loader.js?v=2026-11-08-7"></script>
 
     <!-- ═══ GITHUB RIBBON — compact open-source notice ═════════════════════ -->
     <div id="githubBanner" style="
@@ -264,7 +266,7 @@
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">RF Connections</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.21</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.30</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">VARA HF Analytics with Frequency Tracking</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -289,7 +291,7 @@
             <!-- No Data Warning (hidden by default, shown when no log files found) -->
             <div id="noDataWarning" class="hidden mb-6 p-4 sm:p-6 bg-amber-50 border-2 border-amber-200 rounded-xl text-center"></div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-5 mb-6 sm:mb-10">
+            <div id="statCardsGrid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-5 mb-6 sm:mb-10">
                 <div class="stat-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-green-200">
                     <div class="text-green-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">RF Connections Status</div>
                     <div id="successfulConnections" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
@@ -321,6 +323,13 @@
                     <div class="text-purple-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">RF Connected Stations</div>
                     <div id="uniqueStations" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
                     <div class="text-xs text-purple-600 font-semibold hidden sm:block">Quick Overview</div>
+                </div>
+                <!-- v1.5.28: VHF Connections Status — one block per LinBPQ sound-modem
+                     port (KISS over TCP, e.g. QtSoundModem); was a badge in the
+                     status box (v1.5.23). Hidden when the station has none. -->
+                <div id="vhfStatusCard" class="hidden stat-card bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-emerald-200">
+                    <div class="text-emerald-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">VHF Connections Status</div>
+                    <div id="vhfStatusBody" class="space-y-3"></div>
                 </div>
             </div>
 
@@ -374,6 +383,7 @@
                                 <option value="AXIP">🛰 AXIP</option>
                                 <option value="TELNET">🌐 Telnet</option>
                                 <option value="AX.25">📻 AX.25</option>
+                                <option value="winlink">📮 Winlink (CMS)</option>
                             </select>
                             <select id="messagesStatusFilter" onchange="updateMessagesPanel()" class="px-2 py-1 text-xs border border-amber-300 rounded bg-white" title="Partner's reply to each offer">
                                 <option value="delivered">✅ Delivered</option>
@@ -2550,6 +2560,8 @@
         // failure_reason -> failureType: the DB-backed parser
         // (scripts/parse-vara-log.py) writes these reason strings:
         //   'no_data'                 -> 'nodata'    (connected, no bytes transferred)
+        //   'no_answer'               -> 'timeout'   (v1.5.30: outgoing call never
+        //                                 answered: all tries, no "Connected to")
         //   'incoming_failed'         -> 'incoming'  (remote side failed to connect in)
         //   'port_in_use'             -> 'portInSession'
         //   'superseded'              -> 'timeout'   (a retry sequence that never
@@ -2566,6 +2578,7 @@
         // total but not a specific category.
         const FAILURE_REASON_MAP = {
             no_data: 'nodata',
+            no_answer: 'timeout',
             incoming_failed: 'incoming',
             port_in_use: 'portInSession',
             superseded: 'timeout',
@@ -3257,8 +3270,12 @@
         // before the first loadLogs() → updateMessagesPanel() runs.
         restoreMessagesMediumFilter();
 
-        function mediumMatches(medium, mode) {
+        // v1.5.24: Winlink traffic = the BBS's RMS forwarding partner (BPQ
+        // Mail <-> CMS), whichever route it took (internet, or an RF gateway).
+        const WINLINK_PARTNER = 'RMS';
+        function mediumMatches(medium, mode, partner) {
             if (mode === 'all') return true;
+            if (mode === 'winlink') return partner === WINLINK_PARTNER;
             if (mode === 'rf') return !medium || medium === 'VARA';
             if (mode === 'nonrf') return !!medium && medium !== 'VARA';
             return medium === mode;
@@ -3283,7 +3300,7 @@
             const src = (status === 'all' || status === 'rejected')
                 ? forwardedMessages.concat(rejectedMessages) : forwardedMessages;
             return src.filter(m => m.date >= cutoffYYMMDD &&
-                mediumMatches(m.medium, mode) && statusMatches(m.acceptStatus, status));
+                mediumMatches(m.medium, mode, m.partner) && statusMatches(m.acceptStatus, status));
         }
 
         // Server-side totals per status for the panel's current filters —
@@ -3297,7 +3314,7 @@
                 if (r.day < cutoffYYMMDD) continue;
                 if (partnerFilter !== 'all' && r.partner !== partnerFilter) continue;
                 if (typeFilter !== 'all' && r.msg_type !== typeFilter) continue;
-                if (!mediumMatches(r.medium, mediumMode)) continue;
+                if (!mediumMatches(r.medium, mediumMode, r.partner)) continue;
                 t[r.accept_status || 'none'] += parseInt(r.n) || 0;
             }
             return t;
@@ -3857,7 +3874,7 @@
                     return;
                 }
                 
-                const disc = line.match(/Disconnected\s+TX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+RX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+Session Time:\s+(\d+):(\d+)/i);
+                const disc = line.match(/Disconnected(?:\s*\([^)]*\))?\s+TX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+RX:\s+(\d+)\s+Bytes\s+\(Max:\s+(\d+)\s+bps\)\s+Session Time:\s+(\d+):(\d+)/i);
                 if (disc && curr) {
                     const [, tx, txBps, rx, rxBps, mins, secs] = disc;
                     const totalBytes = parseInt(tx) + parseInt(rx), isSuccess = totalBytes > 0 || curr.snr !== undefined;
@@ -4396,6 +4413,7 @@
         // re-enrich connections with newly-available frequency data.
         async function setTimeRange(days) {
             selectedDays = days;
+            loadModemBadges();   // v1.5.29: VHF card follows the reporting period
             
             // Update button states
             document.getElementById('range1d').classList.remove('active');
@@ -5578,7 +5596,7 @@
             filterRecentConnections();
         }
         
-        // v1.5.21 (N3MEL): click a line of the Failures card to list those
+        // v1.5.28 (N3MEL): click a line of the Failures card to list those
         // connections here. null = all, 'failed' = every failure, else a failureType.
         let failFilter = null;
         const FAIL_FILTER_LABEL = { failed: 'All failures', timeout: 'Timeout (no prop)', channelBusy: 'Channel Busy',
@@ -7090,7 +7108,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.21 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.30 | HF Efficiency Report
                 </p>
             `;
             
@@ -7713,7 +7731,72 @@
             updateNavClocks();            // Start nav bar clocks
             setInterval(refreshData, 900000);  // Refresh connection data every 15 minutes
             setInterval(fetchGeomagneticData, 900000);   // Refresh geomagnetic data every 15 minutes
+            loadModemBadges();
+            setInterval(loadModemBadges, 60000);   // sound-modem badge every minute (v1.5.23)
         });
+
+        // Sound-modem ports (QtSoundModem / Direwolf, KISS over TCP): v1.5.23
+        // badge, v1.5.28 the "VHF Connections Status" card. up = LinBPQ
+        // connected to the modem; nolink = modem listening but LinBPQ isn't
+        // connected; down = nothing on its KISS port.
+        function setVhfCardShown(on) {
+            const card = document.getElementById('vhfStatusCard');
+            const grid = document.getElementById('statCardsGrid');
+            card.classList.toggle('hidden', !on);
+            grid.classList.toggle('lg:grid-cols-4', !on);
+            grid.classList.toggle('lg:grid-cols-5', on);
+        }
+        async function loadModemBadges() {
+            const box = document.getElementById('vhfStatusBody');
+            let d;
+            try {
+                const r = await fetch(RF_API_URL + '?action=soundmodem&days=' + selectedDays + '&t=' + Date.now(), { cache: 'no-store' });
+                const j = await r.json();
+                if (!j.ok) throw new Error(j.error || 'failed');
+                d = j.data;
+            } catch (e) { setVhfCardShown(false); return; }
+            if (!d.modems || !d.modems.length) { setVhfCardShown(false); return; }
+            const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const S = {
+                up:      ['success', 'On air',                'Modem running and LinBPQ connected to it'],
+                nolink:  ['warn',    'LinBPQ not connected',  'The modem is running but LinBPQ is not connected to its KISS port: restart LinBPQ'],
+                down:    ['error',   'Modem not running',     'Nothing is listening on this port\'s KISS address: check the modem service (e.g. systemctl status qtsoundmodem)'],
+                unknown: ['unknown', 'Status unknown',        'The server could not read its network connections'],
+            };
+            const ago = s => {
+                if (!s) return '';
+                const m = Math.max(0, Math.round((Date.now() - new Date(s.replace(' ', 'T') + 'Z').getTime()) / 60000));
+                return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+            };
+            const big = d.modems.length === 1;   // one port: large status, like the other cards
+            box.innerHTML = d.modems.map(m => {
+                const [cls, txt, tip] = S[m.status] || S.unknown;
+                const rows = [];
+                if (m.last_call) rows.push(`<div class="flex justify-between gap-2" title="Newest entry in BPQ's MHeard list for port ${m.port}"><span class="whitespace-nowrap">Last heard:</span><span class="font-semibold text-right"><span class="font-mono whitespace-nowrap">${esc(m.last_call)}</span> ${ago(m.last_heard)}</span></div>`);
+                // watched stations on this port (Maintenance → Watched stations)
+                for (const w of (m.watch || [])) {
+                    const when = w.last_heard ? ago(w.last_heard) : 'never heard';
+                    rows.push(`<div class="flex justify-between gap-2 ${w.quiet ? 'text-amber-700 font-semibold' : ''}" title="Watched, listen only: flagged when not heard for ${esc(w.hours)} h"><span class="whitespace-nowrap">${w.quiet ? '⚠' : '👁'} <span class="font-mono">${esc(w.call)}</span></span><span class="text-right">${when}${w.quiet ? ` (over ${esc(w.hours)} h)` : ''}</span></div>`);
+                }
+                // v1.5.29: every station heard on this port in the reporting
+                // period (BPQ keeps each station once, with its last time).
+                const hh = m.heard || [];
+                const period = selectedDays === 1 ? 'today (00:00Z–now)' : `last ${selectedDays} days`;
+                const hm = s => s ? s.slice(11, 16) + 'Z' : '';
+                const md = s => { const d = new Date(s.replace(' ', 'T') + 'Z'); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); };
+                const heardList = hh.length
+                    ? `<div class="mt-1 max-h-32 overflow-y-auto custom-scrollbar pr-2 space-y-0.5">${hh.map(h =>
+                        `<div class="flex justify-between gap-2"><span class="font-mono whitespace-nowrap">${h.connected ? '🔗 ' : ''}${esc(h.call)}</span><span class="text-gray-500 whitespace-nowrap">${selectedDays === 1 ? '' : md(h.heard_at) + ' '}${hm(h.heard_at)}</span></div>`).join('')}</div>`
+                    : `<div class="mt-1 text-gray-400">none</div>`;
+                rows.push(`<div class="pt-1 mt-1 border-t border-emerald-200" title="Every station BPQ last heard on port ${m.port} in this period (BPQ keeps each station once, with its latest time). 🔗 = BPQ marks it as having connected."><div class="flex justify-between gap-2"><span class="whitespace-nowrap">Heard ${esc(period)}:</span><span class="font-bold text-emerald-700">${hh.length}</span></div>${heardList}</div>`);
+                return `<div title="${esc(tip)}">
+                    <div class="flex items-center"><span class="status-indicator status-${cls} flex-shrink-0"></span><span class="${big ? (txt.length > 8 ? 'text-lg sm:text-2xl' : 'text-2xl sm:text-4xl') : 'text-base sm:text-lg'} font-bold text-gray-900 leading-tight">${txt}</span></div>
+                    <div class="text-xs text-emerald-700 font-semibold mt-1">📻 ${esc(m.name)}</div>
+                    ${rows.length ? `<div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-emerald-200">${rows.join('')}</div>` : ''}
+                </div>`;
+            }).join('');
+            setVhfCardShown(true);
+        }
     </script>
     <script>
     (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();

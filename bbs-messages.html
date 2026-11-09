@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </head>
 
 <body data-nav-page="bbs">
-<script src="bpq-nav-loader.js?v=2026-11-04-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-08-7"></script>
 
 <!-- Top control bar -->
 <div id="controlBar">
@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </label>
             <h2 id="listTitle" style="flex:1;">Personal &amp; Traffic</h2>
             <span class="meta" id="listMeta">0 messages</span>
-            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.21</span>
+            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.30</span>
         </div>
         <!-- Selection toolbar — only visible when ≥1 message is selected.
              Bulk actions: Move-to-folder dropdown, Mark Read, Archive, Kill,
@@ -4318,7 +4318,7 @@ async function prefetchBodies(onlyNums = null) {
         const d = await safeFetchJson(`${CONFIG.apiUrl}?action=read&msg=${m.number}`);
         if (!accept(m, d)) { failed++; console.warn(`prefetch: body failed for #${m.number}: ${d.error}`); }
     };
-    // v1.5.21 (N3MEL): up to 10 bodies per BBS login (action=read_many)
+    // v1.5.28 (N3MEL): up to 10 bodies per BBS login (action=read_many)
     // instead of one login per message. Anything the batch didn't return
     // cleanly is read on its own; an older server without read_many falls
     // back to one-at-a-time for the rest of this run.
@@ -6548,7 +6548,7 @@ function openCheckInModal() {
     document.getElementById('ciState').value    = p.state || '';
     document.getElementById('ciGrid').value     = p.grid || '';
     document.getElementById('ciNetAddress').value = p.netAddress || 'PKTNET@USA';
-    document.getElementById('ciMsgType').value = p.msgType === 'P' ? 'P' : 'B';   // v1.5.21 (N3MEL)
+    document.getElementById('ciMsgType').value = p.msgType === 'P' ? 'P' : 'B';   // v1.5.28 (N3MEL)
     document.getElementById('checkInModal').classList.remove('hidden');
 }
 

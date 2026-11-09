@@ -155,6 +155,7 @@ def fmt_status(status, failure_reason):
         return '\u2713 ok'
     mapping = {
         'no_data': '\u2717 no data',
+        'no_answer': '\u2717 no answer',
         'superseded': '\u26a0 superseded',
         'port_in_use': '\u2717 port busy',
         'incomplete_no_disconnect': '\u26a0 stuck',

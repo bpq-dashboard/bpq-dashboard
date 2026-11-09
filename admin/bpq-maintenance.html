@@ -523,7 +523,7 @@
 <body data-nav-page="maint">
 <!-- Shared navigation (loaded from /_nav.html via /bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-11-04-1"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-08-7"></script>
 
 <!--
   Maintenance reference — v1.5.19 (rebuilt 2026-10-03, checked against the code 2026-10-25)
@@ -536,7 +536,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.21 · updated November 2026
+    v1.5.30 · updated November 2026
   </div>
 </header>
 
@@ -567,7 +567,7 @@
     <button type="button" class="editor-btn reload" id="installReset">Reset to defaults</button></p>
 </details>
 
-<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#optional-pages">Optional pages</a><a href="#firewall-setup">Firewall setup</a><a href="#homefolder">LinBPQ in a home folder</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#wp">Winlink White Pages clean-up</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
+<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#optional-pages">Optional pages</a><a href="#firewall-setup">Firewall setup</a><a href="#homefolder">LinBPQ in a home folder</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#watch">Watched stations</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#wp">Winlink White Pages clean-up</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
 
 <div class="section" id="health">
   <h2 class="section-title green">Health check — is everything running?</h2>
@@ -819,10 +819,36 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
   </div>
 </div>
 
+<div class="section" id="watch">
+  <h2 class="section-title green">System Logs — watched stations &amp; live MHeard</h2>
+  <p class="intro">v1.5.26. <b>Watched stations</b>: stations you rely on (a Winlink gateway used as a backup, a forwarding partner's node) that should be flagged when they haven't been heard for a while. Listen only: nothing is transmitted. They appear above System Logs' MHeard tabs, and in their port's block of RF Connections' VHF Connections Status card. Saved in <span class="kw">data/system-logs.json</span> (not config.php); once saved here, this list replaces any <span class="kw">system_logs.watch</span> in config.php.</p>
+  <div class="cmd note"><div class="cmd-inner">
+    <div class="note-head">Watched stations</div>
+    <div class="cmd-label" id="wsSource">Loading…</div>
+    <table class="opt-table" id="wsTable">
+      <thead><tr><th>Callsign (with SSID)</th><th>Port</th><th>Flag after (hours)</th><th>Last heard</th><th></th></tr></thead>
+      <tbody id="wsBody"></tbody>
+    </table>
+    <div class="mini-row">
+      <button class="editor-btn add" type="button" onclick="wsAdd()">＋ Add station</button>
+      <label style="font-size:0.8rem; display:flex; align-items:center; gap:6px;"><input type="checkbox" id="wsLive"> Read MHeard live from the node every 5 minutes</label>
+    </div>
+    <div class="mini-row">
+      <button class="editor-btn save" type="button" onclick="wsSave()">💾 Save</button>
+      <button class="editor-btn reload" type="button" onclick="wsLoad()">⟳ Reload</button>
+      <span class="editor-status info" id="wsStatus" role="status"></span>
+    </div>
+  </div><div class="cmd-tag green">watch</div></div>
+</div>
+
 <div class="section" id="parsers">
   <h2 class="section-title green">Log parsers — RF Connections, Traffic, System Logs</h2>
   <p class="intro">Three scripts read the BPQ logs into the database every 5 minutes, so those pages load fast. If a page shows <span class="kw">(DB)</span> but the data is old, start here.</p>
   <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data php <var data-v="root">/var/www/bpq-dashboard</var>/scripts/poll-mheard.php <span class="flag">--verbose</span></code>
+      <div class="cmd-label">v1.5.25: System Logs' live MHeard. Logs in to the node with <span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span>, runs <span class="kw">MHU</span> per port and prints the stations as JSON; <span class="kw">"ok":false</span> says what failed (login, no ports because bpq32.cfg isn't readable at <span class="kw">paths.linbpq</span>, or switched off with <span class="kw">system_logs.live_mheard</span>). The System Logs parser runs it every 5 minutes.</div>
+    </div><div class="cmd-tag blue">MHeard</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>tail <span class="flag">-n</span> 5 /var/log/bpq-dashboard/parse-*.log</code>
       <div class="cmd-label">Last lines of each parser log (installer layout). Older installs log to <span class="kw">/var/log/parse-*.log</span>. A <span class="kw">Traceback</span> or <span class="kw">Access denied</span> line points at the problem; "notes an in-flight session at end of file" from the VARA parser is normal.</div>
@@ -1026,6 +1052,14 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
   <p class="intro">Both pages read the radio through flrig via <span class="kw">vara-api.php</span>. Host and port come from the <span class="kw">radio</span> section of config.php (default 127.0.0.1:12345). The old WaveNode meter and its sync jobs are no longer used.</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
+      <code>pgrep <span class="flag">-af</span> 'VARA\.exe'; pgrep <span class="flag">-a</span> flrig; <span class="sudo">sudo</span> ss <span class="flag">-tnp</span> | grep <span class="flag">-E</span> ':8300|:8301|:12345' | grep <span class="flag">-c</span> linbpq</code>
+      <div class="cmd-label">v1.5.27, VARA HF under Wine on this server (Installation Manual §10.15): VARA (its process shows as <span class="kw">C:\VARA\VARA.exe</span>) and flrig running, and LinBPQ linked to both (3 = VARA command + data + flrig). Started by the desktop's autostart script; its log is <span class="kw">~/.cache/hf-station.log</span>.</div>
+    </div><div class="cmd-tag blue">VARA + flrig</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>python3 <span class="flag">-c</span> "import xmlrpc.client as x,time; r=x.ServerProxy('http://127.0.0.1:12345'); r.rig.set_ptt(1); time.sleep(2); r.rig.set_ptt(0); time.sleep(1); print('PTT now', r.rig.get_ptt())"</code>
+      <div class="cmd-label">Keys the radio for 2 s through flrig, the way LinBPQ does for VARA (dummy load, low power, TX time-out timer set). <span class="kw">PTT now 0</span> and the radio back on receive = good. Stays in transmit: flrig's PTT is mixed — set it to CAT only, no RTS/DTR, separate PTT port NONE (§10.15 step 3).</div>
+    </div><div class="cmd-tag red">PTT test</div></div>
+    <div class="cmd"><div class="cmd-inner">
       <code>curl <span class="flag">-s</span> <span class="flag">-X</span> POST http://127.0.0.1:12345/RPC2 <span class="flag">-H</span> 'Content-Type: text/xml' <span class="flag">-d</span> '&lt;?xml version="1.0"?&gt;&lt;methodCall&gt;&lt;methodName&gt;rig.get_vfo&lt;/methodName&gt;&lt;params&gt;&lt;/params&gt;&lt;/methodCall&gt;'</code>
       <div class="cmd-label">Asks flrig for the frequency (in Hz). No answer: flrig isn't running or isn't at that address; <span class="kw">pgrep -af flrig</span> shows whether it's running.</div>
     </div><div class="cmd-tag blue">test flrig</div></div>
@@ -1064,6 +1098,25 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
       <code>ls <span class="flag">-l</span> <var data-v="root">/var/www/bpq-dashboard</var>/cache/vara-sessions/bpq32-radio-backup.txt; grep <span class="flag">-A4</span> "^RADIO 2" <var data-v="linbpq">/opt/linbpq</var>/bpq32.cfg</code>
       <div class="cmd-label">If the backup file exists, a session ended without End Session and the radio is stuck on one frequency. Fix: open the VARA HF Terminal, log in and press <b>End Session</b>. If that isn't possible, stop BPQ, paste the backup file's RADIO 2 block over the one in bpq32.cfg, delete the backup file and start BPQ.</div>
     </div><div class="cmd-tag red">stuck radio</div></div>
+  </div>
+</div>
+
+<div class="section" id="soundmodem">
+  <h2 class="section-title amber">Sound modem — VHF/UHF packet (QtSoundModem, Direwolf)</h2>
+  <p class="intro">v1.5.23: RF Connections' <b>VHF Connections Status</b> card (v1.5.28; a badge before) shows every LinBPQ port that talks KISS over TCP (<span class="kw">TYPE=ASYNC</span> with <span class="kw">IPADDR</span> / <span class="kw">TCPPORT</span> in bpq32.cfg). <b>On air</b> = LinBPQ connected to the modem; <b>LinBPQ not connected</b> = modem listening, LinBPQ not attached; <b>Modem not running</b> = nothing on the KISS port. Setup: Installation Manual §10.13.</p>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> systemctl status qtsoundmodem <span class="flag">--no-pager</span> | head <span class="flag">-12</span></code>
+      <div class="cmd-label">Is the modem running, and did it open the sound card (look for <span class="kw">plughw</span>)? "Modem not running" in the VHF Connections Status card: <span class="kw">sudo systemctl restart qtsoundmodem</span>.</div>
+    </div><div class="cmd-tag blue">service</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>ss <span class="flag">-tnp</span> | grep ':8100'</code>
+      <div class="cmd-label">An <span class="kw">ESTAB</span> line between linbpq and the modem means LinBPQ is using it (use your modem's KISS port). None = "LinBPQ not connected": <span class="kw">sudo systemctl restart bpq</span> (the BBS is off the air for a few seconds).</div>
+    </div><div class="cmd-tag blue">link</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>grep <span class="flag">-E</span> '^(DualPTT|PTT=|PTTMode)' /opt/qtsoundmodem/QtSoundModem.ini</code>
+      <div class="cmd-label">Radio doesn't key: for a Digirig or any RTS-keyed interface you need <span class="kw">PTTMode=64</span> (RTS) and <span class="kw">DualPTT=0</span>. With Dual PTT on, QtSoundModem keys DTR instead. Stop the service before editing the file.</div>
+    </div><div class="cmd-tag red">PTT</div></div>
   </div>
 </div>
 
@@ -1954,6 +2007,67 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
       j.update_available ? 'Update available: ' + j.latest + ' (commands below)' : (j.latest ? 'Up to date' : ''));
   };
   verStatus(false);
+
+  // v1.5.26: System Logs watched stations + live MHeard switch (data/system-logs.json)
+  let wsPorts = [];
+  function wsAgo(s) {
+    if (!s) return 'never heard';
+    const m = Math.max(0, Math.round((Date.now() - new Date(s.replace(' ', 'T') + 'Z').getTime()) / 60000));
+    return m < 60 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago';
+  }
+  function wsRow(w) {
+    const tr = document.createElement('tr');
+    const opts = '<option value="">any port</option>' + wsPorts.map(p =>
+      '<option value="' + p.port + '"' + (Number(w.port) === Number(p.port) ? ' selected' : '') + '>' + p.port + ' · ' + esc(p.name) + '</option>').join('');
+    const heard = w.call ? (w.quiet ? '<span style="color:var(--amber)">⚠ ' : '<span style="color:var(--green)">👁 ') + esc(wsAgo(w.last_heard)) + '</span>' : '';
+    tr.innerHTML =
+      '<td><input class="ws-call" value="' + esc(w.call || '') + '" placeholder="KP2L-10" maxlength="9" style="text-transform:uppercase; width:9em" aria-label="Callsign"></td>' +
+      '<td><select class="ws-port" aria-label="Port">' + opts + '</select></td>' +
+      '<td><input class="ws-hours" type="number" min="0.5" max="720" step="0.5" value="' + esc(w.hours || 6) + '" style="width:6em" aria-label="Hours"></td>' +
+      '<td>' + heard + '</td>' +
+      '<td><button class="editor-btn reload" type="button" title="Remove" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+    document.getElementById('wsBody').appendChild(tr);
+  }
+  window.wsAdd = function () { wsRow({ call: '', port: null, hours: 6 }); };
+  function wsFill(j) {
+    wsPorts = j.ports || [];
+    document.getElementById('wsBody').innerHTML = '';
+    (j.watch || []).forEach(wsRow);
+    const live = document.getElementById('wsLive');
+    live.checked = !!j.live_mheard;
+    live.disabled = !!j.live_mheard_config_off;
+    const src = { page: 'Saved on this page' + (j.saved_by ? ' by ' + esc(j.saved_by) : '') + (j.saved_at ? ', ' + esc(j.saved_at) : '') + '.',
+                  config: 'From config.php (<span class="kw">system_logs.watch</span>). Saving here takes over from it.',
+                  none: 'No stations watched yet.' }[j.source] || '';
+    document.getElementById('wsSource').innerHTML = src +
+      (j.live_mheard_config_off ? ' Live MHeard is switched off in config.php (<span class="kw">system_logs.live_mheard</span>); remove that line to switch it here.' : '') +
+      (wsPorts.length ? '' : ' <b>No BPQ ports found</b>: the web server can\'t read bpq32.cfg at <span class="kw">paths.linbpq</span>; "any port" still works.') +
+      (j.db === false ? ' (Last heard needs the database.)' : '');
+  }
+  window.wsLoad = async function () {
+    const st = document.getElementById('wsStatus');
+    const j = await call('watch_get', 'GET');
+    if (!j.ok) { setSt(st, 'err', j.error || 'Could not load'); return; }
+    wsFill(j); setSt(st, 'info', '');
+  };
+  window.wsSave = async function () {
+    const st = document.getElementById('wsStatus');
+    const watch = [];
+    for (const tr of document.querySelectorAll('#wsBody tr')) {
+      const call_ = tr.querySelector('.ws-call').value.trim().toUpperCase();
+      if (!call_) continue;
+      if (!/^[A-Z0-9]{1,6}(-\d{1,2})?$/.test(call_)) { setSt(st, 'err', 'Not a callsign: ' + call_); return; }
+      const port = tr.querySelector('.ws-port').value;
+      const hours = parseFloat(tr.querySelector('.ws-hours').value);
+      if (!(hours >= 0.5 && hours <= 720)) { setSt(st, 'err', 'Hours for ' + call_ + ': 0.5 to 720'); return; }
+      watch.push({ call: call_, port: port ? Number(port) : null, hours });
+    }
+    setSt(st, 'info', 'Saving…');
+    const j = await call('watch_save', 'POST', { watch, live_mheard: document.getElementById('wsLive').checked });
+    if (!j.ok) { setSt(st, 'err', j.error || 'Not saved'); return; }
+    wsFill(j); setSt(st, 'ok', j.message || 'Saved');
+  };
+  wsLoad();
 })();
 </script>
 <script src="/shared/settings-modal.js"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->

@@ -10,6 +10,10 @@
  *   POST ?action=forms_undo       put the previous copy back
  *   POST ?action=admin_password   change the logged-in admin's password
  *                                 body: {"current": "...", "new": "..."}
+ *   GET  ?action=watch_get        System Logs: watched stations (+ last heard),
+ *                                 live MHeard switch, BPQ ports (v1.5.26)
+ *   POST ?action=watch_save       save them to data/system-logs.json
+ *                                 body: {"watch": [{"call","port","hours"}], "live_mheard": bool}
  *
  * Every POST needs the header  X-BPQ-Dashboard: 1  (sent by the page; a
  * form or link on another web site can't add it, so a visitor's saved login
@@ -249,6 +253,53 @@ case 'admin_password':
     }
     if (function_exists('dashboardLog')) dashboardLog('info', "admin password changed for $user");
     out(['ok' => true, 'message' => "Password changed for $user. Your browser will ask you to log in again with the new password."]);
+
+case 'watch_get':   // v1.5.28
+case 'watch_save':
+    require_once dirname(__DIR__) . '/includes/station-config.php';
+    $file = bpq_system_logs_file();
+    if ($action === 'watch_save') {
+        if ($method !== 'POST') fail('POST only', 405);
+        $in = json_decode((string)file_get_contents('php://input'), true);
+        if (!is_array($in) || !is_array($in['watch'] ?? null)) fail('Bad request');
+        if (count($in['watch']) > 20) fail('At most 20 watched stations');
+        foreach ($in['watch'] as $w) {
+            $c = strtoupper(trim((string)($w['call'] ?? '')));
+            if (!preg_match('/^[A-Z0-9]{1,6}(-\d{1,2})?$/', $c)) fail('Not a callsign: ' . substr($c, 0, 12));
+            $h = (float)($w['hours'] ?? 0);
+            if ($h < 0.5 || $h > 720) fail("Hours for $c: 0.5 to 720");
+        }
+        $save = bpq_system_logs_saved() ?? [];
+        $save['watch'] = bpq_watch_list($in['watch']);
+        $save['live_mheard'] = (bool)($in['live_mheard'] ?? true);
+        $save['saved_by'] = bpq_web_login_user();
+        $save['saved_at'] = gmdate('Y-m-d H:i:s') . 'Z';
+        $dir = dirname($file);
+        if (!is_dir($dir) || !is_writable($dir)) fail("The web server can't write $dir. Over SSH: sudo chown www-data " . $dir, 500);
+        $tmp = $file . '.tmp' . getmypid();
+        if (@file_put_contents($tmp, json_encode($save, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n", LOCK_EX) === false || !@rename($tmp, $file)) {
+            @unlink($tmp); fail('Could not save ' . basename($file), 500);
+        }
+        @chmod($file, 0640);
+        if (function_exists('dashboardLog')) dashboardLog('info', 'System Logs watch list saved by ' . $save['saved_by']);
+    }
+    $pdo = null;
+    if (is_file(dirname(__DIR__) . '/tprfn-db.php')) {
+        try { require_once dirname(__DIR__) . '/tprfn-db.php'; $pdo = tprfn_db(); } catch (Throwable $e) { $pdo = null; }
+    }
+    $ports = [];
+    foreach (bpq_linbpq_ports() as $n => $p) $ports[] = ['port' => $n, 'name' => $p['name']];
+    $cfg = bpq_config_section('system_logs');
+    $saved = bpq_system_logs_saved();
+    out(['ok' => true,
+         'message' => $action === 'watch_save' ? 'Saved. System Logs and RF Connections use it from their next refresh.' : null,
+         'watch' => bpq_watch_status($pdo),
+         'source' => bpq_watch_source(),
+         'live_mheard' => bpq_live_mheard_on(),
+         'live_mheard_config_off' => array_key_exists('live_mheard', $cfg) && !$cfg['live_mheard'],
+         'ports' => $ports,
+         'db' => $pdo !== null,
+         'saved_by' => $saved['saved_by'] ?? null, 'saved_at' => $saved['saved_at'] ?? null]);
 
 default:
     fail('Unknown action');

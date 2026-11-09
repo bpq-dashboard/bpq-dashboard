@@ -377,13 +377,28 @@ else
     CNF=$(mktemp); chmod 600 "$CNF"
     P=${DBP//\\/\\\\}; P=${P//\"/\\\"}     # option-file quoting: \ and " escaped
     printf '[client]\nhost=%s\nuser=%s\npassword="%s"\n' "${DBH:-localhost}" "$DBU" "$P" > "$CNF"; unset P
-    if mysql --defaults-extra-file="$CNF" "$DBN" -e 'SELECT 1' >/dev/null 2>&1; then
-        n=0; bad=0
+    # v1.5.22: the dashboard's own database user may only read and write data
+    # (ARSSYSTEM: tprfn_app), so CREATE / ALTER were refused even for tables
+    # that already exist. update.sh runs under sudo: use MariaDB's root
+    # account over the local socket when it lets us in, else the dashboard user.
+    MYSQL=()
+    if [[ "${DBH:-localhost}" =~ ^(localhost|127\.0\.0\.1|::1)$ ]] && mysql -e 'SELECT 1' "$DBN" >/dev/null 2>&1; then
+        MYSQL=(mysql); say "Database files run as MariaDB root (local socket)."
+    elif mysql --defaults-extra-file="$CNF" "$DBN" -e 'SELECT 1' >/dev/null 2>&1; then
+        MYSQL=(mysql --defaults-extra-file="$CNF")
+    fi
+    if (( ${#MYSQL[@]} )); then
+        n=0; bad=0; denied=0
         for s in $(grep -vE '^[[:space:]]*(#|$)' "$SRC/sql/migrations.list"); do
             [[ -f "$SRC/$s" ]] || continue
-            if mysql --defaults-extra-file="$CNF" "$DBN" < "$SRC/$s" >/dev/null 2>>"$LOG"; then n=$((n+1)); else bad=$((bad+1)); warn "$s didn't apply cleanly (details in $LOG)"; fi
+            ERR=$("${MYSQL[@]}" "$DBN" < "$SRC/$s" 2>&1 >/dev/null); rc=$?
+            [[ -n "$ERR" ]] && printf '%s: %s\n' "$s" "$ERR" >> "$LOG"
+            if (( rc == 0 )); then n=$((n+1))
+            elif grep -q "ERROR 1142" <<<"$ERR"; then denied=$((denied+1))   # CREATE/ALTER command denied
+            else bad=$((bad+1)); warn "$s didn't apply cleanly (details in $LOG)"; fi
         done
         ok "$n database file(s) applied (all safe to repeat)"
+        (( denied )) && say "  $denied file(s) skipped: the dashboard's database user may not create or alter tables. Fine when the tables already exist (System Audit checks them); to apply them, run update.sh with sudo on a MariaDB whose root logs in over the socket."
     else
         warn "Could not log in to the database '$DBN' as '$DBU' — updates skipped. System Audit lists any it lacks."
     fi

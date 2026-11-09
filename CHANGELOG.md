@@ -4,6 +4,213 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.30] - 2026-11-09
+
+### Fixed
+- **RF Connections: unanswered calls are Timeout (no prop), not No Data**
+  (K1AJD, N3MEL). An outgoing VARA call that ran all its tries ("Connecting
+  to … 15/15", ~45 s) and never logged "Connected to" ended 0/0 bytes and
+  was filed as No Data. `parse-vara-log.py` now stores it as `no_answer`,
+  which the page counts under Timeout (no prop); `no_data` stays for a
+  link that came up and carried nothing. `sql/2026-11-09-vara-no-answer.sql`
+  moves the existing rows (outgoing, 0/0 bytes, no S/N); safe to repeat.
+- VARA's "Disconnected (Timeout)  TX: …" line (a reason in brackets) wasn't
+  recognised by the parser or the page, so the session stayed open until
+  the next one closed it as superseded. Both now read it.
+- User Guide §12 (Failures card) explains Timeout vs No Data. RF report
+  label "✗ no answer".
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.29] - 2026-11-08
+
+### Added
+- **RF Connections → VHF Connections Status: stations heard in the
+  reporting period** (K1AJD). Under each sound-modem port: "Heard today:
+  N" and every station heard on that port since 00:00Z (or in the last 7 /
+  30 / 90 days, with dates), newest first, UTC times, 🔗 for stations BPQ
+  marks as connected. Follows the page's Today / 7 / 30 / 90 Days buttons.
+  From `net_mheard` (BPQ MHeard + the live MHU poll), which keeps each
+  station once at its latest time, so it lists stations, not every contact.
+  (`rf-connections-api.php` `action=soundmodem&days=N`,
+  `bpq-rf-connections.html`; User Guide §12.)
+- Nothing to do by hand: `sudo bash update.sh`.
+
+## [1.5.28] - 2026-11-08
+
+### Changed
+- **RF Connections: "VHF Connections Status" card** (K1AJD). The
+  sound-modem status moved from a badge in the top-right status box
+  (v1.5.23) into its own card beside RF Connections Status: large status
+  (On air / LinBPQ not connected / Modem not running), the port's name, the
+  newest station heard on it and its watched stations. One block per
+  KISS-over-TCP port; the card and the fifth grid column only appear on
+  stations that have one. (`bpq-rf-connections.html`; User Guide §12;
+  Maintenance → Sound modem and Watched stations wording.)
+
+### Docs
+- Installation Manual §10.15 after K1AJD's reboot test: start-up script v3
+  (`9>&-` so flrig / VARA don't inherit the lock; exits when its Xtigervnc
+  is gone), only the TigerVNC service starts the desktop (no `@reboot
+  vncserver` crontab beside it), `ExecStopPost` clean-up, LinBPQ
+  `wait-flrig` drop-in (LinBPQ doesn't reconnect to flrig), other
+  `snd-usb-audio` lines in `/etc/modprobe.d/` override the card numbers,
+  flrig 2.0.10 can garble `sep_serial_port` ("Cannot access NONE…").
+- Nothing to do by hand: `sudo bash update.sh`.
+
+## [1.5.27] - 2026-11-08
+
+### Docs
+- **Installation Manual §10.15 *VARA HF under Wine (no Windows PC)*** —
+  from K1AJD moving VARA HF off its Windows PC: the layout (VARA under Wine
+  on 127.0.0.1:8300/8301, flrig the only program on the CAT port, LinBPQ
+  keys by `PTT CAT` through flrig, VARA's PTT None, syslog to 127.0.0.1),
+  fixed device names, pinned ALSA card numbers next to a packet sound card,
+  flrig CAT-only PTT and an always-release PTT test, the 32-bit Wine prefix
+  and winetricks components, the full VARA setup zip (its `OCX` folder; the
+  *MSCOMM32.OCX not found* error), LinBPQ / config.php changes, a TigerVNC
+  desktop service with an autostart watchdog (VARA's process is
+  `C:\VARA\VARA.exe` under Wine), the on-air test and the way back.
+  §8 requirements and What's New point to it.
+- **Maintenance → Rig Status & RF Power Monitor:** VARA + flrig running and
+  linked check, and a 2-second flrig PTT test.
+- No code changes. Nothing to do by hand.
+
+## [1.5.26] - 2026-11-08
+
+### Added
+- **Maintenance → Watched stations** (K1AJD): edit the System Logs watch
+  list (callsign, port or any, hours before it's flagged) and the live
+  MHeard switch on the page, with each station's last-heard time. Saved by
+  `admin/maintenance-api.php` (`watch_get`, `watch_save`; admin login and
+  the page's request header, as the other actions) to
+  `data/system-logs.json`, written atomically, mode 640; `config.php` is
+  never written by the web server (it holds passwords). Once saved there,
+  that list replaces `config.php`'s `system_logs.watch`; live MHeard is off
+  if either says off. At most 20 stations, 0.5–720 hours.
+  (`includes/station-config.php` `bpq_system_logs_saved()`,
+  `bpq_live_mheard_on()`, `bpq_watch_source()`.)
+
+### Docs
+- User Guide §14, §19 (Maintenance list), §25; Manual What's New and
+  §10.14; `config.php.example` note. Nothing to do by hand: a watch list
+  already in `config.php` keeps working until the page saves one.
+
+## [1.5.25] - 2026-11-08
+
+### Added
+- **Live MHeard on System Logs** (K1AJD). LinBPQ writes `MHSave.txt` only
+  when it stops, so the MHeard card showed the list as of the last restart.
+  New `scripts/poll-mheard.php` (command line only) logs in to the node like
+  the Telnet Client's NetROM list (`bbs.user` / `bbs.pass`, `NODE` when the
+  login lands in the BBS), runs `MHU <port>` for every PORT in `bpq32.cfg`
+  and prints JSON; `parse-system-logs.py` runs it every 5 minutes and merges
+  it with `MHSave.txt` (newest time wins; bytes, status, grid and frequency
+  stay from the file; stations heard only live are added). Off switch:
+  `config.php` → `'system_logs' => ['live_mheard' => false]`.
+- **Watched stations** — listen-only check that a station is still on the
+  air: `'system_logs' => ['watch' => [['call' => 'KP2L-10', 'port' => 4,
+  'hours' => 6]]]`. System Logs shows each as 👁 heard / ⚠ quiet (above the
+  MHeard tabs); a watched station on a sound-modem port also appears under
+  that port's badge on RF Connections. Nothing is transmitted.
+  (`includes/station-config.php` `bpq_watch_list()` / `bpq_watch_status()`;
+  `system-logs-api.php ?action=mheard` and `rf-connections-api.php
+  ?action=soundmodem` return `watch`.)
+
+### Removed
+- Known limitation "MHeard as of LinBPQ's last restart" (User Guide §27).
+
+### Docs
+- User Guide §12 (badge), §14 (MHeard, watch), §24, §25, §27; Manual What's
+  New and §10.14; Maintenance → Log parsers (poll test command);
+  `config.php.example` (`system_logs`).
+
+### To do by hand
+- The watch list is empty by default. To watch a station, add to
+  `config.php` (inside the main array), then nothing else is needed:
+  `'system_logs' => ['watch' => [['call' => 'KP2L-10', 'port' => 4, 'hours' => 6]]],`
+
+## [1.5.24] - 2026-11-08
+
+### Fixed
+- **Forwarded Messages never listed the BBS's Winlink (CMS) traffic.** BPQ
+  Mail logs forwards to and from the CMS (partner **RMS**) in Winlink's B2F
+  form (`FC EM 7229_K1AJD 277 237 0`, no from / to / type), which the
+  parser didn't recognise. They are now stored as personal messages from
+  the sender BPQ logs (`B2 From`), with the route in the *To* column:
+  `WINLINK@CMS` (internet) or `WINLINK@<gateway>` when the connect script's
+  `ELSE` step went through an RF gateway (K1AJD: KP2L-10). Accept status
+  comes from the `FS` reply as for other partners.
+- A connect script with `ELSE` (first attempt fails, second connects) lost
+  track of the session: the failed attempt's "Disconnected" line, logged
+  after the second "Connecting", ended the live session, so its messages
+  got no route. (`scripts/parse-vara-log.py`; normal BBS forwards are
+  unchanged.)
+
+### Added
+- Forwarded Messages: **Via → 📮 Winlink (CMS)** lists the RMS partner's
+  traffic by either route. (`bpq-rf-connections.html`; User Guide §12;
+  Manual What's New, §10.14.)
+
+### Upgrade note
+- Earlier Winlink forwards appear after one re-scan:
+  `sudo -u www-data python3 <web root>/scripts/parse-vara-log.py --bbs-log-dir <web root>/logs --my-callsign YOURCALL --rescan-messages-days 30`.
+
+## [1.5.23] - 2026-11-08
+
+### Added
+- **RF Connections: sound-modem status badge** (K1AJD). For each LinBPQ port
+  that is KISS over TCP (`TYPE=ASYNC` with `IPADDR` / `TCPPORT`, e.g.
+  QtSoundModem or Direwolf), named from `bpq32.cfg`: On air (LinBPQ
+  connected to the modem), LinBPQ not connected (modem listening, no
+  connection), or Modem not running (nothing on its KISS port; local modems
+  only), plus the newest station in BPQ's MHeard list for that port.
+  Refreshed every minute. New `rf-connections-api.php?action=soundmodem`
+  (works without the database; reads `/proc/net/tcp`, runs no commands;
+  returns names and states only, never the modem's address or port).
+  `bpq_linbpq_ports()` also notes each KISS port's address for the server.
+  (`bpq-rf-connections.html`; User Guide §12; Manual What's New.)
+- Installation Manual §10.13 *VHF/UHF packet with a sound modem
+  (QtSoundModem)* and §10.14 *Winlink: an RF gateway as the outage route*
+  (from K1AJD's setup, 2026-11-08); Maintenance page section *Sound modem*
+  (service, LinBPQ link and PTT checks).
+- Nothing to do by hand: `sudo bash update.sh`.
+
+## [1.5.22] - 2026-11-08
+
+### Fixed
+- **System Logs MHeard tabs are your own ports.** There were five fixed
+  tabs named for one station's ports (Telnet Server, Internet, VARA HF,
+  ARDOP, VHF 1200), so a station whose port 4 is VHF packet saw its VHF
+  stations under "ARDOP" (K1AJD after adding QtSoundModem as port 4). Tabs
+  are now built from the PORT blocks in `<paths.linbpq>/bpq32.cfg`, named
+  by their `ID=` lines (commented-out ports ignored; only names leave the
+  server, never addresses). Ports above 5 are parsed and shown too
+  (`scripts/parse-system-logs.py` stopped at port 5); a port with heard
+  stations that isn't in the file shows as "Port N". Grid and frequency
+  columns appear where BPQ records them; 6 m, 2 m, 1.25 m and 70 cm get
+  band labels. The parser now reads `MHSave.txt` and `RTKnown.txt` from
+  LinBPQ's own folder (`paths.linbpq`) when that copy is newer than the one
+  in the logs folder, which nothing kept up to date on stations where an old
+  copy script had stopped (K1AJD). (`bpq-system-logs.html`, `system-logs-api.php`
+  `?action=mheard` now also returns `ports`, `includes/station-config.php`
+  `bpq_linbpq_ports()`.)
+- **`update.sh` database step** ran the repeat-safe database files as the
+  dashboard's own database user. Where that user may only read and write
+  data, every update warned that 7 files "didn't apply cleanly" (CREATE /
+  ALTER command denied) although the tables were there. update.sh runs
+  under sudo, so it now uses MariaDB's root over the local socket when it
+  can, else the dashboard user, and reports refused CREATE/ALTER as one
+  short note instead of warnings.
+
+### Added
+- `config.php` → `'system_logs' => ['port_names' => [4 => 'VHF 1200']]`
+  (optional): names for the MHeard tabs where the web server can't read
+  `bpq32.cfg`, or to rename one.
+
+### Docs
+- User Guide §14 (MHeard), §25 (settings), §27 (limitation removed);
+  Manual What's New. Nothing to do by hand: `sudo bash update.sh`.
+
 ## [1.5.21] - 2026-11-04
 
 From N3MEL's report after updating to 1.5.20.

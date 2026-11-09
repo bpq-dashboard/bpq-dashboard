@@ -11,3 +11,4 @@ data/system-logs-schema.sql
 sql/2026-09-21-rf-messages-medium.sql
 sql/2026-09-26-message-keep-and-bodies.sql
 sql/2026-10-06-rf-messages-delivery.sql
+sql/2026-11-09-vara-no-answer.sql

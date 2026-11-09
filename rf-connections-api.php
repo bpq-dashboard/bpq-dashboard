@@ -42,6 +42,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/tprfn-db.php';
+require_once __DIR__ . '/includes/station-config.php';   // bpq_linbpq_ports() (v1.5.23)
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
@@ -348,11 +349,87 @@ function action_all(PDO $pdo): array {
     ];
 }
 
+// ─── Sound-modem ports (v1.5.23) ────────────────────────────────────────────
+// Status of LinBPQ's KISS-over-TCP ports (QtSoundModem, Direwolf, ...) for the
+// badge on RF Connections: is the modem listening on its KISS port (local
+// modems only), is LinBPQ connected to it, and the last station heard on that
+// BPQ port (net_mheard). Read from /proc/net/tcp(6): no commands, no sudo.
+// Never returns addresses or port numbers of the modem, only names and state.
+
+function tcp_sockets(): array {
+    $out = [];
+    foreach (['/proc/net/tcp', '/proc/net/tcp6'] as $f) {
+        $lines = @file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!$lines) continue;
+        array_shift($lines);
+        foreach ($lines as $l) {
+            $c = preg_split('/\s+/', trim($l));
+            if (count($c) < 4) continue;
+            $out[] = ['lport' => hexdec(substr($c[1], strrpos($c[1], ':') + 1)),
+                      'rport' => hexdec(substr($c[2], strrpos($c[2], ':') + 1)),
+                      'state' => $c[3]];          // 0A = LISTEN, 01 = ESTABLISHED
+        }
+    }
+    return $out;
+}
+
+function action_soundmodem(): array {
+    // v1.5.29: stations heard in the reporting period (UTC days, as the page's
+    // Today / 7 / 30 / 90 Days buttons: today 00:00Z back days-1 days, to now).
+    $days = max(1, min(90, (int)($_GET['days'] ?? 1)));
+    $since = gmdate('Y-m-d 00:00:00', strtotime('-' . ($days - 1) . ' days', time()));
+    $socks = tcp_sockets();
+    $haveProc = (bool)$socks;
+    $pdo = null;
+    try { $pdo = tprfn_db(); } catch (Throwable $e) { /* status still works without the database */ }
+    $out = [];
+    foreach (bpq_linbpq_ports() as $num => $p) {
+        if (empty($p['kiss_port'])) continue;
+        $kp = (int)$p['kiss_port'];
+        $local = in_array(strtolower($p['kiss_host'] ?? ''), ['127.0.0.1', 'localhost', '::1'], true);
+        $listening = $local ? (bool)array_filter($socks, fn($s) => $s['state'] === '0A' && $s['lport'] === $kp) : null;
+        $linked = (bool)array_filter($socks, fn($s) => $s['state'] === '01' && $s['rport'] === $kp);
+        $status = !$haveProc ? 'unknown'
+                : ($linked ? 'up' : ($listening === false ? 'down' : 'nolink'));
+        $last = null; $heard = [];
+        if ($pdo) {
+            try {
+                $st = $pdo->prepare('SELECT callsign, heard_at FROM net_mheard WHERE port = ? ORDER BY heard_at DESC LIMIT 1');
+                $st->execute([$num]);
+                $last = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+                // BPQ's MHeard keeps each station once, with its LAST time
+                // heard: so this is every station last heard in the period.
+                $st = $pdo->prepare('SELECT callsign, heard_at, status FROM net_mheard WHERE port = ? AND heard_at >= ? ORDER BY heard_at DESC LIMIT 200');
+                $st->execute([$num, $since]);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $heard[] = ['call' => $r['callsign'], 'heard_at' => $r['heard_at'], 'connected' => $r['status'] === 'connected'];
+                }
+            } catch (Throwable $e) { $last = null; }
+        }
+        $out[] = ['port' => $num, 'name' => $p['name'], 'status' => $status, 'local' => $local,
+                  'last_heard' => $last ? $last['heard_at'] : null, 'last_call' => $last ? $last['callsign'] : null,
+                  'heard' => $heard];
+    }
+    // v1.5.25: watched stations (config.php system_logs.watch), shown under
+    // the badge of the port they're watched on.
+    $watch = bpq_watch_status($pdo);
+    foreach ($out as &$m) {
+        $m['watch'] = array_values(array_filter($watch, fn($w) => $w['port'] === $m['port']));
+    }
+    unset($m);
+    return ['modems' => $out, 'checked_at' => gmdate('Y-m-d H:i:s'), 'since' => $since, 'days' => $days];
+}
+
 // ─── Dispatcher ─────────────────────────────────────────────────────────────
 
 $action = strparam('action', 'all', [
-    'sessions', 'heatmap', 'stats', 'parser_status', 'all', 'messages'
+    'sessions', 'heatmap', 'stats', 'parser_status', 'all', 'messages', 'soundmodem'
 ]);
+
+if ($action === 'soundmodem') {      // works without the database (v1.5.23)
+    success(action_soundmodem());
+    exit;
+}
 
 try {
     $pdo = tprfn_db();

@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.21**
+**Version 1.5.30**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -42,6 +42,9 @@
     - 10.10 Winlink White Pages cleanup tools
     - 10.11 VARA log collection
     - 10.12 NetROM RTT collection
+    - 10.13 VHF/UHF packet with a sound modem (QtSoundModem)
+    - 10.14 Winlink: an RF gateway as the outage route
+    - 10.15 VARA HF under Wine (no Windows PC)
 11. Security Hardening
 12. Troubleshooting
 13. Quick Reference
@@ -80,6 +83,46 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.30
+
+- **RF Connections → Failures:** a call nobody answered (VARA's 15 tries with no "Connected to") now counts as **Timeout (no prop)** instead of **No Data**; No Data is left for a link that came up and carried nothing. Earlier sessions are moved by the update. VARA's "Disconnected (Timeout)" line is now read too (such sessions used to stay open until the next one).
+
+### In v1.5.29
+
+- **RF Connections → VHF Connections Status lists the stations heard** on each sound-modem port in the page's reporting period (Today = 00:00Z to now, or 7 / 30 / 90 days), with their UTC times. It follows the Today / 7 / 30 / 90 Days buttons. Each station appears once, at the last time BPQ heard it.
+
+### In v1.5.28
+
+- **RF Connections → VHF Connections Status:** the sound-modem status (on air / LinBPQ not connected / modem not running, last heard, watched stations) is now a card beside RF Connections Status instead of a badge in the status box.
+- **§10.15 (VARA HF under Wine) after a real reboot test:** a corrected start-up script (it doesn't hand its lock to flrig and VARA, and stops with its desktop); one way to start the VNC desktop; clean-up on stop; LinBPQ waits for flrig at boot; older sound-driver settings that override the card numbers; flrig's garbled "separate PTT port" setting.
+
+### In v1.5.27
+
+- **New §10.15 *VARA HF under Wine (no Windows PC)*:** run VARA HF on the dashboard's server — interface and fixed device names, sound-card numbering, flrig as the only program on the CAT port (CAT-only PTT; the mixed-PTT setting that leaves a radio transmitting), the Wine prefix and the full VARA setup (MSCOMM32.OCX), LinBPQ and dashboard settings, starting at boot, testing, and the way back. Maintenance → Rig Status & RF Power Monitor has matching checks.
+
+### In v1.5.26
+
+- **Watched stations and live MHeard on the Maintenance page** (*Watched stations* section): add or remove stations, set the port and the hours, see when each was last heard, switch live MHeard on or off. Saved in `data/system-logs.json`; `config.php` is not written by the page (it holds passwords). A watch list already in `config.php` (v1.5.25) keeps working until the page saves one.
+
+### In v1.5.25
+
+- **Live MHeard:** System Logs' MHeard card is no longer as of LinBPQ's last restart. Every 5 minutes the dashboard reads the node's `MHU` list for each port (with `bbs.user` / `bbs.pass`) and merges it with `MHSave.txt`. Off switch: `'system_logs' => ['live_mheard' => false]`.
+- **Watched stations:** a listen-only check for stations you depend on (e.g. a Winlink gateway used as a backup, §10.14): `'system_logs' => ['watch' => [['call' => 'GATEWAY-10', 'port' => 4, 'hours' => 6]]]` in `config.php`. System Logs shows each one heard / ⚠ quiet; a watched station on a sound-modem port also appears under its RF Connections' VHF Connections Status card. Nothing is transmitted.
+
+### In v1.5.24
+
+- **RF Connections → Forwarded Messages** shows your BBS's Winlink (CMS) forwards. They were never listed: BPQ logs them in Winlink's B2F form, which the parser didn't read. A new Via choice **📮 Winlink (CMS)** lists them, with the route in the *To* column (`WINLINK@CMS` = internet, `WINLINK@<gateway>` = through an RF gateway, §10.14). Earlier forwards appear after a re-scan: `sudo -u www-data python3 <web root>/scripts/parse-vara-log.py --bbs-log-dir <web root>/logs --my-callsign YOURCALL --rescan-messages-days 30`.
+
+### In v1.5.23
+
+- **Installation Manual:** new §10.13 (VHF/UHF packet with QtSoundModem and a Digirig) and §10.14 (a Winlink RF gateway as the outage route); Maintenance page section *Sound modem*.
+- **RF Connections:** a status badge for each LinBPQ port that uses a sound modem over KISS TCP (QtSoundModem, Direwolf): on air / LinBPQ not connected / modem not running, and the last station heard on it. Nothing to set up: the ports come from `bpq32.cfg`.
+
+### In v1.5.22
+
+- **System Logs MHeard tabs** are your own LinBPQ ports, named from `bpq32.cfg` (`ID=`), instead of five fixed tabs; ports above 5 are shown too. Optional `config.php` → `'system_logs' => ['port_names' => […]]` when the web server can't read `bpq32.cfg`.
+- **`update.sh`** runs the database files as MariaDB's root over the local socket (it runs under sudo). Stations whose dashboard database user can't create or alter tables no longer get "didn't apply cleanly" warnings.
 
 ### In v1.5.21
 
@@ -275,14 +318,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.21.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.26.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.21
+cd bpq-dashboard-1.5.30
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -830,7 +873,7 @@ The VARA HF Terminal lets you make keyboard-to-keyboard HF radio connections fro
 
 ### Requirements
 
-- VARA HF modem software running (Windows PC connected to your radio, or Wine on Linux)
+- VARA HF modem software running (Windows PC connected to your radio, or Wine on Linux: §10.15)
 - flrig running and connected to the radio (on this server or another computer; `radio` in `config.php`)
 - A VARA HF port in `bpq32.cfg` (`DRIVER=VARA`)
 - An FLRIG **`RADIO 2`** block in `bpq32.cfg`: the page retunes by rewriting that block (frequency changes and the End Session restore currently handle `RADIO 2` only), and `www-data` must be able to write `bpq32.cfg`
@@ -1247,6 +1290,183 @@ It writes into the LinBPQ logs folder (through the `logs` link), so run it as a 
 ```
 */10 * * * * /var/www/bpq-dashboard/nodes-rtt.sh
 ```
+
+### 10.13 VHF/UHF packet with a sound modem (QtSoundModem)
+
+QtSoundModem (G8BPQ's version of the UZ7HO sound modem) turns a USB sound interface into a 1200-baud packet TNC that LinBPQ uses over KISS TCP. RF Connections then shows that port in its *VHF Connections Status* card, and System Logs an MHeard tab named from the port's `ID=`. Written from a Debian 12 install with a Digirig; other interfaces differ only in the PTT setting.
+
+1. **Find the interface.** With it plugged in: `lsusb` (a Digirig is a C-Media audio codec plus a CP2102 serial chip), `arecord -l` (its card number and name, e.g. card 1 "Device") and `ls -l /dev/serial/by-id/` (its serial port).
+2. **Install** (64-bit Intel; `piQtSoundModem64` for a Pi):
+   ```bash
+   sudo mkdir -p /opt/qtsoundmodem && cd /opt/qtsoundmodem
+   sudo wget -O QtSoundModem64 https://www.cantab.net/users/john.wiseman/Downloads/Beta/QtSoundModem64
+   sudo chmod 755 QtSoundModem64 && sudo chown -R YOURUSER:YOURUSER /opt/qtsoundmodem
+   sudo apt install -y libqt5serialport5 libqt5multimedia5 libqt5multimedia5-plugins libfftw3-single3 alsa-utils
+   sudo usermod -aG audio,dialout YOURUSER
+   ldd QtSoundModem64 | grep "not found"      # should print nothing
+   ```
+3. **Keep the desktop's sound system off the interface**, so system sounds can never go out over the radio. PulseAudio (replace the IDs with yours from `lsusb`):
+   ```
+   # /etc/udev/rules.d/89-digirig-no-pulse.rules
+   SUBSYSTEM=="sound", ATTRS{idVendor}=="0d8c", ATTRS{idProduct}=="0012", ENV{PULSE_IGNORE}="1"
+   ```
+   and give the PTT port a fixed short name (`serial` from `udevadm info -a -n /dev/ttyUSB0`):
+   ```
+   # /etc/udev/rules.d/89-digirig-ptt.rules
+   SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="YOURSERIAL", SYMLINK+="digirig-ptt"
+   ```
+   then `sudo udevadm control --reload && sudo udevadm trigger`. Use the short name: QtSoundModem can't take the long `/dev/serial/by-id/...` path.
+4. **Set it up once in its window**, from a desktop terminal: `cd /opt/qtsoundmodem && ./QtSoundModem64`. Without a desktop, it can show its window over VNC: `QT_QPA_PLATFORM=vnc:size=1280x900:port=5905 ./QtSoundModem64`, then a VNC viewer on port 5905 (open that port to your own address only while you use it).
+   - *Settings → Devices*: sound in and out = the **plughw** entry of the interface (the card runs at 44.1/48 kHz, plughw converts to the modem's 12000); PTT port `digirig-ptt`, **RTS**; **Dual PTT off** (with it on, QtSoundModem keys DTR, and a Digirig doesn't key); KISS server on, port 8100; AGW off unless something uses it.
+   - *Settings → Modems*: channel A = AFSK AX.25 1200bd.
+   - Levels: `alsamixer -c 1` (F4 capture: Mic about 40 % with capture on; F3 playback: Speaker about 50 %), then `sudo alsactl store 1`. Received packets should decode in the monitor pane; the Calibration buttons key the radio with tones.
+5. **Run it as a service** without its window:
+   ```ini
+   # /etc/systemd/system/qtsoundmodem.service
+   [Unit]
+   Description=QtSoundModem - KISS on port 8100
+   After=sound.target network.target
+   Before=bpq.service
+   [Service]
+   User=YOURUSER
+   Group=YOURUSER
+   SupplementaryGroups=audio dialout
+   WorkingDirectory=/opt/qtsoundmodem
+   ExecStart=/opt/qtsoundmodem/QtSoundModem64 nogui
+   Restart=on-failure
+   RestartSec=10
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   `sudo systemctl daemon-reload && sudo systemctl enable --now qtsoundmodem`, then `ss -ltnp | grep 8100` shows it listening.
+6. **Add the LinBPQ port** (back up `bpq32.cfg` first; use a free port number) and restart LinBPQ:
+   ```
+   PORT
+    PORTNUM=4
+    ID=VHF Packet 1200 (QtSoundModem)
+    TYPE=ASYNC
+    PROTOCOL=KISS
+    IPADDR=127.0.0.1
+    TCPPORT=8100
+    CHANNEL=A
+    QUALITY=192
+    MAXFRAME=2
+    FRACK=7000
+    RESPTIME=1000
+    RETRIES=10
+    PACLEN=128
+    TXDELAY=300
+    SLOTTIME=100
+    PERSIST=64
+   ENDPORT
+   ```
+   `ss -tnp | grep 8100` then shows an ESTAB connection from linbpq, and RF Connections' *VHF Connections Status* card shows the port **On air**. `MH 4` lists stations heard; a `C 4 CALL` connect proves both directions.
+
+### 10.14 Winlink: an RF gateway as the outage route
+
+A BPQ RMS gateway reaches the Winlink CMS over the internet (`APPLICATION n,RMS,C 1 CMS,...`). With `FALLBACKTORELAY=1` and `RELAYAPPL=BBS` in the telnet port, users' sessions go to your BBS when the CMS can't be reached, and the BBS keeps their mail. To let the BBS send mail on through a nearby Winlink RF gateway while the internet is down, give the BBS's RMS forwarding partner an `ELSE` step (stop LinBPQ first: BPQ Mail rewrites `linmail.cfg` when it stops):
+
+```
+ConnectScript = "attach 1|nofallback|c cms|ELSE|C 4 GATEWAY-10";
+```
+
+Internet first, as before; only if `c cms` fails does it connect over port 4. Agree it with the gateway's sysop first. Test by blocking the CMS port for a few minutes (`sudo iptables -I OUTPUT -p tcp --dport 8772 -j REJECT`, remove with `-D` instead of `-I`) and forwarding a message: the BBS log shows `c cms` failing, then the gateway connect and `FS Y`. Through another gateway the BBS signs in as an ordinary user (`;FW:` lists only its own call), so your own mail goes; mail from other users may be refused there and then waits for the internet route. Nothing is lost either way. Since v1.5.24 these forwards show on RF Connections → Forwarded Messages, Via *📮 Winlink (CMS)*, with `WINLINK@GATEWAY-10` as the route. Don't schedule test connects to the gateway (each opens a CMS session); to know it's still there, watch it instead: add it on **Admin → Maintenance → Watched stations** (v1.5.26; in v1.5.25 `'system_logs' => ['watch' => [['call' => 'GATEWAY-10', 'port' => 4, 'hours' => 6]]]` in `config.php`), which flags it on System Logs and in RF Connections' *VHF Connections Status* card when it hasn't been heard for 6 hours.
+
+### 10.15 VARA HF under Wine (no Windows PC)
+
+VARA HF is a Windows program, but it runs on the dashboard's Linux server under **Wine**. Wine runs VARA's own x86 code and translates its Windows calls, so on a 64-bit Intel/AMD server there's no speed penalty and on-air throughput is the same; it is not an option on ARM (Raspberry Pi). What you trade: VARA needs a desktop session to run in, the Wine setup is fussier than Windows (re-test after Wine or VARA updates), and serial-port tricks are best kept out of Wine. The dashboard sees no difference: it is the same VARA writing the same log. Written from K1AJD's move (Debian 12, Wine 11, VARA HF 4.9.1, Yaesu FTdx-3000 with an SCU-17); other radios and interfaces differ only in the device IDs and the flrig rig.
+
+How the pieces connect:
+
+```
+radio -- USB interface (sound card + CAT serial port) -- this server
+  sound card ← VARA HF (Wine)  TCP 8300/8301 ← LinBPQ VARA port (DRIVER=VARA, PTT CAT)
+  CAT port   ← flrig           TCP 12345     ← LinBPQ rig control (FLRIG) + dashboard Rig pages
+  VARA syslog → 127.0.0.1:514 → rsyslog → vara-logger → logs/<call>.vara → RF Connections (§10.11)
+```
+
+**Keying:** VARA's own PTT is set to *None*. When VARA wants to transmit it tells LinBPQ, LinBPQ asks flrig, and flrig sends the radio's CAT transmit command. Only flrig ever opens the CAT port. (On Windows the same was true in practice: two programs can't open one COM port.)
+
+**Before you start:** set the radio's **TX time-out timer** (e.g. TX TOT 3 min) so a stuck transmit can't run on, and keep the old Windows setup untouched as the way back until the server has run cleanly for a while.
+
+1. **Plug the interface into the server and give its devices fixed names.** `lsusb` shows the parts (SCU-17: a TI PCM2903B codec `08bb:29b3` and a CP2105 dual serial bridge `10c4:ea70`; radios with built-in USB look similar). A udev rule keeps the desktop sound system off the sound card and gives the serial ports names that survive reboots:
+   ```
+   # /etc/udev/rules.d/89-scu17.rules
+   SUBSYSTEM=="sound", ATTRS{idVendor}=="08bb", ENV{PULSE_IGNORE}="1"
+   SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea70", \
+     ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="scu17-cat"
+   ```
+   `sudo udevadm control --reload`, re-plug, `ls -l /dev/scu17-cat`. On the SCU-17 the first port (*Enhanced*) is CAT.
+2. **More than one USB sound card? Fix their numbers.** QtSoundModem (§10.13) picks its card by number; a second card can swap the numbers at the next boot and send packet audio into the wrong radio. Pin them by USB ID, e.g. HF interface = card 0, Digirig = card 1:
+   ```
+   # /etc/modprobe.d/bpq-usb-audio.conf
+   options snd-usb-audio index=0,1 vid=0x08bb,0x0d8c pid=0x29b3,0x0012
+   ```
+   Check after plugging in with `arecord -l`.
+3. **flrig on the server** (`sudo apt install flrig`, or a newer build). Run it once in the desktop as the station user: *Config → Setup → Transceiver*: your rig, port `/dev/scu17-cat` (a short name: flrig cuts long `/dev/serial/by-id/…` paths), the radio's CAT baud, and **RTS/CTS** only if the radio's *CAT RTS* menu is on (both sides must agree); *PTT*: **CAT** only, no RTS/DTR, *separate PTT port* = NONE; *Server*: 127.0.0.1, 12345. Mixed PTT settings (CAT plus RTS plus a missing separate port) keyed K1AJD's radio and left it transmitting. Check the settings file (`~/.flrig/<RIG>.prefs`: `ptt_via_cat` set, `ptt_via_rts:0`, `sep_serial_port:NONE`), then test into a dummy load at low power — this always sends "transmit off", even after an error:
+   ```bash
+   python3 - <<'EOF'
+   import xmlrpc.client, time
+   r = xmlrpc.client.ServerProxy("http://127.0.0.1:12345")
+   print("freq:", r.rig.get_vfo())
+   try:
+       r.rig.set_ptt(1); time.sleep(2)
+   finally:
+       r.rig.set_ptt(0)
+   time.sleep(1); print("PTT now:", r.rig.get_ptt())   # 0 = receive
+   EOF
+   ```
+4. **VARA HF in its own 32-bit Wine prefix**, in a terminal inside the desktop (not over SSH), as the station user:
+   ```bash
+   export WINEPREFIX=$HOME/.wine-vara WINEARCH=win32 WINEDEBUG=-all
+   wineboot -i
+   winetricks -q vb6run pdh_nt4 comctl32ocx comdlg32ocx sound=alsa
+   ```
+   Download the **full** VARA HF setup zip (downloads.winlink.org → VARA Products), unzip it into a folder of its own and run the setup from there: it installs `MSCOMM32.OCX` from the `OCX` folder beside it (run on its own, it stops with *MSCOMM32.OCX not found*). Wine's `wineusb` / `winebth` "Failed to create device" lines are harmless. Start it with `wine "$WINEPREFIX/drive_c/VARA/VARA.exe" &`, then: register it; *VARA Setup*: TCP command port 8300 (data 8301), **Syslog** to `127.0.0.1` port 514 with Station Name `H-<CALL-SSID>` (the name vara-logger filters on, §10.11); *SoundCard*: the HF interface for input and output (not the packet radio's); **PTT: None**; drive level as before.
+5. **Point LinBPQ and the dashboard at it** (back up both files first):
+   ```
+   bpq32.cfg, the VARA port:    ADDR 127.0.0.1 8300 PTT CAT
+   bpq32.cfg, rig control:      FLRIG 127.0.0.1:12345
+   config.php:                  'radio' => ['flrig_host' => '127.0.0.1', ...]
+   ```
+   Restart LinBPQ; `ss -tnp | grep -E ':8300|:8301|:12345'` shows linbpq connected to all three. (Using the callsign validator, §10.9: LinBPQ to 9025, the validator's upstream 127.0.0.1:8300.)
+6. **Start it at boot.** Run the desktop as a service: a TigerVNC session (`/etc/tigervnc/vncserver.users` `:3=YOURUSER`, `sudo systemctl enable --now tigervncserver@:3`, and a drop-in with `Restart=always` so a Log Out brings it back). In it, an autostart script starts flrig, then VARA, and starts either again if it closes:
+   ```bash
+   #!/bin/bash
+   # ~/bin/hf-station.sh, run by ~/.config/autostart/hf-station.desktop
+   [ "${DISPLAY%%.*}" = ":3" ] || exit 0       # only in the VNC desktop
+   exec 9>/tmp/hf-station-$USER.lock; flock -n 9 || exit 0
+   exec >>"$HOME/.cache/hf-station.log" 2>&1
+   export WINEPREFIX=$HOME/.wine-vara WINEDEBUG=-all
+   # stop when this desktop's X server goes (else an old copy keeps the
+   # lock and the next desktop's copy quits)
+   XPID=$(pgrep -u "$USER" -f "Xtigervnc :3" | head -1)
+   alive() { [ -n "$XPID" ] && kill -0 "$XPID" 2>/dev/null; }
+   # 9>&- : don't hand the lock to flrig / VARA
+   ( while alive; do
+       pgrep -u "$USER" -x flrig >/dev/null || flrig 9>&-
+       sleep 10
+     done ) &
+   sleep 10
+   while alive; do
+       pgrep -u "$USER" -f 'VARA\.exe' >/dev/null ||
+           wine "$WINEPREFIX/drive_c/VARA/VARA.exe" 9>&-
+       sleep 10
+   done
+   ```
+   Under Wine VARA's process is named `C:\VARA\VARA.exe`, so look for it with `pgrep -af 'VARA\.exe'` (a pattern with `/` never matches), and note that the `wine` command returns while VARA keeps running. Start only **one** way: the TigerVNC service, not also an old `@reboot vncserver` crontab line (both racing for :3 makes the service restart in a loop). Add to the service's drop-in `ExecStopPost=-/usr/bin/pkill -u YOURUSER -f hf-station.sh` (and the same for `-x flrig` and `-f VARA.exe`) so a desktop restart leaves nothing behind, and make LinBPQ wait for flrig at boot — it doesn't reconnect to flrig later:
+   ```
+   # /etc/systemd/system/bpq.service.d/wait-flrig.conf
+   [Unit]
+   After=tigervncserver@:3.service
+   [Service]
+   ExecStartPre=/bin/sh -c 'for i in $(seq 60); do ss -ltn | grep -q ":12345 " && exit 0; sleep 2; done; exit 0'
+   TimeoutStartSec=180
+   ```
+   If another sound driver setting exists (`grep -rn snd-usb-audio /etc/modprobe.d/`), comment it out: a later file overrides the card numbers. And after changing flrig's setup, check `~/.flrig/<RIG>.prefs` for a garbled `sep_serial_port` (flrig 2.0.10 can leave part of an old long path after "NONE"; it then fails with *Cannot access NONE…*): it must read exactly `sep_serial_port:NONE`.
+7. **Test on the air.** Start a forward to a partner on the current band: flrig follows the script's `RADIO` command, the radio keys and releases in bursts, the session completes, and `tail -4 logs/<call>.vara` shows the session (S/N, bytes, speed) — RF Connections lists it at the next parse. Then restart the desktop (`sudo systemctl restart tigervncserver@:3`) and check flrig and VARA come back and LinBPQ reconnects.
+
+**Way back:** put the two backed-up files back, restart LinBPQ, close VARA and flrig on the server, move the USB cable to the Windows PC and start them there.
 
 ---
 
@@ -1696,10 +1916,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.21-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.30-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.21 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.30 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*
