@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.30**
+**Version 1.5.33**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -83,6 +83,18 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.33
+
+- **Email Client:** marking messages read now always clears the folder's red unread number (database-only copies were left unread before); the Bulletins view also shows each group's database-only bulletins.
+
+### In v1.5.32
+
+- **Email Client → ⚙ Properties:** one menu at the top of the page with every Email Client option (mail, view, folders, contacts, settings, help). Messages now sort newest first by their date, so a new message no longer lands at the bottom of a 📌 folder.
+
+### In v1.5.31
+
+- **Email Client:** messages killed on the BBS (copies kept in 📌 folders) are hidden unless Preferences → *Show messages killed on the BBS* is ticked; the list says how many are hidden. Fixed "undefined" in place of the message type on some saved messages.
 
 ### In v1.5.30
 
@@ -325,7 +337,7 @@ Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.30
+cd bpq-dashboard-1.5.33
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -1916,10 +1928,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.30-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.33-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.30 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.33 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

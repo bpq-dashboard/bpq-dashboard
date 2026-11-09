@@ -1,7 +1,7 @@
 <?php
 /**
  * bpq-nodes-api.php - Live BPQ NetROM nodes and routes via telnet scrape
- * BPQ Dashboard v1.5.30
+ * BPQ Dashboard v1.5.33
  *
  * BPQ login sequence (confirmed from nc trace on the server):
  *   IAC negotiation -> user: -> <bbs.user> -> password: -> <bbs.pass>

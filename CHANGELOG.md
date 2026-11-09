@@ -4,6 +4,60 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.33] - 2026-11-09
+
+### Fixed
+- **Email Client: "Mark read" didn't clear the red unread badge** (K1AJD,
+  Bulletins). Badges count a folder's database-only copies (rows this
+  browser never fetched, e.g. past *Max messages per list*), but bulk
+  Read only marked messages in the browser's inboxes, and the Bulletins
+  view didn't even list the groups' database-only bulletins. Read now marks
+  those too (folder cache + server), and the Bulletins view includes them,
+  so what the badge counts is what you can see and clear. (User Guide §9
+  selecting messages.)
+- `NAV_VERSION` 2026-11-09-2 (Guide PDF link).
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.32] - 2026-11-09
+
+### Added
+- **Email Client: ⚙ Properties menu** (K1AJD) at the right of the top bar:
+  every option in one Thunderbird-style menu: Mail (Get Mail, Compose,
+  Quick Check-In, PKTNET Forms, NTS Report, auto-fetch interval), View
+  (show killed-on-BBS, pop-up / pane), Folders (new, rename / empty the
+  open folder, bulletin clean-up, retention), Contacts, Settings (Rules,
+  Signature, Muted groups, Killed list — each opens Preferences at its
+  section — All Preferences, Statistics), Help (User Guide). Esc or a click
+  outside closes it. (User Guide §9 *What you see*.)
+
+### Fixed
+- **Email Client: a new message could sort to the bottom of a folder**
+  (K1AJD, N3MEL folder). Lists sorted on when the dashboard first saw each
+  message, and database rows and the browser's clock didn't agree. Now
+  newest first by the message's own date (year inferred), then first
+  seen, then number.
+- Menu **📖 Guide** could open a removed PDF (404) in browsers that had
+  cached the menu: `NAV_VERSION` wasn't bumped in 1.5.29–1.5.31 when the
+  Guide link changed. Now `2026-11-09-1` on every page.
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.31] - 2026-11-09
+
+### Changed
+- **Email Client: messages killed on the BBS are hidden by default**
+  (K1AJD). Copies kept in 📌 folders (and local copies BPQ no longer has)
+  filled folders with faded "⚠ killed on BBS" rows. New Preferences switch
+  *Show messages killed on the BBS* (off by default, kept in this browser);
+  the list's count adds "· N killed on BBS hidden", and hidden ones don't
+  count toward unread badges. Nothing is deleted. Empty folder still
+  empties everything. (`bbs-messages.html`; User Guide §9 📌 section and
+  Preferences.)
+
+### Fixed
+- Email Client: saved messages without a BPQ status showed "undefined" in
+  the row; they show the message type.
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
 ## [1.5.30] - 2026-11-09
 
 ### Fixed

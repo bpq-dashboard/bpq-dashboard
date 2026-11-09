@@ -1,6 +1,6 @@
 <?php
 /**
- * BPQ Dashboard v1.5.30 — Post-Installation Check
+ * BPQ Dashboard v1.5.33 — Post-Installation Check
  * Checks every component installed by bpq-dashboard-install.sh
  * Access: https://your.domain/install-check.php  (behind the admin login)
  *
@@ -963,7 +963,7 @@ function renderPage($results,$pass,$fail,$warn,$score,$sc) {
 $total = $pass+$fail+$warn; ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BPQ Dashboard v1.5.30 — Install Check</title>
+<title>BPQ Dashboard v1.5.33 — Install Check</title>
 <style>
 :root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;
       --acc:#4a9eff;--grn:#3fb950;--red:#f85149;--org:#d29922;--pur:#bc8cff;}
@@ -1009,7 +1009,7 @@ h1{font-size:20px;color:var(--acc);margin-bottom:4px;}
         color:var(--org);font-size:12px;text-align:center;line-height:1.8;}
 .footer strong{color:var(--red);}
 </style></head><body>
-<h1>🔧 BPQ Dashboard v1.5.30 — Post-Installation Check</h1>
+<h1>🔧 BPQ Dashboard v1.5.33 — Post-Installation Check</h1>
 <p class="sub"><?=date('Y-m-d H:i:s T')?> · PHP <?=phpversion()?> · <?=htmlspecialchars(php_uname('n'))?></p>
 
 <div class="card">

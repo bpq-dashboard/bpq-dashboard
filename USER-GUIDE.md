@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.30**
+**Version 1.5.33**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -382,7 +382,20 @@ A webmail-style client for your BBS: Personal mail, NTS traffic and bulletins, w
 
 ### What you see
 
-**Top bar:** 📨 **Get Mail**, the auto-fetch chip (shows the countdown; click it to change the interval), the search box, ✏ **Compose**, 📄 **NTS Report**, 📻 **PKTNET Forms**, ✅ **Quick Check-In**.
+**Top bar:** 📨 **Get Mail**, the auto-fetch chip (shows the countdown; click it to change the interval), the search box, ✏ **Compose**, 📄 **NTS Report**, 📻 **PKTNET Forms**, ✅ **Quick Check-In**, and on the right **⚙ Properties ▾** (v1.5.32).
+
+**⚙ Properties** gathers every Email Client option in one menu, like Thunderbird's, so nothing has to be hunted for in the sidebar or Preferences:
+
+- **Mail:** Get Mail now, Compose, Quick Check-In, PKTNET Forms, NTS Report, and the **Auto-fetch** interval (changes at once).
+- **View:** **Show messages killed on the BBS** and **Open messages in** Pop-up / Pane (both change at once).
+- **Folders:** New folder; Rename / empty the folder you have open (one of My Folders); Clean up Bulletin folders; Run bulletin retention now.
+- **Contacts:** Address Book, BBSes Seen, Forwarding Activity.
+- **Settings:** Rules, Signature, Muted bulletin groups, Killed-message list (each opens Preferences at that section), All Preferences, Statistics.
+- **Help:** this guide.
+
+Click outside the menu or press Esc to close it. The sidebar's Contacts and Settings entries still work as before.
+
+Messages are listed newest first by their date (since v1.5.32; before, a new message could land at the bottom of a 📌 folder), then by when the dashboard first saw them.
 
 **Folder list (left):**
 
@@ -451,7 +464,7 @@ The search box filters the **folder you're in** by from, to, subject and message
 ### Selecting several messages
 
 - **Select all**, or **Shift**-click a range, or **Ctrl**-click (⌘ on a Mac) to add or remove one without opening it.
-- The selection bar then offers **Move**, **Read**, 🗂 **Archive** and 🗑 **Kill**.
+- The selection bar then offers **Move**, **Read**, 🗂 **Archive** and 🗑 **Kill**. **Read** also clears messages that exist only in the database copy of a folder, so the folder's red unread number goes down to match (fixed in v1.5.33). The **Bulletins** view lists those database-only bulletins of every unmuted group too, so selecting all there and clicking **Read** clears the Bulletins badge.
 
 ### Deleting messages
 
@@ -473,10 +486,10 @@ This runs automatically once a day (`bulletin-retention.timer`). **Preferences �
 
 Every message is saved in the dashboard's database, text included, so it stays readable after BPQ removes it. A message that arrived and left BPQ before its text was saved shows only its listing, with a note saying so. Killing a message normally removes it from the database too. To keep copies from some folders even after you kill them on the BBS, pin those folders.
 
-Each folder row — the bulletin groups under **Bulletins** and your own **My Folders** — has a 📌 icon: faint means off, bright means on. Click it to toggle. In a pinned folder, **Kill** removes the message from the BBS but keeps the database copy in the folder, marked "no longer on BBS". For example, pin **TODAY** to keep every TODAY bulletin, and leave **WX** unpinned so killed WX bulletins go away as usual.
+Each folder row — the bulletin groups under **Bulletins** and your own **My Folders** — has a 📌 icon: faint means off, bright means on. Click it to toggle. In a pinned folder, **Kill** removes the message from the BBS but keeps the database copy in the folder, marked "⚠ killed on BBS". Since v1.5.31 these kept copies are **hidden** until you tick *Show messages killed on the BBS* in Preferences; the list's count says how many are hidden ("· 3 killed on BBS hidden"), and hidden ones don't count toward the folder's unread badge. For example, pin **TODAY** to keep every TODAY bulletin, and leave **WX** unpinned so killed WX bulletins go away as usual.
 
 - Only messages that are *in* a pinned folder when you kill them are kept. Pinning a folder doesn't bring back messages killed earlier.
-- A kept message is already gone from the BBS, so **Kill** is disabled on it. To delete the kept copy, move it to **Trash** and empty Trash.
+- A kept message is already gone from the BBS, so **Kill** is disabled on it. To delete the kept copy, turn on *Show messages killed on the BBS*, move it to **Trash** and empty Trash.
 - Trash can't be pinned. Everything in a pinned group is also kept past the 14-day bulletin retention, whether or not it has been killed.
 - Muted groups don't appear in the sidebar. To pin one, unmute it first; you can re-mute it afterwards and the pin stays.
 
@@ -507,7 +520,7 @@ NTS traffic is filed into **NTS** automatically, with an unread count. **📄 NT
 
 ### Preferences
 
-**Settings → Preferences…** holds the auto-fetch interval, *Max messages per list*, *Open messages in*, *Body fetching*, **Forget killed list** (the dashboard remembers what you killed so BPQ's listing doesn't bring it back until BPQ's housekeeping removes it), **Muted bulletin groups**, **Clean up Bulletin folders** (repairs group folders with damaged names from an old bug), **Run retention cleanup now** and the **Signature** (v1.5.19, see *Composing*). Preferences are kept in this browser, except the signature, which is kept on the server.
+**Settings → Preferences…** holds the auto-fetch interval, *Max messages per list*, *Open messages in*, *Body fetching*, **Show messages killed on the BBS** (v1.5.31, off by default: 📌-kept copies and messages BPQ no longer has are hidden from the lists and unread counts), **Forget killed list** (the dashboard remembers what you killed so BPQ's listing doesn't bring it back until BPQ's housekeeping removes it), **Muted bulletin groups**, **Clean up Bulletin folders** (repairs group folders with damaged names from an old bug), **Run retention cleanup now** and the **Signature** (v1.5.19, see *Composing*). Preferences are kept in this browser, except the signature, which is kept on the server.
 
 ### Forwarding details
 
@@ -1221,7 +1234,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.30-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.33-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1248,7 +1261,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.30 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.33 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1263,6 +1276,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.30 — User Guide**
+**73 — BPQ Dashboard v1.5.33 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

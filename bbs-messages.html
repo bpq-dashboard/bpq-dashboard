@@ -287,6 +287,32 @@
         border-radius: 6px; font-size: 13px;
     }
 
+    /* ── Properties menu (v1.5.32) ───────────────────────────────── */
+    .props-wrap { position: relative; margin-left: auto; }
+    .props-menu {
+        position: absolute; right: 0; top: calc(100% + 6px); z-index: 900;
+        width: 330px; max-height: calc(100vh - 140px); overflow-y: auto;
+        background: var(--bg-panel); color: var(--text-strong);
+        border: 1px solid var(--border-soft); border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.18); padding: 6px 0; font-size: 13px;
+    }
+    .props-menu.hidden { display: none; }
+    .props-sec { padding: 8px 14px 3px; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--text-muted); }
+    .props-sec:not(:first-child) { border-top: 1px solid var(--border-soft); margin-top: 4px; }
+    .props-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+                  padding: 6px 14px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+    .props-item:hover:not(:disabled), .props-item:focus-visible { background: var(--accent-soft); outline: none; }
+    .props-item:disabled { color: var(--text-muted); cursor: default; }
+    .props-item .pi { width: 18px; text-align: center; flex-shrink: 0; }
+    .props-item .ph { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+    .props-row { display: flex; align-items: center; gap: 9px; padding: 5px 14px; }
+    .props-row select { flex: 1; padding: 3px 6px; border: 1px solid var(--border-soft); border-radius: 5px;
+                        background: var(--bg-panel); color: var(--text-strong); font-size: 12px; }
+    .props-seg { display: inline-flex; border: 1px solid var(--border-soft); border-radius: 5px; overflow: hidden; margin-left: auto; }
+    .props-seg button { border: 0; background: none; color: var(--text-soft); padding: 3px 9px; font-size: 12px; cursor: pointer; }
+    .props-seg button.on { background: var(--accent); color: #fff; }
+
     /* ── Modal ────────────────────────────────────────────────────── */
     .modal-backdrop {
         position: fixed; inset: 0; background: rgba(0,0,0,0.45);
@@ -447,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </head>
 
 <body data-nav-page="bbs">
-<script src="bpq-nav-loader.js?v=2026-11-08-7"></script>
+<script src="bpq-nav-loader.js?v=2026-11-09-2"></script>
 
 <!-- Top control bar -->
 <div id="controlBar">
@@ -474,6 +500,53 @@ document.addEventListener('DOMContentLoaded', function () {
             title="Quick check-in — generates a bulletin and hands it straight to Compose">
         <span>✅</span> Quick Check-In
     </button>
+    <!-- v1.5.32: every Email Client option in one place, like Thunderbird's menus -->
+    <div class="props-wrap">
+        <button id="propsBtn" class="ctrl-btn secondary" onclick="togglePropsMenu(event)"
+                aria-haspopup="true" aria-expanded="false" title="All Email Client options in one place">
+            <span>⚙</span> Properties ▾
+        </button>
+        <div id="propsMenu" class="props-menu hidden" role="menu" onclick="event.stopPropagation()">
+            <div class="props-sec">Mail</div>
+            <button class="props-item" onclick="propsDo(getMail)"><span class="pi">📨</span>Get Mail now</button>
+            <button class="props-item" onclick="propsDo(openComposeModal)"><span class="pi">✏</span>Compose…</button>
+            <button class="props-item" onclick="propsDo(openCheckInModal)"><span class="pi">✅</span>Quick Check-In…</button>
+            <button class="props-item" onclick="propsDo(() => window.open('pktnet-forms/index.html', '_blank'))"><span class="pi">📻</span>PKTNET Forms<span class="ph">new tab</span></button>
+            <button class="props-item" onclick="propsDo(() => window.open('nts-forwarding-report.php', '_blank'))"><span class="pi">📄</span>NTS Report<span class="ph">new tab</span></button>
+            <div class="props-row"><span class="pi">⏱</span>Auto-fetch
+                <select id="propsAutoFetch" onchange="propsSetAutoFetch(this.value)">
+                    <option value="0">Off</option><option value="60">1 min</option><option value="300">5 min</option>
+                    <option value="900">15 min</option><option value="1800">30 min</option><option value="3600">60 min</option>
+                </select></div>
+
+            <div class="props-sec">View</div>
+            <label class="props-item"><span class="pi"><input type="checkbox" id="propsShowKilled" onchange="propsSetShowKilled(this.checked)"></span>Show messages killed on the BBS</label>
+            <div class="props-row"><span class="pi">▣</span>Open messages in
+                <span class="props-seg"><button id="propsReaderPopup" onclick="propsSetReader('popup')">Pop-up</button><button id="propsReaderPane" onclick="propsSetReader('pane')">Pane</button></span></div>
+
+            <div class="props-sec">Folders</div>
+            <button class="props-item" onclick="propsDo(() => openNewFolderPrompt())"><span class="pi">＋</span>New folder…</button>
+            <button class="props-item" id="propsRenameFolder" onclick="propsDo(() => openRenameFolderModal(currentFolder.substring(7)))"><span class="pi">✎</span><span id="propsRenameLabel">Rename / empty this folder…</span></button>
+            <button class="props-item" onclick="propsDo(() => cleanupCorruptedBulletinFolders())"><span class="pi">🧹</span>Clean up Bulletin folders</button>
+            <button class="props-item" onclick="propsDo(() => runBulletinRetentionNow())"><span class="pi">🗓</span>Run bulletin retention now</button>
+
+            <div class="props-sec">Contacts</div>
+            <button class="props-item" onclick="propsDo(openAddressBookModal)"><span class="pi">👥</span>Address Book…</button>
+            <button class="props-item" onclick="propsDo(openBbsBookModal)"><span class="pi">🏢</span>BBSes Seen…</button>
+            <button class="props-item" onclick="propsDo(openForwardingActivityModal)"><span class="pi">↗</span>Forwarding Activity…</button>
+
+            <div class="props-sec">Settings</div>
+            <button class="props-item" onclick="propsDo(openRulesModal)"><span class="pi">🧩</span>Rules (auto-filing)…</button>
+            <button class="props-item" onclick="propsDo(() => openPrefsAt('prefSignature'))"><span class="pi">✍</span>Signature…</button>
+            <button class="props-item" onclick="propsDo(() => openPrefsAt('prefMuted'))"><span class="pi">🔕</span>Muted bulletin groups…</button>
+            <button class="props-item" onclick="propsDo(() => openPrefsAt('prefKilled'))"><span class="pi">🗑</span>Killed-message list…</button>
+            <button class="props-item" onclick="propsDo(() => openPrefsAt())"><span class="pi">⚙</span>All Preferences…</button>
+            <button class="props-item" onclick="propsDo(openStatsModal)"><span class="pi">📊</span>Statistics…</button>
+
+            <div class="props-sec">Help</div>
+            <button class="props-item" onclick="propsDo(openEmailGuide)"><span class="pi">📖</span>User Guide<span class="ph">§9 Email Client</span></button>
+        </div>
+    </div>
 </div>
 
 <!-- App shell: sidebar, message list, preview -->
@@ -579,7 +652,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </label>
             <h2 id="listTitle" style="flex:1;">Personal &amp; Traffic</h2>
             <span class="meta" id="listMeta">0 messages</span>
-            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.30</span>
+            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.33</span>
         </div>
         <!-- Selection toolbar — only visible when ≥1 message is selected.
              Bulk actions: Move-to-folder dropdown, Mark Read, Archive, Kill,
@@ -746,7 +819,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             <!-- v1.5.19 (N3MEL): signature, kept on the server so every
                  browser and device uses the same one -->
-            <div class="form-group" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
+            <div class="form-group" id="prefSignature" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
                 <label style="display:flex; align-items:center; gap:8px;">
                     <input type="checkbox" id="settingSigEnabled"> Signature on new messages
                 </label>
@@ -768,13 +841,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
             <!-- Killed-message tracking — let user see and clear the list
                  in case they want to allow a killed message to reappear. -->
-            <div class="form-group" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
+            <div class="form-group" id="prefKilled" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
                 <label>Killed messages</label>
                 <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">
                     Messages you've killed are remembered for 90 days so BPQ
                     can't redeliver them. Currently tracking
                     <span id="killedCount" style="font-weight:600;">0</span>
                     killed message<span id="killedCountPlural">s</span>.
+                </div>
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:normal; margin-bottom:8px; cursor:pointer;">
+                    <input type="checkbox" id="settingShowKilled"> Show messages killed on the BBS
+                </label>
+                <div style="font-size:11px; color:var(--text-muted); margin:-4px 0 8px 22px;">
+                    Off: copies kept in 📌 folders (and messages BPQ no longer has) stay
+                    in the database but are hidden from the lists and unread counts.
+                    On: they show faded, marked ⚠ killed on BBS.
                 </div>
                 <button class="ctrl-btn secondary" onclick="if (confirm('Forget all killed messages? Any that BPQ still has will reappear on the next Get Mail.')) { clearKilledSet(); document.getElementById('killedCount').textContent = '0'; document.getElementById('killedCountPlural').textContent = 's'; showToast('Killed list cleared', 'info'); }"
                         style="font-size:12px; padding:6px 10px;">Forget killed list</button>
@@ -787,7 +868,7 @@ document.addEventListener('DOMContentLoaded', function () {
                  chip list is the only remaining way to reach it: click a
                  chip's label to open that folder, or its ✕ to unmute
                  (which brings the sidebar row back). -->
-            <div class="form-group" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
+            <div class="form-group" id="prefMuted" style="border-top:1px solid var(--border-soft); padding-top:12px; margin-top:12px;">
                 <label>Muted bulletin groups</label>
                 <div style="font-size:12px; color:var(--text-soft); margin-bottom:8px;">
                     Hidden from the sidebar's Bulletins list and the aggregate
@@ -1241,6 +1322,9 @@ const CONFIG = {
         // 2026-10-12: 'popup' opens a clicked message in the reader
         // pop-up; 'pane' uses the right-hand reading pane (old layout).
         readerMode:       'popup',
+        // v1.5.31: messages killed on the BBS (📌-kept database copies and
+        // local copies BPQ no longer has) are hidden unless this is on.
+        showKilled:       false,
         // Bulletin distribution-group labels (e.g. "SITREP", "WX") hidden
         // from the aggregate Bulletins view/badge. Display-only — BPQ still
         // receives, stores, and forwards every one of these; this dashboard
@@ -2783,7 +2867,7 @@ async function markServerMessageRead(m) {
 function folderUnreadCount(name) {
     const local = [...inboxes.personal, ...inboxes.nts, ...inboxes.bulletins]
         .filter(m => m._folder === name && !m._archived);
-    const localUnread = local.filter(m => m._unread).length;
+    const localUnread = local.filter(m => m._unread && (settings.showKilled || !m._stale)).length;
     const localNums = new Set(local.map(m => m.number).filter(n => n != null));
     // bbs_number is a VARCHAR column — coerce before comparing against
     // localNums (a Set of real numbers), same fix as currentFolderMessages().
@@ -2791,7 +2875,8 @@ function folderUnreadCount(name) {
         .filter(sm => {
             const num = (sm.number != null && sm.number !== '') ? Number(sm.number) : null;
             const coerced = (num != null && !Number.isNaN(num)) ? num : null;
-            return (coerced == null || !localNums.has(coerced)) && !sm._read;
+            return (coerced == null || !localNums.has(coerced)) && !sm._read
+                && (settings.showKilled || !sm._goneFromBbs);
         })
         .length;
     return localUnread + serverOnlyUnread;
@@ -3643,6 +3728,7 @@ function applySettingsToUI() {
     document.getElementById('settingMaxList').value = String(settings.maxList);
     document.getElementById('settingBodyMode').value = settings.bodyMode;
     document.getElementById('settingReaderMode').value = settings.readerMode === 'pane' ? 'pane' : 'popup';
+    document.getElementById('settingShowKilled').checked = !!settings.showKilled;
     updateAutoFetchChip();
     renderMutedBulletinGroupsList();
 }
@@ -3682,6 +3768,65 @@ function renderMutedBulletinGroupsList() {
     });
 }
 
+// ─── Properties menu (v1.5.32) ─────────────────────────────────
+function propsRefresh() {
+    const af = document.getElementById('propsAutoFetch');
+    if (af) {
+        af.value = String(settings.autoFetchSeconds);
+        if (af.value !== String(settings.autoFetchSeconds)) af.value = '300';
+    }
+    const sk = document.getElementById('propsShowKilled');
+    if (sk) sk.checked = !!settings.showKilled;
+    const pane = settings.readerMode === 'pane';
+    document.getElementById('propsReaderPopup')?.classList.toggle('on', !pane);
+    document.getElementById('propsReaderPane')?.classList.toggle('on', pane);
+    const rn = document.getElementById('propsRenameFolder');
+    if (rn) {
+        const custom = typeof currentFolder === 'string' && currentFolder.startsWith('custom:');
+        rn.disabled = !custom;
+        document.getElementById('propsRenameLabel').textContent = custom
+            ? `Rename / empty "${currentFolder.substring(7)}"…` : 'Rename / empty this folder… (open one of My Folders)';
+    }
+}
+function togglePropsMenu(ev) {
+    if (ev) ev.stopPropagation();
+    const m = document.getElementById('propsMenu');
+    const open = m.classList.contains('hidden');
+    if (open) propsRefresh();
+    m.classList.toggle('hidden', !open);
+    document.getElementById('propsBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function closePropsMenu() {
+    const m = document.getElementById('propsMenu');
+    if (m && !m.classList.contains('hidden')) {
+        m.classList.add('hidden');
+        document.getElementById('propsBtn').setAttribute('aria-expanded', 'false');
+    }
+}
+function propsDo(fn) { closePropsMenu(); try { fn(); } catch (e) { console.error(e); } }
+function propsSetAutoFetch(v) {
+    settings.autoFetchSeconds = parseInt(v, 10) || 0;
+    persistSettings(); updateAutoFetchChip(); stopAutoFetch(); startAutoFetchIfEnabled();
+    showToast(settings.autoFetchSeconds ? `Auto-fetch every ${settings.autoFetchSeconds / 60} min` : 'Auto-fetch off', 'success');
+}
+function propsSetShowKilled(on) {
+    settings.showKilled = !!on;
+    persistSettings(); renderSidebarBadges(); renderList();
+}
+function propsSetReader(mode) { setReaderMode(mode); propsRefresh(); }
+function openPrefsAt(id) {
+    openSettingsModal();
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (el) setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
+}
+function openEmailGuide() {
+    const a = document.querySelector('a.bpq-nav-link-guide');
+    window.open(a ? a.href : '/', '_blank', 'noopener');
+}
+document.addEventListener('click', closePropsMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePropsMenu(); });
+
 function openSettingsModal() {
     applySettingsToUI();
     document.getElementById('settingSigEnabled').checked   = !!emailSignature.enabled;
@@ -3700,7 +3845,10 @@ function saveSettings() {
     settings.maxList          = parseInt(document.getElementById('settingMaxList').value, 10);
     settings.bodyMode         = document.getElementById('settingBodyMode').value;
     setReaderMode(document.getElementById('settingReaderMode').value, { silent: true });
+    settings.showKilled       = document.getElementById('settingShowKilled').checked;
     persistSettings();
+    renderSidebarBadges();
+    renderList();
     updateAutoFetchChip();
     stopAutoFetch();
     startAutoFetchIfEnabled();
@@ -4119,7 +4267,7 @@ function mergeArchiveIntoInbox(existing, dbRows) {
     // See mergeInbox()'s matching comment — bbs_number wraps around, so
     // sort by receipt time first and only fall back to number when
     // neither side has a timestamp.
-    merged.sort((a, b) => (b._archivedAt || 0) - (a._archivedAt || 0) || (b.number || 0) - (a.number || 0));
+    merged.sort(msgNewestFirst);
     return merged;
 }
 
@@ -4188,6 +4336,37 @@ async function loadInboxesFromDatabase() {
 // message whose number falls INSIDE the fresh window's number range is
 // treated as gone; older ones keep `_stale` only if the database says the
 // message was killed (`_goneFromBbs`).
+// v1.5.32: newest first by the message's own date ("09-Nov"), then by
+// when the dashboard first saw it, then by number. Sorting on first-seen
+// alone put a new N3MEL message at the BOTTOM of a 📌 folder (database
+// rows' first_seen_at and this browser's clock didn't agree). BPQ's date
+// has no year: it's the latest year that doesn't put it in the future.
+const MSG_MON = { JAN:0, FEB:1, MAR:2, APR:3, MAY:4, JUN:5, JUL:6, AUG:7, SEP:8, OCT:9, NOV:10, DEC:11 };
+function msgDayKey(m) {
+    if (m._dayKey !== undefined) return m._dayKey;
+    let key = 0;
+    const d = String(m.date || '');
+    let mm = d.match(/^(\d{1,2})-([A-Za-z]{3})/);
+    if (mm && MSG_MON[mm[2].toUpperCase()] !== undefined) {
+        const ref = new Date((m._archivedAt && m._archivedAt > 0) ? m._archivedAt : Date.now());
+        let y = ref.getUTCFullYear();
+        key = Date.UTC(y, MSG_MON[mm[2].toUpperCase()], +mm[1]);
+        if (key > ref.getTime() + 2 * 86400000) key = Date.UTC(y - 1, MSG_MON[mm[2].toUpperCase()], +mm[1]);
+    } else if ((mm = d.match(/^(\d{4})-(\d{2})-(\d{2})/))) {
+        key = Date.UTC(+mm[1], +mm[2] - 1, +mm[3]);
+    } else if (m._archivedAt) {
+        const t = new Date(m._archivedAt);
+        key = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
+    }
+    try { Object.defineProperty(m, '_dayKey', { value: key, enumerable: false, configurable: true, writable: true }); } catch (e) {}
+    return key;
+}
+function msgNewestFirst(a, b) {
+    return (msgDayKey(b) - msgDayKey(a))
+        || ((b._archivedAt || 0) - (a._archivedAt || 0))
+        || ((b.number || 0) - (a.number || 0));
+}
+
 function mergeInbox(existing, fresh, capped = false) {
     const byNum = new Map(existing.map(m => [m.number, m]));
     const freshNums = fresh.map(m => m.number).filter(n => typeof n === 'number');
@@ -4230,7 +4409,7 @@ function mergeInbox(existing, fresh, capped = false) {
     // messages under stale pre-wrap ones with bigger numbers. Fall back
     // to number only for the rare case both sides lack a timestamp
     // (e.g. cached data from before this fix existed).
-    merged.sort((a, b) => (b._archivedAt || 0) - (a._archivedAt || 0) || (b.number || 0) - (a.number || 0));
+    merged.sort(msgNewestFirst);
     return merged;
 }
 
@@ -4404,16 +4583,20 @@ function selectFolder(folder) {
 //
 // Custom folders (currentFolder === 'custom:<name>') return all messages
 // whose `_folder` field matches <name>, regardless of origin inbox.
+// v1.5.31: what the list shows — every message in the folder, less those
+// killed on the BBS unless Preferences → "Show messages killed on the BBS".
+// Bulk actions on the whole folder (Empty folder) don't use this.
 function currentFolderMessages() {
-    if (currentFolder === 'archived') {
-        return [...inboxes.personal, ...inboxes.nts, ...inboxes.bulletins]
-                .filter(m => m._archived)
-                .sort((a,b) => (b._archivedAt || 0) - (a._archivedAt || 0) || b.number - a.number);
-    }
-    if (currentFolder === 'sent') return inboxes.sent || [];
+    const all = currentFolderMessagesAll();
+    return settings.showKilled ? all : all.filter(m => !m._stale);
+}
+function hiddenKilledCount() {
+    return settings.showKilled ? 0 : currentFolderMessagesAll().filter(m => m._stale).length;
+}
 
-    if (currentFolder.startsWith('custom:')) {
-        const name = currentFolder.substring(7);
+// One custom folder's messages: local copies filed there plus database
+// rows this browser doesn't have (v1.5.33: also used by the Bulletins view).
+function customFolderMessages(name) {
         const local = [...inboxes.personal, ...inboxes.nts, ...inboxes.bulletins]
                 .filter(m => m._folder === name);
         // Add in anything the server has saved for this folder that
@@ -4469,8 +4652,18 @@ function currentFolderMessages() {
                          _stale: !!sm._goneFromBbs };
             });
         // See mergeInbox()'s comment on _archivedAt vs bbs_number wraparound.
-        return [...local, ...serverOnly].sort((a,b) => (b._archivedAt||0) - (a._archivedAt||0) || (b.number||0) - (a.number||0));
+        return [...local, ...serverOnly].sort(msgNewestFirst);
+}
+
+function currentFolderMessagesAll() {
+    if (currentFolder === 'archived') {
+        return [...inboxes.personal, ...inboxes.nts, ...inboxes.bulletins]
+                .filter(m => m._archived)
+                .sort((a,b) => (b._archivedAt || 0) - (a._archivedAt || 0) || b.number - a.number);
     }
+    if (currentFolder === 'sent') return inboxes.sent || [];
+
+    if (currentFolder.startsWith('custom:')) return customFolderMessages(currentFolder.substring(7));
 
     // Built-in inbox (personal/nts/bulletins): exclude archived AND
     // messages that have been moved to a custom folder.
@@ -4484,9 +4677,24 @@ function currentFolderMessages() {
     // custom Rule target) hides a message from this list.
     const src = inboxes[currentFolder] || [];
     if (currentFolder === 'bulletins') {
-        return src.filter(m => !m._archived &&
+        const loc = src.filter(m => !m._archived &&
             (!m._folder || m._folder.startsWith(BULLETIN_GROUP_PREFIX)) &&
             !isBulletinGroupMuted(bulletinGroupLabel(m)));
+        // v1.5.33: plus the database-only bulletins of each (unmuted)
+        // group folder. The Bulletins badge has always counted them, so
+        // without them here "Mark read" on everything shown couldn't
+        // clear the badge.
+        const seen = new Set(loc.map(m => m.number).filter(n => n != null));
+        const extra = [];
+        for (const n of customFolders) {
+            if (!n.startsWith(BULLETIN_GROUP_PREFIX) || isBulletinGroupMuted(n.slice(BULLETIN_GROUP_PREFIX.length))) continue;
+            for (const m of customFolderMessages(n)) {
+                if (!m._fromServer || (m.number != null && seen.has(m.number))) continue;
+                if (m.number != null) seen.add(m.number);
+                extra.push(m);
+            }
+        }
+        return extra.length ? [...loc, ...extra].sort(msgNewestFirst) : loc;
     }
     return src.filter(m => !m._archived && !m._folder);
 }
@@ -4514,6 +4722,11 @@ function renderList() {
     meta.textContent = filtered.length === list.length
         ? `${filtered.length} message${filtered.length === 1 ? '' : 's'}`
         : `${filtered.length} of ${list.length}`;
+    const hk = hiddenKilledCount();
+    if (hk) {
+        meta.textContent += ` · ${hk} killed on BBS hidden`;
+        meta.title = 'Preferences → "Show messages killed on the BBS" shows them';
+    } else meta.title = '';
 
     if (filtered.length === 0) {
         body.innerHTML = `<div style="padding:32px; text-align:center; color:var(--text-muted); font-size:13px;">
@@ -4551,7 +4764,7 @@ function renderList() {
                 <div class="row-subject">${escapeHtml(m.subject || '(no subject)')}${folderChip}</div>
                 <div class="row-meta">
                     <span>#${m.number}</span>
-                    <span>${m.status}</span>
+                    <span>${escapeHtml(m.status || m.type || '')}</span>
                     <span>${formatBytes(m.size)}</span>
                     ${m._stale ? '<span style="color:var(--new-flag)">⚠ killed on BBS</span>' : ''}
                 </div>
@@ -5012,6 +5225,21 @@ function unfileSelected() {
 function bulkMarkRead() {
     if (selectedSet.size === 0) return;
     const msgs = getSelectedMessages();
+    // v1.5.33: selected rows that exist only in the database (a folder's
+    // server copy this browser never fetched) aren't in the inboxes, so
+    // they were never marked and the folder's red badge stayed. Mark them
+    // in the folder cache now; the server is told below.
+    const localNums = new Set(msgs.map(m => m.number));
+    const serverOnly = currentFolderMessagesAll().filter(m => m._fromServer && m._serverId
+        && selectedSet.has(m.number) && !localNums.has(m.number));
+    for (const m of serverOnly) {
+        for (const name of Object.keys(serverFolderCache)) {
+            const e = (serverFolderCache[name] || []).find(sm => sm.id === m._serverId);
+            if (e) e._read = true;
+        }
+        if (m.number != null) localReadSet.add(m.number);
+        msgs.push(m);
+    }
     msgs.forEach(m => {
         if (m._unread) {
             m._unread = false;
