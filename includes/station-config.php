@@ -281,3 +281,50 @@ function bpq_pages_off(): array {
     }
     return $off;
 }
+
+/**
+ * v1.5.34: the station's backup status (Maintenance → Backups, System Audit).
+ *
+ * The dashboard doesn't make backups itself. Any backup script can report to
+ * it by writing a small JSON file (world-readable) when it finishes:
+ *   {"result":"ok"|"failed", "finished_at":"2026-11-09T08:21:40Z",
+ *    "last_ok_at":"2026-11-09T08:21:40Z", "message":"...", "snapshot":"11d6ec94",
+ *    "tool":"restic", "drive":"/mnt/backup", "keep":"30 daily + 12 weekly"}
+ * Path: config.php 'backup' => ['status_file' => ...]
+ * (default /var/lib/bpq-backup/status.json); 'max_age_hours' (default 36).
+ */
+function bpq_backup_status(): array {
+    $cfg  = bpq_config_section('backup');
+    $file = (string)($cfg['status_file'] ?? '/var/lib/bpq-backup/status.json');
+    $max  = max(1, (float)($cfg['max_age_hours'] ?? 36));
+    $out  = ['file' => $file, 'max_age_hours' => $max, 'present' => false, 'verdict' => 'missing'];
+    if (!@is_readable($file)) {
+        $out['why'] = @file_exists($file) ? 'not readable by the web server (chmod 644)' : 'no status file';
+        return $out;
+    }
+    $j = json_decode((string)@file_get_contents($file, false, null, 0, 65536), true);
+    if (!is_array($j)) { $out['why'] = 'status file is not valid JSON'; return $out; }
+    $out['present'] = true;
+    $keep = ['result', 'finished_at', 'last_ok_at', 'message', 'snapshot', 'tool', 'drive', 'keep', 'stored', 'size'];
+    foreach ($keep as $k) if (isset($j[$k]) && is_scalar($j[$k])) $out[$k] = substr((string)$j[$k], 0, 300);
+    $lastOk = isset($out['last_ok_at']) ? strtotime($out['last_ok_at']) : false;
+    $out['age_hours'] = $lastOk ? round((time() - $lastOk) / 3600, 1) : null;
+    $drive = (string)($out['drive'] ?? '');
+    if ($drive !== '' && @is_dir($drive)) {
+        $free = @disk_free_space($drive); $tot = @disk_total_space($drive);
+        if ($free !== false && $tot) {
+            $out['drive_free_gb']  = round($free / 1073741824, 1);
+            $out['drive_total_gb'] = round($tot / 1073741824, 1);
+            $out['drive_used_pct'] = round(100 - $free * 100 / $tot);
+        }
+        $out['drive_mounted'] = true;
+    } elseif ($drive !== '') {
+        $out['drive_mounted'] = false;
+    }
+    if (($out['result'] ?? '') === 'failed')            $out['verdict'] = 'failed';
+    elseif (!$lastOk)                                   $out['verdict'] = 'failed';
+    elseif ($out['age_hours'] > $max)                   $out['verdict'] = 'stale';
+    elseif (($out['drive_used_pct'] ?? 0) >= 90)        $out['verdict'] = 'full';
+    else                                                $out['verdict'] = 'ok';
+    return $out;
+}

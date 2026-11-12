@@ -1095,6 +1095,28 @@ def send_bbs_report(report_text, changes_count):
 # MAIN
 # ============================================================================
 
+def _linmail_lock(wait_secs=300):
+    """v1.5.35: one script at a time edits linmail.cfg (shared with
+    connect-watchdog.py). Waits up to wait_secs, then gives up."""
+    import fcntl
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cache', 'linmail.lock')
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fd = open(path, 'w')
+    except OSError:
+        return None
+    end = time.time() + wait_secs
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except OSError:
+            if time.time() > end:
+                print('Another script is changing linmail.cfg; try again later', file=sys.stderr)
+                sys.exit(0)
+            time.sleep(5)
+
+
 def main():
     parser = argparse.ArgumentParser(description='BPQ Propagation-Based Forwarding Scheduler')
     parser.add_argument('--apply', action='store_true', help='Apply changes to linmail.cfg')
@@ -1102,6 +1124,8 @@ def main():
     parser.add_argument('--partner', type=str, help='Only process specific partner callsign')
     parser.add_argument('--dry-run', action='store_true', help='Show what would change (default)')
     args = parser.parse_args()
+    if args.apply:
+        _LOCK = _linmail_lock()  # noqa: F841 — held until exit
 
     # Load settings.json overrides (if Dashboard Settings UI has been configured)
     apply_settings_json()

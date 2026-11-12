@@ -12,6 +12,8 @@
  *                                 body: {"current": "...", "new": "..."}
  *   GET  ?action=watch_get        System Logs: watched stations (+ last heard),
  *                                 live MHeard switch, BPQ ports (v1.5.26)
+ *   GET  ?action=backup_status    the station's last backup (v1.5.34), from the
+ *                                 status file a backup script writes
  *   POST ?action=watch_save       save them to data/system-logs.json
  *                                 body: {"watch": [{"call","port","hours"}], "live_mheard": bool}
  *
@@ -253,6 +255,10 @@ case 'admin_password':
     }
     if (function_exists('dashboardLog')) dashboardLog('info', "admin password changed for $user");
     out(['ok' => true, 'message' => "Password changed for $user. Your browser will ask you to log in again with the new password."]);
+
+case 'backup_status':   // v1.5.42
+    require_once dirname(__DIR__) . '/includes/station-config.php';
+    out(['ok' => true] + bpq_backup_status());
 
 case 'watch_get':   // v1.5.28
 case 'watch_save':

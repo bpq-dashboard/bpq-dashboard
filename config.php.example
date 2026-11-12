@@ -72,8 +72,14 @@ return [
     // ---- Message text saved to the database (message-bodies.timer) ----
     // Personal mail and NTS traffic always. Bulletins: 'all', 'pinned'
     // (only groups pinned 📌 in the Email Client) or 'none'.
+    // Bulletins are listed with "LL <bulletin_list_recent>" (newest messages
+    // of every type) on most runs and a full "LB" once every
+    // <bulletin_full_list_hours>: BPQ logs every line it sends, and a full
+    // LB every 5 minutes made a busy hub's BBS log 40-50 MB a day (v1.5.40).
     'messages' => [
-        'bulletin_text' => 'all',
+        'bulletin_text'            => 'all',
+        'bulletin_list_recent'     => 100,
+        'bulletin_full_list_hours' => 24,
     ],
 
     // ---- Database (MariaDB / MySQL) ----
@@ -154,6 +160,26 @@ return [
         'vara'           => true,   // VARA HF Terminal (bpq-vara)
         'vara_validator' => false,  // VARA callsign check (vara-validator), see 'vara_validator' below
     ],
+
+    // ---- Connect Watchdog (v1.5.35) ----
+    // scripts/connect-watchdog.py (root cron, every 5 min; Installation
+    // Manual §10.1) pauses an RF Forwarding Partner that doesn't answer.
+    // Defaults:
+    // 'watchdog' => [
+    //     'fail_count'  => 2,      // failed attempts in a row before a pause
+    //     'pause_hours' => 6,      // how long a pause lasts
+    //     'notify'      => true,   // BBS message on pause / resume (bbs.user / bbs.pass)
+    //     'notify_to'   => '',     // default: station.callsign
+    //     'exclude'     => [],     // never pause these, e.g. ['RMS']
+    // ],
+
+    // ---- Backups (v1.5.34) ----
+    // Maintenance → Backups and System Audit read the status file your
+    // backup script writes (Installation Manual §10.16). Defaults:
+    // 'backup' => [
+    //     'status_file'   => '/var/lib/bpq-backup/status.json',
+    //     'max_age_hours' => 36,
+    // ],
 
     // ---- System Logs (v1.5.22) ----
     // The MHeard tabs are named from the ID= lines of the PORT blocks in

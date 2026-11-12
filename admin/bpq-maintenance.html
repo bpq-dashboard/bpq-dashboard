@@ -374,6 +374,7 @@
   .editor-status.ok   { color: var(--green); background: var(--green-dim); }
   .editor-status.err  { color: var(--red);   background: rgba(248,81,73,0.1); }
   .editor-status.info { color: var(--muted); }
+  .editor-status.warn { color: var(--amber); background: var(--amber-dim); }
   /* v1.5.19: password and forms cards */
   .mini-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin: 10px 0; }
   .mini-form input { font-family: var(--mono); font-size: 0.8rem; padding: 6px 8px; border-radius: 5px;
@@ -523,7 +524,7 @@
 <body data-nav-page="maint">
 <!-- Shared navigation (loaded from /_nav.html via /bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-11-09-2"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-12-4"></script>
 
 <!--
   Maintenance reference — v1.5.19 (rebuilt 2026-10-03, checked against the code 2026-10-25)
@@ -536,7 +537,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.33 · updated November 2026
+    v1.5.42 · updated November 2026
   </div>
 </header>
 
@@ -567,7 +568,7 @@
     <button type="button" class="editor-btn reload" id="installReset">Reset to defaults</button></p>
 </details>
 
-<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#optional-pages">Optional pages</a><a href="#firewall-setup">Firewall setup</a><a href="#homefolder">LinBPQ in a home folder</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#watch">Watched stations</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#wp">Winlink White Pages clean-up</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
+<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#optional-pages">Optional pages</a><a href="#firewall-setup">Firewall setup</a><a href="#homefolder">LinBPQ in a home folder</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#watch">Watched stations</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#wp">Winlink White Pages clean-up</a><a href="#watchdog">Connect Watchdog</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#backup">Backups</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
 
 <div class="section" id="health">
   <h2 class="section-title green">Health check — is everything running?</h2>
@@ -938,7 +939,7 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
     </div><div class="cmd-tag blue">diagnose</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>systemctl list-timers message-bodies.timer <span class="flag">--no-pager</span>; <span class="sudo">sudo</span> journalctl <span class="flag">-u</span> message-bodies.service <span class="flag">-n</span> 12 <span class="flag">--no-pager</span></code>
-      <div class="cmd-label">The job that saves message text every 5 minutes, whether or not the Email Client is open. Each run ends with one line: listed, <span class="kw">text saved</span>, <span class="kw">not on BBS</span>, <span class="kw">number reused</span>, errors. Details per message: <span class="kw">/var/log/bpq-dashboard/message-bodies.log</span> (v1.5.19; was <span class="kw">logs/</span>). Bulletins saved: config.php <span class="kw">'messages' =&gt; ['bulletin_text' =&gt; 'all']</span> (or <span class="kw">'pinned'</span>, <span class="kw">'none'</span>).</div>
+      <div class="cmd-label">The job that saves message text every 5 minutes, whether or not the Email Client is open. Each run ends with one line: listed (with <span class="kw">(LL 100)</span>, or <span class="kw">(LB)</span> on the once-a-day full bulletin list, v1.5.42), <span class="kw">text saved</span>, <span class="kw">not on BBS</span>, <span class="kw">number reused</span>, errors. Details per message: <span class="kw">/var/log/bpq-dashboard/message-bodies.log</span> (v1.5.19; was <span class="kw">logs/</span>). Bulletins saved: config.php <span class="kw">'messages' =&gt; ['bulletin_text' =&gt; 'all']</span> (or <span class="kw">'pinned'</span>, <span class="kw">'none'</span>).</div>
     </div><div class="cmd-tag cyan">status</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> systemd-run <span class="flag">--uid=</span>www-data <span class="flag">--gid=</span>www-data <span class="flag">--unit=</span>message-bodies-backfill php <var data-v="root">/var/www/bpq-dashboard</var>/scripts/fetch-message-bodies.php <span class="flag">--backfill</span>; <span class="sudo">sudo</span> journalctl <span class="flag">-u</span> message-bodies-backfill <span class="flag">-f</span></code>
@@ -1178,9 +1179,32 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
   </div>
 </div>
 
+<div class="section" id="watchdog">
+  <h2 class="section-title green">Connect Watchdog — pause a hub that doesn't answer (optional)</h2>
+  <p class="intro">v1.5.35. <span class="kw">scripts/connect-watchdog.py</span> watches the partners on RF Connections → <b>RF Forwarding Partners</b> (<span class="kw">data/stations/partners.json</span>). After <b>2 failed forwarding attempts in a row</b> it pauses that partner for <b>6 hours</b> (<span class="kw">Enabled = 0</span> in <span class="kw">linmail.cfg</span>; its mail waits in the queue), then enables it again. A good session, including the partner calling you, resets the count, and ends a pause early (v1.5.38). Only attempts that went on the air and got no answer count; one stopped by your own busy port (<i>Error - Port in use</i>) or that ended in the same second doesn't. Each change restarts LinBPQ for a few seconds (all changes in one run share one restart, and a run with forwarding in progress waits). The tiles on RF Connections show ⏸ <i>Paused until …</i> and ⚠ failed attempts. You get a BBS message on each pause and resume (<span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span>, to <span class="kw">station.callsign</span>). Settings: config.php <span class="kw">'watchdog' =&gt; ['fail_count' =&gt; 2, 'pause_hours' =&gt; 6, 'exclude' =&gt; []]</span>. Installation Manual §10.1.</p>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py <span class="flag">--status</span></code>
+      <div class="cmd-label">Each partner: its block in linmail.cfg, Enabled, watching / paused / disabled, failed attempts in a row, last good session and when a pause ends. <i>not in linmail</i>: the tile's call has no forwarding block of that name (N3MEL-2 looks for <span class="kw">N3MEL</span>); <i>disabled</i>: off in BPQ by you, left alone.</div>
+    </div><div class="cmd-tag blue">status</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py <span class="flag">--dry-run</span></code>
+      <div class="cmd-label">A normal run that changes nothing: says what it would pause or enable.</div>
+    </div><div class="cmd-tag blue">dry run</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py <span class="flag">--resume</span> N3MEL</code>
+      <div class="cmd-label">Enable a paused partner now (<span class="kw">--resume all</span> for every paused one). <span class="kw">--pause N3MEL --hours 6</span> pauses one by hand. Both restart LinBPQ.</div>
+    </div><div class="cmd-tag green">resume</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> crontab <span class="flag">-l</span> | grep connect-watchdog; <span class="sudo">sudo</span> tail <span class="flag">-20</span> /var/log/bpq-dashboard/connect-watchdog.log</code>
+      <div class="cmd-label">Scheduled? It runs from root's crontab every 5 minutes: <span class="kw">*/5 * * * * /usr/bin/python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py</span> (root: it edits linmail.cfg and restarts LinBPQ). The log shows each run's decision. Also in Admin → Log Viewer.</div>
+    </div><div class="cmd-tag amber">schedule + log</div></div>
+  </div>
+</div>
+
 <div class="section" id="prop">
   <h2 class="section-title green">Propagation scheduler &amp; storm monitor (optional)</h2>
-  <p class="intro">Both rewrite forwarding schedules in <span class="kw">linmail.cfg</span>: the scheduler by band conditions, the storm monitor by Kp index. Both read the partner list from <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/data/partners.json</span> (edited below), then <span class="kw">data/settings.json</span>, which <b>overrides</b> it and their own settings when present. <span class="kw">settings.json</span> is what the <b>⚙ Dashboard Settings</b> button in this menu bar edits (admin pages only, BBS password); <b>Save All</b> writes every tab, so fill them all in first. Skip this section if neither is scheduled (<span class="kw">sudo crontab -l | grep -E "prop-scheduler|storm-monitor"</span>).</p>
+  <p class="intro">Both rewrite forwarding schedules in <span class="kw">linmail.cfg</span>: the scheduler by band conditions, the storm monitor by Kp index. Since v1.5.35 they and the <a href="#watchdog">Connect Watchdog</a> take turns through <span class="kw">cache/linmail.lock</span> (the scheduler and storm monitor wait up to 5 minutes for it), so two of them never rewrite the file at once. Both read the partner list from <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/data/partners.json</span> (edited below), then <span class="kw">data/settings.json</span>, which <b>overrides</b> it and their own settings when present. <span class="kw">settings.json</span> is what the <b>⚙ Dashboard Settings</b> button in this menu bar edits (admin pages only, BBS password); <b>Save All</b> writes every tab, so fill them all in first. Skip this section if neither is scheduled (<span class="kw">sudo crontab -l | grep -E "prop-scheduler|storm-monitor"</span>).</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code>python3 <span class="flag">-m</span> py_compile <var data-v="root">/var/www/bpq-dashboard</var>/scripts/prop-scheduler.py <var data-v="root">/var/www/bpq-dashboard</var>/scripts/storm-monitor.py &amp;&amp; echo OK</code>
@@ -1399,6 +1423,37 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
   </div>
 </div>
 
+<div class="section" id="backup">
+  <h2 class="section-title cyan">Backups — last backup of this station</h2>
+  <p class="intro"><b>Optional, recommended.</b> v1.5.42: set up a nightly backup of this station (LinBPQ, databases, dashboard, system settings) to a separate drive with <span class="kw">sudo bash <var data-v="root">/var/www/bpq-dashboard</var>/scripts/bpq-backup-setup.sh</span> (never formats a drive; Installation Manual §10.16). This section shows what the backup reports — the dashboard's own or any script of yours. A script reports by writing a small JSON file when it finishes (default <span class="kw">/var/lib/bpq-backup/status.json</span>, readable by everyone; format and an example in the Installation Manual §10.16). Flagged when the last good backup is older than 36 hours (<span class="kw">'backup' =&gt; ['max_age_hours' =&gt; 36]</span> in config.php), when the last run failed, or when the backup drive is 90% full. System Audit has the same check.</p>
+  <div class="cmd note"><div class="cmd-inner">
+    <div class="note-head">Last backup</div>
+    <div class="kv" id="bkInfo">Checking…</div>
+    <div class="mini-row">
+      <button class="editor-btn reload" type="button" onclick="bkLoad()">⟳ Check again</button>
+      <span class="editor-status info" id="bkLine" role="status"></span>
+    </div>
+  </div><div class="cmd-tag cyan">backup</div></div>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> systemctl list-timers <span class="flag">--all</span> | grep <span class="flag">-i</span> backup; <span class="sudo">sudo</span> tail <span class="flag">-20</span> /var/log/<i>your-backup</i>.log</code>
+      <div class="cmd-label">When the backup runs next and what its last run said (use your script's timer and log names). "Older than 36 h": the timer didn't run (server off at that time catches up at boot only with <span class="kw">Persistent=true</span>) or the run failed; the log's last lines say why. "Drive not mounted": plug it in, then <span class="kw">sudo mount /mnt/backup</span>.</div>
+    </div><div class="cmd-tag blue">schedule + log</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> bash <var data-v="root">/var/www/bpq-dashboard</var>/scripts/bpq-backup-setup.sh</code>
+      <div class="cmd-label">Optional (v1.5.42): set up — or change — the nightly backup. Asks for the mounted backup folder, installs restic if needed, makes the password (write it down), creates the store and the timer, and runs the first backup. Never formats a drive; preparing one: Manual §10.16.</div>
+    </div><div class="cmd-tag green">set up</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> systemctl start bpq-backup.service; <span class="sudo">sudo</span> tail <span class="flag">-5</span> /var/log/bpq-dashboard/backup.log</code>
+      <div class="cmd-label">Run a backup now and see how it ended (<span class="kw">OK</span>, or <span class="kw">FAILED: …</span> with the reason). Settings: <span class="kw">/etc/bpq-dashboard/backup.conf</span>. Off: <span class="kw">sudo systemctl disable --now bpq-backup.timer</span>.</div>
+    </div><div class="cmd-tag blue">run now</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> cat /var/lib/bpq-backup/status.json; ls <span class="flag">-l</span> /var/lib/bpq-backup/status.json</code>
+      <div class="cmd-label">The report itself. It must be readable by the web server (<span class="kw">-rw-r--r--</span>); "not readable": <span class="kw">sudo chmod 644 /var/lib/bpq-backup/status.json</span> and make the script write it that way.</div>
+    </div><div class="cmd-tag cyan">status file</div></div>
+  </div>
+</div>
+
 <div class="section" id="update">
   <h2 class="section-title cyan">Install check, updates &amp; backups</h2>
   <p class="intro">Rules that have saved this install before: back up before you change anything, back up with <span class="kw">cp -n</span> so a second run can't overwrite a good backup, and never leave backups in the web root.</p>
@@ -1511,6 +1566,8 @@ cd bpq-dashboard-<span id="verLatest2">X.Y.Z</span> &amp;&amp; <span class="sudo
     <div class="paths-row"><div class="paths-key">nginx site</div><div class="paths-val">/etc/nginx/sites-enabled/bpq-dashboard</div></div>
     <div class="paths-row"><div class="paths-key">LinBPQ</div><div class="paths-val"><var data-v="linbpq">/opt/linbpq</var>/  (bpq32.cfg, linmail.cfg, WP.cfg)</div></div>
     <div class="paths-row"><div class="paths-key">BPQ logs</div><div class="paths-val"><var data-v="root">/var/www/bpq-dashboard</var>/logs/  (link to LinBPQ's log folder)</div></div>
+    <div class="paths-row"><div class="paths-key">RF Connections BBS lines</div><div class="paths-val"><var data-v="root">/var/www/bpq-dashboard</var>/cache/bbs-lines/ — the lines RF Connections needs from each day's BBS log (v1.5.39), kept so a day's log is read once. Safe to delete; it is rebuilt.</div></div>
+    <div class="paths-row"><div class="paths-key">Connect Watchdog</div><div class="paths-val"><var data-v="root">/var/www/bpq-dashboard</var>/cache/watchdog-state.json (state) · cache/linmail.lock (shared with the scheduler and storm monitor) · <var data-v="linbpq">/opt/linbpq</var>/linmail.cfg.watchdog.bak (copy before its last change) · /var/log/bpq-dashboard/connect-watchdog.log. See <a href="#watchdog">Connect Watchdog</a>.</div></div>
     <div class="paths-row"><div class="paths-key">Parser schedule</div><div class="paths-val">/etc/cron.d/bpq-dashboard</div></div>
     <div class="paths-row"><div class="paths-key">Admin sudo rules</div><div class="paths-val">/etc/sudoers.d/www-data-tools (copy of www-data-tools.sudoers)</div></div>
     <div class="paths-row"><div class="paths-key">Parser logs</div><div class="paths-val">/var/log/bpq-dashboard/</div></div>
@@ -2044,6 +2101,32 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
       (wsPorts.length ? '' : ' <b>No BPQ ports found</b>: the web server can\'t read bpq32.cfg at <span class="kw">paths.linbpq</span>; "any port" still works.') +
       (j.db === false ? ' (Last heard needs the database.)' : '');
   }
+  // v1.5.34: last backup (status file written by the station's backup script)
+  window.bkLoad = async function () {
+    const info = document.getElementById('bkInfo'), line = document.getElementById('bkLine');
+    if (!info) return;
+    const j = await call('backup_status', 'GET');
+    if (!j.ok) { info.textContent = j.error || 'Not available'; setSt(line, 'err', 'Check failed'); return; }
+    if (!j.present) {
+      info.innerHTML = 'No backup reported: <b>' + esc(j.file) + '</b> — ' + esc(j.why || '') + '.';
+      setSt(line, 'info', 'Optional: sudo bash ' + ((document.getElementById('v-root') || {}).value || '<web root>') + '/scripts/bpq-backup-setup.sh (Manual §10.16)');
+      return;
+    }
+    const age = j.age_hours == null ? '' : (j.age_hours < 1 ? ' (less than an hour ago)' : j.age_hours < 48 ? ' (' + Math.round(j.age_hours) + ' h ago)' : ' (' + Math.round(j.age_hours / 24) + ' days ago)');
+    const rows = [];
+    rows.push('Last good backup: <b>' + (j.last_ok_at ? esc(fmtDate(j.last_ok_at)) + esc(age) : 'none recorded') + '</b>');
+    if (j.finished_at && j.finished_at !== j.last_ok_at) rows.push('Last run: ' + esc(fmtDate(j.finished_at)) + ' — <b>' + esc(j.result || '?') + '</b>' + (j.message ? ': ' + esc(j.message) : ''));
+    else if (j.message) rows.push('Last run: ' + esc(j.message));
+    if (j.snapshot || j.tool) rows.push('Snapshot: ' + esc([j.tool, j.snapshot].filter(Boolean).join(' ')) + (j.keep ? ' · keeps ' + esc(j.keep) : ''));
+    if (j.drive) rows.push('Drive: ' + esc(j.drive) + (j.drive_mounted === false ? ' — <b>not mounted</b>'
+        : j.drive_free_gb != null ? ' — ' + esc(j.drive_used_pct) + '% used, ' + esc(j.drive_free_gb) + ' GB free of ' + esc(j.drive_total_gb) + ' GB' : ''));
+    info.innerHTML = rows.join('<br>');
+    const v = j.verdict;
+    setSt(line, v === 'ok' ? 'ok' : v === 'failed' ? 'err' : 'warn',
+      v === 'ok' ? 'Up to date' : v === 'stale' ? 'Older than ' + j.max_age_hours + ' h — check the backup' : v === 'full' ? 'Backup drive nearly full' : 'Last backup failed');
+  };
+  bkLoad();
+
   window.wsLoad = async function () {
     const st = document.getElementById('wsStatus');
     const j = await call('watch_get', 'GET');

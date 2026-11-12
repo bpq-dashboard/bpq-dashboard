@@ -394,7 +394,7 @@
 <body class="min-h-screen" data-nav-page="system">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="bpq-nav-loader.js?v=2026-11-09-2"></script>
+<script src="bpq-nav-loader.js?v=2026-11-12-4"></script>
 
     <!-- Modern Navigation with gradient -->
     
@@ -406,7 +406,7 @@
                     <div class="text-center flex-1">
                         <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                             <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">System Logs</h1>
-                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.33</span>
+                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.42</span>
                         </div>
                         <p class="text-gray-600 text-sm sm:text-lg">Real-time event monitoring</p>
                         <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -1110,8 +1110,11 @@
 
         async function loadSystemLogs() {
             allLogs = [];
+            // v1.5.41: the database stats don't need the raw lines, so start
+            // them now and let them fill in while the log viewer loads.
+            usedSystemLogsApiData = false;
+            const statsPromise = DATA_MODE === 'live' ? loadSystemLogsStatsFromApi(selectedDays) : Promise.resolve(false);
 
-            
             try {
                 if (DATA_MODE === 'live') {
                     let filesLoaded = 0;
@@ -1139,6 +1142,22 @@
                         }
                     }
                     
+                    // v1.5.41: the newest lines, read from the end of the files
+                    // on the server (instead of downloading whole daily logs,
+                    // 40-50 MB each on a busy hub, ten at a time).
+                    if (filesLoaded === 0 && USE_SYSTEM_LOGS_API) {
+                        try {
+                            updateStatus('loading', 'Loading recent log lines...');
+                            const r = await fetch(SYSTEM_LOGS_API_URL + '?action=lines&limit=' + MAX_LOG_ENTRIES_TO_LOAD + '&t=' + Date.now(), { cache: 'no-store' });
+                            if (r.ok && (r.headers.get('Content-Type') || '').startsWith('text/plain')) {
+                                const lines = (await r.text()).split('\n');
+                                for (const l of lines) if (l.trim().length > 0) allLogs.push(l);
+                                totalLines = allLogs.length;
+                                filesLoaded = totalLines > 0 ? 1 : 0;
+                            }
+                        } catch (e) { console.warn('[System Logs] lines API failed, reading the files: ' + e.message); }
+                    }
+
                     // If main file not loaded, try daily log files (log_YYMMDD_BBS.txt)
                     if (filesLoaded === 0) {
                         const filesToLoad = LOG_FILES.length > 0 ? LOG_FILES : generateLogFileList();
@@ -1264,8 +1283,7 @@
                 // `allLogs` is still loaded above regardless (the log viewer
                 // stays file-based either way) — this only short-circuits
                 // the expensive stats computation.
-                usedSystemLogsApiData = false;
-                const apiOk = await loadSystemLogsStatsFromApi(selectedDays);
+                const apiOk = await statsPromise;   // started at the top (v1.5.41)
 
                 if (!apiOk) {
                     // Parse all logs for accurate statistics
@@ -2930,7 +2948,7 @@
             doc.setTextColor(150);
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
-            doc.text(`BPQ Dashboard v1.5.33 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            doc.text(`BPQ Dashboard v1.5.42 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
             
             // Generate filename
             const dateStr = new Date().toISOString().slice(0, 10);

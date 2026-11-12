@@ -18,7 +18,7 @@
     'use strict';
 
     // Cache-busting query param — bump when _nav.html changes.
-    var NAV_VERSION = '2026-11-09-2';   // 1.5.33: must equal the ?v= on every page's script tag (System Audit checks it)
+    var NAV_VERSION = '2026-11-12-4';   // 1.5.42: must equal the ?v= on every page's script tag (System Audit checks it)
 
     // Page keys that live inside the Admin dropdown — used to also light up
     // the Admin button when one of these pages is active.

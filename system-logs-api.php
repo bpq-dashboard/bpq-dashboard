@@ -42,6 +42,10 @@
  *   ?action=internet_stations
  *      Cumulative non-RF-connected stations (sys_internet_stations).
  *
+ *   ?action=lines[&limit=N]       (v1.5.41) the newest N lines (default 100000)
+ *                                 of the BBS logs, oldest first, as plain text,
+ *                                 read from the end of each day's file. For
+ *                                 the raw log viewer; no database needed.
  *   ?action=all[&days=N]
  *      Convenience — stats + hourly + top_stations + errors + rms +
  *      tcp + the three snapshots + internet_stations in one round-trip.
@@ -335,6 +339,10 @@ $valid_actions = [
     'tcp', 'nodesrtt', 'mheard', 'rtknown', 'internet_stations', 'all',
 ];
 $action = (string)($_GET['action'] ?? 'all');
+if ($action === 'lines') {           // v1.5.41: raw log viewer, straight from the files
+    action_lines();
+    exit;
+}
 if (!in_array($action, $valid_actions, true)) {
     $action = 'all';
 }
@@ -363,4 +371,43 @@ try {
     success($data);
 } catch (PDOException $e) {
     bail(500, 'Query failed: ' . $e->getMessage());
+}
+
+/**
+ * v1.5.42 — the raw log viewer's lines. The page used to download whole
+ * daily BBS logs, ten at a time, until it had 100,000 lines: on a busy hub
+ * (40-50 MB a day) that was hundreds of MB before the first line showed.
+ * This reads backwards from the end of today's log, then yesterday's, and so
+ * on (at most 90 days), and returns only the newest `limit` lines, oldest
+ * first, as the page has always sorted them.
+ */
+function action_lines(): void {
+    $limit = intparam('limit', 100000, 1000, 200000);
+    $dir = __DIR__ . '/logs';
+    $out = [];                               // newest first while collecting
+    $today = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    for ($d = 0; $d < 90 && count($out) < $limit; $d++) {
+        $f = $dir . '/log_' . $today->modify("-$d days")->format('ymd') . '_BBS.txt';
+        if (!is_readable($f) || ($size = filesize($f)) === 0) continue;
+        $fh = fopen($f, 'rb');
+        $pos = $size; $carry = '';
+        while ($pos > 0 && count($out) < $limit) {
+            $n = min(1048576, $pos);
+            $pos -= $n;
+            fseek($fh, $pos);
+            $chunk = fread($fh, $n) . $carry;
+            $parts = explode("\n", $chunk);
+            $carry = $pos > 0 ? array_shift($parts) : '';   // may be a partial line
+            for ($i = count($parts) - 1; $i >= 0 && count($out) < $limit; $i--) {
+                $l = rtrim($parts[$i], "\r");
+                if (trim($l) !== '') $out[] = $l;
+            }
+        }
+        if ($carry !== '' && count($out) < $limit && trim($carry) !== '') $out[] = rtrim($carry, "\r");
+        fclose($fh);
+    }
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('X-Lines: ' . count($out));
+    for ($i = count($out) - 1; $i >= 0; $i--) echo $out[$i], "\n";
 }

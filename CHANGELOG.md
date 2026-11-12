@@ -4,6 +4,224 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.42] - 2026-11-12
+
+### Added
+- **Nightly station backups for every sysop: optional, recommended**
+  (K1AJD). Generalised from ARSSYSTEM's own backup.
+  - `scripts/bpq-backup-setup.sh` (run as root, any time) explains that the
+    backup is optional, installs restic if needed, asks for the mounted
+    backup folder (warns if it's on the system disk), reads the LinBPQ
+    folder from config.php and finds the `bpq`/`linbpq` service, makes and
+    shows the password once, creates the store
+    (`<drive>/restic-<hostname>`), writes `/etc/bpq-dashboard/backup.conf`
+    (600), installs and enables `bpq-backup.timer` (nightly ~03:15,
+    Persistent) and offers the first run. It never formats a drive.
+  - `scripts/bpq-backup.sh` (the nightly run): LinBPQ's folder copied with
+    LinBPQ stopped for a few seconds, `mysqldump --all-databases`, the
+    dashboard, /etc, /root, /home, /opt, /usr/local/{bin,sbin}, crontabs,
+    and lists of packages / enabled units / firewall rules; keeps 30 daily,
+    12 weekly, 6 monthly; `restic check` 5% on Sundays; writes
+    `/var/lib/bpq-backup/status.json`, so Maintenance → Backups and System
+    Audit show it. Log `/var/log/bpq-dashboard/backup.log`.
+  - `bpq-backup.service` / `bpq-backup.timer` (only start once
+    backup.conf exists).
+  - The installer's new last step (STEP 17) offers it with default **No**,
+    and the summary repeats the command; `update.sh` ends with a reminder
+    while no backup reports; System Audit's Info line gives the command.
+- Installation Manual §10.16 rewritten (the tool, preparing a drive with a
+  `nofail` fstab line, checking and restoring, your own script), §3 and
+  the installer questions table; User Guide §19, §22, §24 (*Nightly
+  backup*), §26; Maintenance *Backups* (set-up and run-now commands).
+  NAV_VERSION 2026-11-12-4.
+- Nothing to do by hand to update. ARSSYSTEM keeps its own `ars-backup`
+  (it already reports to the dashboard), so don't run the setup there.
+
+## [1.5.41] - 2026-11-12
+
+### Fixed
+- **System Logs took a long time to load** (K1AJD). The cards were already
+  database-backed, but the page first downloaded whole daily BBS logs, ten
+  in parallel, until it had 100,000 lines for the Live Log Viewer, and only
+  then asked the database for the cards. On ARSSYSTEM a day's log is
+  40–50 MB, so a batch of ten was hundreds of MB.
+  - The database request now starts first and the cards fill in at once.
+  - New `system-logs-api.php?action=lines&limit=N` (no database needed):
+    the newest N lines (default 100,000), read backwards from the end of
+    today's log and earlier days (at most 90), returned oldest-first as
+    plain text. The viewer uses it, and falls back to the files if the API
+    isn't there. Test: 50,000 lines across two days in 29 ms.
+  - A database table for raw log lines was considered and not built: the
+    files are the source, a busy hub writes hundreds of thousands of lines a
+    day, and the viewer only needs the newest ones.
+- User Guide §14 Tips. NAV_VERSION 2026-11-12-3.
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.40] - 2026-11-12
+
+### Fixed
+- **BPQ's BBS log grew 40–50 MB a day** (K1AJD: 472,444 of 490,545 lines
+  on 2026-11-11 were the BBS sending to K1AJD-4). `message-bodies.timer`
+  listed Bulletins with `LB` every 5 minutes; BPQ answers `LB` with the
+  whole bulletin list (~1,640 lines) and logs every line it sends. Most
+  runs now use `LL <n>` (the newest n messages of every type; bulletins
+  kept), with a full `LB` once a day and on `--backfill`. New config.php
+  `messages.bulletin_list_recent` (default 100) and
+  `messages.bulletin_full_list_hours` (24); state in
+  `cache/message-bodies-listing.json`. The summary line names the listing
+  used. `LB <n>` isn't supported by BPQ (tested on K1AJD: no output).
+- NAV_VERSION 2026-11-12-2. Installation Manual *Message text* paragraph, User Guide §24,
+  Maintenance *Messages*, config.php.example.
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.39] - 2026-11-12
+
+### Fixed
+- **RF Connections: 7 / 30 / 90 Days took a long time to fill in** (K1AJD).
+  For each day of the period the page downloaded the whole BPQ BBS log
+  (`log_YYMMDD_BBS.txt`) and re-read it in the browser. On ARSSYSTEM those
+  are 40–50 MB a day, 1.3 GB for 30 days, of which the page uses a few
+  hundred KB: RADIO commands, *Incoming Connect … Freq*, channel busy /
+  port in use / session attached / *Failure with*, and FA/FB/FF/FC lines.
+  New `rf-connections-api.php?action=bbslines&file=log_YYMMDD_BBS.txt`
+  returns only those lines, cached in `cache/bbs-lines/` and extended as
+  today's log grows (each log is read once; a partly written last line
+  waits for the next request). Falls back to filtering on the fly if the
+  cache folder isn't writable, and to the raw file if the API fails. Test:
+  a 48 MB log → 343 KB, 0.5 s the first time, 7 ms after.
+- User Guide §12 (At the top), Maintenance *Key paths*. NAV_VERSION
+  2026-11-12-1.
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.38] - 2026-11-11
+
+### Changed
+- **Connect Watchdog: a paused partner that connects ends its pause**
+  (K1AJD). A good session with a paused partner (usually it calls us)
+  re-enables it at the next run, within 5 minutes, with a *"forwarding
+  resumed early"* BBS message. KK4DIV-1 called in three times on
+  2026-11-11 while paused and still waited out its 6 hours.
+
+### Fixed
+- **Long good sessions were thrown away:** an attempt was dropped as "never
+  ended" 15 minutes after its *start*, so a 15-minute exchange (KK4DIV
+  01:15–01:31Z) never reset the failed count. Now measured from its last
+  line, and a session that had answered always counts as good.
+- **Attempts that never went on the air counted as failures:** `Connecting
+  to BBS N4SFL` / `N4SFL Disconnected` in the same second (12:00 and 12:04Z,
+  just after the 11:50 resume; KK4DIV 12:04) paused KK4DIV and N4SFL again
+  at 12:10Z. A failure now needs a failure message from the modem/node
+  (*Failure with*, *Can't connect*, *Timeout*…) or the connect command plus
+  20 s without an answer. A real failure after an ELSE that hit a busy port
+  still counts.
+- **BBS notices never sent** (*"no BBS prompt after login"*): the login now
+  works like `scripts/poll-mheard.php` (answers telnet option requests,
+  CR LF, waits for the greeting); a failure logs the BBS's last words
+  (password masked).
+- Replayed on 2026-11-10/11 logs: only N4SFL's real failures (05:35, 05:46Z)
+  pause anything.
+- Installation Manual §10.1, User Guide §12 / §26, Maintenance *Connect
+  Watchdog*. NAV_VERSION 2026-11-11-1.
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.37] - 2026-11-10
+
+### Fixed
+- **Connect Watchdog counted attempts that weren't the partner's fault**
+  (K1AJD, from his 2026-11-10 BBS log; tiles showed KK4DIV-1 and KD4WLE-3
+  with 1 failed attempt).
+  - `Error - Port in use`: at 23:11Z BPQ tried KD4WLE and KK4DIV while
+    N4SD-11's session on the VARA port was ending, so both attempts stopped
+    at our own port. Such attempts (and `CHANNEL BUSY`) are no longer
+    counted either way.
+  - The partner calling us is logged under its full call (`KK4DIV-1`,
+    `N4SD-11`, `KD4WLE-3`) while its linmail.cfg block is `KK4DIV`; those
+    good sessions were ignored, so they never reset the count. Lines are
+    now matched on the base call (one good event per incoming session).
+  - Replayed on that day's log: all five partners end at 0 failed; N4SFL's
+    real run of `VARA} Failure with N4SFL-1` (06:26–13:17Z) would have
+    paused it at 06:37Z, as intended.
+- Installation Manual §10.1 (what counts), What's New. NAV_VERSION
+  2026-11-10-3.
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+  The tiles correct themselves on the watchdog's next run.
+
+## [1.5.36] - 2026-11-10
+
+### Added
+- **System Audit: Connect Watchdog checks** (K1AJD). OK running / Info with
+  each paused partner and its resume time / Warn if its state is older
+  than 30 minutes (not running) / Warn for RF Forwarding Partners with no
+  linmail.cfg entry (not watched). Only once the watchdog has run.
+- Docs for the v1.5.35 watchdog everywhere it applies: User Guide §22
+  (audit), §24 (*Forwarding tools*: watchdog, scheduler, storm monitor,
+  the shared lock), §25 (`watchdog` settings), §26 (its BBS messages and
+  log lines); Installation Manual §12 *Forwarding to one partner stopped*,
+  §10.1 cross-references; Maintenance *Key paths* row and a note in
+  *Propagation scheduler & storm monitor* about the lock; Log Viewer
+  descriptions.
+- `NAV_VERSION` 2026-11-10-2 (Guide PDF link).
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
+## [1.5.35] - 2026-11-10
+
+### Changed
+- **Connect Watchdog rewritten** (K1AJD): pause a hub that doesn't answer.
+  `scripts/connect-watchdog.py` now watches RF Connections → RF Forwarding
+  Partners (`data/stations/partners.json`; N3MEL-2 → linmail.cfg block
+  N3MEL) instead of a list inside the script. After **2 failed forwarding
+  attempts in a row** it sets `Enabled = 0` for **6 hours**, then
+  `Enabled = 1`; a good session (either direction) resets the count.
+  - Failed vs good is read from the BBS log per attempt (from
+    "Connecting to BBS", including the ConnectScript's ELSE steps):
+    good when the partner answered (SID, FS/FF/FQ/FA/FC, "Connected to").
+    Before, any session under 2 minutes counted as a failure, so a quick
+    successful exchange could pause a partner.
+  - One LinBPQ restart per run for all changes, put off while a
+    forwarding session is in progress; `linmail.cfg.watchdog.bak`.
+  - Manual `--resume` / `--pause` now restart LinBPQ (before, they wrote
+    linmail.cfg while LinBPQ ran, which LinBPQ then overwrote on its next
+    stop). New `--dry-run`; `--status` shows each partner's block, Enabled,
+    failed count and pause end.
+  - BBS messages use config.php `bbs` (they never sent before: a missing
+    import was swallowed). Settings in config.php `watchdog`
+    (`fail_count`, `pause_hours`, `notify`, `notify_to`, `exclude`;
+    config.php.example).
+  - A partner you disabled yourself is left alone; one you re-enable by
+    hand clears its pause.
+  - Cron runs write only to its log (no output every 5 minutes).
+- **RF Forwarding Partners tiles** show ⏸ *Paused until HH:MMZ* (red tile)
+  and ⚠ *N failed attempts* (`rf-connections-api.php?action=watchdog`,
+  from `cache/watchdog-state.json`).
+- **`cache/linmail.lock`**: the watchdog, `prop-scheduler.py --apply` and
+  `storm-monitor.py` take turns editing linmail.cfg.
+- Admin → Maintenance → **Connect Watchdog** section; Install Check's
+  suggested cron line updated. Installation Manual §10.1 rewritten; User
+  Guide §12 (RF Forwarding Partners), §19, §27.
+- `NAV_VERSION` 2026-11-10-1.
+- To use it: `sudo bash update.sh --web-root /var/www/tprfn`, then add the
+  cron line in §10.1 to root's crontab (it isn't scheduled by the update).
+
+## [1.5.34] - 2026-11-09
+
+### Added
+- **Admin → Maintenance → Backups: the station's last backup** (K1AJD).
+  The dashboard doesn't make backups; a backup script reports by writing
+  `/var/lib/bpq-backup/status.json` (result, finished_at, last_ok_at,
+  message, snapshot, tool, drive, keep). The section shows the last good
+  backup and its age, a failed run's reason, and the drive's free space:
+  green up to date, amber older than 36 h or drive ≥ 90% full, red failed.
+  Same check in **System Audit** (Info when nothing reports). New
+  `includes/station-config.php` `bpq_backup_status()`,
+  `maintenance-api.php?action=backup_status`, optional config.php
+  `'backup' => ['status_file', 'max_age_hours']` (config.php.example).
+- **Installation Manual §10.16** *Backing up the station*: what to back up
+  on a packet station, restic, nofail mounts, testing a restore, and the
+  status file format with a bash example. User Guide §19 (Backups) and
+  §22 (Backups check).
+- `NAV_VERSION` 2026-11-09-3 (Guide PDF link).
+- Nothing to do by hand: `sudo bash update.sh --web-root /var/www/tprfn`.
+
 ### Docs
 - README and Installation Manual §4: the quick-install `wget` line still
   downloaded `v1.5.26.zip`, a tag that was never published (404), then

@@ -495,3 +495,11 @@ cat <<EOF
   Backup and log: $BK
   Undo:           sudo bash $SRC/update.sh --rollback $BK
 EOF
+# v1.5.42: point out the optional station backup until something reports one
+if [[ ! -r /etc/bpq-dashboard/backup.conf && ! -s /var/lib/bpq-backup/status.json ]]; then
+    cat <<EOF
+
+  ${YLW}Optional, recommended:${NC} this station has no nightly backup. With a backup
+  drive mounted: ${BOLD}sudo bash $WEB_ROOT/scripts/bpq-backup-setup.sh${NC}  (Manual §10.16)
+EOF
+fi

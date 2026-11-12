@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.33 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.42 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.33 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.42 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -1898,6 +1898,29 @@ else
 fi
 
 # ============================================================================
+hdr "STEP 17 — Nightly backups (optional, recommended)"
+# ============================================================================
+# v1.5.42: never required, and never formats a drive. scripts/bpq-backup-setup.sh
+# asks for a mounted backup folder, makes the password, creates the store and
+# the nightly timer. It can be run any time later (Installation Manual §10.16).
+BK_DONE="n"
+if [[ -r /etc/bpq-dashboard/backup.conf ]]; then
+    ok "Nightly backups are already set up (/etc/bpq-dashboard/backup.conf)."
+    BK_DONE="y"
+else
+    explain "OPTIONAL, but strongly recommended: a dead disk loses LinBPQ's configuration"
+    explain "and BBS mail, the dashboard's database and settings, and your system set-up."
+    explain "This sets up a nightly encrypted backup to a separate drive (usually a USB"
+    explain "drive left plugged in). It needs that drive formatted and mounted first —"
+    explain "if it isn't yet, say N now and run the setup later (Manual §10.16)."
+    if yesno "Set up nightly backups now?" N; then
+        bash "$WEB_ROOT/scripts/bpq-backup-setup.sh" && [[ -r /etc/bpq-dashboard/backup.conf ]] && BK_DONE="y"
+    else
+        say "Skipped. Later: sudo bash $WEB_ROOT/scripts/bpq-backup-setup.sh  (Maintenance > Backups)"
+    fi
+fi
+
+# ============================================================================
 hdr "DONE — Summary"
 # ============================================================================
 
@@ -1943,6 +1966,7 @@ if [[ "$WEB_SHARED" == "y" ]]; then
     echo
 fi
 [[ "$FW_DONE" == "y" ]] || { echo "${BOLD}Firewall:${NC} not set up. When you're ready: sudo bash $WEB_ROOT/tools/setup-firewall.sh"; echo; }
+[[ "$BK_DONE" == "y" ]] || { echo "${BOLD}Backups (optional, recommended):${NC} not set up. When you have a backup drive mounted:"; echo "   sudo bash $WEB_ROOT/scripts/bpq-backup-setup.sh   ${DIM}(Installation Manual §10.16)${NC}"; echo; }
 WEB_URL="http://$SERVER_IP$( [[ "$WEB_PORT" != "80" ]] && echo ":$WEB_PORT" )"
 [[ -n "$WEB_BIND" ]] && WEB_URL="http://127.0.0.1:$WEB_PORT  (through your reverse proxy from other machines)"
 

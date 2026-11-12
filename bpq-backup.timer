@@ -1,0 +1,10 @@
+[Unit]
+Description=BPQ Dashboard: nightly station backup (optional)
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

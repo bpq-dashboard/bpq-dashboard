@@ -874,6 +874,51 @@ if (is_dir($yappDir) && is_readable($yappDir)) {
         $mb >= 500 ? "find $yappDir -type f -mtime +30 -print   (then -delete instead of -print)" : '');
 }
 
+// v1.5.35: Connect Watchdog (optional): running, paused partners, unmatched tiles
+$wdFile = $WEB_ROOT . '/cache/watchdog-state.json';
+if (is_readable($wdFile) && is_array($wd = json_decode((string)@file_get_contents($wdFile), true)) && isset($wd['partners'])) {
+    $age = time() - (strtotime((string)($wd['updated_at'] ?? '')) ?: 0);
+    $paused = $missing = [];
+    foreach ((array)$wd['partners'] as $blk => $p) {
+        if (!empty($p['paused'])) $paused[] = $blk . ' until ' . str_replace('T', ' ', substr((string)($p['resume_at'] ?? ''), 0, 16)) . ' UTC';
+        if (($p['status'] ?? '') === 'not_in_linmail') $missing[] = (string)($p['call'] ?? $blk);
+    }
+    if ($age > 1800) {
+        $findings[] = finding('watchdog','application','warn','Connect Watchdog not running',
+            'Its state was last written ' . round($age / 60) . ' minutes ago (it runs every 5 minutes).',
+            'sudo crontab -l | grep connect-watchdog   # then: sudo tail -20 /var/log/bpq-dashboard/connect-watchdog.log');
+    } elseif ($paused) {
+        $findings[] = finding('watchdog','application','info','Connect Watchdog: ' . count($paused) . ' partner(s) paused',
+            'Paused after failed forwarding attempts: ' . implode('; ', $paused) . '. They resume by themselves.',
+            'sudo python3 ' . $WEB_ROOT . '/scripts/connect-watchdog.py --resume CALL   # to resume one now');
+    } else {
+        $findings[] = finding('watchdog','application','ok','Connect Watchdog running',
+            'Watching ' . count((array)$wd['partners']) . ' RF Forwarding Partner(s); none paused.', '');
+    }
+    if ($missing) {
+        $findings[] = finding('watchdog-match','application','warn','Connect Watchdog: partner(s) not in linmail.cfg',
+            'RF Forwarding Partners with no forwarding entry of that name, so not watched: ' . implode(', ', $missing) . '.',
+            'Fix the call on RF Connections → RF Forwarding Partners (N3MEL-2 looks for the linmail.cfg entry N3MEL).');
+    }
+}
+
+// v1.5.34: the station's backup, if a backup script reports to the dashboard
+require_once dirname(__DIR__) . '/includes/station-config.php';
+$bk = bpq_backup_status();
+if (!$bk['present']) {
+    $findings[] = finding('backup','application','info','No backup set up (optional, recommended)',
+        "Nothing reports a backup to the dashboard ({$bk['file']}: " . ($bk['why'] ?? '') . '). A nightly backup to a separate drive protects LinBPQ, the databases and the system settings (Installation Manual §10.16).',
+        'sudo bash ' . $WEB_ROOT . '/scripts/bpq-backup-setup.sh');
+} else {
+    $when = ($bk['last_ok_at'] ?? '') !== '' ? "Last good backup {$bk['last_ok_at']} ({$bk['age_hours']} h ago)" : 'No good backup recorded';
+    $drv  = isset($bk['drive_free_gb']) ? "; drive {$bk['drive_used_pct']}% used, {$bk['drive_free_gb']} GB free" : (($bk['drive_mounted'] ?? null) === false ? '; backup drive not mounted' : '');
+    $lvl  = ['ok' => 'ok', 'stale' => 'warn', 'full' => 'warn', 'failed' => 'crit'][$bk['verdict']] ?? 'warn';
+    $title = ['ok' => 'Backup up to date', 'stale' => 'Backup is older than ' . $bk['max_age_hours'] . ' h', 'full' => 'Backup drive nearly full', 'failed' => 'Last backup failed'][$bk['verdict']] ?? 'Backup';
+    $findings[] = finding('backup','application',$lvl,$title,
+        $when . $drv . (($bk['result'] ?? '') === 'failed' && ($bk['message'] ?? '') !== '' ? '. Last run: ' . $bk['message'] : '') . '.',
+        $lvl === 'ok' ? '' : 'Look at the backup script\'s log; check the drive is plugged in and mounted.');
+}
+
 // Shared nav: files present, and every page's ?v= matches the loader's NAV_VERSION
 $navLoader = "$WEB_ROOT/bpq-nav-loader.js";
 if (!file_exists("$WEB_ROOT/_nav.html") || !file_exists($navLoader)) {

@@ -716,6 +716,28 @@ def restore_normal_mode(state, kp):
 # MAIN
 # ============================================================================
 
+def _linmail_lock(wait_secs=300):
+    """v1.5.35: one script at a time edits linmail.cfg (shared with
+    connect-watchdog.py). Waits up to wait_secs, then gives up."""
+    import fcntl
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cache', 'linmail.lock')
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        fd = open(path, 'w')
+    except OSError:
+        return None
+    end = time.time() + wait_secs
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except OSError:
+            if time.time() > end:
+                print('Another script is changing linmail.cfg; try again later', file=sys.stderr)
+                sys.exit(0)
+            time.sleep(5)
+
+
 def main():
     # Load settings.json overrides (if Dashboard Settings UI has been configured)
     apply_settings_json()
@@ -724,6 +746,8 @@ def main():
     parser.add_argument('--status', action='store_true', help='Show current state only')
     parser.add_argument('--restore', action='store_true', help='Force restore optimized schedules')
     args = parser.parse_args()
+    if not args.status:
+        _LOCK = _linmail_lock()  # noqa: F841 — held until exit
 
     state = load_state()
 

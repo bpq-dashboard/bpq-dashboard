@@ -1,0 +1,10 @@
+[Unit]
+Description=BPQ Dashboard: nightly station backup (optional; scripts/bpq-backup-setup.sh)
+After=mariadb.service network-online.target
+ConditionPathExists=/etc/bpq-dashboard/backup.conf
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash @WEB_ROOT@/scripts/bpq-backup.sh
+Nice=10
+IOSchedulingClass=idle

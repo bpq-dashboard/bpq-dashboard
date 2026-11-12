@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.33**
+**Version 1.5.42**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -45,6 +45,7 @@
     - 10.13 VHF/UHF packet with a sound modem (QtSoundModem)
     - 10.14 Winlink: an RF gateway as the outage route
     - 10.15 VARA HF under Wine (no Windows PC)
+    - 10.16 Backing up the station (optional, recommended)
 11. Security Hardening
 12. Troubleshooting
 13. Quick Reference
@@ -83,6 +84,42 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.42
+
+- **Nightly backups for any station (optional, recommended):** new `scripts/bpq-backup-setup.sh` sets up an encrypted nightly backup of LinBPQ, the databases, the dashboard and the system settings to a drive you choose, reported on Maintenance → Backups. The installer offers it as its last step; `update.sh` reminds you while no backup is set up. Never formats a drive. §10.16 rewritten (preparing a drive, restoring).
+
+### In v1.5.41
+
+- **System Logs loads much faster:** the cards come straight from the database first, and the Live Log Viewer gets only the newest lines from the server instead of downloading whole daily BBS logs.
+
+### In v1.5.40
+
+- **Smaller BBS logs:** the message-text job (`message-bodies.timer`) lists bulletins with `LL 100` instead of the full `LB` list on most runs, with a full list once a day. On K1AJD this cuts the BBS log from 40–50 MB a day to a few MB (§ *Message text*).
+
+### In v1.5.39
+
+- **RF Connections:** 7 / 30 / 90 Days open much faster. The page now asks the server for just the BBS-log lines it uses instead of downloading every day's whole log (on a busy hub, 1.3 GB for 30 days).
+
+### In v1.5.38
+
+- **Connect Watchdog:** a paused partner that connects to you is enabled again within 5 minutes instead of waiting out the 6 hours. Only attempts that really went on the air and got no answer count as failures; long good sessions are no longer lost; the BBS messages log in like the live MHeard poll (§10.1).
+
+### In v1.5.37
+
+- **Connect Watchdog:** a forwarding attempt that failed only because your own VARA port was busy (*Error - Port in use*) no longer counts as the partner not answering, and the partner's own calls to you (logged as `KK4DIV-1`) now count as good sessions (§10.1).
+
+### In v1.5.36
+
+- **Connect Watchdog** now appears in System Audit (running, paused partners, partners it can't match), the Log Viewer descriptions and Maintenance's *Key paths*, and in the User Guide (§24 forwarding tools, §25 settings, §26 its messages). New troubleshooting entry §12 *Forwarding to one partner stopped*.
+
+### In v1.5.35
+
+- **§10.1 Connect Watchdog rewritten:** it watches the RF Forwarding Partners, pauses a partner for 6 hours after 2 failed forwarding attempts in a row (settings in `config.php` `watchdog`), shows pauses on the partner tiles and on Maintenance, and shares a lock on `linmail.cfg` with the propagation scheduler and storm monitor.
+
+### In v1.5.34
+
+- **Admin → Maintenance → Backups** and a **System Audit** check show the station's last backup, as reported by your backup script in a small status file. New **§10.16** on backing up a packet station (what to include, restic, testing a restore) and the status file's format.
 
 ### In v1.5.33
 
@@ -159,6 +196,7 @@ From the first Linux Mint and Ubuntu installs (N3MEL, KG9NI) and requests from s
 - **The dashboard's own logs** (bpq-telnet, bpq-vara, Email Client, message-text job, NWS posting, forwarding tools) are written to `/var/log/bpq-dashboard/`, not LinBPQ's logs folder; on stations where the web user could only read that folder, bpq-telnet and bpq-vara used to stop at start. Weekly log rotation is installed.
 - **VARA log from the TPRFN server:** TPRFN stations whose VARA HF sends its syslog to the TPRFN server can have the dashboard download it every 5 minutes (`vara-remote.timer`, §10.11) instead of running a receiver.
 - **Firewall, optional:** `tools/setup-firewall.sh` sets up ufw with a question per port and never locks out your SSH session; the installer offers it at the end (default No). See §11.
+- **Nightly backups, optional but recommended (v1.5.42):** `scripts/bpq-backup-setup.sh` sets up an encrypted nightly backup of LinBPQ, the databases, the dashboard and the system settings to a separate drive; the installer offers it as its last step (default No) and `update.sh` reminds you while none is set up. It never formats a drive. See §10.16.
 - **In-place updates:** every release from now on has `update.sh`: `sudo bash update.sh` in the unzipped new release updates your install without a reinstall, keeps your settings and data, backs up what it replaces, and prints a one-line rollback (§4, *Updating*). Maintenance shows when a new release is out.
 - **Maintenance page:** *Change admin password* (no SSH needed), *PKTNET forms* update with Undo, *Optional pages*, *Firewall setup* and *LinBPQ in a home folder* sections.
 - **Email Client signature** (thanks N3MEL): Preferences → Signature, added to new messages (and optionally replies), kept on the server.
@@ -330,14 +368,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.33.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.42.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.33
+cd bpq-dashboard-1.5.42
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -370,6 +408,7 @@ Some questions are **yes/no**. The capital letter is the default:
 | Start the page helpers now (and at every boot)? | **Y** |
 | Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need, plus the Maintenance page's *Change admin password* helper |
 | Set up a basic firewall (ufw) now? *(default No)* | **N** to do it later; **y** runs `tools/setup-firewall.sh` (§11) |
+| Set up nightly backups now? *(optional, recommended; default No)* | **y** only if a backup drive is already formatted and mounted; it runs `scripts/bpq-backup-setup.sh`. Otherwise **N**, prepare the drive, and run it later (§10.16) |
 
 The whole run takes 5–15 minutes, mostly downloading. Everything the installer does is also written to a log file named on the first screen (`/tmp/bpq-dashboard-install-….log`).
 
@@ -758,6 +797,8 @@ printf '/var/log/bpq-dashboard/*.log {\n    weekly\n    rotate 8\n    compress\n
 
 `message-bodies.timer` saves the text of new BBS messages to the database every 5 minutes, whether or not the Email Client is open (BPQ can remove bulletins within days). Bulletins: `'messages' => ['bulletin_text' => 'all']` in config.php; `'pinned'` saves only groups pinned 📌, `'none'` none. To fetch text for messages already in the database once: `sudo -u www-data php $W/scripts/fetch-message-bodies.php --backfill`.
 
+**Keeping the BBS log small (v1.5.40).** BPQ writes every line it sends to the BBS log, and BPQ's `LB` command sends the whole bulletin list. On a busy hub that's well over a thousand lines a run, which made the log 40–50 MB a day. So most runs list only the newest messages with `LL 100` (keeping the bulletins), and a full `LB` happens once a day to catch anything older. To change the numbers: `'messages' => ['bulletin_list_recent' => 100, 'bulletin_full_list_hours' => 24]`. If more than about 100 messages of all types arrive between two runs (5 minutes), raise `bulletin_list_recent`. Each run's summary line shows which listing it used (`B:… (LL 100)` or `(LB)`).
+
 `--days 8` matters: some BPQ versions write the traffic report weekly rather than daily.
 
 **9. Helper services** (only for the pages you use; set the others to `false` in `config.php 'pages'`)
@@ -932,15 +973,46 @@ Built-in profiles (each sets the right data mode for VARA): **Yaesu** FTdx3000, 
 
 ### 10.1 Connect Watchdog
 
-`scripts/connect-watchdog.py` watches the BBS log for repeated failed outgoing forwarding connects. When a partner fails 3 times within 3 hours, it replaces that partner's ConnectScript in `linmail.cfg` with a pause, and puts the original back after 4 hours, restarting LinBPQ each time so it loads the change (`systemctl stop bpq` / `start bpq`; set `bpq_stop_cmd` / `bpq_start_cmd` in its `CONFIG` if your service has another name). State is kept in `cache/watchdog-state.json`; its log is `connect-watchdog.log` in the logs folder.
+`scripts/connect-watchdog.py` (rewritten in v1.5.35) stops LinBPQ calling a hub over and over when it isn't answering, and tries it again later.
 
-Set up:
+- **Which partners:** the ones on RF Connections → **RF Forwarding Partners** (`data/stations/partners.json`). Each tile's call is matched to its forwarding block in `linmail.cfg` by name: `N3MEL-2` uses the block `N3MEL` (or `N3MEL-2` if that's what the block is called). A tile with no matching block isn't watched.
+- **What counts as a failed attempt:** in BPQ's BBS log, an outgoing attempt starts at `Connecting to BBS N3MEL` and includes the `ELSE` steps of the same ConnectScript. It **succeeded** if the partner answered (its SID such as `[BPQ-6.0.24.1-B1FWIHJM$]`, the B2/FBB lines `FS` / `FF` / `FQ` / `FA` / `FC`, or `Connected to …`), even when there was no mail to pass. It **failed** only if it really went on the air and got no answer: a failure message from the modem or node (`VARA} Failure with N3MEL-2`, *Can't connect*, *Timeout*…), or the connect command went out and 20 seconds or more passed with no answer (v1.5.38).
+- **Not counted (v1.5.38):** `Connecting to BBS N4SFL` followed by `N4SFL Disconnected` in the same second. The ConnectScript had nothing to do at that time (for example, outside its `TIMES` window) or LinBPQ had just started, so nothing went on the air.
+- **Not counted (v1.5.37):** an attempt that only failed because your own port was busy (`Error - Port in use`, typically while another partner's session is ending) or the channel was busy. That isn't the partner's fault, so it counts neither for nor against it.
+- **The partner calling you counts as good:** BPQ logs those sessions under the partner's full call (`KK4DIV-1`, `N4SD-11`). The watchdog matches them on the base call, so a hub that keeps calling you in isn't paused just because your calls to it missed.
+- **What it does:** after **2 failed attempts in a row** it sets `Enabled = 0` for that partner (BPQ stops calling it; its mail waits in the queue) for **6 hours**, then `Enabled = 1` again, and counting starts over. A good session, whether you called the partner or it called you, resets the count. You get a BBS message on each pause and resume.
+- **Back early (v1.5.38):** if a paused partner has a good session with you during the pause (usually it calls you), the pause ends at the next run, within 5 minutes, with a *"forwarding resumed early"* message.
+- **LinBPQ restarts:** LinBPQ reads `linmail.cfg` only when it starts, and writes its own copy when it stops. So each change is: stop LinBPQ, edit, start LinBPQ (a few seconds; sessions in progress are dropped). All changes due in one run share one restart, and a run is put off while a forwarding session is in progress. The previous file is kept as `linmail.cfg.watchdog.bak`. `cache/linmail.lock` makes the watchdog, the propagation scheduler and the storm monitor take turns.
+- **Left alone:** a partner you switched off yourself (`Enabled = 0` that the watchdog didn't set). If you turn a paused partner back on by hand, the watchdog notices and clears its pause.
+- **Shown on:** the RF Forwarding Partners tiles (⏸ *Paused until HH:MMZ*, ⚠ *N failed attempts*), Maintenance → *Connect Watchdog*, System Audit (running, paused partners, unmatched tiles) and the Log Viewer (*Forwarding tools*). Troubleshooting: §12 *Forwarding to one partner stopped*.
 
-1. Edit the `PARTNERS` dict near the top of the script: one entry per partner, with the `connect_call` that appears in your ConnectScript (e.g. `W1XYZ-1`) and its `attach_port`. The detection settings (`fail_threshold`, `fail_window_mins`, `pause_hours`) are in `CONFIG` just above.
-2. It edits `linmail.cfg` (found through `config.php` `paths.linbpq`) and restarts LinBPQ, so run it as root from root's crontab:
+**Settings** (optional, `config.php`):
+
+```php
+'watchdog' => [
+    'fail_count'  => 2,      // failed attempts in a row before a pause
+    'pause_hours' => 6,      // how long a pause lasts
+    'notify'      => true,   // BBS message on pause / resume
+    'notify_to'   => '',     // default: station.callsign
+    'exclude'     => [],     // partners never to pause, e.g. ['RMS']
+],
+```
+
+The BBS messages use the `bbs` login in `config.php` (`user` / `pass`), as the pages do.
+
+**Set up:**
+
+1. Make sure the RF Forwarding Partners tiles list your hubs. Then check what the watchdog sees, which changes nothing:
+   ```bash
+   sudo python3 /var/www/bpq-dashboard/scripts/connect-watchdog.py --status
+   sudo python3 /var/www/bpq-dashboard/scripts/connect-watchdog.py --dry-run
+   ```
+2. Schedule it in **root's** crontab (`sudo crontab -e`), because it edits `linmail.cfg` and restarts LinBPQ:
    ```
    */5 * * * * /usr/bin/python3 /var/www/bpq-dashboard/scripts/connect-watchdog.py
    ```
+   It counts only attempts made after its first run. Its log is `/var/log/bpq-dashboard/connect-watchdog.log`, and its state is `cache/watchdog-state.json`.
+3. By hand: `--resume N3MEL` (or `--resume all`) enables a paused partner now, and `--pause N3MEL --hours 6` pauses one. Both restart LinBPQ.
 
 ### 10.2 Propagation Scheduler
 
@@ -1482,6 +1554,84 @@ radio -- USB interface (sound card + CAT serial port) -- this server
 
 ---
 
+### 10.16 Backing up the station (optional, recommended)
+
+**This is optional — the dashboard runs fine without it — but strongly recommended.** A packet station is more than the dashboard, and a dead disk loses all of it: LinBPQ's `bpq32.cfg`, `linmail.cfg` and BBS mail, the dashboard's `config.php`, `data/` and database, and the system settings that took an afternoon to get right (udev names for the radio interfaces, sound-card numbers, systemd units, the firewall), plus flrig, QtSoundModem and VARA under Wine. The installer offers this as its last step (default **No**); you can set it up any time.
+
+#### The easy way: `bpq-backup-setup.sh` (v1.5.42)
+
+With a backup drive mounted (next section), run:
+
+```bash
+sudo bash /var/www/bpq-dashboard/scripts/bpq-backup-setup.sh
+```
+
+It asks a few questions and then:
+
+- installs **restic** if needed (encrypted, deduplicated backups);
+- asks for the **backup folder** (the mounted drive, e.g. `/mnt/backup`) and warns if it is on the system disk;
+- reads the LinBPQ folder from `config.php` and finds LinBPQ's service (`bpq` or `linbpq`);
+- makes a **password** and shows it once — **write it down and keep it away from the computer**; without it nobody can restore, you included;
+- creates the backup store (`<drive>/restic-<hostname>`), writes `/etc/bpq-dashboard/backup.conf`, and switches on `bpq-backup.timer` (nightly about 03:15; a missed night runs at the next start);
+- offers to run the first backup.
+
+**Each night** `scripts/bpq-backup.sh` saves: LinBPQ's folder (copied with LinBPQ stopped for a few seconds, so the BBS files are consistent), every MariaDB database, the dashboard folder, `/etc`, `/root`, `/home`, `/opt`, `/usr/local/bin`, `/usr/local/sbin`, the crontabs, and lists of installed packages, enabled services and firewall rules. Left out: Downloads folders, caches, Trash. It keeps 30 daily, 12 weekly and 6 monthly copies, reads back 5% of the stored data every Sunday, and reports to **Admin → Maintenance → Backups** and **System Audit**. Log: `/var/log/bpq-dashboard/backup.log`. Settings: `/etc/bpq-dashboard/backup.conf` (run the setup again, or edit it). Off: `sudo systemctl disable --now bpq-backup.timer`.
+
+#### Preparing a backup drive
+
+Use an external USB hard drive or SSD (128 GB is plenty; avoid thumb drives, which wear out). **Formatting erases the drive — check the name twice.**
+
+```bash
+lsblk -o NAME,SIZE,MODEL,LABEL,MOUNTPOINT      # before plugging in …
+lsblk -o NAME,SIZE,MODEL,LABEL,MOUNTPOINT      # … and after: the NEW line is the drive, e.g. sdb with sdb1
+sudo mkfs.ext4 -L BPQBACKUP /dev/sdX1          # sdX1 = the drive's partition (ERASES IT)
+sudo mkdir -p /mnt/backup
+echo 'LABEL=BPQBACKUP /mnt/backup ext4 defaults,nofail,x-systemd.device-timeout=10 0 2' | sudo tee -a /etc/fstab
+sudo systemctl daemon-reload && sudo mount /mnt/backup && df -h /mnt/backup
+```
+
+`nofail` lets the computer start normally without the drive; that night's backup then reports *backup drive not mounted*. If the drive has no partition (only `sdb`), make one first: `sudo parted -s /dev/sdX mklabel gpt mkpart BPQBACKUP ext4 1MiB 100%`.
+
+#### Checking and restoring
+
+```bash
+sudo -i
+export RESTIC_REPOSITORY=/mnt/backup/restic-$(hostname -s) RESTIC_PASSWORD_FILE=/etc/bpq-dashboard/backup-password
+restic snapshots                                        # the copies kept
+restic restore latest --target /root/restore --include /var/backups/bpq-dashboard/linbpq/bpq32.cfg
+```
+
+- **One file:** restore it to `/root/restore` as above, compare, copy back (stop LinBPQ first for LinBPQ's files: `systemctl stop bpq`).
+- **Browse a copy:** `mkdir -p /root/mnt && restic mount /root/mnt` (second terminal; Ctrl+C to unmount).
+- **Test a restore once** (and every few months): restore `/var/backups/bpq-dashboard` to a scratch folder, check `zcat …/mariadb-all.sql.gz | head` and `cmp …/linbpq/bpq32.cfg <your LinBPQ folder>/bpq32.cfg`.
+- **Whole server** (new disk): install the same Linux release (`system/os-release.txt` in the backup), `apt install restic rsync mariadb-server`, mount the drive, write the password to a file and `restic restore latest --target /root/restore`. Then reinstall packages (`xargs -a /root/restore/var/backups/bpq-dashboard/system/apt-manual.txt apt install -y`), copy back `/home`, `/opt`, `/usr/local`, LinBPQ's folder (from `var/backups/bpq-dashboard/linbpq`) and the dashboard folder, copy back from `etc/` only what you need (systemd units, udev rules, modprobe, nginx, sudoers, iptables — not the whole of `/etc`), load the databases (`zcat …/mariadb-all.sql.gz | mysql`), restore the crontabs, `systemctl daemon-reload`, enable the services and reboot. Then run Install Check.
+- **A second copy away from the station** (lightning, fire, theft take the USB drive too): `restic copy` can send the same snapshots to another drive or to cloud storage.
+
+#### Your own backup script instead
+
+If you already have a backup, it can report to the dashboard too. At the end of each run, have the script write one line of JSON to `/var/lib/bpq-backup/status.json`, readable by everyone (no passwords in it):
+
+```json
+{"result":"ok","finished_at":"2026-11-09T08:21:40Z","last_ok_at":"2026-11-09T08:21:40Z",
+ "message":"7.9G used, 1.7T free","snapshot":"11d6ec94","tool":"restic",
+ "drive":"/mnt/backup","keep":"30 daily + 12 weekly"}
+```
+
+On a failed run write `"result":"failed"`, the reason in `"message"`, and keep the previous `"last_ok_at"`. In bash, for example:
+
+```bash
+STATUS=/var/lib/bpq-backup/status.json
+write_status() {   # write_status ok|failed "message" [snapshot]
+    local now=$(date -u +%FT%TZ) lastok
+    if [ "$1" = ok ]; then lastok=$now; else lastok=$(sed -n 's/.*"last_ok_at":"\([^"]*\)".*/\1/p' "$STATUS" 2>/dev/null); fi
+    mkdir -p "${STATUS%/*}" && chmod 755 "${STATUS%/*}"
+    printf '{"result":"%s","finished_at":"%s","last_ok_at":"%s","message":"%s","snapshot":"%s","tool":"restic","drive":"/mnt/backup"}\n' \
+        "$1" "$now" "$lastok" "${2//\"/\'}" "${3:-}" > "$STATUS.tmp" && chmod 644 "$STATUS.tmp" && mv -f "$STATUS.tmp" "$STATUS"
+}
+```
+
+**Admin → Maintenance → Backups** then shows the last good backup, the last run's result and the drive's free space, and **System Audit** has the same check: Warn when the last good backup is more than 36 hours old or the drive is 90% full, Critical when the last run failed. Other path or limit: in `config.php`, `'backup' => ['status_file' => '/path/status.json', 'max_age_hours' => 36]`.
+
 ## 11. Security Hardening
 
 > **Important:** Do not skip this section if your server is accessible from the internet.
@@ -1739,6 +1889,21 @@ Test by hand: `sudo -u www-data php /var/www/bpq-dashboard/scripts/fetch-message
 
 Open config.php and set `'pass'` under `'bbs'` (still `'CHANGE_THIS_PASSWORD'` in a copied example) to your BPQ sysop password.
 
+### Forwarding to one partner stopped (Connect Watchdog)
+
+If the RF Connections tile is red with ⏸ *Paused until HH:MMZ*, the Connect Watchdog (§10.1) paused that partner after 2 failed attempts in a row. It resumes by itself at that time.
+
+```bash
+sudo python3 /var/www/bpq-dashboard/scripts/connect-watchdog.py --status          # who is paused, until when
+sudo tail -30 /var/log/bpq-dashboard/connect-watchdog.log                         # why
+sudo python3 /var/www/bpq-dashboard/scripts/connect-watchdog.py --resume N3MEL    # enable it now (restarts LinBPQ)
+```
+
+- **It keeps pausing the same partner:** check the partner is on the air and the ConnectScript is right (`linmail.cfg`; RF Connections → Failures). A partner that's only on the air at set times can go in `'watchdog' => ['exclude' => ['N3MEL']]`.
+- **A partner isn't watched** (*not in linmail*): the tile's call must match its forwarding entry's name (N3MEL-2 → `N3MEL`).
+- **Forwarding is off but no tile is red:** `Enabled = 0` was set by hand or by another tool, so the watchdog leaves it alone. Set `Enabled = 1` with LinBPQ stopped.
+- **Nothing in the log:** it isn't scheduled. Check `sudo crontab -l | grep connect-watchdog`.
+
 ### Firewall page says the rules could not be read
 
 The sudo rules are missing or out of date (see Security Hardening → Configure sudoers for www-data). Copy `www-data-tools.sudoers` again; sudo picks the change up at once, nothing needs restarting.
@@ -1928,10 +2093,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.33-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.42-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.33 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.42 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

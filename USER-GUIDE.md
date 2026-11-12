@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.33**
+**Version 1.5.42**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -418,7 +418,7 @@ Messages are listed newest first by their date (since v1.5.32; before, a new mes
 - **Auto-fetch** repeats this **every 5 minutes** by default. Change it, or turn it off, in Preferences → *Auto-fetch interval*.
 - With *Body fetching* on **Eager** (default), the page also reads every new message's text during Get Mail, so clicks open instantly. **Lazy** reads a message's text only when you open it, which makes Get Mail faster.
 - The listings take one BBS login. Since v1.5.21 the message texts are read up to 10 per login too (before, every message had its own login, which on a slow or RF-linked BBS added a few seconds each). A message that doesn't come back cleanly in a batch is read again on its own.
-- Separately, the server saves the text of new messages to the database every 5 minutes (`message-bodies.timer`), even when no browser is open. Which bulletins it saves is set by `messages.bulletin_text` in `config.php`: `all` (default), `pinned` (only 📌 groups) or `none`.
+- Separately, the server saves the text of new messages to the database every 5 minutes (`message-bodies.timer`), even when no browser is open. Which bulletins it saves is set by `messages.bulletin_text` in `config.php`: `all` (default), `pinned` (only 📌 groups) or `none`. To keep BPQ's BBS log small it lists bulletins with `LL 100` on most runs and the full list once a day (v1.5.40; `messages.bulletin_list_recent` / `bulletin_full_list_hours`).
 
 The dashboard logs in to the BBS with `bbs.user` / `bbs.pass` from `config.php`. It works whether BPQ's `USER=` line lands that login at the node (then it types `bbs`, or `bbs.alias`) or straight in the BBS, and whatever BPQ's greeting looks like (since v1.5.18; before that the greeting had to contain a `}`). If the login fails, the message says which step and shows the last line BPQ sent (Section 26).
 
@@ -640,7 +640,7 @@ The main page: your VARA HF sessions, forwarding partners, forwarded messages an
 
 ### At the top
 
-- **Today / 7 Days / 30 Days / 90 Days** — the range for everything below. Today is the default.
+- **Today / 7 Days / 30 Days / 90 Days** — the range for everything below. Today is the default. Since v1.5.39 the page reads only the few lines it needs from each day's BBS log (frequencies, failure reasons, message proposals), filtered and cached on the server in `cache/bbs-lines/`. It used to download each whole day's log, which on a busy hub is 40–50 MB a day. The first time a day is opened it takes a moment while the server reads that day's log once; after that it's quick.
 - 🔄 **Refresh**, and 📄 **Station Report** — a PDF of one station's sessions: base callsign (all SSIDs), last 24 hours to a year, all/outgoing/incoming. It lists remote stations only, so your own callsign gives an empty report.
 - The status line shows how many connections were loaded; **"(DB)"** at the end means the fast database path is in use (Section 26).
 
@@ -658,6 +658,7 @@ One tile per forwarding partner: when it last connected and on which band, how m
 
 - **🔄 Refresh Queue**, **+ Add** and **Manage** (edit/remove). Adding and removing partners asks for the admin login. This list is stored on the server in `data/stations/partners.json`; it is separate from the propagation scheduler's list (Section 19).
 - The server asks the BBS for the queue at most once a minute and shares the answer with every visitor, so a refresh within the minute shows the same numbers.
+- **Connect Watchdog** (v1.5.35, optional, *Installation Manual* §10.1): when it runs, a partner that has failed forwarding attempts shows ⚠ *N failed attempts*, and one it has paused shows a red tile with ⏸ **Paused until HH:MMZ**. After 2 failed attempts in a row the watchdog pauses forwarding to that partner for 6 hours (its mail waits in the queue), then enables it again. If the partner connects to you during the pause, the pause ends within 5 minutes (v1.5.38). Hover the line for the reason. Maintenance → *Connect Watchdog* has the status, dry-run and resume commands.
 - The sent/received counts are RF (VARA HF) messages only. A message to the same base callsign over NET/ROM, AXIP, AX.25 or Telnet doesn't count here; see Forwarded Messages for those.
 
 ### 📨 Forwarded Messages (click ▶ to open)
@@ -773,7 +774,7 @@ Statistics and a searchable viewer for BPQ's daily logs, plus BPQ's live MHeard 
 
 - **Port in Use** counts BBS log lines reading "Error - Port in use" (the radio port was busy with another session). It is one kind of RF failure only; the full count is on RF Connections. The two pages also default to different ranges (System Logs 7 days, RF Connections today), so set both to the same range when comparing.
 - The cards, charts, error breakdown, Most Active Stations, RMS/TCP panels and the MHeard/routing tables come from the database (`parse-system-logs.py`, every 5 minutes); "(DB)" in their status lines confirms it. The Live Log Viewer always reads the log files directly.
-- Big date ranges take a moment to load in the Live Log Viewer.
+- Since v1.5.41 the cards load first, straight from the database, and the Live Log Viewer fills in after. The viewer gets the newest 100,000 lines from the server, read from the end of the log files (`system-logs-api.php?action=lines`). It used to download whole daily logs, which on a busy hub are 40–50 MB each. If the oldest lines you need aren't there, use the log files themselves (Admin → Log Viewer, or `logs/` on the server).
 
 ---
 
@@ -928,6 +929,8 @@ Commands use the installer's defaults (`/var/www/bpq-dashboard`, database `bpqda
 - **LinBPQ in a home folder** (v1.5.19) — the narrow access fix (ACLs) for Ubuntu 21.04+ / Mint 21+, and how to test it as the web server.
 - **Database & credentials** — test the database login exactly the way the pages and the parsers use it, file permissions for `db-config.php`, backups (kept outside the web root) and changing the database password.
 - **Log parsers** — dry runs and rebuilds for the RF Connections, Traffic and System Logs parsers, and how to tell whether they're keeping up.
+- **Backups** (v1.5.34; set-up command v1.5.42) — **optional, recommended.** `sudo bash <web root>/scripts/bpq-backup-setup.sh` sets up a nightly encrypted backup to a separate drive (*Installation Manual* §10.16); the section then shows the station's last backup as the backup reports it: when the last good one finished, whether the last run failed and why, the snapshot, and the backup drive's free space. Green **Up to date**; amber when the last good backup is older than 36 hours or the drive is 90% full; red when the last run failed. The dashboard doesn't make backups itself; setting one up and the small status file it writes: *Installation Manual* §10.16.
+- **Connect Watchdog** (v1.5.35) — status, dry run, resume / pause by hand, schedule and log for the script that pauses a forwarding partner for 6 hours after 2 failed attempts in a row.
 - **Watched stations** (v1.5.26) — add, change or remove the stations System Logs and RF Connections flag when they go quiet, see when each was last heard, and switch live MHeard on or off. Saved in `data/system-logs.json`.
 - **Email Client database** — **PKTNET forms**: installed vs the author's latest version, **Update forms** and **Undo** (v1.5.19); the schema check that 📌 pinned folders need, counts of saved message text and kept-after-kill copies, folder sizes, what the "⚠ killed on BBS" label really means, and the NTS and bulletin-folder diagnostics.
 - **Bulletin retention** — preview, run or review the daily 14-day clean-up.
@@ -1022,6 +1025,10 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 **Database:** connection exactly as the pages make it; the Email Client, RF Connections, Traffic and System Logs tables; the 2026-09/10 updates (📌 keep, Forwarded Messages "Via" and delivery status); data size against the InnoDB buffer pool; whether MariaDB listens on the network.
 
+**Connect Watchdog** (v1.5.36, only once it has run): OK when running with no partner paused; Info listing paused partners and when they resume; Warn when it hasn't run for 30 minutes, or when an RF Forwarding Partner has no forwarding entry in `linmail.cfg` (so isn't watched).
+
+**Backups** (v1.5.34): the last backup reported (Info, with the optional set-up command, when none reports; Warn when older than 36 hours or the drive is 90% full; Critical when the last run failed). See Section 19 → Backups.
+
 **Logs & updates:** security updates waiting; /var/log size; log rotation for the dashboard's own logs; each log parser scheduled, running and error-free.
 
 **Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status (a service whose page is switched off in `config.php 'pages'` shows as *not in use*, v1.5.19); the VARA log download from the TPRFN server, when used (last good download under 30 minutes); APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry.
@@ -1095,7 +1102,7 @@ The dashboard's own log files (bpq-telnet, bpq-vara, vara-validator, the Email C
 
 | Timer | When | What |
 |---|---|---|
-| `message-bodies.timer` | every 5 minutes | Saves the text of new BBS messages to the database |
+| `message-bodies.timer` | every 5 minutes | Saves the text of new BBS messages to the database. Lists bulletins with `LL 100` most runs and the full `LB` list once a day (v1.5.40; keeps BPQ's BBS log small) |
 | `bulletin-retention.timer` | daily | Deletes unpinned bulletins older than 14 days |
 | `nws-auto-post.timer` (optional) | every 5 minutes | Posts new NWS Warnings/Watches for your state as bulletins |
 | `vara-remote.timer` (optional, v1.5.19) | every 5 minutes (:03, :08 …) | Downloads the new part of your VARA HF log from the TPRFN server (`config.php 'vara_remote'`) |
@@ -1109,6 +1116,24 @@ The dashboard's own log files (bpq-telnet, bpq-vara, vara-validator, the Email C
 | `parse-system-logs.py` | Events, errors, RMS/TCP, MHeard (with the node's live list via `scripts/poll-mheard.php`, v1.5.25), routing | System Logs |
 
 Their logs are in `/var/log/bpq-dashboard/` and in the Log Viewer under *Log parsers*.
+
+### Nightly backup (optional, v1.5.42)
+
+| Unit | When | What |
+|---|---|---|
+| `bpq-backup.timer` → `scripts/bpq-backup.sh` | nightly about 03:15 | Only after `scripts/bpq-backup-setup.sh` has been run. Encrypted restic backup of LinBPQ, the databases, the dashboard and the system settings to the backup drive; reports to Maintenance → Backups. Settings `/etc/bpq-dashboard/backup.conf`, log `/var/log/bpq-dashboard/backup.log` |
+
+### Forwarding tools (optional, root's crontab)
+
+These edit `linmail.cfg` and restart LinBPQ, so they run as root, and only if you schedule them (*Installation Manual* §10.1–10.3). They take turns through `cache/linmail.lock`.
+
+| Script | When | What |
+|---|---|---|
+| `connect-watchdog.py` (v1.5.35) | every 5 minutes | Pauses an RF Forwarding Partner for 6 hours after 2 failed forwarding attempts in a row, then enables it again (`Enabled` in `linmail.cfg`). Shown on the RF Connections tiles and Maintenance → *Connect Watchdog*; state `cache/watchdog-state.json` |
+| `prop-scheduler.py --apply` | every 2 days | Rewrites partners' ConnectScripts by band conditions and your history |
+| `storm-monitor.py` | hourly | Moves partners to 80 m in a geomagnetic storm, puts the schedules back after |
+
+Their logs are in `/var/log/bpq-dashboard/` and in the Log Viewer under *Forwarding tools*.
 
 ### Read straight from BPQ's files
 
@@ -1130,7 +1155,7 @@ Some choices follow you to every browser; others stay in the browser where you m
 | APRS BBS station info and beacon settings | Theme (and the Chat and APRS pages' own theme) |
 | RF Connections forwarding partners and saved station locations | NWS callsign, destination, auto-refresh and the Post All password |
 | The propagation scheduler's partners (`data/partners.json`) and ⚙ Dashboard Settings (`data/settings.json`) | Telnet session log, YAPP *Received recently*, Chat callsign |
-| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the optional pages (`pages`, `radio.enabled`), the VARA log source (`vara_remote`), System Logs tab names (`system_logs.port_names`, v1.5.22), live MHeard on/off and watched stations (Maintenance → *Watched stations*, kept in `data/system-logs.json` since v1.5.26; or `system_logs.live_mheard` / `system_logs.watch` in `config.php`) | Maintenance page *Your install* values |
+| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the Connect Watchdog's limits (`watchdog`: failed attempts, pause hours, exclusions; v1.5.42), the optional pages (`pages`, `radio.enabled`), the VARA log source (`vara_remote`), System Logs tab names (`system_logs.port_names`, v1.5.22), live MHeard on/off and watched stations (Maintenance → *Watched stations*, kept in `data/system-logs.json` since v1.5.26; or `system_logs.live_mheard` / `system_logs.watch` in `config.php`) | Maintenance page *Your install* values |
 | Which NWS alerts were already posted automatically (`cache/nws-auto-post-state.json`) | |
 
 Clearing a browser's site data resets the right-hand column for that browser only; nothing on the server is lost.
@@ -1168,6 +1193,13 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | A page looks old or its menu is missing an item after an update | Browser cache | Ctrl+Shift+R |
 | *"Failed to load: JSON.parse: unexpected end of data"* (Log Viewer, v1.5.16 and earlier) | The log held characters that weren't valid UTF-8 (raw BBS text), so the server sent an empty reply | Update to v1.5.17 or later, then Ctrl+Shift+R |
 | *"Empty reply from the server"* / *"Server reply was not JSON"* (Log Viewer) | The Log Viewer's PHP stopped with an error | Open **Web Server Errors** in the Log Viewer (or `sudo tail -30 /var/log/nginx/error.log`) for the PHP error |
+| BBS message *"Watchdog: N3MEL forwarding paused 6h"* (v1.5.35) | The Connect Watchdog saw 2 forwarding attempts in a row that N3MEL didn't answer and turned its forwarding off for 6 hours; its mail waits in the queue | Nothing: it resumes by itself (*"… forwarding resumed"*). Sooner: `sudo python3 <web root>/scripts/connect-watchdog.py --resume N3MEL` |
+| *"no forwarding block in linmail.cfg — not watched"* (Connect Watchdog log or `--status`: *not in linmail*) | A call on the RF Forwarding Partners tiles has no forwarding entry of that name in `linmail.cfg` (N3MEL-2 looks for `N3MEL`) | Fix the tile's call, or nothing if that partner isn't one you forward to |
+| *"FAILED: backup drive not mounted at /mnt/backup"* (backup log; Maintenance → Backups red) | The nightly backup found no drive at the backup folder | Plug the drive in, `sudo mount /mnt/backup`, then `sudo systemctl start bpq-backup.service` |
+| *"Backups aren't set up"* (running `bpq-backup.sh` by hand) | The optional backup was never set up | `sudo bash <web root>/scripts/bpq-backup-setup.sh` |
+| BBS message *"Watchdog: N4SFL forwarding resumed early"* (v1.5.38) | A paused partner had a good session with you (usually it called you), so its pause ended before the 6 hours | Nothing |
+| *"BBS message not sent: … (last text from the BBS: '…')"* (Connect Watchdog log) | The watchdog couldn't log in to the BBS to send its notice; the quoted text is the last thing the BBS said (passwords masked) | Check `bbs.user` / `bbs.pass` in config.php (the same login the System Logs live MHeard poll uses); the pause or resume itself still happened |
+| *"Change due … but forwarding is in progress … next run"* (Connect Watchdog log) | A pause or resume was due, but a forwarding session was running, so LinBPQ wasn't restarted | Nothing: the next run (5 minutes) does it |
 | *"nws-auto-post: disabled …"* (journal) | Automatic NWS bulletins are off | Nothing, or turn them on (*Installation Manual* §10.4) |
 | *"Set config.php nws.auto_post.area to your 2-letter state code"* | Turned on, but no state chosen | Set `'area'` in `config.php` `nws` → `auto_post` |
 | *"FAILED (BBS not reachable; will retry next run)"* (NWS auto-post log) | BPQ wasn't answering on its telnet port | Nothing if BPQ is back; the alert goes out on the next run while it's still in force |
@@ -1181,7 +1213,7 @@ These affect what you see in this release. Each says what to do meanwhile.
 
 - **VARA retunes only `RADIO 2`.** Frequency changes and the End Session restore rewrite the `RADIO 2` block in `bpq32.cfg`; a station whose FLRIG radio has another number can't QSY from the page yet.
 - **VARA quick frequencies are fixed** (3.596, 7.103, 10.148, 14.103, 14.106 MHz). Type any other frequency in the box.
-- **The connect watchdog's settings** are in the script itself (*Installation Manual* §10.1); the propagation scheduler and storm monitor use ⚙ Dashboard Settings or the partners editor (Section 19).
+- **Two partner lists:** the connect watchdog (v1.5.35) watches the RF Forwarding Partners tiles (`data/stations/partners.json`), while the propagation scheduler and storm monitor use their own list (⚙ Dashboard Settings or the partners editor, Section 19).
 - **RF Power Monitor watt-hours** always read 0 (flrig has no energy reading).
 - **Traffic Report's Messages card** leaves out NTS traffic (Section 13).
 - **The NWS page doesn't know which alerts were posted automatically**, so it can't stop you posting one again by hand.
@@ -1234,7 +1266,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.33-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.42-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1261,7 +1293,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.33 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.42 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1276,6 +1308,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.33 — User Guide**
+**73 — BPQ Dashboard v1.5.42 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

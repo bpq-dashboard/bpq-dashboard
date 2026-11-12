@@ -200,7 +200,7 @@
     <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
          Replaces the previously-duplicated <nav> block. The active link is
          driven by the data-nav-page attribute on <body>. -->
-    <script src="bpq-nav-loader.js?v=2026-11-09-2"></script>
+    <script src="bpq-nav-loader.js?v=2026-11-12-4"></script>
 
     <!-- ═══ GITHUB RIBBON — compact open-source notice ═════════════════════ -->
     <div id="githubBanner" style="
@@ -266,7 +266,7 @@
                 <div class="text-center flex-1">
                     <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
                         <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">RF Connections</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.33</span>
+                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.42</span>
                     </div>
                     <p class="text-gray-600 text-sm sm:text-lg">VARA HF Analytics with Frequency Tracking</p>
                     <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
@@ -2457,8 +2457,12 @@
             // Fetch all in parallel — preserves the original behavior, just
             // with a smaller list
             const fetchPromises = filesToLoad.flatMap(({ bbsFilename, cmsFilename, dateKey }) => [
-                fetch(BBS_LOG_BASE_URL + bbsFilename + '?t=' + Date.now())
-                    .then(r => r.ok ? r.text() : null)
+                // v1.5.39: only the lines this page reads, filtered and cached on
+                // the server (a busy hub's raw log is 40-50 MB a day); the raw
+                // file if the API isn't there.
+                fetch(RF_API_URL + '?action=bbslines&file=' + bbsFilename + '&t=' + Date.now(), { cache: 'no-store' })
+                    .then(r => r.ok ? r.text() : (r.status === 404 ? null
+                        : fetch(BBS_LOG_BASE_URL + bbsFilename + '?t=' + Date.now()).then(r2 => r2.ok ? r2.text() : null)))
                     .then(text => text ? { type: 'bbs', filename: bbsFilename, text } : null)
                     .catch(() => null),
                 fetch(CMS_LOG_BASE_URL + cmsFilename + '?t=' + Date.now())
@@ -5754,6 +5758,18 @@
             }[c]));
         }
 
+        // v1.5.35: Connect Watchdog state (cache/watchdog-state.json via the API)
+        let _watchdog = null;
+        async function loadWatchdog() {
+            try {
+                const r = await fetch(RF_API_URL + '?action=watchdog&t=' + Date.now(), { cache: 'no-store' });
+                const j = await r.json();
+                const d = j && (j.data || j);
+                _watchdog = d && d.partners ? d : null;
+            } catch (e) { _watchdog = null; }
+            updateTPRFNHubStations();
+        }
+
         function updateTPRFNHubStations() {
             const container = document.getElementById('tprfnHubList');
             const partners = getForwardingPartners();
@@ -5842,9 +5858,21 @@
                     msgHtml = `<span class="text-[10px] font-bold" title="Messages via RF this period (sent/received)"><span class="text-orange-600">↑${counts.sent}</span> <span class="text-green-700">↓${counts.recv}</span></span>`;
                 }
 
+                // v1.5.35: Connect Watchdog pause / failed-attempt count
+                let wdHtml = '';
+                const wd = _watchdog && _watchdog.partners ? (_watchdog.partners[callsign] || _watchdog.partners[base]) : null;
+                if (wd && wd.paused) {
+                    statusClass = 'bg-red-50 border-red-300 text-red-800';
+                    const until = wd.resume_at ? wd.resume_at.slice(11, 16) + 'Z' : '';
+                    wdHtml = `<div class="mt-1 text-[10px] font-bold text-red-700" title="Connect Watchdog: ${escapeHtmlRf(wd.reason || 'paused')} — forwarding to this partner is off (Enabled = 0) until ${escapeHtmlRf(wd.resume_at || '')} UTC; its mail waits in the queue">⏸ Paused until ${escapeHtmlRf(until)}</div>`;
+                } else if (wd && wd.fails_in_a_row > 0) {
+                    wdHtml = `<div class="mt-1 text-[10px] font-bold text-amber-700" title="Connect Watchdog: failed forwarding attempts in a row; paused at ${(_watchdog.settings && _watchdog.settings.fail_count) || 2}">⚠ ${wd.fails_in_a_row} failed attempt${wd.fails_in_a_row === 1 ? '' : 's'}</div>`;
+                }
+
                 return `
                     <div class="p-2 rounded-lg border ${statusClass}">
                         <div class="font-bold text-sm">${escapeHtmlRf(callsign)}</div>
+                        ${wdHtml}
                         <div class="flex items-center justify-between gap-1 mt-1">
                             <span class="text-xs">${timeStr}</span>
                             ${bandStr}
@@ -7108,7 +7136,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.33 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.42 | HF Efficiency Report
                 </p>
             `;
             
@@ -7733,6 +7761,7 @@
             setInterval(fetchGeomagneticData, 900000);   // Refresh geomagnetic data every 15 minutes
             loadModemBadges();
             setInterval(loadModemBadges, 60000);   // sound-modem badge every minute (v1.5.23)
+            loadWatchdog(); setInterval(loadWatchdog, 120000);   // Connect Watchdog pauses (v1.5.35)
         });
 
         // Sound-modem ports (QtSoundModem / Direwolf, KISS over TCP): v1.5.23

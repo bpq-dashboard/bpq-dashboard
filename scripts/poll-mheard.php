@@ -1,7 +1,7 @@
 <?php
 /**
  * scripts/poll-mheard.php — LinBPQ's live MHeard lists (v1.5.25)
- * BPQ Dashboard v1.5.33
+ * BPQ Dashboard v1.5.42
  *
  * LinBPQ writes MHSave.txt only when it stops, so System Logs' MHeard card
  * showed the list as of the last restart. This logs in to the node (same

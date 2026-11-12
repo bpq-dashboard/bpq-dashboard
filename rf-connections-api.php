@@ -423,11 +423,39 @@ function action_soundmodem(): array {
 // ─── Dispatcher ─────────────────────────────────────────────────────────────
 
 $action = strparam('action', 'all', [
-    'sessions', 'heatmap', 'stats', 'parser_status', 'all', 'messages', 'soundmodem'
+    'sessions', 'heatmap', 'stats', 'parser_status', 'all', 'messages', 'soundmodem', 'watchdog', 'bbslines'
 ]);
 
 if ($action === 'soundmodem') {      // works without the database (v1.5.23)
     success(action_soundmodem());
+    exit;
+}
+if ($action === 'bbslines') {        // v1.5.39: the few BBS-log lines the page reads
+    bbs_lines_action();
+    exit;
+}
+if ($action === 'watchdog') {        // v1.5.35: Connect Watchdog pauses, for the partner tiles
+    $f = dirname(__FILE__) . '/cache/watchdog-state.json';
+    $j = @is_readable($f) ? json_decode((string)@file_get_contents($f), true) : null;
+    $out = ['running' => false, 'partners' => (object)[]];
+    if (is_array($j) && isset($j['partners']) && is_array($j['partners'])) {
+        $upd = strtotime((string)($j['updated_at'] ?? '')) ?: 0;
+        $out['running'] = $upd > time() - 1800;     // cron runs every 5 minutes
+        $out['updated_at'] = $j['updated_at'] ?? null;
+        $out['settings'] = $j['settings'] ?? null;
+        $p = [];
+        foreach ($j['partners'] as $block => $st) {
+            if (!is_array($st) || !preg_match('/^[A-Z0-9\-]{1,12}$/', (string)$block)) continue;
+            $p[$block] = [
+                'call' => (string)($st['call'] ?? $block), 'status' => (string)($st['status'] ?? ''),
+                'paused' => !empty($st['paused']), 'resume_at' => $st['resume_at'] ?? null,
+                'paused_at' => $st['paused_at'] ?? null, 'reason' => $st['reason'] ?? null,
+                'fails_in_a_row' => (int)($st['fails_in_a_row'] ?? 0), 'last_ok_at' => $st['last_ok_at'] ?? null,
+            ];
+        }
+        $out['partners'] = (object)$p;
+    }
+    success($out);
     exit;
 }
 
@@ -457,4 +485,63 @@ try {
         );
     }
     bail(500, 'Query failed: ' . $e->getMessage());
+}
+
+/**
+ * v1.5.42 — ?action=bbslines&file=log_YYMMDD_BBS.txt
+ *
+ * The RF Connections page used to download every day's raw BBS log (on a busy
+ * hub 40-50 MB a day, 1.3 GB for 30 days) only to read a handful of line
+ * types from it. This returns just those lines, the same text as in the
+ * file: RADIO commands, "Incoming Connect from … Freq", channel busy / port in
+ * use / session attached / "Failure with", and FA/FB/FF/FC proposals. The
+ * result is kept in cache/bbs-lines/ and extended as the log grows, so each
+ * day's log is read once.
+ */
+function bbs_lines_action(): void {
+    $f = (string)($_GET['file'] ?? '');
+    if (!preg_match('/^log_\d{6}_BBS\.txt$/', $f)) { http_response_code(400); echo 'bad file name'; return; }
+    $src = __DIR__ . '/logs/' . $f;
+    if (!is_file($src) || !is_readable($src)) { http_response_code(404); return; }
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: no-store');
+
+    $needles = [' RADIO ', 'Incoming Connect from', 'busy', 'Port in use', 'Session Attached',
+                'Failure with', ' FA ', ' FB ', ' FF ', ' FC ', 'connected VARA HF'];
+    $keep = static function (string $line) use ($needles): bool {
+        foreach ($needles as $n) if (stripos($line, $n) !== false) return true;
+        return false;
+    };
+
+    $dir = __DIR__ . '/cache/bbs-lines';
+    if (!is_dir($dir)) @mkdir($dir, 0775, true);
+    $cache = $dir . '/' . $f; $metaF = $cache . '.json';
+    $lk = (is_dir($dir) && is_writable($dir)) ? @fopen($cache . '.lock', 'c') : false;
+    if (!$lk) {                                   // no cache: filter on the fly
+        $in = fopen($src, 'rb');
+        while (($l = fgets($in)) !== false) if ($keep($l)) echo $l;
+        fclose($in);
+        return;
+    }
+    flock($lk, LOCK_EX);
+    clearstatcache(true, $src);
+    $size = filesize($src); $ino = fileinode($src);
+    $meta = is_file($metaF) ? (json_decode((string)@file_get_contents($metaF), true) ?: []) : [];
+    $from = 0; $mode = 'wb';
+    if (is_file($cache) && ($meta['ino'] ?? null) === $ino && (int)($meta['size'] ?? -1) <= $size) {
+        $from = (int)$meta['size']; $mode = 'ab';
+    }
+    if ($from < $size || $mode === 'wb') {
+        $in = fopen($src, 'rb'); fseek($in, $from);
+        $out = fopen($cache, $mode); $pos = $from;
+        while (($l = fgets($in)) !== false) {
+            if (substr($l, -1) !== "\n") break;      // the line being written: next time
+            $pos += strlen($l);
+            if ($keep($l)) fwrite($out, $l);
+        }
+        fclose($in); fclose($out);
+        file_put_contents($metaF, json_encode(['size' => $pos, 'ino' => $ino]));
+    }
+    flock($lk, LOCK_UN); fclose($lk);
+    readfile($cache);
 }

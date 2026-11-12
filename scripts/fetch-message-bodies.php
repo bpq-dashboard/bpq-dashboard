@@ -12,7 +12,13 @@
  * from a systemd timer (message-bodies.timer, every 5 minutes) and:
  *
  *   1. logs in to the BBS once and lists the newest Personal (LP), NTS (LT)
- *      and Bulletins (LB), up to 200 each;
+ *      and Bulletins, up to 200 each. Bulletins (v1.5.40): "LB" makes BPQ
+ *      send the WHOLE bulletin list (~1,600 lines on K1AJD), and BPQ logs
+ *      every line it sends — 288 runs a day made the BBS log 40-50 MB/day.
+ *      So most runs use "LL <recent>" (the newest messages of every type,
+ *      bulletins kept) and a full "LB" is done once every <full_hours>;
+ *      config.php 'messages' => ['bulletin_list_recent' => 100,
+ *      'bulletin_full_list_hours' => 24];
  *   2. archives those listings into bpq_messages (the same INSERT IGNORE +
  *      bulletin-group filing the page's Get Mail uses);
  *   3. reads (R <n>) every listed message whose saved copy has no text yet
@@ -85,6 +91,12 @@ $config['log_file'] = bpq_app_log('message-bodies.log');   // v1.5.19: /var/log/
 $bulletinPolicy = $opt['bulletins'] ?? getConfig('messages', 'bulletin_text', 'all');
 if (!in_array($bulletinPolicy, ['all', 'pinned', 'none'], true)) $bulletinPolicy = 'all';
 $listCount = 200;
+// v1.5.40: bulletins listed with "LL <n>" most of the time, a full "LB" now and then
+$recentCount   = max(20, min(1000, (int)getConfig('messages', 'bulletin_list_recent', 100)));
+$fullListHours = max(1, min(168, (int)getConfig('messages', 'bulletin_full_list_hours', 24)));
+$listStateFile = $webRoot . '/cache/message-bodies-listing.json';
+$listState     = @json_decode((string)@file_get_contents($listStateFile), true) ?: [];
+$fullListDue   = $opt['backfill'] || (time() - (int)($listState['last_full_lb'] ?? 0)) >= $fullListHours * 3600;
 $limit     = $opt['limit'] ?? ($opt['backfill'] ? 5000 : 400);
 $stateFile = $webRoot . '/cache/message-bodies-state.json';
 
@@ -274,10 +286,21 @@ try {
     try {
         $sock = bbsOpen();
         try {
-            foreach (['P' => 'LP', 'T' => 'LT', 'B' => 'LB'] as $kind => $cmd) {
+            $bCmd = $fullListDue ? 'LB' : 'LL ' . $recentCount;
+            foreach (['P' => 'LP', 'T' => 'LT', 'B' => $bCmd] as $kind => $cmd) {
                 $r = bbsCommand($sock, $cmd, $kind === 'B' ? 60 : 30);
                 if (!$r['prompt']) out("WARNING: $cmd listing did not finish (timeout); using what arrived");
-                $msgs = array_slice(parseMessageList($r['text']), 0, $listCount);
+                $msgs = parseMessageList($r['text']);
+                if ($kind === 'B' && $cmd !== 'LB') {
+                    // "LL n" lists every type: keep the bulletins only
+                    $msgs = array_values(array_filter($msgs, fn($m) => strtoupper(substr((string)$m['status'], 0, 1)) === 'B'));
+                }
+                if ($kind === 'B' && $cmd === 'LB' && $r['prompt'] && !$opt['dry']) {
+                    $listState['last_full_lb'] = time();
+                    @file_put_contents($listStateFile, json_encode($listState));
+                }
+                $stats['bulletin_list'] = $cmd;
+                $msgs = array_slice($msgs, 0, $listCount);
                 foreach ($msgs as $m) {
                     $type = strtoupper(substr((string)$m['status'], 0, 1));
                     if (!in_array($type, ['P', 'T', 'B'], true)) $type = $kind;
@@ -443,7 +466,7 @@ if (!$opt['dry'] && $candidates) {
 }
 
 $s = $stats;
-out(sprintf('Done in %ds: listed P:%d T:%d B:%d, %d new archived, %d to read, text saved %d, ' .
+out(sprintf('Done in %ds: listed P:%d T:%d B:%d (' . ($s['bulletin_list'] ?? 'LB') . '), %d new archived, %d to read, text saved %d, ' .
             'not on BBS %d, number reused %d, skipped (gone or failed before) %d, errors %d, "not found" junk cleared %d%s',
     (int)round(microtime(true) - $t0), $s['listed']['P'], $s['listed']['T'], $s['listed']['B'], $s['archived'],
     $s['candidates'], $s['saved'], $s['not_found'], $s['other_msg'], $s['skipped_failed'],
