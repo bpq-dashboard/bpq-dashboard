@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio Map - BPQ Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#21262d;--border2:#30363d;
+    --text:#e6edf3;--muted:#7d8590;--green:#3fb950;--green-dim:#1a4428;
+    --amber:#d29922;--amber-dim:#3d2b05;--blue:#58a6ff;--blue-dim:#0d2340;
+    --red:#f85149;--red-dim:#3d0c0a;--purple:#bc8cff;--purple-dim:#1e1040;
+    --cyan:#39d0d8;--cyan-dim:#0c2d30;--orange:#f0883e;--orange-dim:#3a1d06;
+    --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  [data-theme="light"] {
+    --bg:#f6f8fa;--surface:#ffffff;--surface2:#f6f8fa;--border:#d0d7de;--border2:#afb8c1;
+    --text:#1f2328;--muted:#656d76;
+    --green:#1a7f37;--green-dim:#dcfce7;--amber:#9a6700;--amber-dim:#fff8c5;
+    --blue:#0969da;--blue-dim:#ddf4ff;--red:#cf222e;--red-dim:#ffebe9;
+    --purple:#8250df;--purple-dim:#fbefff;--cyan:#0d7d8a;--cyan-dim:#e0f7f9;
+    --orange:#bc4c00;--orange-dim:#fff1e5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;padding:32px 24px 64px;max-width:1280px;margin:0 auto;}
+  header{border-bottom:1px solid var(--border2);padding-bottom:20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+  header h1{font-family:var(--mono);font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;}
+  header h1 span{color:var(--green);}
+  header .meta{font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-align:right;line-height:1.8;}
+  .nav-back{font-family:var(--mono);font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;opacity:0.8;}
+  .nav-back:hover{opacity:1;}
+  .auth-gate{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:32px;max-width:440px;margin:80px auto;text-align:center;}
+  .auth-gate h2{font-family:var(--mono);font-size:1rem;margin-bottom:8px;color:var(--amber);}
+  .auth-gate p{color:var(--muted);font-size:0.85rem;}
+  .loading{font-family:var(--mono);color:var(--muted);text-align:center;padding:60px 0;}
+  .intro{color:var(--muted);font-size:0.85rem;margin-bottom:18px;max-width:900px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:0.72rem;color:var(--muted);margin-bottom:10px;}
+  .btn{font-family:var(--mono);font-size:0.72rem;font-weight:600;padding:5px 12px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;}
+  .btn:hover{border-color:var(--blue);color:var(--blue);}
+  .diagram{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px;overflow-x:auto;margin-bottom:26px;}
+  .diagram svg{display:block;min-width:1100px;width:100%;height:auto;}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:0.75rem;color:var(--muted);margin:2px 4px 10px;}
+  .legend i{display:inline-block;width:26px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px;}
+  h2.sec{font-family:var(--mono);font-size:0.85rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:26px 0 10px;}
+  .notes{display:flex;flex-direction:column;gap:6px;}
+  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:6px;padding:8px 12px;font-size:0.85rem;}
+  .note.warn{border-left-color:var(--amber);} .note.ok{border-left-color:var(--green);}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:0.8rem;}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{font-family:var(--mono);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);background:var(--surface2);}
+  td code,.mono{font-family:var(--mono);font-size:0.76rem;}
+  .tbl-wrap{overflow-x:auto;}
+  .pill{display:inline-block;font-family:var(--mono);font-size:0.66rem;padding:1px 7px;border-radius:9px;border:1px solid var(--border2);margin:1px 2px 1px 0;white-space:nowrap;}
+  .pill.ok{color:var(--green);border-color:var(--green);} .pill.warn{color:var(--amber);border-color:var(--amber);}
+  .muted{color:var(--muted);}
+  /* the diagram */
+  .n-box{stroke-width:1.5;rx:8;}
+  .n-bpq{fill:var(--blue-dim);stroke:var(--blue);}
+  .n-bpq-off{fill:var(--surface2);stroke:var(--red);stroke-dasharray:5 4;}
+  .n-modem{fill:var(--green-dim);stroke:var(--green);}
+  .n-alsa{fill:var(--purple-dim);stroke:var(--purple);}
+  .n-card{fill:var(--cyan-dim);stroke:var(--cyan);}
+  .n-radio{fill:var(--orange-dim);stroke:var(--orange);}
+  .t1{font-family:var(--mono);font-size:12.5px;font-weight:700;fill:var(--text);}
+  .t2{font-family:var(--sans);font-size:11.5px;fill:var(--muted);}
+  .colh{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:0.08em;fill:var(--muted);text-transform:uppercase;}
+  .e{fill:none;stroke-width:2;}
+  .e-ok{stroke:var(--green);} .e-warn{stroke:var(--amber);stroke-dasharray:6 5;}
+  .e-audio{stroke:var(--purple);} .e-direct{stroke:var(--cyan);} .e-rf{stroke:var(--orange);}
+  .el{font-family:var(--mono);font-size:10.5px;fill:var(--muted);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;}
+  @media(max-width:700px){body{padding:20px 16px 48px;} header .meta{text-align:left;}}
+</style>
+</head>
+<body data-nav-page="audio">
+<script src="/bpq-nav-loader.js?v=2026-11-16-1"></script>
+
+<a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
+
+<header>
+  <h1>🎛️ BPQ Dashboard <span>//</span> Audio Map <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.66</span></h1>
+  <div class="meta">LinBPQ ports → sound modems → ALSA → sound cards → radios<br>Read from the running system</div>
+</header>
+
+<div id="auth-gate" class="auth-gate" style="display:none;"><h2>🔒 Admin login needed</h2><p id="auth-msg"></p></div>
+<div id="loading" class="loading">Reading the station's audio setup…</div>
+
+<div id="main" style="display:none;">
+  <p class="intro">How each LinBPQ radio port reaches its radio: the modem program listening on the port, the ALSA device it goes through (a shared <b>dmix</b>/<b>dsnoop</b> device lets several modems use one card), the sound card, and what keys the transmitter. Worked out from what is running now, not from settings, so a modem that is stopped shows as missing.</p>
+  <div class="toolbar"><span id="stamp"></span><button class="btn" onclick="load()">⟳ Refresh</button></div>
+  <div class="diagram">
+    <div class="legend">
+      <span><i style="border-color:var(--green)"></i>LinBPQ connected to the modem</span>
+      <span><i style="border-color:var(--amber);border-top-style:dashed"></i>not connected</span>
+      <span><i style="border-color:var(--purple)"></i>shared audio (dmix / dsnoop)</span>
+      <span><i style="border-color:var(--cyan)"></i>card used directly</span>
+      <span><i style="border-color:var(--orange)"></i>card to radio</span>
+    </div>
+    <div id="svg"></div>
+  </div>
+  <h2 class="sec">Notes</h2><div id="notes" class="notes"></div>
+  <h2 class="sec">Programs using the sound cards</h2><div class="tbl-wrap"><table id="t-progs"></table></div>
+  <h2 class="sec">Sound cards and mixer levels</h2><div class="tbl-wrap"><table id="t-cards"></table></div>
+  <h2 class="sec">ALSA devices (/etc/asound.conf and users' ~/.asoundrc)</h2><div class="tbl-wrap"><table id="t-alsa"></table></div>
+  <h2 class="sec">LinBPQ radio ports</h2><div class="tbl-wrap"><table id="t-bpq"></table></div>
+</div>
+
+<script>
+const API = 'audio-map-api.php';
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function load() {
+  document.getElementById('loading').style.display = 'block';
+  fetch(API + '?t=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.text().then(t => {
+      let d = null; try { d = JSON.parse(t); } catch (e) {}
+      if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.detail = d && d.error; throw e; }
+      if (!d || !d.success) throw new Error((d && d.error) || 'HTTP ' + r.status);
+      return d;
+    }))
+    .then(d => {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('main').style.display = 'block';
+      render(d);
+    })
+    .catch(err => {
+      document.getElementById('loading').style.display = 'none';
+      if (err.message === 'auth') {
+        document.getElementById('auth-gate').style.display = 'block';
+        document.getElementById('auth-msg').textContent = err.detail || 'Reload the page and log in.';
+      } else {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('loading').textContent = 'Could not read the audio setup: ' + err.message;
+      }
+    });
+}
+
+function cardName(d, n) { const c = d.cards.find(x => x.index === n); return c ? c : { index: n, id: '?', name: 'card ' + n }; }
+function mixerLine(d, n) {
+  const m = d.mixer && d.mixer[String(n)];
+  if (!m || !m.length) return '';
+  // the first control with a playback level, and the first with a capture level
+  const pl = m.find(c => c.playback && c.playback.pct !== null && !/mic/i.test(c.name)) || m.find(c => c.playback && c.playback.pct !== null);
+  const cp = m.find(c => c.capture && c.capture.pct !== null);
+  return [pl ? `▶ ${pl.name} ${pl.playback.pct}%${pl.playback.on === false ? ' off' : ''}` : '',
+          cp ? `● ${cp.name} ${cp.capture.pct}%${cp.capture.on === false ? ' off' : ''}` : ''].filter(Boolean).join(' · ');
+}
+
+function render(d) {
+  document.getElementById('stamp').textContent = 'Read ' + d.generated_at + ' UTC' +
+    (d.helper.ok ? '' : ' · programs not visible (see Notes)');
+  drawDiagram(d);
+  // notes
+  const notes = d.notes.slice();
+  if (!notes.length) notes.push({ lvl: 'ok', text: 'Nothing to point out.' });
+  document.getElementById('notes').innerHTML = notes.map(n => `<div class="note ${esc(n.lvl)}">${n.lvl === 'warn' ? '⚠ ' : n.lvl === 'ok' ? '✓ ' : 'ℹ '}${esc(n.text)}</div>`).join('');
+  // programs
+  const bpqBy = {}; d.bpq.ports.forEach(p => bpqBy[p.num] = p);
+  const rows = d.modems.map(m => {
+    const cards = Object.entries(m.cards).map(([n, u]) => {
+      const c = cardName(d, +n);
+      const dir = [u.play ? 'play' : '', u.cap ? 'capture' : ''].filter(Boolean).join(' + ');
+      const how = u.exclusive ? '<span class="muted">directly (card to itself)</span>'
+        : `via <code>${esc(u.top || '?')}</code> → ${u.via.map(v => `<code>${esc(v)}</code> ${esc((d.pcms[v] || {}).type || '')}`).join(', ')}`;
+      return `card ${n} <code>${esc(c.id)}</code> ${dir}: ${how}`;
+    }).join('<br>');
+    const ports = m.listen.map(l => `<code>${esc(l.addr)}:${l.port}</code>${l.conn ? ' <span class="muted">(connected)</span>' : ''}${l.wine ? ' <span class="muted">(via wineserver)</span>' : ''}`).join(' ') || '<span class="muted">none</span>';
+    const bp = m.bpq_ports.map(n => {
+      const p = bpqBy[n];
+      return `<span class="pill ${p && p.attached ? 'ok' : 'warn'}">port ${n}${p && p.attached ? ' ✓' : ' not connected'}</span>`;
+    }).join('') || '<span class="muted">—</span>';
+    return `<tr><td><b>${esc(m.label)}</b><br><span class="mono muted">${esc(m.comm)} · pid ${m.pid}</span></td>
+      <td>${esc(m.user)}<br><span class="muted">${m.unit === 'session' ? 'desktop login' : esc(m.unit || '?')}</span></td>
+      <td>${cards}${m.configured ? `<br><span class="muted">configured: ${esc(m.configured)}</span>` : ''}</td>
+      <td>${ports}</td><td>${bp}</td><td>${esc(m.level || '')}</td></tr>`;
+  });
+  document.getElementById('t-progs').innerHTML = `<tr><th>Program</th><th>Runs as</th><th>Sound</th><th>Listens on</th><th>LinBPQ</th><th>TX level</th></tr>` +
+    (rows.join('') || `<tr><td colspan="6" class="muted">${d.helper.ok ? 'No program has a sound card open.' : 'Not visible without the helper (see Notes).'}</td></tr>`);
+  // cards
+  document.getElementById('t-cards').innerHTML = `<tr><th>Card</th><th>Name</th><th>Used by</th><th>Mixer</th></tr>` + d.cards.map(c => {
+    const users = d.modems.filter(m => m.cards[String(c.index)]).map(m => esc(m.label)).join(', ') || '<span class="muted">nothing</span>';
+    const mx = d.mixer && d.mixer[String(c.index)];
+    const mix = mx ? mx.map(x => `<code>${esc(x.name)}</code> ` +
+      [['playback', x.playback], ['capture', x.capture]].filter(([, v]) => v).map(([w, v]) => v.pct === null
+          ? `${w} ${v.on === false ? 'off' : 'on'}`
+          : `${w} ${v.pct}%${v.db !== null ? ' (' + v.db + ' dB)' : ''}${v.on === false ? ' off' : ''}`).join(', ')).join('<br>')
+      : (d.helper.ok ? '<span class="muted">mixer not readable from the web server</span>' : '<span class="muted">not visible without the helper</span>');
+    const mixTxt = Array.isArray(mx) && !mx.length ? '<span class="muted">no mixer controls read (amixer)</span>' : mix;
+    return `<tr><td class="mono">${c.index} <b>${esc(c.id)}</b>${c.usbid ? '<br><span class="muted">USB ' + esc(c.usbid) + '</span>' : ''}</td>
+      <td>${esc(c.name)}${c.label ? '<br><b>' + esc(c.label) + '</b>' : ''}<br><span class="muted">${esc(c.long)}</span></td><td>${users}</td><td>${mixTxt}</td></tr>`;
+  }).join('');
+  // alsa
+  const named = Object.values(d.pcms).filter(p => p.named);
+  document.getElementById('t-alsa').innerHTML = `<tr><th>Device</th><th>Type</th><th>Leads to</th><th>Programs attached</th></tr>` +
+    (named.map(p => {
+      const leads = p.cards.length ? p.cards.map(n => 'card ' + n + ' ' + esc(cardName(d, n).id)).join(', ') : '<span class="muted">no card (e.g. PulseAudio)</span>';
+      const chain = p.slaves.map(s => `${s.role ? s.role + ': ' : ''}<code>${esc(s.to.includes('·') ? (d.pcms[s.to] || {}).type + ' (inline)' : s.to)}</code>`).join(', ');
+      const att = d.attached && d.attached[p.name] !== undefined ? d.attached[p.name] : '';
+      return `<tr><td><code>${esc(p.name)}</code>${p.desc ? '<br><span class="muted">' + esc(p.desc) + '</span>' : ''}${p.from && p.from !== '/etc/asound.conf' ? '<br><span class="muted mono">' + esc(p.from) + '</span>' : ''}</td><td>${esc(p.type)}${p.ipc_key !== null ? '<br><span class="muted mono">ipc_key ' + p.ipc_key + '</span>' : ''}</td>
+        <td>${chain || ''}${chain ? '<br>' : ''}${leads}</td><td>${att}</td></tr>`;
+    }).join('') || `<tr><td colspan="4" class="muted">${d.conf_read ? 'No pcm devices defined.' : '/etc/asound.conf is not there or not readable: programs use the cards directly.'}</td></tr>`);
+  // bpq
+  document.getElementById('t-bpq').innerHTML = `<tr><th>Port</th><th>Driver</th><th>Modem at</th><th>Keying</th><th>Program</th></tr>` +
+    (d.bpq.ports.map(p => {
+      const r = p.interlock !== null ? d.bpq.radios.find(x => x.num === p.interlock) : null;
+      const key = p.kind === 'tnc' ? (p.ptt ? `LinBPQ, PTT ${esc(p.ptt)}${r ? ` via RADIO ${r.num} (${esc(r.via)})` : ''}` : 'the modem') : 'the modem (KISS)';
+      const m = p.modem !== null ? d.modems[p.modem] : null;
+      return `<tr><td class="mono"><b>${p.num}</b> ${esc(p.name)}</td><td>${esc(p.driver)}${p.interlock !== null ? '<br><span class="muted">INTERLOCK ' + p.interlock + '</span>' : ''}${p.bw ? '<br><span class="muted">BW' + p.bw + '</span>' : ''}</td>
+        <td class="mono">${p.port ? esc(p.host) + ':' + p.port : '—'}</td><td>${key}</td>
+        <td>${m ? esc(m.label) + ` <span class="pill ${p.attached ? 'ok' : 'warn'}">${p.attached ? 'connected' : 'not connected'}</span>` : (p.port ? '<span class="pill warn">nothing listening</span>' : '')}</td></tr>`;
+    }).join('') || `<tr><td colspan="5" class="muted">${d.bpq.read ? 'No radio ports.' : 'bpq32.cfg not readable.'}</td></tr>`);
+}
+
+// ── the diagram: five columns, one band per sound card ─────────────────────
+function drawDiagram(d) {
+  const W = 214, H = 64, GAP = 14, X = [20, 290, 560, 830, 1100], TOP = 40;
+  const nodes = [], edges = [];
+  const bpqBy = {}; d.bpq.ports.forEach(p => bpqBy[p.num] = p);
+  const place = (col, key, cls, l1, l2, l3) => { const n = { col, key, cls, l1, l2, l3 }; nodes.push(n); return n; };
+  const used = new Set();
+  let y = TOP;
+  const bands = [];
+  const cardsUsed = d.cards.filter(c => d.modems.some(m => m.cards[String(c.index)]) || d.radios.some(r => r.card === c.index));
+  for (const c of cardsUsed) {
+    const n = c.index;
+    const ms = d.modems.map((m, i) => ({ m, i })).filter(x => x.m.cards[String(n)] && !used.has('m' + x.i))
+      .sort((a, b) => (a.m.bpq_ports[0] || 99) - (b.m.bpq_ports[0] || 99));
+    const col = [[], [], [], [], []];
+    for (const { m, i } of ms) {
+      used.add('m' + i);
+      for (const pn of m.bpq_ports) {
+        const p = bpqBy[pn];
+        col[0].push(place(0, 'b' + pn, 'n-bpq', `Port ${pn}`, p.name, `${p.driver}${p.interlock !== null ? ' · INTERLOCK ' + p.interlock : ''}${p.bw ? ' · BW' + p.bw : ''}`));
+        edges.push({ a: 'b' + pn, b: 'm' + i, cls: p.attached ? 'e-ok' : 'e-warn', label: ':' + p.port });
+      }
+      const lp = m.listen.map(l => l.port).slice(0, 3).join(' ');
+      col[1].push(place(1, 'm' + i, 'n-modem', m.label, `${m.unit === 'session' ? 'desktop login' : m.unit || m.comm} · pid ${m.pid}`, [lp ? 'TCP ' + lp : '', m.level ? 'TX ' + m.level.replace(' (--output-volume)', '') : ''].filter(Boolean).join(' · ')));
+    }
+    // ALSA devices on this card: the top-level ones the modems go through
+    const tops = [...new Set(ms.map(x => x.m.cards[String(n)]).filter(u => !u.exclusive).map(u => u.top || u.via[0]))];
+    for (const t of tops) {
+      const p = d.pcms[t] || { type: '?', shares: [] };
+      const sh = (p.shares || [t]).map(s => { const q = d.pcms[s] || {}; const a = d.attached && d.attached[s] !== undefined ? ` ×${d.attached[s]}` : ''; return `${q.type || ''}${a}`; }).join(' · ');
+      col[2].push(place(2, 'a' + n + t, 'n-alsa', t, p.desc || p.type, sh));
+      edges.push({ a: 'a' + n + t, b: 'c' + n, cls: 'e-audio', label: '' });
+    }
+    for (const { m, i } of ms) {
+      const u = m.cards[String(n)];
+      if (u.exclusive) edges.push({ a: 'm' + i, b: 'c' + n, cls: 'e-direct', label: 'direct' });
+      else edges.push({ a: 'm' + i, b: 'a' + n + (u.top || u.via[0]), cls: 'e-audio', label: u.play && u.cap ? '' : (u.play ? 'play only' : 'capture only') });
+    }
+    col[3].push(place(3, 'c' + n, 'n-card', `card ${n} · ${c.id}`, c.name, mixerLine(d, n)));
+    const r = d.radios.find(x => x.card === n);
+    const k0 = r && r.keyed[0];
+    const l2 = k0 ? 'keyed by ' + k0.how.replace(/ \(.*\)/, '').replace(/ itself$/, '') + (r.keyed.length > 1 ? ' +' + (r.keyed.length - 1) : '') : 'radio';
+    const l3 = k0 ? [(k0.how.match(/\((.*)\)/) || [, ''])[1].replace(/, PTT /, ' · PTT '), k0.ports.length ? 'port ' + k0.ports.join(',') : ''].filter(Boolean).join(' · ') : '';
+    col[4].push(place(4, 'r' + n, 'n-radio', (r && r.label) || 'Radio on ' + c.id, l2, l3));
+    edges.push({ a: 'c' + n, b: 'r' + n, cls: 'e-rf', label: '' });
+    const rowsN = Math.max(1, ...col.map(x => x.length));
+    const bandH = rowsN * (H + GAP);
+    col.forEach((list, ci) => {
+      const off = (bandH - list.length * (H + GAP)) / 2;
+      list.forEach((nd, k) => { nd.x = X[ci]; nd.y = y + off + k * (H + GAP); });
+    });
+    bands.push({ y, h: bandH });
+    y += bandH + 26;
+  }
+  // modems with no card shown yet (none) and LinBPQ ports nothing answers
+  const orphans = d.bpq.ports.filter(p => p.port && p.modem === null);
+  if (orphans.length) {
+    orphans.forEach((p, k) => {
+      const nd = place(0, 'b' + p.num, p.listening ? 'n-bpq' : 'n-bpq-off', `Port ${p.num}`, p.name,
+        p.listening ? `${p.host}:${p.port} answers${p.attached ? ', connected' : ''} (program not visible)` : `nothing listens on ${p.host}:${p.port}`);
+      nd.x = X[0]; nd.y = y + k * (H + GAP);
+    });
+    y += orphans.length * (H + GAP) + 10;
+  }
+  const height = Math.max(y + 10, 160);
+  const byKey = {}; nodes.forEach(n => byKey[n.key] = n);
+  const fit = (s, max) => s && s.length > max ? s.slice(0, max - 1) + '…' : (s || '');
+  let svg = `<svg viewBox="0 0 ${X[4] + W + 20} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Audio map of the station">`;
+  ['LinBPQ port', 'Modem program', 'ALSA device', 'Sound card', 'Radio'].forEach((t, i) => svg += `<text class="colh" x="${X[i] + 4}" y="22">${t}</text>`);
+  for (const e of edges) {
+    const a = byKey[e.a], b = byKey[e.b];
+    if (!a || !b) continue;
+    const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2, mx = (x1 + x2) / 2;
+    svg += `<path class="e ${e.cls}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+    if (e.label) svg += `<text class="el" x="${mx}" y="${(y1 + y2) / 2 - 5}" text-anchor="middle">${esc(e.label)}</text>`;
+  }
+  for (const n of nodes) {
+    svg += `<g><title>${esc([n.l1, n.l2, n.l3].filter(Boolean).join('\n'))}</title><rect class="n-box ${n.cls}" x="${n.x}" y="${n.y}" width="${W}" height="${H}" rx="8"/>`
+      + `<text class="t1" x="${n.x + 10}" y="${n.y + 19}">${esc(fit(n.l1, 24))}</text>`
+      + `<text class="t2" x="${n.x + 10}" y="${n.y + 36}">${esc(fit(n.l2, 33))}</text>`
+      + `<text class="t2" x="${n.x + 10}" y="${n.y + 52}">${esc(fit(n.l3, 33))}</text></g>`;
+  }
+  if (!nodes.length) svg += `<text class="t2" x="20" y="80">${d.helper.ok ? 'No sound modem has a card open.' : 'Programs are not visible without the helper (see Notes); the tables below show what can be read.'}</text>`;
+  svg += '</svg>';
+  document.getElementById('svg').innerHTML = svg;
+}
+
+load();
+</script>
+</body>
+</html>

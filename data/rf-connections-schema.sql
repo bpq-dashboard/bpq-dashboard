@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS rf_connections (
     callsign        VARCHAR(16)     NOT NULL,            -- 'KE0GB' or 'KE0GB-1'
     base_call       VARCHAR(10)     NOT NULL,            -- 'KE0GB' (without SSID)
     direction       ENUM('incoming','outgoing','unknown') NOT NULL DEFAULT 'unknown',
+    modem           ENUM('vara','mercury','vhf','data2g') NOT NULL DEFAULT 'vara',  -- v1.5.46: which parser wrote it; 'vhf' v1.5.51, 'data2g' v1.5.56
 
     -- Timing — stored as DATETIME in UTC; the source log format is
     -- "Mon DD HH:MM:SS" or "YYMMDD HH:MM:SS". Parser converts to UTC datetime.
@@ -31,9 +32,10 @@ CREATE TABLE IF NOT EXISTS rf_connections (
     duration_sec    INT UNSIGNED    NULL,                -- NULL if session ongoing
 
     -- RF metadata
-    freq_khz        INT UNSIGNED    NULL,                -- 14105 for 14.105 MHz; NULL if unknown
+    freq_khz        DECIMAL(9,2) UNSIGNED NULL,          -- 14105.00 for 14.105 MHz, 7101.30 for 7.1013 (v1.5.54: was INT); NULL if unknown
     band            VARCHAR(8)      NULL,                -- '80m','40m','30m','20m','17m','15m','VARA HF','WL2K','Unknown'
     bandwidth       SMALLINT UNSIGNED NULL,              -- 500 / 2300 / 2750 — extracted from VARA "Bandwidth" line
+    link_mode       VARCHAR(24)     NULL,                -- v1.5.46: Mercury's mode at connect (DATAC16 ...); v1.5.56 Data2G's main waveform (w48-256l-r5/8)
 
     -- Quality / throughput
     avg_snr_db      DECIMAL(5,1)    NULL,                -- e.g. 12.5 — from "Average S/N: 12.5 dB" line
@@ -50,6 +52,7 @@ CREATE TABLE IF NOT EXISTS rf_connections (
                                                            -- 'port_in_use', 'superseded', 'incomplete_no_disconnect',
                                                            -- 'channel_busy' (BBS-log-correlated, added 2026-09-16),
                                                            -- 'no_answer' (outgoing, never connected; v1.5.42)
+    end_reason      VARCHAR(24)     NULL,                -- v1.5.55, Mercury: peer_ack / rx_disconnect / timeout ...
 
     -- Bookkeeping
     log_line_no     INT UNSIGNED    NULL,                -- Where in the source log this session ends — useful for debug
@@ -65,8 +68,9 @@ CREATE TABLE IF NOT EXISTS rf_connections (
     KEY idx_start    (session_start),
     KEY idx_base     (base_call),
     KEY idx_band     (band, session_start),
-    KEY idx_status   (status, session_start)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Pre-parsed VARA HF sessions for fast page rendering';
+    KEY idx_status   (status, session_start),
+    KEY idx_modem    (modem, session_start)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Pre-parsed VARA HF (and Mercury, VHF, Data2G) sessions for fast page rendering';
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- Parser state — track which line of which file we last read so the

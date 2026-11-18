@@ -459,17 +459,33 @@ def send_bbs_message(subject, body, dry_run=False):
         send(user)
         read(r'password:$', 8)
         send(pw)
+        # v1.5.45: the same decisions as includes/bbs-login.php, which works on
+        # every station: a node greeting (CTEXT) need not end in '}' — K1AJD's
+        # ends with a list of node aliases — so after the greeting, unless we
+        # are already at the BBS prompt, always send the BBS alias. The old
+        # code sent it only after a '}' and gave up with "no BBS prompt".
+        def at_bbs(txt):
+            tail = txt.rstrip()[-80:]
+            if re.search(r'\bde [A-Z0-9/\-]+>$', tail, re.I):
+                return True
+            return bool((re.search(r'Connected to BBS', txt, re.I) or re.search(r'\[[A-Za-z0-9.\-]+\$\]', txt))
+                        and re.search(r'>$', tail))
         got = ''
-        for _ in range(6):                        # BBS greeting can take a few seconds
-            got += read(None, 2.5, 1.0)
-            if re.search(r'[>}]\s*$', got.rstrip()):
+        for _ in range(8):                        # the greeting can take a few seconds
+            got += read(None, 2.5, 1.5)
+            if '}' in got or at_bbs(got) or re.search(r'sorry|invalid|incorrect|password:', got, re.I):
                 break
         if re.search(r'sorry|invalid|incorrect|password:', got, re.I):
             raise RuntimeError('login refused: check bbs.user / bbs.pass')
-        if re.search(r'\}\s*$', got.rstrip()):          # at the node: go to the BBS
-            send(str(bbs.get('alias') or 'BBS'))
-            got = read(r'>$', 10)
-        if not re.search(r'>\s*$', got.rstrip()):
+        if not at_bbs(got):                       # at the node (or still in its greeting): go to the BBS
+            send(str(bbs.get('alias') or 'bbs'))
+            got2 = ''
+            for _ in range(6):
+                got2 += read(None, 2.5, 1.5)
+                if at_bbs(got2):
+                    break
+            got = got2
+        if not at_bbs(got):
             raise RuntimeError('no BBS prompt after login')
         send(f'SP {to}')
         read(r':$', 6)
@@ -686,9 +702,17 @@ def main():
     ap.add_argument('--pause', metavar='CALL', help='pause a partner now')
     ap.add_argument('--hours', type=int, default=CONFIG['pause_hours'], help='with --pause')
     ap.add_argument('--resume', metavar='CALL', help="enable a paused partner now ('all' for every one)")
+    ap.add_argument('--test-notice', action='store_true',
+                    help='send a test BBS message to the notice address (checks bbs.user/pass and the login); changes nothing else')
     a = ap.parse_args()
     setup_logging(to_file=not a.status,
-                  console=sys.stdout.isatty() or bool(a.status or a.dry_run or a.pause or a.resume))
+                  console=sys.stdout.isatty() or bool(a.status or a.dry_run or a.pause or a.resume or a.test_notice))
+    if a.test_notice:                      # v1.5.45
+        CONFIG['notify'] = True
+        send_bbs_message('Connect watchdog: test notice',
+                         'This is a test message from connect-watchdog.py --test-notice.\n'
+                         'If you can read it, the watchdog can tell you when it pauses or resumes a partner.')
+        return 0
     if a.status:
         cmd_status()
         return 0

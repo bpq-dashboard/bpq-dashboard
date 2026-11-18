@@ -15,7 +15,7 @@
  *   GET  ?action=backup_status    the station's last backup (v1.5.34), from the
  *                                 status file a backup script writes
  *   POST ?action=watch_save       save them to data/system-logs.json
- *                                 body: {"watch": [{"call","port","hours"}], "live_mheard": bool}
+ *                                 body: {"watch": [{"call","port","hours","probe_hours"}], "live_mheard": bool}
  *
  * Every POST needs the header  X-BPQ-Dashboard: 1  (sent by the page; a
  * form or link on another web site can't add it, so a visitor's saved login
@@ -274,6 +274,9 @@ case 'watch_save':
             if (!preg_match('/^[A-Z0-9]{1,6}(-\d{1,2})?$/', $c)) fail('Not a callsign: ' . substr($c, 0, 12));
             $h = (float)($w['hours'] ?? 0);
             if ($h < 0.5 || $h > 720) fail("Hours for $c: 0.5 to 720");
+            $ph = (int)($w['probe_hours'] ?? 0);                     // v1.5.55
+            if (!in_array($ph, BPQ_PROBE_HOURS, true)) fail("Test connect for $c: off or 1, 2, 3, 4, 6, 8, 12, 24 hours");
+            if ($ph && !((int)($w['port'] ?? 0) > 0)) fail("Test connect for $c needs a port");
         }
         $save = bpq_system_logs_saved() ?? [];
         $save['watch'] = bpq_watch_list($in['watch']);

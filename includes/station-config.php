@@ -128,7 +128,12 @@ function bpq_linbpq_ports(): array {
                 $name = preg_match('/^\s*ID\s*=\s*(.+)$/mi', $blk, $m) ? trim($m[1]) : '';
                 $drv  = preg_match('/^\s*DRIVER\s*=\s*(\S+)/mi', $blk, $m) ? strtoupper($m[1]) : '';
                 $kind = in_array($drv, ['TELNET', 'BPQAXIP', 'AXIP'], true) ? 'net' : 'rf';
-                $ports[$num] = ['name' => mb_substr($name !== '' ? $name : "Port $num", 0, 40), 'kind' => $kind];
+                $ports[$num] = ['name' => mb_substr($name !== '' ? $name : "Port $num", 0, 40), 'kind' => $kind, 'driver' => $drv];
+                // v1.5.43: VARA-type ports (VARA, Mercury, Data2G) name their TNC with "ADDR host port"
+                if ($drv === 'VARA' && preg_match('/^\s*ADDR\s+(\S+)\s+(\d+)/mi', $blk, $ad)) {
+                    $ports[$num]['tnc_host'] = $ad[1];
+                    $ports[$num]['tnc_port'] = (int)$ad[2];
+                }
                 if (preg_match('/^\s*IPADDR\s*=\s*(\S+)/mi', $blk, $ip) && preg_match('/^\s*TCPPORT\s*=\s*(\d+)/mi', $blk, $tp)
                     && !in_array($drv, ['TELNET', 'BPQAXIP', 'AXIP'], true)) {
                     $ports[$num]['kiss_host'] = $ip[1];
@@ -183,6 +188,9 @@ function bpq_watch_source(): string {
  * it been quiet longer than 'hours'? 'port' optional (any port).
  * -> [['call', 'port' (int|null), 'hours' (float)], ...]
  */
+/** v1.5.50: allowed "test connect every N hours" values (0 = off). */
+const BPQ_PROBE_HOURS = [0, 1, 2, 3, 4, 6, 8, 12, 24];
+
 function bpq_watch_list(?array $from = null): array {
     if ($from === null) {
         $s = bpq_system_logs_saved();
@@ -200,7 +208,10 @@ function bpq_watch_list(?array $from = null): array {
         $key = $call . '/' . ($port ?? '*');
         if (isset($seen[$key]) || count($out) >= 20) continue;
         $seen[$key] = true;
-        $out[] = ['call' => $call, 'port' => $port, 'hours' => $hours];
+        // v1.5.50: test connect every N hours (0 = off; needs a port)
+        $probe = (int)($w['probe_hours'] ?? 0);
+        $probe = ($port && in_array($probe, BPQ_PROBE_HOURS, true)) ? $probe : 0;
+        $out[] = ['call' => $call, 'port' => $port, 'hours' => $hours, 'probe_hours' => $probe];
     }
     return $out;
 }
@@ -219,7 +230,15 @@ function bpq_watch_status(?PDO $pdo): array {
             } catch (Throwable $e) { $last = null; }
         }
         $ageH = $last ? (time() - strtotime($last . ' UTC')) / 3600 : null;
-        $out[] = $w + ['last_heard' => $last, 'quiet' => $ageH === null || $ageH > $w['hours']];
+        $probe = null;                                   // v1.5.50: last test connect
+        if ($pdo && $w['probe_hours'] && $w['port']) {
+            try {
+                $st = $pdo->prepare('SELECT probed_at, result, connect_secs FROM link_probes WHERE callsign = ? AND port = ? ORDER BY probed_at DESC LIMIT 1');
+                $st->execute([$w['call'], $w['port']]);
+                $probe = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+            } catch (Throwable $e) { $probe = null; }
+        }
+        $out[] = $w + ['last_heard' => $last, 'quiet' => $ageH === null || $ageH > $w['hours'], 'last_probe' => $probe];
     }
     return $out;
 }

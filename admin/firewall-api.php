@@ -48,6 +48,24 @@ $LABELS = [
     8300 => 'VARA HF command', 8301 => 'VARA HF data',
     9025 => 'VARA validator command', 9026 => 'VARA validator data',
 ];
+// v1.5.43: Mercury HF modem (VARA-style TNC, no password: keep it local)
+require_once dirname(__DIR__) . '/includes/mercury-status.php';
+$merc = bpq_mercury_settings();
+if ($merc['enabled'] !== false && (@file_exists($merc['ini']) || @file_exists($merc['log']))) {
+    $LABELS[$merc['tnc_port']]     = 'Mercury HF command (keep local)';
+    $LABELS[$merc['tnc_port'] + 1] = 'Mercury HF data (keep local)';
+    $LABELS[$merc['broadcast_port']] = 'Mercury HF broadcast (keep local)';
+    if (!empty($merc['ui_enabled'])) $LABELS[$merc['ui_port']] = 'Mercury HF monitor page (keep local)';   // v1.5.55
+}
+// v1.5.56: Data2G HF modem (VARA-style TNC; listens on 127.0.0.1 by default)
+require_once dirname(__DIR__) . '/includes/data2g-status.php';
+$d2g = bpq_data2g_settings();
+if ($d2g['enabled'] !== false && ($d2g['unit_there'] || @file_exists($d2g['log']))) {
+    $LABELS[$d2g['tnc_port']]     = 'Data2G HF command (keep local)';
+    $LABELS[$d2g['tnc_port'] + 1] = 'Data2G HF data (keep local)';
+    $LABELS[$d2g['kiss_port']]    = 'Data2G HF KISS (keep local)';
+    if ($d2g['web_port'] > 0) $LABELS[$d2g['web_port']] = 'Data2G HF monitor page (keep local)';
+}
 $flrigPort = (int)($cfg['radio']['flrig_port'] ?? 12345);
 $LABELS[$flrigPort] = 'flrig (radio control)';
 $LABELS[(int)($cfg['bbs']['port'] ?? 8010)] = 'BPQ telnet';

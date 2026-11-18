@@ -12,3 +12,8 @@ sql/2026-09-21-rf-messages-medium.sql
 sql/2026-09-26-message-keep-and-bodies.sql
 sql/2026-10-06-rf-messages-delivery.sql
 sql/2026-11-09-vara-no-answer.sql
+sql/2026-11-14-rf-connections-modem.sql
+sql/2026-11-15-rf-connections-vhf.sql
+sql/2026-11-15-rf-connections-freq-decimal.sql
+sql/2026-11-15-rf-connections-data2g.sql
+sql/2026-11-18-rf-connections-link-sec.sql

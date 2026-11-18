@@ -460,7 +460,7 @@ function bbsFreqEventsForToday($bbsLogDir) {
         // INCOMING — freq given in Hz
         if (preg_match('/\|[A-Z0-9-]+\s+Incoming Connect from ([A-Z0-9-]+).*?Freq\s+(\d+)\s+Mode\s+VARA/i', $line, $m)) {
             $call = strtoupper($m[1]);
-            $freqKhz = (int)round(((int)$m[2]) / 1000);
+            $freqKhz = round(((int)$m[2]) / 1000, 2);    // v1.5.54: keep tenths (7102.4)
             $events[$call][] = ['sec' => $sec, 'freq_khz' => $freqKhz];
             continue;
         }
@@ -468,7 +468,7 @@ function bbsFreqEventsForToday($bbsLogDir) {
         // OUTGOING — freq given in MHz
         if (preg_match('/>([A-Z0-9-]+)\s+RADIO\s+([\d.]+)/i', $line, $m)) {
             $call = strtoupper(explode('-', $m[1])[0]);
-            $freqKhz = (int)round(((float)$m[2]) * 1000);
+            $freqKhz = round(((float)$m[2]) * 1000, 2);  // v1.5.54: 7.101300 -> 7101.3
             $events[$call][] = ['sec' => $sec, 'freq_khz' => $freqKhz];
             continue;
         }

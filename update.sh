@@ -263,6 +263,10 @@ elif [[ -f /etc/sudoers.d/www-data-tools && -f "$SRC/www-data-tools.sudoers" ]] 
    ! cmp -s <(sudo_want) /etc/sudoers.d/www-data-tools; then
     say "Sudo rules to refresh: /etc/sudoers.d/www-data-tools  (see: diff /etc/sudoers.d/www-data-tools $SRC/www-data-tools.sudoers)"
 fi
+if [[ -f /etc/sudoers.d/www-data-tools && -f "$SRC/tools/audio-map-helper" ]] && ! kept /etc/sudoers.d/www-data-tools && \
+   ! cmp -s "$SRC/tools/audio-map-helper" /usr/local/sbin/bpq-dashboard-audio-map; then
+    say "Audio Map helper to install: /usr/local/sbin/bpq-dashboard-audio-map  (read-only, for Admin > Audio Map)"
+fi
 
 if (( ${#REPL[@]} + ${#ADD[@]} + ${#REMOVE[@]} == 0 )) && [[ $FORCE != y ]]; then
     echo; ok "Nothing to copy: every file already matches $NEW_VER."
@@ -470,6 +474,15 @@ if grep -qs 'bpq-dashboard-set-admin-password' /etc/sudoers.d/* && [[ -f "$SRC/t
     if ! cmp -s "$SRC/tools/set-admin-password" "$H"; then
         if [[ -e "$H" ]]; then cp -p "$H" "$BK/etc/"; else echo "$H" >> "$BK/new-root-files.txt"; fi
         install -o root -g root -m 755 "$SRC/tools/set-admin-password" "$H" && ok "Admin-password helper updated ($H)"
+    fi
+fi
+
+# v1.5.57: the Audio Map page's read-only helper, where the sudo rule for it is in place
+if grep -qs 'bpq-dashboard-audio-map' /etc/sudoers.d/* && [[ -f "$SRC/tools/audio-map-helper" ]]; then
+    H=/usr/local/sbin/bpq-dashboard-audio-map
+    if ! cmp -s "$SRC/tools/audio-map-helper" "$H"; then
+        if [[ -e "$H" ]]; then cp -p "$H" "$BK/etc/"; else echo "$H" >> "$BK/new-root-files.txt"; fi
+        install -o root -g root -m 755 "$SRC/tools/audio-map-helper" "$H" && ok "Audio Map helper installed ($H)"
     fi
 fi
 

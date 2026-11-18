@@ -32,3 +32,10 @@ www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -t
 # never point this at the web folder, which the web user can write). It changes
 # only an existing admin login, reads the password on stdin and logs no secret.
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-set-admin-password *
+
+# v1.5.57: Admin > Audio Map. Who has which sound card open (through which
+# dmix/dsnoop), the ports those programs listen on, and the cards' mixer
+# levels, read from /proc and amixer. Root-owned copy in /usr/local/sbin
+# (install.sh / update.sh put it there from tools/audio-map-helper); "" = no
+# arguments allowed. It reads only and prints no command lines or secrets.
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-audio-map ""

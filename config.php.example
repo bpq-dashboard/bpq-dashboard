@@ -181,6 +181,44 @@ return [
     //     'max_age_hours' => 36,
     // ],
 
+    // ---- Mercury HF modem (v1.5.43, optional) ----
+    // RF Connections shows a "Mercury HF Status" card when Mercury is
+    // installed (its log or TNC port is found). Installation Manual §10.17.
+    // Defaults below; uncomment only to change them, or 'enabled' => false
+    // to hide the card. tnc_port defaults to arq_tcp_base_port in the ini.
+    // v1.5.46: its calls are rows in RF Connections too (Recent connections,
+    // partner strips, 7-day history, hourly chart). The headline numbers
+    // (success rate, failures, S/N, stations) stay VARA's unless
+    // in_headlines is true.
+    // v1.5.55 (optional): scheduled test connects to watched stations
+    // (Maintenance → Watched stations → Test connect) and how long the
+    // hour-by-hour heard history is kept.
+    // 'link_probe'  => ['enabled' => true, 'offset_minutes' => 7, 'timeout' => 150],
+    // 'system_logs' => ['history_days' => 90],
+    // v1.5.51: which LinBPQ ports are VHF packet (normally read from bpq32.cfg)
+    // 'vhf' => ['ports' => [4]],
+    // 'mercury' => [
+    //     'enabled'      => 'auto',
+    //     'log'          => '/var/log/mercury/mercury.log',
+    //     'ini'          => '/etc/mercury/mercury.ini',
+    //     'tnc_port'     => 8400,
+    //     'in_headlines' => false,
+    // ],
+
+    // ---- Data2G HF modem (v1.5.56, optional) ----
+    // Like Mercury: a "Data2G HF" card on RF Connections when Data2G is
+    // installed (its log, service file or TNC port is found), and its calls
+    // as rows beside VARA's (parse-data2g-log.py, run by the VARA parser).
+    // The ports are read from the data2g service's ExecStart (--command-port,
+    // --kiss-port, --web-port). Installation Manual §10.18. Defaults below.
+    // 'data2g' => [
+    //     'enabled'      => 'auto',
+    //     'log'          => '/var/log/data2g/data2g.log',
+    //     'unit'         => '/etc/systemd/system/data2g.service',
+    //     'tnc_port'     => 8500,
+    //     'in_headlines' => false,
+    // ],
+
     // ---- System Logs (v1.5.22) ----
     // The MHeard tabs are named from the ID= lines of the PORT blocks in
     // <paths.linbpq>/bpq32.cfg. Only if the web server can't read that file
@@ -207,6 +245,8 @@ return [
         'enabled'    => true,           // false = no flrig: Rig pages hidden from the menu, no history poller
         'flrig_host' => '127.0.0.1',    // machine running flrig
         'flrig_port' => 12345,          // flrig XML-RPC port (Config > Setup > XML-RPC Server)
+        // 'settings_panel' => false,   // v1.5.66: hide Rig Status' Radio settings card (it only
+                                        //   appears when flrig reports a Yaesu FTdx-3000 anyway)
         'bpq_radio'  => 0,              // bpq32.cfg RADIO number whose scan list the Rig page
                                         //   shows; 0 = the RADIO block with an FLRIG line
         'max_power'  => 0,              // highest TX power (W) the Rig page may set;

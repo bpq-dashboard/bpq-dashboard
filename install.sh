@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.42 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.66 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.42 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.66 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -1499,12 +1499,14 @@ sleep 2   # the reload finishes a moment after systemctl returns
 http_code() { curl -s -o /dev/null -m 15 -w '%{http_code}' -A 'Mozilla/5.0 (install.sh)' "$@" 2>/dev/null; }
 if command -v curl >/dev/null 2>&1; then
     WEB_TEST="http://${WEB_BIND:-127.0.0.1}:$WEB_PORT"
-    CODE=$(http_code $WEB_TEST/api/config.php)
+    # station-info.php: a public PHP page. (Not api/config.php: the web-server
+    # rule that guards config.php answers 403 for it too, on purpose. v1.5.64)
+    CODE=$(http_code $WEB_TEST/station-info.php)
     case "$CODE" in
-        200) ok "PHP answers through the web server (api/config.php → 200)" ;;
+        200) ok "PHP answers through the web server (station-info.php → 200)" ;;
         502|504) err "PHP pages answer $CODE — the web server can't reach PHP-FPM at $PHP_FPM_SOCK."
              err "Check: ls -l /run/php/ ; then fix fastcgi_pass in /etc/nginx/sites-available/bpq-dashboard" ;;
-        *)   warn "api/config.php answered ${CODE:-nothing} (expected 200). See the web server error log." ;;
+        *)   warn "station-info.php answered ${CODE:-nothing} (expected 200). See the web server error log." ;;
     esac
     CODE=$(http_code $WEB_TEST/admin/bpq-maintenance.html)
     case "$CODE" in
@@ -1854,13 +1856,18 @@ if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
     explain "fail2ban and listening ports through a few read-only sudo rules"
     explain "(listed in www-data-tools.sudoers). They can't change anything."
     explain "One more rule (v1.5.19) lets the Maintenance page change the admin"
-    explain "login's password, through a small root-owned helper in /usr/local/sbin."
+    explain "login's password, through a small root-owned helper in /usr/local/sbin,"
+    explain "and one (v1.5.57) lets Admin > Audio Map see which programs use the sound cards."
     if yesno "Install those sudo rules (/etc/sudoers.d/www-data-tools)?" Y; then
         # The helper must be root-owned and outside the web folder (the web
         # user can write there, so a sudo rule pointing into it = root).
         if [[ -f "$WEB_ROOT/tools/set-admin-password" ]]; then
             install -o root -g root -m 755 "$WEB_ROOT/tools/set-admin-password" /usr/local/sbin/bpq-dashboard-set-admin-password \
                 && ok "Admin-password helper: /usr/local/sbin/bpq-dashboard-set-admin-password"
+        fi
+        if [[ -f "$WEB_ROOT/tools/audio-map-helper" ]]; then      # v1.5.57: Admin > Audio Map (read-only)
+            install -o root -g root -m 755 "$WEB_ROOT/tools/audio-map-helper" /usr/local/sbin/bpq-dashboard-audio-map \
+                && ok "Audio Map helper: /usr/local/sbin/bpq-dashboard-audio-map"
         fi
         TMP_SUDO=$(mktemp)
         sed "s/^www-data /$WEB_USER /" "$WEB_ROOT/www-data-tools.sudoers" > "$TMP_SUDO"

@@ -192,6 +192,34 @@ CREATE TABLE IF NOT EXISTS net_mheard (
     KEY idx_port (port)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Live snapshot of MHSave.txt (heard stations by port)';
 
+-- v1.5.50: every hearing of a station, kept for the VHF path history on RF
+-- Connections (net_mheard above holds only the latest per station). One row
+-- per new "last heard" time seen by the 5-minute poll, so at most one per
+-- station per poll. Kept system_logs.history_days (default 90).
+CREATE TABLE IF NOT EXISTS net_heard_history (
+    id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    callsign        VARCHAR(16)     NOT NULL,
+    port            TINYINT UNSIGNED NOT NULL,
+    heard_at        DATETIME        NOT NULL,              -- UTC
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq_heard (callsign, port, heard_at),
+    KEY idx_heard_at (heard_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Every MHeard time seen (VHF path history, v1.5.50)';
+
+-- v1.5.50: test connects made by scripts/link-probe.py to watched stations
+-- that have "Test connect every N h" set (Maintenance → Watched stations).
+CREATE TABLE IF NOT EXISTS link_probes (
+    id              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
+    probed_at       DATETIME        NOT NULL,              -- UTC, when the C command was sent
+    callsign        VARCHAR(16)     NOT NULL,
+    port            TINYINT UNSIGNED NOT NULL,
+    result          ENUM('connected','failed','busy','error') NOT NULL,
+    connect_secs    DECIMAL(6,1)    NULL,                  -- C command to "Connected to" / "Failure with"
+    detail          VARCHAR(160)    NULL,                  -- the node's answer, or the error
+    PRIMARY KEY (id),
+    KEY idx_call_time (callsign, probed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Scheduled test connects (link-probe.py, v1.5.50)';
+
 CREATE TABLE IF NOT EXISTS net_rtknown (
     callsign        VARCHAR(16)     NOT NULL,
     last_heard      DATETIME        NOT NULL,

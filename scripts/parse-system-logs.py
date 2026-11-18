@@ -754,6 +754,66 @@ def merge_live_mheard(rows, live):
     return rows
 
 
+def record_heard_history(conn, verbose=False):
+    """v1.5.50: copy each station's latest heard time from the fresh
+    net_mheard snapshot into net_heard_history (one row per new time), and
+    drop rows older than system_logs.history_days (default 90). Returns
+    (1, rows added); (0, 0) when the table isn't there yet."""
+    days = 90
+    try:
+        days = max(7, min(int(bpq_db_config.load_config_section('system_logs').get('history_days') or 90), 730))
+    except (TypeError, ValueError):
+        pass
+    try:
+        with conn.cursor() as cur:
+            n = cur.execute("INSERT IGNORE INTO net_heard_history (callsign, port, heard_at) "
+                            "SELECT callsign, port, heard_at FROM net_mheard "
+                            "WHERE heard_at IS NOT NULL AND heard_at >= UTC_TIMESTAMP() - INTERVAL %s DAY",
+                            (days,))
+            cur.execute("DELETE FROM net_heard_history WHERE heard_at < UTC_TIMESTAMP() - INTERVAL %s DAY", (days,))
+    except pymysql.MySQLError as e:
+        if verbose:
+            sys.stdout.write(f"  [heard_hist] skipped: {e} (run update.sh for the new table)\n")
+        conn.rollback()
+        return 0, 0
+    if verbose:
+        sys.stdout.write(f"  [heard_hist] {n} new hearing(s) kept\n")
+    return 1, n
+
+
+def run_vhf_connections(verbose=False):
+    """v1.5.51: scripts/parse-vhf-connections.py (re-reads the last 2 days;
+    quick). Its failure never stops this parser."""
+    import subprocess
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'parse-vhf-connections.py')
+    if not os.path.isfile(script):
+        return
+    try:
+        r = subprocess.run([sys.executable, script, '--quiet'], capture_output=True, text=True, timeout=120)
+        out = (r.stdout + r.stderr).strip()
+        if out:
+            sys.stdout.write('  ' + out.replace('\n', '\n  ') + '\n')
+    except (OSError, subprocess.SubprocessError) as e:
+        sys.stdout.write(f"  [vhf] parse-vhf-connections.py did not run: {e}\n")
+
+
+def start_link_probe(verbose=False):
+    """v1.5.50: start scripts/link-probe.py --due in the background. It
+    does nothing unless a watched station has "Test connect" set and its
+    time slot hasn't been tried yet; it keeps its own lock and log."""
+    import subprocess
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'link-probe.py')
+    if not os.path.isfile(script):
+        return
+    try:
+        subprocess.Popen([sys.executable, script, '--due', '--quiet'],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True, close_fds=True)
+    except OSError as e:
+        if verbose:
+            sys.stdout.write(f"  [link-probe] not started: {e}\n")
+
+
 def run_snapshot(conn, logs_dir, source, filename, parse_fn, table, columns,
                  verbose, dry_run, allow_missing=False):
     """Shared runner for the three snapshot sources — DELETE + INSERT
@@ -916,6 +976,16 @@ def main():
                 'net_mheard', ['port', 'callsign', 'heard_at', 'bytes', 'status',
                               'grid', 'freq_mhz', 'polled_at'],
                 args.verbose, args.dry_run, allow_missing=live is not None)
+        if 'mheard' in sources and not args.dry_run:
+            # v1.5.50: keep every hearing for the VHF path history
+            totals['heard_hist'] = record_heard_history(conn, args.verbose)
+            conn.commit()
+            # v1.5.51: VHF packet connections into rf_connections (uses the
+            # hearings just recorded to tell VHF calls from AXIP ones)
+            run_vhf_connections(args.verbose)
+            # v1.5.50: scheduled test connects (scripts/link-probe.py), in
+            # the background so this run isn't held up by a slow connect
+            start_link_probe(args.verbose)
         if 'rtknown' in sources:
             totals['rtknown'] = run_snapshot(
                 conn, args.logs_dir, 'rtknown', 'RTKnown.txt', parse_rtknown_file,

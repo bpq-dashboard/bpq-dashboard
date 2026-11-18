@@ -569,7 +569,7 @@ foreach ((glob('/etc/logrotate.d/*') ?: []) as $lrf) {
     if (stripos($txt, $WEB_ROOT) !== false || stripos($txt, $LOG_DIR) !== false || preg_match('#bpq|vara#i', $txt)) $lrFiles[] = $lrf;
 }
 $own = [];
-foreach (['dashboard.log','bbs-messages.log','message-bodies.log','nws-auto-post.log','bpq-telnet-daemon.log','bpq-vara-daemon.log','prop-scheduler.log','storm-monitor.log','connect-watchdog.log'] as $f) {
+foreach (['dashboard.log','bbs-messages.log','message-bodies.log','nws-auto-post.log','bpq-telnet-daemon.log','bpq-vara-daemon.log','prop-scheduler.log','storm-monitor.log','connect-watchdog.log','link-probe.log'] as $f) {
     // v1.5.19: these now live in /var/log/bpq-dashboard (covered by its *.log);
     // only copies still written into LinBPQ's logs folder need naming
     if (file_exists("$LOG_DIR/$f") && bpq_app_log_dir() === $LOG_DIR) $own[] = "$LOG_DIR/$f";
@@ -917,6 +917,169 @@ if (!$bk['present']) {
     $findings[] = finding('backup','application',$lvl,$title,
         $when . $drv . (($bk['result'] ?? '') === 'failed' && ($bk['message'] ?? '') !== '' ? '. Last run: ' . $bk['message'] : '') . '.',
         $lvl === 'ok' ? '' : 'Look at the backup script\'s log; check the drive is plugged in and mounted.');
+}
+
+// v1.5.50: scheduled test connects to watched stations (scripts/link-probe.py,
+// started by parse-system-logs.py every 5 minutes)
+if (!empty($pdo)) {
+    foreach (bpq_watch_list() as $w) {
+        if (empty($w['probe_hours']) || empty($w['port'])) continue;
+        try {
+            $st = $pdo->prepare('SELECT TIMESTAMPDIFF(MINUTE, MAX(probed_at), UTC_TIMESTAMP()) FROM link_probes WHERE callsign = ? AND port = ?');
+            $st->execute([$w['call'], $w['port']]);
+            $age = $st->fetchColumn();
+        } catch (Throwable $e) {
+            $findings[] = finding('link-probe','logs','warn','Test connects: no link_probes table',
+                'Watched stations have Test connect set, but the table for the results is missing.', 'Run update.sh again');
+            break;
+        }
+        $late = $age === null || $age === false || (int)$age > $w['probe_hours'] * 60 * 2 + 30;
+        $findings[] = finding('link-probe-' . strtolower($w['call']),'logs', $late ? 'warn' : 'ok',
+            $late ? "Test connects to {$w['call']} not running" : "Test connects to {$w['call']} running",
+            ($age === null || $age === false ? 'None recorded yet' : "Last one {$age} min ago")
+            . " (every {$w['probe_hours']} h on port {$w['port']}). They start from parse-system-logs.py's 5-minute run.",
+            $late ? 'sudo tail -20 /var/log/bpq-dashboard/link-probe.log; sudo -u www-data python3 ' . $WEB_ROOT . '/scripts/link-probe.py --list' : '');
+    }
+}
+
+// v1.5.43: Mercury HF modem (optional): running, LinBPQ attached, audio, kept local
+require_once dirname(__DIR__) . '/includes/mercury-status.php';
+$mst = bpq_mercury_status($WEB_ROOT . '/cache');
+if (!empty($mst['enabled'])) {
+    $mp = $mst['tnc_port'];
+    $where = 'TNC port ' . $mp . ($mst['bpq_port'] ? ', LinBPQ port ' . $mst['bpq_port']['num'] : ', no LinBPQ port with ADDR 127.0.0.1 ' . $mp);
+    $lvl = ['up' => 'ok', 'session' => 'ok', 'nolink' => 'warn', 'audio' => 'warn', 'down' => 'warn'][$mst['status']] ?? 'info';
+    $title = ['up' => 'Mercury HF running', 'session' => 'Mercury HF running (in a session)', 'nolink' => 'Mercury HF: LinBPQ not attached',
+              'audio' => 'Mercury HF: sound card delivers no audio', 'down' => 'Mercury HF not running'][$mst['status']] ?? 'Mercury HF: status unknown';
+    $rec = ['nolink' => 'Check the Mercury port\'s "ADDR 127.0.0.1 ' . $mp . '" line in bpq32.cfg, then restart LinBPQ.',
+            'audio'  => 'sudo tail -20 /var/log/mercury/mercury.log   # if the card is shared with VARA, check VARA is running',
+            'down'   => 'sudo systemctl status mercury'][$mst['status']] ?? '';
+    $findings[] = finding('mercury','application',$lvl,$title,
+        'Mercury' . ($mst['version'] ? ' ' . $mst['version'] : '') . ", $where" . ($mst['errors_24h'] ? "; {$mst['errors_24h']} error(s) in its log in 24 h" : '')
+        . ($mst['log_there'] && !$mst['log_readable'] ? '; its log is not readable by the web server' : '') . '.', $rec);
+    // Mercury's TNC answers on every network interface and has no password:
+    // anyone who reaches it can key the transmitter.
+    if ($mst['listening']) {
+        $range = $mp . ':' . ($mp + 2);
+        $blocked = $fw4ok && preg_match('/(DROP|REJECT).*(dports\s+' . $mp . '[:,]|dpt:' . $mp . '\b)/', (string)$fw4);
+        $findings[] = finding('mercury-exposed','security', $blocked ? 'ok' : ($fw4ok ? 'warn' : 'info'),
+            $blocked ? 'Mercury TNC kept local (firewall)' : 'Mercury TNC may be reachable from the network',
+            "Mercury listens on all interfaces on $mp-" . ($mp + 2) . ' with no password; anyone who reaches it can key the transmitter.'
+            . ($fw4ok ? '' : ' (www-data may not read iptables here, so this could not be checked.)'),
+            $blocked ? '' : "sudo iptables -I INPUT -p tcp -m multiport --dports $range ! -i lo -j DROP && sudo netfilter-persistent save");
+    }
+    // v1.5.49: Mercury's own monitor page (ui_enabled) also listens on every
+    // interface with no password, and its full page can change Mercury's
+    // audio, PTT and TX level. Keep it to this machine.
+    $mset = bpq_mercury_settings();
+    if (!empty($mset['ui_enabled'])) {
+        $up = (int)$mset['ui_port'];
+        $uBlocked = $fw4ok && preg_match('/(DROP|REJECT).*(dpt:' . $up . '\b|dports?\s+[\d,:]*\b' . $up . '\b)|(dpt:|dports?\s+[\d,:]*\b)' . $up . '\b.*(DROP|REJECT)/', (string)$fw4);
+        $findings[] = finding('mercury-ui-exposed','security', $uBlocked ? 'ok' : ($fw4ok ? 'warn' : 'info'),
+            $uBlocked ? "Mercury monitor (port $up) kept local (firewall)" : "Mercury monitor (port $up) may be reachable from the network",
+            "mercury.ini has ui_enabled = true: Mercury serves its monitor pages on port $up on all interfaces, with no password. Its full page (mercury.html) can change Mercury's audio devices, PTT and TX level."
+            . ($fw4ok ? '' : ' (www-data may not read iptables here, so this could not be checked.)'),
+            $uBlocked ? '' : "sudo iptables -I INPUT -p tcp --dport $up ! -i lo -j DROP && sudo netfilter-persistent save");
+    }
+    // v1.5.46: Mercury's calls reach RF Connections (parse-mercury-log.py,
+    // run by the VARA parser every 5 minutes)
+    if (!empty($pdo) && $mst['log_there']) {
+        try {
+            $hasModem = (int)$pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+                                          AND TABLE_NAME = 'rf_connections' AND COLUMN_NAME = 'modem'")->fetchColumn() > 0;
+            if (!$hasModem) {
+                $findings[] = finding('mercury-parser','logs','warn','Mercury calls not in RF Connections yet',
+                    'The database upgrade that adds the modem column to rf_connections has not run, so parse-mercury-log.py stops.',
+                    'Run update.sh again, or: sudo mysql <db> < ' . $WEB_ROOT . '/sql/2026-11-14-rf-connections-modem.sql');
+            } else {
+                $st = $pdo->prepare('SELECT TIMESTAMPDIFF(MINUTE, last_parsed_at, NOW()) FROM rf_parser_state WHERE log_file = ?');
+                $st->execute([basename(bpq_mercury_settings()['log'])]);
+                $age = $st->fetchColumn();
+                $n = (int)$pdo->query("SELECT COUNT(*) FROM rf_connections WHERE modem = 'mercury'")->fetchColumn();
+                $ok = $age !== false && $age !== null && (int)$age <= 30;
+                $findings[] = finding('mercury-parser','logs', $ok ? 'ok' : 'warn',
+                    $ok ? 'Mercury calls read into RF Connections' : 'Mercury log not read into RF Connections',
+                    $ok ? "$n Mercury call(s) in the table; last read {$age} min ago."
+                        : ($age === false || $age === null ? 'parse-mercury-log.py has never finished a run.' : "Last read $age min ago.")
+                          . ' The VARA parser runs it every 5 minutes; its line is in parse-vara-log.log.',
+                    $ok ? '' : 'sudo -u www-data python3 ' . $WEB_ROOT . '/scripts/parse-mercury-log.py --dry-run');
+            }
+        } catch (Throwable $e) { /* database checks above report it */ }
+    }
+}
+
+// v1.5.56: Data2G HF modem (optional): running, LinBPQ attached, audio, kept local, parser
+require_once dirname(__DIR__) . '/includes/data2g-status.php';
+$dst = bpq_data2g_status($WEB_ROOT . '/cache');
+if (!empty($dst['enabled'])) {
+    $dp = $dst['tnc_port'];
+    $where = 'TNC port ' . $dp . ($dst['bpq_port'] ? ', LinBPQ port ' . $dst['bpq_port']['num'] : ', no LinBPQ port with ADDR 127.0.0.1 ' . $dp);
+    $lvl = ['up' => 'ok', 'session' => 'ok', 'nolink' => 'warn', 'audio' => 'warn', 'down' => 'warn'][$dst['status']] ?? 'info';
+    $title = ['up' => 'Data2G HF running', 'session' => 'Data2G HF running (in a session)', 'nolink' => 'Data2G HF: LinBPQ not attached',
+              'audio' => 'Data2G HF: sound card input ended', 'down' => 'Data2G HF not running'][$dst['status']] ?? 'Data2G HF: status unknown';
+    $rec = ['nolink' => 'Check the Data2G port\'s "ADDR 127.0.0.1 ' . $dp . '" line in bpq32.cfg, then restart LinBPQ.',
+            'audio'  => 'sudo tail -20 /var/log/data2g/data2g.log; sudo systemctl restart data2g',
+            'down'   => 'sudo systemctl status data2g'][$dst['status']] ?? '';
+    $tzNote = '';
+    if ($dst['tz'] !== 'UTC' && date_default_timezone_get() !== 'UTC' && trim((string)@file_get_contents('/etc/timezone')) !== 'Etc/UTC') {
+        $tzNote = '; the service has no TZ=UTC, so its log may be in local time (the dashboard reads it as UTC)';
+        if ($lvl === 'ok') { $lvl = 'warn'; $rec = 'Add Environment=TZ=UTC to /etc/systemd/system/data2g.service, then sudo systemctl daemon-reload && sudo systemctl restart data2g'; }
+    }
+    $findings[] = finding('data2g','application',$lvl,$title,
+        'Data2G' . ($dst['version'] ? ' ' . $dst['version'] : '') . ' (' . ($dst['process'] ?: 'process not seen') . "), $where"
+        . ($dst['errors_24h'] ? "; {$dst['errors_24h']} error(s) in its log in 24 h" : '')
+        . ($dst['log_there'] && !$dst['log_readable'] ? '; its log is not readable by the web server' : '') . $tzNote . '.', $rec);
+    // Data2G has no password on its TNC either, but listens where --listen
+    // says (127.0.0.1 by default). Check the service keeps it there.
+    $dset = bpq_data2g_settings();
+    $exec = '';
+    if (@is_readable($dset['unit'])) {
+        $u = preg_replace('/\\\\\r?\n\s*/', ' ', (string)@file_get_contents($dset['unit']));
+        if (preg_match('/^\s*ExecStart\s*=\s*(.+)$/m', $u, $m)) $exec = $m[1];
+    }
+    if ($exec !== '') {
+        $lis = preg_match('/--listen[ =](\S+)/', $exec, $m) ? $m[1] : '127.0.0.1';
+        $local = in_array($lis, ['127.0.0.1', 'localhost', '::1'], true);
+        $findings[] = finding('data2g-local','security', $local ? 'ok' : 'warn',
+            $local ? 'Data2G TNC kept local (--listen 127.0.0.1)' : "Data2G TNC listens on $lis",
+            $local ? "Its command, data and KISS ports ($dp, " . ($dp + 1) . ", {$dst['kiss_port']}) answer this machine only."
+                   : "Data2G's TNC has no password: anyone who reaches $dp can key the transmitter.",
+            $local ? '' : "Set --listen 127.0.0.1 in /etc/systemd/system/data2g.service (then daemon-reload, restart data2g), or: sudo iptables -I INPUT -p tcp -m multiport --dports $dp:" . ($dp + 1) . ",{$dst['kiss_port']} ! -i lo -j DROP && sudo netfilter-persistent save");
+        if ($dst['monitor']) {
+            $wp = (int)$dst['monitor']['port'];
+            $wl = $dst['monitor']['local_only'];
+            $wBlocked = $fw4ok && preg_match('/(DROP|REJECT).*(dpt:' . $wp . '\b|dports?\s+[\d,:]*\b' . $wp . '\b)|(dpt:|dports?\s+[\d,:]*\b)' . $wp . '\b.*(DROP|REJECT)/', (string)$fw4);
+            $findings[] = finding('data2g-ui-exposed','security', ($wl || $wBlocked) ? 'ok' : 'warn',
+                ($wl || $wBlocked) ? "Data2G monitor page (port $wp) kept local" : "Data2G monitor page (port $wp) open to the network",
+                "data2g-web serves its page (with a password, no TLS) on {$dst['monitor']['listen']}:$wp. Its Settings tab can change Data2G."
+                . ($wl ? '' : ' The password would cross the network in the clear.'),
+                ($wl || $wBlocked) ? '' : "sudo iptables -I INPUT -p tcp --dport $wp ! -i lo -j DROP && sudo netfilter-persistent save");
+        }
+    }
+    // Data2G's calls reach RF Connections (parse-data2g-log.py, run by the VARA parser)
+    if (!empty($pdo) && $dst['log_there']) {
+        try {
+            $t = (string)$pdo->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+                                       AND TABLE_NAME = 'rf_connections' AND COLUMN_NAME = 'modem'")->fetchColumn();
+            if (strpos($t, "'data2g'") === false) {
+                $findings[] = finding('data2g-parser','logs','warn','Data2G calls not in RF Connections yet',
+                    'The database upgrade that lets rf_connections hold Data2G rows has not run, so parse-data2g-log.py stops.',
+                    'Run update.sh again, or: sudo mysql <db> < ' . $WEB_ROOT . '/sql/2026-11-15-rf-connections-data2g.sql');
+            } else {
+                $st = $pdo->prepare('SELECT TIMESTAMPDIFF(MINUTE, last_parsed_at, NOW()) FROM rf_parser_state WHERE log_file = ?');
+                $st->execute([basename($dset['log'])]);
+                $age = $st->fetchColumn();
+                $n = (int)$pdo->query("SELECT COUNT(*) FROM rf_connections WHERE modem = 'data2g'")->fetchColumn();
+                $ok = $age !== false && $age !== null && (int)$age <= 30;
+                $findings[] = finding('data2g-parser','logs', $ok ? 'ok' : 'warn',
+                    $ok ? 'Data2G calls read into RF Connections' : 'Data2G log not read into RF Connections',
+                    $ok ? "$n Data2G call(s) in the table; last read {$age} min ago."
+                        : ($age === false || $age === null ? 'parse-data2g-log.py has never finished a run.' : "Last read $age min ago.")
+                          . ' The VARA parser runs it every 5 minutes; its line is in parse-vara-log.log.',
+                    $ok ? '' : 'sudo -u www-data python3 ' . $WEB_ROOT . '/scripts/parse-data2g-log.py --dry-run');
+            }
+        } catch (Throwable $e) { /* database checks above report it */ }
+    }
 }
 
 // Shared nav: files present, and every page's ?v= matches the loader's NAV_VERSION

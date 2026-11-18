@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.42** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
+**Version 1.5.66** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Platform: Debian / Ubuntu / Raspberry Pi](https://img.shields.io/badge/platform-Linux-orange.svg)]()
@@ -21,15 +21,24 @@ BPQ Dashboard turns your packet radio node into a friendly, browser-accessible o
 - **Full BBS message client** with NTS folder, address book, custom folders
 - **System Audit** — automated health checks for daemons, certs, security, resources
 - **Nightly station backups (optional, recommended)** — `scripts/bpq-backup-setup.sh` backs up LinBPQ, the databases, the dashboard and the system settings to a separate drive every night (encrypted, with restic) and shows the result on the Maintenance page
+- **RF Connections, redesigned (v1.5.44)** — status strip, headline numbers, partner rows with a 7-day strip, modems and conditions side by side, details in tabs, light and dark; the previous layout stays as a Classic view
+- **Mercury HF modem** — for stations running the open-source Mercury modem beside VARA as a LinBPQ port: a status card on RF Connections, its calls beside the VARA sessions (v1.5.46), checks in System Audit, and a setup guide (Manual §10.17)
+- **Data2G HF modem** (v1.5.56) — the same for the open-source Data2G modem: a status card, its calls (with S/N) beside the VARA sessions and on the Station Map, System Audit checks, a desktop monitor-page script (`tools/data2g-monitor.sh`), and a setup guide (Manual §10.18)
+- **Modem performance** (v1.5.63) — RF Connections tab comparing VARA HF, Mercury and Data2G over 7, 14 or 30 days: success rate, how calls ended, S/N, success by band, a timeline of every connection against the planetary K index, a day-by-day table with NOAA's A index, a head-to-head of the same station on the same band, and findings worked out from your numbers
+- **Throughput you can compare** (v1.5.64) — each modem's own rate figure is labelled for what it is (VARA's peak speed level, Data2G's best minute), and an **Effective** throughput (bytes × 8 over the time connected) is worked out the same way for every modem
+- **VHF paths** (v1.5.50) — hour-by-hour history of when watched stations were heard, with optional scheduled test connects; VHF packet connects listed beside the HF sessions (v1.5.51)
+- **Packet Live NetRom/Node Map** (v1.5.62) — the UK Packet Radio Network's live node map, in an RF Connections tab
+- **Audio Map** (v1.5.57) — Admin page that draws, from the running system, how each LinBPQ radio port reaches its radio: modem program, shared ALSA device (dmix/dsnoop), sound card with mixer levels, and what keys the transmitter
+- **Radio settings for the Yaesu FTdx-3000** (v1.5.60) — on Rig Status, through flrig: live ALC / power / SWR / compression meters, and width, roofing filter, IPO, attenuator, AGC, noise blanker, noise reduction and notch, each with a hint for data use; changes need the sysop password and wait while a modem is transmitting. The card appears only when flrig reports an FTdx-3000
 
-See the [User Guide](BPQ-Dashboard-v1.5.42-User-Guide.pdf) for detailed feature walkthroughs.
+See the [User Guide](BPQ-Dashboard-v1.5.66-User-Guide.pdf) for detailed feature walkthroughs.
 
 ## Quick links
 
 | Document | What it covers |
 |---|---|
-| 📖 **[User Guide](BPQ-Dashboard-v1.5.42-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
-| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.5.42-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
+| 📖 **[User Guide](BPQ-Dashboard-v1.5.66-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
+| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.5.66-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
 | 🧭 **[Installation guide](USER-MANUAL.md#4-installation--step-by-step)** | Step-by-step install for newcomers, plus manual install and updating |
 | ⚡ **[Phase 1 Deployment Guide](docs/PHASE-1-DEPLOYMENT.md)** | Background on the DB-backed RF Connections (done automatically by `install.sh`) |
 | ⚡ **[Traffic Report Deployment Guide](docs/TRAFFIC-STATS-DEPLOYMENT.md)** | Background on the DB-backed Traffic Report (done automatically by `install.sh`) |
@@ -44,8 +53,8 @@ On the computer that already runs LinBPQ:
 ```bash
 sudo apt update && sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.42.zip
-unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.42
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.66.zip
+unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.66
 sudo bash install.sh
 ```
 

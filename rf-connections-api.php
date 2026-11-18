@@ -43,6 +43,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/tprfn-db.php';
 require_once __DIR__ . '/includes/station-config.php';   // bpq_linbpq_ports() (v1.5.23)
+require_once __DIR__ . '/includes/mercury-status.php';   // Mercury HF tile (v1.5.43)
+require_once __DIR__ . '/includes/data2g-status.php';    // Data2G HF tile (v1.5.56)
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
@@ -79,13 +81,56 @@ function strparam(string $name, string $default, array $allowed = null): string 
 // ─── Endpoint handlers ──────────────────────────────────────────────────────
 
 /**
- * GET ?action=sessions — recent VARA HF sessions
+ * v1.5.46: rf_connections has a modem column (vara | mercury) once
+ * sql/2026-11-14-rf-connections-modem.sql has run. Until then every row is
+ * VARA and the column names below are left out.
+ */
+function rf_cols(PDO $pdo): array {
+    static $cols = null;
+    if ($cols === null) {
+        $cols = [];
+        try {
+            $st = $pdo->query("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+                               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rf_connections'");
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $c) $cols[$c] = true;
+        } catch (Throwable $e) { /* leave empty */ }
+    }
+    return $cols;
+}
+function rf_vara_only(PDO $pdo): string {
+    return isset(rf_cols($pdo)['modem']) ? " AND modem = 'vara'" : '';
+}
+/** The headline set: VARA, plus Mercury when mercury.in_headlines and
+ *  Data2G when data2g.in_headlines (v1.5.56); never VHF (v1.5.51). */
+function rf_headline_modems(PDO $pdo): string {
+    if (!isset(rf_cols($pdo)['modem'])) return '';
+    $m = ["'vara'"];
+    if (rf_mercury_in_headlines()) $m[] = "'mercury'";
+    if (rf_data2g_in_headlines())  $m[] = "'data2g'";
+    return count($m) > 1 ? ' AND modem IN (' . implode(',', $m) . ')' : " AND modem = 'vara'";
+}
+/** config.php data2g.in_headlines (default false), as for Mercury (v1.5.56). */
+function rf_data2g_in_headlines(): bool {
+    $c = function_exists('bpq_config_section') ? bpq_config_section('data2g') : [];
+    return filter_var($c['in_headlines'] ?? false, FILTER_VALIDATE_BOOLEAN);
+}
+/** config.php mercury.in_headlines (default false): Mercury rows count in
+ *  the RF Connections headline numbers too. */
+function rf_mercury_in_headlines(): bool {
+    $c = function_exists('bpq_config_section') ? bpq_config_section('mercury') : [];
+    return filter_var($c['in_headlines'] ?? false, FILTER_VALIDATE_BOOLEAN);
+}
+
+
+/**
+ * GET ?action=sessions — recent VARA HF (and Mercury, VHF, v1.5.56 Data2G) sessions
  *
  * Optional filters:
  *   days   how many days back (1-365, default 30)
  *   status all | success | failed (default all)
  *   band   filter to specific band (default no filter)
  *   limit  max rows (1-5000, default 1000)
+ *   modem  all | vara | mercury | vhf | data2g (v1.5.46, default all)
  *
  * Returns rows sorted newest-first, with timestamps as ISO strings for JS.
  */
@@ -109,6 +154,18 @@ function action_sessions(PDO $pdo): array {
         $params[] = (string)$band;
     }
 
+    // v1.5.46: modem / link_mode / end_reason (Mercury rows), when the
+    // migration has run; ?modem=vara|mercury narrows to one.
+    $cols = rf_cols($pdo);
+    $extra = '';
+    foreach (['modem', 'link_mode', 'end_reason', 'link_sec'] as $c) {   // link_sec v1.5.64
+        $extra .= isset($cols[$c]) ? ", $c" : ", NULL AS $c";
+    }
+    if (isset($cols['modem'])) {
+        $modem = strparam('modem', 'all', ['all', 'vara', 'mercury', 'vhf', 'data2g']);
+        if ($modem !== 'all') { $where[] = 'modem = ?'; $params[] = $modem; }
+    }
+
     $where_sql = implode(' AND ', $where);
     $params[] = $limit;
 
@@ -118,14 +175,20 @@ function action_sessions(PDO $pdo): array {
                 DATE_FORMAT(session_end,   '%Y-%m-%dT%H:%i:%sZ') AS session_end,
                 duration_sec, freq_khz, band, bandwidth,
                 avg_snr_db, tx_bytes, rx_bytes, tx_max_bps, rx_max_bps,
-                status, failure_reason
+                status, failure_reason$extra
             FROM rf_connections
             WHERE $where_sql
             ORDER BY session_start DESC
             LIMIT ?";
 
     $rows = tprfn_query($pdo, $sql, $params);
-    return ['sessions' => $rows, 'count' => count($rows)];
+    if (!isset($cols['modem'])) {
+        foreach ($rows as &$r) { $r['modem'] = 'vara'; }
+        unset($r);
+    }
+    return ['sessions' => $rows, 'count' => count($rows),
+            'mercury_in_headlines' => rf_mercury_in_headlines(),
+            'data2g_in_headlines' => rf_data2g_in_headlines()];
 }
 
 /**
@@ -137,6 +200,7 @@ function action_sessions(PDO $pdo): array {
  */
 function action_heatmap(PDO $pdo): array {
     $days = intparam('days', 30, 1, 365);
+    $vo = rf_headline_modems($pdo);   // v1.5.55
 
     $sql = "SELECT
                 COALESCE(band, 'Unknown') AS band,
@@ -147,7 +211,7 @@ function action_heatmap(PDO $pdo): array {
                 AVG(avg_snr_db)           AS avg_snr_db
             FROM rf_connections
             WHERE session_start >= DATE_SUB(NOW(), INTERVAL ? DAY)
-              AND status = 'success'
+              AND status = 'success'$vo
             GROUP BY band, HOUR(session_start), DATE(session_start)
             ORDER BY day, hour_utc";
 
@@ -163,6 +227,7 @@ function action_heatmap(PDO $pdo): array {
  */
 function action_stats(PDO $pdo): array {
     $days = intparam('days', 30, 1, 365);
+    $vo = rf_headline_modems($pdo);   // v1.5.46: headline numbers are VARA
 
     // Overall numbers
     $overall_sql = "SELECT
@@ -173,7 +238,7 @@ function action_stats(PDO $pdo): array {
                 AVG(CASE WHEN status = 'success' THEN avg_snr_db END) AS avg_snr_db,
                 COUNT(DISTINCT base_call)                           AS unique_callsigns
             FROM rf_connections
-            WHERE session_start >= DATE_SUB(NOW(), INTERVAL ? DAY)";
+            WHERE session_start >= DATE_SUB(NOW(), INTERVAL ? DAY)$vo";
     $overall = tprfn_query_one($pdo, $overall_sql, [$days]) ?: [];
 
     // Top callsigns by session count
@@ -184,7 +249,7 @@ function action_stats(PDO $pdo): array {
                 AVG(avg_snr_db)        AS avg_snr_db
             FROM rf_connections
             WHERE session_start >= DATE_SUB(NOW(), INTERVAL ? DAY)
-              AND status = 'success'
+              AND status = 'success'$vo
             GROUP BY base_call
             ORDER BY session_count DESC
             LIMIT 10";
@@ -197,7 +262,7 @@ function action_stats(PDO $pdo): array {
                 SUM(tx_bytes+rx_bytes)    AS total_bytes
             FROM rf_connections
             WHERE session_start >= DATE_SUB(NOW(), INTERVAL ? DAY)
-              AND status = 'success'
+              AND status = 'success'$vo
             GROUP BY band
             ORDER BY session_count DESC";
     $bands = tprfn_query($pdo, $bands_sql, [$days]);
@@ -295,6 +360,18 @@ function action_messages(PDO $pdo): array {
         $where[] = "(accept_status IS NULL OR accept_status <> 'R')";
     } elseif ($has_delivery && $status === 'rejected') {
         $where[] = "accept_status = 'R'";
+    }
+
+    // v1.5.46: modem / link_mode / end_reason (Mercury rows), when the
+    // migration has run; ?modem=vara|mercury narrows to one.
+    $cols = rf_cols($pdo);
+    $extra = '';
+    foreach (['modem', 'link_mode', 'end_reason'] as $c) {
+        $extra .= isset($cols[$c]) ? ", $c" : ", NULL AS $c";
+    }
+    if (isset($cols['modem'])) {
+        $modem = strparam('modem', 'all', ['all', 'vara', 'mercury', 'vhf', 'data2g']);
+        if ($modem !== 'all') { $where[] = 'modem = ?'; $params[] = $modem; }
     }
 
     $where_sql = implode(' AND ', $where);
@@ -420,11 +497,64 @@ function action_soundmodem(): array {
     return ['modems' => $out, 'checked_at' => gmdate('Y-m-d H:i:s'), 'since' => $since, 'days' => $days];
 }
 
+/**
+ * GET ?action=paths&days=14 — VHF path history (v1.5.50)
+ *
+ * For each watched station (Maintenance → Watched stations): how often it
+ * was heard in each UTC hour (net_heard_history, filled by the 5-minute
+ * MHeard poll) and the scheduled test connects (link_probes, written by
+ * scripts/link-probe.py). Tables missing (update.sh not run) → empty lists
+ * and 'tables' => false.
+ */
+function action_paths(PDO $pdo): array {
+    $days = intparam('days', 14, 1, 90);
+    $since = gmdate('Y-m-d', time() - ($days - 1) * 86400) . ' 00:00:00';
+    $out = []; $tables = true;
+    foreach (bpq_watch_list() as $w) {
+        $row = $w + ['last_heard' => null, 'heard' => [], 'probes' => []];
+        $pw = $w['port'] ? ' AND port = ?' : '';
+        $args = $w['port'] ? [$w['call'], $w['port']] : [$w['call']];
+        try {
+            $st = $pdo->prepare("SELECT MAX(heard_at) FROM net_mheard WHERE callsign = ?$pw");
+            $st->execute($args);
+            $row['last_heard'] = $st->fetchColumn() ?: null;
+        } catch (Throwable $e) { /* System Logs tables missing */ }
+        try {
+            $st = $pdo->prepare("SELECT DATE_FORMAT(heard_at, '%Y-%m-%d') d, HOUR(heard_at) h, COUNT(*) n
+                                 FROM net_heard_history WHERE callsign = ?$pw AND heard_at >= ?
+                                 GROUP BY d, h ORDER BY d, h");
+            $st->execute(array_merge($args, [$since]));
+            foreach ($st->fetchAll(PDO::FETCH_NUM) as $r) $row['heard'][] = [$r[0], (int)$r[1], (int)$r[2]];
+            if ($w['port']) {
+                $st = $pdo->prepare('SELECT probed_at, result, connect_secs, detail FROM link_probes
+                                     WHERE callsign = ? AND port = ? AND probed_at >= ? ORDER BY probed_at');
+                $st->execute([$w['call'], $w['port'], $since]);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $r['connect_secs'] = $r['connect_secs'] === null ? null : (float)$r['connect_secs'];
+                    $row['probes'][] = $r;
+                }
+            }
+        } catch (Throwable $e) { $tables = false; }
+        $out[] = $row;
+    }
+    return ['stations' => $out, 'days' => $days, 'now' => gmdate('Y-m-d H:i:s'), 'tables' => $tables];
+}
+
 // ─── Dispatcher ─────────────────────────────────────────────────────────────
 
 $action = strparam('action', 'all', [
-    'sessions', 'heatmap', 'stats', 'parser_status', 'all', 'messages', 'soundmodem', 'watchdog', 'bbslines'
+    'sessions', 'heatmap', 'stats', 'parser_status', 'all', 'messages', 'soundmodem', 'watchdog', 'bbslines', 'mercury', 'data2g', 'paths'
 ]);
+
+if ($action === 'mercury') {         // v1.5.43: Mercury HF status tile (no database needed)
+    success(bpq_mercury_status(dirname(__FILE__) . '/cache'));
+    exit;
+}
+
+if ($action === 'data2g') {          // v1.5.56: Data2G HF status tile (no database needed)
+    success(bpq_data2g_status(dirname(__FILE__) . '/cache'));
+    exit;
+}
 
 if ($action === 'soundmodem') {      // works without the database (v1.5.23)
     success(action_soundmodem());
@@ -473,6 +603,7 @@ try {
         'parser_status' => action_parser_status($pdo),
         'all'           => action_all($pdo),
         'messages'      => action_messages($pdo),
+        'paths'         => action_paths($pdo),
     };
     success($data);
 } catch (PDOException $e) {
@@ -488,7 +619,7 @@ try {
 }
 
 /**
- * v1.5.42 — ?action=bbslines&file=log_YYMMDD_BBS.txt
+ * v1.5.39 — ?action=bbslines&file=log_YYMMDD_BBS.txt
  *
  * The RF Connections page used to download every day's raw BBS log (on a busy
  * hub 40-50 MB a day, 1.3 GB for 30 days) only to read a handful of line

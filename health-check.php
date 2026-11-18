@@ -188,7 +188,6 @@ if ($configExists) {
 // ========================================================================
 
 $keyFiles = [
-    'api/config.php'        => 'Configuration API endpoint',
     'api/data.php'          => 'DataLog + connections API (RF Power Monitor)',
     'bbs-messages.php'      => 'BBS messages backend',
     'bbs-messages.html'     => 'BBS messages dashboard',
@@ -266,14 +265,13 @@ if (is_dir($logsDir)) {
 // 6. API Endpoints
 // ========================================================================
 
-// Test config API
-$configApi = testUrl('api/config.php');
-$configApiOk = $configApi['status'] === 200;
-$configJson = @json_decode($configApi['body'], true);
-$configApiSuccess = $configApiOk && isset($configJson['success']) && $configJson['success'];
-check('API: config.php', $configApiSuccess,
-    $configApiOk ? ('HTTP 200 — ' . ($configJson['success'] ? 'success' : 'returned error: ' . ($configJson['error'] ?? 'unknown'))) : "HTTP {$configApi['status']}",
-    'Check that config.php exists and has valid settings');
+// PHP through the web server (v1.5.64: station-info.php, a public page;
+// api/config.php is refused by the rule that guards config.php, on purpose)
+$stApi = testUrl('station-info.php');
+$stJson = @json_decode($stApi['body'], true);
+check('API: station-info.php', $stApi['status'] === 200 && is_array($stJson),
+    $stApi['status'] === 200 ? 'HTTP 200 — ' . (is_array($stJson) ? 'station settings read' : 'not JSON') : "HTTP {$stApi['status']}",
+    'Check that config.php exists and has valid settings, and that PHP-FPM is running');
 
 // Test datalog API
 $dataApi = testUrl('api/data.php?source=datalog&days=1&debug=1');

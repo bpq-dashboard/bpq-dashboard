@@ -374,7 +374,7 @@ try {
 }
 
 /**
- * v1.5.42 — the raw log viewer's lines. The page used to download whole
+ * v1.5.41 — the raw log viewer's lines. The page used to download whole
  * daily BBS logs, ten at a time, until it had 100,000 lines: on a busy hub
  * (40-50 MB a day) that was hundreds of MB before the first line showed.
  * This reads backwards from the end of today's log, then yesterday's, and so

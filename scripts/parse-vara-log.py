@@ -376,8 +376,9 @@ def build_freq_lookup(bbs_log_dir, since=None, until=None, verbose=False):
                         base = base_call(im.group(2))
                         try:
                             freq_hz = int(im.group(3))
-                            # Round to nearest kHz (preserves 1-decimal MHz display)
-                            freq_khz = int(round(freq_hz / 1000.0))
+                            # kHz with decimals (v1.5.54: was rounded to whole kHz,
+                            # so 7102400 Hz showed as 7.1020)
+                            freq_khz = round(freq_hz / 1000.0, 2)
                             freq_events.append((ts, base, freq_khz))
                         except ValueError:
                             pass
@@ -389,7 +390,7 @@ def build_freq_lookup(bbs_log_dir, since=None, until=None, verbose=False):
                         base = base_call(om.group(1))
                         try:
                             freq_mhz = float(om.group(2))
-                            freq_khz = int(round(freq_mhz * 1000))
+                            freq_khz = round(freq_mhz * 1000, 2)   # 7.101300 -> 7101.3 (v1.5.54)
                             freq_events.append((ts, base, freq_khz))
                         except ValueError:
                             pass
@@ -863,6 +864,17 @@ def parse_bpq_port_map(cfg_path, verbose=False):
     return port_map
 
 
+def _has_modem_column(conn):
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rf_connections' "
+                        "AND COLUMN_NAME = 'modem'")
+            return bool(cur.fetchone()[0])
+    except Exception:
+        return False
+
+
 def load_outgoing_vara_sessions(conn, since=None):
     """{base_call: [(start, end), ...]} of successful outgoing VARA
     sessions from rf_connections, for the outbound-medium fallback."""
@@ -872,6 +884,8 @@ def load_outgoing_vara_sessions(conn, since=None):
     sql = ("SELECT base_call, session_start, "
            "COALESCE(session_end, session_start + INTERVAL 30 MINUTE) "
            "FROM rf_connections WHERE direction = 'outgoing' AND status = 'success'")
+    if _has_modem_column(conn):
+        sql += " AND modem = 'vara'"          # v1.5.46: Mercury rows aren't VARA
     params = ()
     if since:
         sql += " AND session_start >= %s"
@@ -1684,7 +1698,11 @@ def reset_parser_state(conn, log_filename):
     """
     with conn.cursor() as cur:
         cur.execute("DELETE FROM rf_parser_state WHERE log_file = %s", (log_filename,))
-        cur.execute("DELETE FROM rf_connections")
+        # v1.5.46: Mercury's rows (parse-mercury-log.py) are not ours to clear
+        try:
+            cur.execute("DELETE FROM rf_connections WHERE modem = 'vara'")
+        except pymysql.MySQLError:           # before the modem column existed
+            cur.execute("DELETE FROM rf_connections")
         cur.execute("DELETE FROM rf_messages")
     # AUTO_INCREMENT reset is purely cosmetic. Try it — if user lacks ALTER,
     # the table just keeps incrementing IDs from where it left off, which
@@ -2196,6 +2214,12 @@ def main():
                     help='Your station base callsign (e.g. W1AW). Used to '
                          'skip your own outbound CMS connections in WL2K '
                          'detection. Default: derived from VARA log filename.')
+    ap.add_argument('--no-data2g', action='store_true',
+                    help='Do not run parse-data2g-log.py afterwards (v1.5.56; '
+                         'it runs by itself when Data2G\'s log is there)')
+    ap.add_argument('--no-mercury', action='store_true',
+                    help='Do not run parse-mercury-log.py afterwards (v1.5.46; '
+                         'it runs by itself when Mercury\'s log is there)')
     args = ap.parse_args()
 
     # Override DB config from flags
@@ -2252,6 +2276,62 @@ def main():
             sys.stdout.write("  [DRY RUN — no DB writes performed]\n")
     finally:
         conn.close()
+
+    if not args.no_mercury and not args.dry_run:
+        run_mercury_parser(bbs_log_dir)
+    if not args.no_data2g and not args.dry_run:
+        run_modem_parser('data2g', '/var/log/data2g/data2g.log', 'parse-data2g-log.py', 'Data2G', bbs_log_dir)
+
+
+def run_mercury_parser(bbs_log_dir):
+    """v1.5.46: Mercury HF calls go into rf_connections too. Run
+    parse-mercury-log.py after this parser (same cron line, no new one),
+    when Mercury's log is there and config.php doesn't switch it off.
+    Its own failures never stop this parser."""
+    mc = bpq_db_config.load_config_section('mercury')
+    en = mc.get('enabled', 'auto')
+    if en is False or str(en).lower() in ('false', '0', 'no', 'off'):
+        return
+    log = mc.get('log') or '/var/log/mercury/mercury.log'
+    if not os.path.exists(log):
+        return
+    import subprocess
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'parse-mercury-log.py')
+    cmd = [sys.executable, script, '--quiet', '--log', log]
+    if bbs_log_dir:
+        cmd += ['--bbs-log-dir', bbs_log_dir]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+        out = (r.stdout + r.stderr).strip()
+        if out:
+            sys.stdout.write(out + '\n')
+    except (OSError, subprocess.SubprocessError) as e:
+        sys.stdout.write(f"Mercury parser did not run: {e}\n")
+
+
+
+def run_modem_parser(section, default_log, script_name, label, bbs_log_dir):
+    """v1.5.56: the same for another VARA-style modem's parser (Data2G):
+    runs when its log is there and config.php <section>.enabled isn't false."""
+    mc = bpq_db_config.load_config_section(section)
+    en = mc.get('enabled', 'auto')
+    if en is False or str(en).lower() in ('false', '0', 'no', 'off'):
+        return
+    log = mc.get('log') or default_log
+    if not os.path.exists(log):
+        return
+    import subprocess
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
+    cmd = [sys.executable, script, '--quiet', '--log', log]
+    if bbs_log_dir:
+        cmd += ['--bbs-log-dir', bbs_log_dir]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=240)
+        out = (r.stdout + r.stderr).strip()
+        if out:
+            sys.stdout.write(out + '\n')
+    except (OSError, subprocess.SubprocessError) as e:
+        sys.stdout.write(f"{label} parser did not run: {e}\n")
 
 
 if __name__ == '__main__':

@@ -281,6 +281,60 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--u
     animation:pulse 0.7s infinite;margin-left:8px;
     display:none;
 }
+
+/* 2026-11-17 (v1.5.60): Radio settings — rig-control-api.php through flrig */
+.rc-card{
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:12px;padding:18px 22px;width:100%;max-width:900px;margin-top:16px;
+}
+.rc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.rc-head .card-title{margin-bottom:0}
+.rc-badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rc-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;border:1px solid var(--border2);color:var(--muted)}
+.rc-badge.idle{border-color:var(--green);color:var(--green)}
+.rc-badge.busy{border-color:#f59e0b;color:#f59e0b;background:rgba(245,158,11,.08)}
+.rc-badge.lock{border-color:var(--border2)}
+.rc-badge.unl{border-color:var(--green);color:var(--green)}
+.rc-btn{background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:6px;
+    padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--ui)}
+.rc-btn:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+.rc-btn:disabled{opacity:.35;cursor:not-allowed}
+.rc-sec{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rc-sec:first-of-type{margin-top:4px}
+.rc-meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 18px}
+.rc-m-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px}
+.rc-m-lbl b{font-family:var(--mono);color:var(--text)}
+.rc-m-bar{height:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden;position:relative}
+.rc-m-fill{height:100%;width:0;transition:width .35s ease;background:var(--green)}
+.rc-m-fill.warn{background:#f59e0b}.rc-m-fill.bad{background:var(--red)}
+.rc-m-note{font-size:10px;color:var(--muted);margin-top:6px}
+.rc-table{width:100%;border-collapse:collapse;font-size:12px}
+.rc-table td{padding:6px 6px;border-top:1px solid var(--border);vertical-align:middle}
+.rc-table tr:first-child td{border-top:none}
+.rc-table td.l{color:var(--muted);white-space:nowrap;width:1%}
+.rc-table td.v{font-family:var(--mono);font-weight:700;white-space:nowrap;width:1%}
+.rc-table td.c{white-space:nowrap;width:1%}
+.rc-table td.h{font-size:11px;color:var(--muted)}
+.rc-table select,.rc-table input{background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+    border-radius:6px;padding:4px 6px;font-size:12px;font-family:var(--mono)}
+.rc-table input{width:76px;text-align:right}
+.rc-table select:disabled,.rc-table input:disabled{opacity:.45}
+.rc-ok{color:var(--green)}.rc-warn{color:#f59e0b}
+.rc-ref td{font-size:11px}
+.rc-ref td.m{font-family:var(--mono);color:var(--amber);white-space:nowrap;width:1%}
+.rc-ref td.n{white-space:nowrap;width:1%;font-weight:700}
+.rc-note{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+.rc-msg{font-size:11px;min-height:15px;margin-top:10px;text-align:center}
+.rc-msg.ok{color:var(--green)}.rc-msg.err{color:var(--red)}.rc-msg.warn{color:#f59e0b}
+.rc-log{font-family:var(--mono);font-size:10px;color:var(--muted);max-height:140px;overflow:auto;line-height:1.6}
+@media (max-width:640px){
+  .rc-card{padding:14px 12px}
+  .rc-table td.h{display:block;border-top:none;padding-top:0}
+  .rc-table tr{display:grid;grid-template-columns:auto auto 1fr}
+  .rc-table td.l,.rc-table td.v,.rc-table td.c{width:auto}
+  .rc-table td.h{grid-column:1/-1}
+}
 </style>
 </head>
 <body data-nav-page="rig">
@@ -289,12 +343,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--u
      Sits above the kiosk-style #app content. The min-height:100vh
      on #app means the centered content will need a tiny bit of scroll
      when the nav is visible, but the layout still works. -->
-<script src="bpq-nav-loader.js?v=2026-11-12-4"></script>
+<script src="bpq-nav-loader.js?v=2026-11-16-1"></script>
 
 <div id="app">
 
   <!-- Version badge (top-right corner, discrete) -->
-  <span style="position:fixed; top:60px; right:14px; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700; z-index:10;">v1.5.42</span>
+  <span style="position:fixed; top:60px; right:14px; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700; z-index:10;">v1.5.66</span>
 
   <!-- Main layout: meters left, freq+scanner right -->
   <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%;max-width:900px">
@@ -412,6 +466,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--u
       </div>
 
     </div>
+  </div>
+
+  <!-- 2026-11-17 (v1.5.60): radio settings through flrig (rig-control-api.php) -->
+  <div class="rc-card" id="rcCard" hidden>
+    <div class="rc-head">
+      <div class="card-title">🎛️ Radio settings <span id="rcModel" style="text-transform:none;letter-spacing:0"></span></div>
+      <div class="rc-badges">
+        <span class="rc-badge" id="rcBusy">–</span>
+        <span class="rc-badge lock" id="rcLock">🔒 View only</span>
+        <button class="rc-btn" id="rcRefresh" onclick="rcLoad()">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="rcBody"><div class="rc-note">Reading the radio through flrig…</div></div>
+    <div class="rc-msg" id="rcMsg"></div>
   </div>
 
 
@@ -1051,6 +1119,211 @@ function updateGauges(smeter) {
 window.addEventListener('load', () => {
     drawMeter('smeterGauge', {value: 0, ticks: S_TICKS, zones: S_ZONES});
 });
+</script>
+<script>
+// ── Radio settings (v1.5.60): rig-control-api.php ───────────────────────────
+const RC_API = 'rig-control-api.php';
+let rc = null, rcUnlocked = false, rcMeterTimer = null, rcSetting = false;
+let rcShown = false, rcOff = false;   // v1.5.66: the card appears only for an FTdx-3000
+
+// The radio's DATA menu can't be read through flrig, so it is listed here
+// for checking on the front panel (MENU, then the number).
+const RC_MENU = [
+  ['067', 'DATA MODE',        'PSK or OTHERS. With OTHERS, 069 and 070 below apply.'],
+  ['069', 'OTHER DISP (SSB)', 'Display offset used in OTHERS data mode.'],
+  ['070', 'OTHER SHIFT (SSB)','Passband centre in OTHERS data mode; 1500 Hz suits the 2300-2400 Hz wide modems.'],
+  ['071', 'DATA LCUT FREQ',   'Low-cut of the data receive audio: OFF or 100 Hz or lower, so the bottom of a wide signal isn\'t cut.'],
+  ['072', 'DATA LCUT SLOPE',  'Goes with 071.'],
+  ['073', 'DATA HCUT FREQ',   'High-cut: OFF or 3000 Hz or higher, so the top of a 2300 Hz signal isn\'t cut.'],
+  ['074', 'DATA HCUT SLOPE',  'Goes with 073.'],
+  ['075', 'DATA IN SELECT',   'Where the transmit audio comes from: DATA for the rear DATA jack (the SCU-17\'s cable), USB for the radio\'s USB port. It must match how the modem audio reaches the radio.'],
+  ['076', 'DATA GAIN',        'Transmit audio level into the radio. Set together with the modems\' output levels so ALC stays near zero at full power (watch ALC in Live meters while a modem transmits).'],
+  ['077', 'DATA OUT LEVEL',   'Receive audio level to the modems.'],
+  ['078', 'DATA VOX GAIN',    'Only used when keying by VOX. LinBPQ keys by CAT, so normally not involved.'],
+  ['079', 'DATA VOX DELAY',   'As 078.'],
+  ['103', 'SSB MIC SELECT',   'Only applies if a modem is run in USB instead of PKT-U.'],
+  ['104', 'SSB TX BPF',       'Transmit passband in USB mode; as 103.'],
+];
+// Order and grouping of the rows
+const RC_ROWS = [
+  ['Receive', ['width', 'narrow', 'shift', 'roofing', 'frontend', 'att', 'agc']],
+  ['Noise and notch', ['nb', 'nr', 'nrlevel', 'autonotch', 'notch', 'notchfreq']],
+  ['Transmit', ['power', 'processor', 'monitor']],
+];
+const RC_INFO = {
+  shift: 'Keep at 0 for data: a shift moves the passband off the modem\'s signal.',
+  roofing: 'AUTO, or 3 kHz or wider, for the 2300 Hz modems.',
+  frontend: 'IPO in a quiet station; AMP 1 on the higher bands if signals are weak.',
+  att: 'Off unless a very strong signal overloads the receiver.',
+  agc: 'AUTO or Mid suit the modems.',
+  power: 'Set in TX Power above.',
+  nrlevel: 'Only matters with noise reduction on.',
+  notchfreq: 'Only matters with the manual notch on.',
+};
+
+function rcEsc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function rcMsg(t, cls){ const m = document.getElementById('rcMsg'); m.textContent = t || ''; m.className = 'rc-msg ' + (cls || ''); }
+
+async function rcLoad(quiet){
+  if (rcSetting) return;
+  try {
+    const r = await fetch(RC_API + '?action=state', {credentials:'same-origin', cache:'no-store'});
+    const d = await r.json();
+    if (d.ok && (d.disabled || !d.supported)) { rcOff = !!d.disabled; document.getElementById('rcCard').hidden = true; rcShown = false; return; }
+    if (!d.ok) { if (rcShown) rcRenderError(d.error || 'Could not read the radio'); return; }   // flrig away: keep quiet unless the card was showing
+    rc = d;
+    document.getElementById('rcCard').hidden = false; rcShown = true;
+    rcRender();
+    if (!quiet) rcMsg('', '');
+  } catch(e) { if (rcShown) rcRenderError('Could not reach rig-control-api.php'); }
+}
+function rcRenderError(t){
+  document.getElementById('rcBody').innerHTML = '<div class="rc-note">' + rcEsc(t) + '</div>';
+  document.getElementById('rcBusy').textContent = '–'; document.getElementById('rcBusy').className = 'rc-badge';
+}
+
+function rcControl(key){
+  const s = rc.settings[key], v = rc.values[key] || {};
+  const dis = (!rcUnlocked || rc.busy.busy) ? ' disabled' : '';
+  if (key === 'width') {
+    if (!rc.widths.length) return '';
+    return '<select data-k="width"' + dis + '>' + rc.widths.map(w =>
+      '<option value="' + w + '"' + (String(w) === String(v.value) ? ' selected' : '') + '>' + w + ' Hz</option>').join('') + '</select>';
+  }
+  if (key === 'power' || !s || s.readonly) return '';
+  if (s.opts) {
+    return '<select data-k="' + key + '"' + dis + '>' + Object.entries(s.opts).map(([k, l]) =>
+      '<option value="' + k + '"' + (k === v.opt ? ' selected' : '') + '>' + rcEsc(l) + '</option>').join('') + '</select>';
+  }
+  if (s.range) {
+    const [lo, hi, st] = s.range;
+    return '<input type="number" min="' + lo + '" max="' + hi + '" step="' + st + '" value="' + rcEsc(v.value ?? '') + '" data-k="' + key + '"' + dis + '>'
+         + ' <button class="rc-btn" onclick="rcApplyInput(\'' + key + '\')"' + dis + '>Set</button>';
+  }
+  return '';
+}
+
+function rcRender(){
+  document.getElementById('rcModel').textContent = rc.model ? '· ' + rc.model + (rc.mode ? ' · ' + rc.mode : '') : '';
+  const b = document.getElementById('rcBusy');
+  if (!rc.supported) {
+    b.textContent = '–'; b.className = 'rc-badge';
+    document.getElementById('rcBody').innerHTML = '<div class="rc-note">flrig reports <b>' + rcEsc(rc.model)
+      + '</b>. This panel only knows the Yaesu FTdx-3000\'s commands, so it is off for this radio.</div>';
+    return;
+  }
+  b.textContent = rc.busy.busy ? '⏳ Busy: ' + rc.busy.why : '● Radio idle';
+  b.className = 'rc-badge ' + (rc.busy.busy ? 'busy' : 'idle');
+  b.title = rc.busy.busy ? 'Changes wait until the radio has been idle for 45 s' : '';
+
+  let h = '<div class="rc-sec"><span>Live transmit meters</span>'
+        + '<label style="text-transform:none;letter-spacing:0;font-size:11px;cursor:pointer"><input type="checkbox" id="rcLive"'
+        + (rcMeterTimer ? ' checked' : '') + ' onchange="rcLiveToggle(this.checked)"> Live</label></div>'
+        + '<div class="rc-meters">' + [['alc','ALC'],['po','PO'],['swr','SWR'],['comp','COMP']].map(([k, l]) =>
+            '<div><div class="rc-m-lbl"><span>' + l + '</span><b id="rcM_' + k + '">–</b></div>'
+          + '<div class="rc-m-bar"><div class="rc-m-fill" id="rcF_' + k + '"></div></div></div>').join('') + '</div>'
+        + '<div class="rc-m-note" id="rcMNote">Turn on Live, then watch while a modem transmits. ALC should stay low (in the green); the radio\'s meters read 0–255.</div>';
+
+  for (const [title, keys] of RC_ROWS) {
+    h += '<div class="rc-sec"><span>' + title + '</span></div><table class="rc-table">';
+    for (const k of keys) {
+      const v = rc.values[k]; if (!v) continue;
+      const label = k === 'width' ? 'Width' : k === 'power' ? 'RF power' : (rc.settings[k]?.label || k);
+      const shown = v.shown ?? (v.value === null ? '?' : v.value + (rc.settings[k]?.unit ? ' ' + rc.settings[k].unit : ''));
+      let hint = '';
+      if (v.hint) hint = '<span class="' + (v.hint.good ? 'rc-ok' : 'rc-warn') + '">' + (v.hint.good ? '✓ ' : '⚠ ') + '</span>' + rcEsc(v.hint.text);
+      else if (RC_INFO[k]) hint = rcEsc(RC_INFO[k]);
+      if (k === 'shift' && v.value !== null && Number(v.value) !== 0) hint = '<span class="rc-warn">⚠ </span>' + rcEsc(RC_INFO.shift);
+      if (rc.settings[k]?.readonly) hint += (hint ? ' ' : '') + '<i>(shown only: set it on the radio)</i>';
+      h += '<tr><td class="l">' + rcEsc(label) + '</td><td class="v">' + rcEsc(v.value === null ? 'no answer' : shown)
+         + '</td><td class="c">' + rcControl(k) + '</td><td class="h">' + hint + '</td></tr>';
+    }
+    h += '</table>';
+  }
+
+  h += '<div class="rc-sec"><span>Data menu (check on the radio)</span></div>'
+     + '<div class="rc-note" style="margin:0 0 6px">The FTdx-3000 does not answer menu (EX) reads through flrig, so these can\'t be shown here. '
+     + 'Check them on the front panel: <b>MENU</b>, turn to the number, read the value.</div>'
+     + '<table class="rc-table rc-ref">' + RC_MENU.map(([m, n, t]) =>
+         '<tr><td class="m">' + m + '</td><td class="n">' + rcEsc(n) + '</td><td>' + rcEsc(t) + '</td></tr>').join('') + '</table>';
+
+  h += '<div class="rc-sec"><span>Recent changes</span></div><div class="rc-log" id="rcLog">–</div>';
+  document.getElementById('rcBody').innerHTML = h;
+  document.querySelectorAll('#rcBody select[data-k]').forEach(el => el.addEventListener('change', () => rcSet(el.dataset.k, el.value)));
+  rcLoadLog();
+}
+
+async function rcApplyInput(key){
+  const el = document.querySelector('#rcBody input[data-k="' + key + '"]');
+  if (el) rcSet(key, String(Math.round(Number(el.value))));
+}
+
+async function rcSet(key, value){
+  if (!rcUnlocked) { rcMsg('Unlock with 🔒 in Radio Control first', 'warn'); rcLoad(true); return; }
+  rcSetting = true;
+  document.querySelectorAll('#rcBody select, #rcBody input:not(#rcLive), #rcBody .rc-btn').forEach(e => e.disabled = true);
+  const label = key === 'width' ? 'Width' : (rc.settings[key]?.label || key);
+  rcMsg('Setting ' + label + '…', '');
+  try {
+    const r = await fetch(RC_API, {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+      body: JSON.stringify({action:'set', key, value})});
+    const d = await r.json();
+    if (r.status === 403) rcMsg(d.error || 'Locked', 'warn');
+    else if (!d.ok) rcMsg(d.error || 'Change failed', r.status === 409 ? 'warn' : 'err');
+    else rcMsg(label + ' changed', 'ok');
+  } catch(e) { rcMsg('Network error — try again', 'err'); }
+  rcSetting = false;
+  rcLoad(true);
+}
+
+async function rcLoadLog(){
+  try {
+    const d = await (await fetch(RC_API + '?action=log', {credentials:'same-origin', cache:'no-store'})).json();
+    const el = document.getElementById('rcLog'); if (!el || !d.ok) return;
+    el.innerHTML = d.log.length ? d.log.map(e => rcEsc(e.ts + ' UTC  ' + (e.label || e.key) + ': ' + (e.from ?? '?') + ' → ' + e.to
+      + (e.now === null || String(e.now) === String(e.to) || String(e.now).startsWith(String(e.to)) ? '' : '  (radio reads ' + e.now + ')'))).join('<br>') : 'No changes made from this page yet.';
+  } catch(e) {}
+}
+
+function rcLiveToggle(on){
+  clearInterval(rcMeterTimer); rcMeterTimer = null;
+  if (on) { rcMeters(); rcMeterTimer = setInterval(rcMeters, 1500); }
+}
+async function rcMeters(){
+  if (document.hidden) return;
+  try {
+    const d = await (await fetch(RC_API + '?action=meters', {credentials:'same-origin', cache:'no-store'})).json();
+    if (!d.ok || !d.meters) return;
+    for (const [k, v] of Object.entries(d.meters)) {
+      const f = document.getElementById('rcF_' + k), t = document.getElementById('rcM_' + k);
+      if (!f) continue;
+      const pct = v === null ? 0 : Math.min(100, v / 2.55);
+      f.style.width = pct + '%';
+      // ALC: anything above about a third of the scale is driving too hard; SWR above about 1.5:1 (~ 1/4 scale)
+      const warnAt = {alc: 30, swr: 25, comp: 60, po: 101}[k], badAt = {alc: 55, swr: 45, comp: 85, po: 101}[k];
+      f.className = 'rc-m-fill' + (pct >= badAt ? ' bad' : pct >= warnAt ? ' warn' : '');
+      t.textContent = v === null ? '–' : v;
+    }
+    const n = document.getElementById('rcMNote');
+    if (n) n.textContent = (d.ptt ? '🔴 Transmitting · ' : 'Receiving (meters read only while transmitting) · ') + d.at + ' UTC';
+  } catch(e) {}
+}
+
+function rcSetUnlocked(on){
+  rcUnlocked = !!on;
+  const l = document.getElementById('rcLock');
+  l.textContent = on ? '🔓 Changes allowed' : '🔒 View only';
+  l.className = 'rc-badge ' + (on ? 'unl' : 'lock');
+  l.title = on ? '' : 'Unlock with 🔒 in Radio Control (the BBS password) to change settings';
+  if (rc) rcRender();
+}
+// Follow the page's unlock (Radio Control 🔒), as TX Power does
+const _rcPrevUnlock = setTxPowerUnlocked;
+setTxPowerUnlocked = function(on){ _rcPrevUnlock(on); rcSetUnlocked(on); };
+
+rcLoad();
+setInterval(() => { if (!rcOff && !document.hidden && !rcSetting && !document.activeElement?.closest?.('#rcBody input, #rcBody select')) rcLoad(true); }, 30000);
 </script>
 </body>
 </html>

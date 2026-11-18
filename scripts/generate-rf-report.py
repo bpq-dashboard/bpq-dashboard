@@ -75,6 +75,13 @@ def fetch_data(callsign, hours, direction='all'):
             where = ["base_call = %s",
                      "session_start >= DATE_SUB(NOW(), INTERVAL %s HOUR)"]
             params = [callsign, hours]
+            # v1.5.46: the propagation report is VARA's (Mercury rows have
+            # no S/N or speed); skip the filter before the migration ran.
+            cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rf_connections' "
+                        "AND COLUMN_NAME = 'modem'")
+            if list((cur.fetchone() or {0: 0}).values())[0]:
+                where.append("modem = 'vara'")
             if direction in ('outgoing', 'incoming'):
                 where.append("direction = %s")
                 params.append(direction)
@@ -172,7 +179,7 @@ def fmt_dir(direction):
 def fmt_freq(khz):
     if not khz:
         return '-'
-    return f"{int(khz) / 1000:.4f}"
+    return f"{float(khz) / 1000:.4f}"   # freq_khz has decimals since v1.5.54
 
 
 def fmt_avg_rate(tx, rx, dur):

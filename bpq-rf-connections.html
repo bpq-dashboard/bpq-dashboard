@@ -48,6 +48,9 @@
         .dot-green { background: #10b981; }
         .dot-orange { background: #f59e0b; }
         .dot-red { background: #ef4444; }
+        .dot-merc { background: #0d9488; }      /* v1.5.53: reached by Mercury only */
+        .dot-vhf { background: #4f46e5; }       /* v1.5.53: reached by VHF packet only */
+        .dot-d2g { background: #c2410c; }       /* v1.5.56: reached by Data2G only */
         .dot-home { background: linear-gradient(135deg, #10b981, #059669); width: 20px !important; height: 20px !important; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 3px solid white; }
         .time-range-btn { background: #e5e7eb; color: #374151; }
         .time-range-btn:hover { background: #d1d5db; }
@@ -92,6 +95,8 @@
     [data-theme="dark"] [class~="bg-orange-50"] { background-color: #431407 !important; }
     [data-theme="dark"] [class~="bg-orange-100"] { background-color: #7c2d12 !important; }
     [data-theme="dark"] [class~="bg-emerald-50"] { background-color: #022c22 !important; }
+    [data-theme="dark"] [class~="bg-teal-50"] { background-color: #042f2e !important; }
+    [data-theme="dark"] [class~="text-teal-700"] { color: #5eead4 !important; }
     [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
     [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
     [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
@@ -195,175 +200,452 @@
     /* Modals */
     [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
     </style>
+    <style id="rf-redesign-style">
+        /* v1.5.44 RF Connections layout A — tokens for light and dark */
+        :root {
+            --rf-bg:#F4F6F9; --rf-card:#FFFFFF; --rf-text:#18202B; --rf-muted:#5B6575; --rf-border:#E1E5EB; --rf-line:#EEF1F5;
+            --rf-soft:#EEF1F5; --rf-soft2:#F8F9FB; --rf-good:#1F7A47; --rf-goodbg:#E3F3EA; --rf-goodfg:#14532D;
+            --rf-warn:#8A5D00; --rf-warnbg:#FDF0D5; --rf-warnfg:#6B4404; --rf-bad:#A3361F; --rf-badbg:#FBE4DE;
+            --rf-accent:#2457C5; --rf-accentbg:#E6EEFB; --rf-accentfg:#173C8F; --rf-onaccent:#FFFFFF;
+            --rf-dotwarn:#C27803; --rf-barbad:#C2410C;
+        }
+        [data-theme="dark"] {
+            --rf-bg:#0F141A; --rf-card:#171D25; --rf-text:#E7ECF3; --rf-muted:#9AA6B6; --rf-border:#2B3440; --rf-line:#222A35;
+            --rf-soft:#252D38; --rf-soft2:#1C232C; --rf-good:#4CC584; --rf-goodbg:#173A27; --rf-goodfg:#A6E8C2;
+            --rf-warn:#F1B65C; --rf-warnbg:#3A2D14; --rf-warnfg:#F6CD8A; --rf-bad:#FF8A75; --rf-badbg:#3D1E18;
+            --rf-accent:#8DB4FF; --rf-accentbg:#1E2C47; --rf-accentfg:#C4D8FF; --rf-onaccent:#0F141A;
+            --rf-dotwarn:#F1B65C; --rf-barbad:#E5533D;
+        }
+        body { background: var(--rf-bg) !important; color: var(--rf-text); font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+        .rf-wrap { max-width: 1360px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+        @media (max-width: 640px) { .rf-wrap { padding-left: 12px; padding-right: 12px; } }
+        .rf-muted { color: var(--rf-muted); } .rf-small { font-size: 12px; }
+        .rf-a, .rf-banner a, .rf-classic { color: var(--rf-accent); font-weight: 600; }
+        .rf-banner { background: var(--rf-accentbg); color: var(--rf-accentfg); font-size: 13px; }
+        .rf-banner-in { display: flex; align-items: center; gap: 10px; padding-top: 8px; padding-bottom: 8px; }
+        .rf-banner a { color: var(--rf-accentfg); text-decoration: underline; }
+        #githubBannerClose { width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
+        .rf-head { background: var(--rf-card); border-bottom: 1px solid var(--rf-border); }
+        .rf-head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding-top: 16px; padding-bottom: 10px; }
+        .rf-title { flex: 1 1 340px; display: flex; flex-direction: column; gap: 4px; }
+        .rf-title-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+        .rf-title h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--rf-text); }
+        .rf-ver { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--rf-soft); color: var(--rf-muted); font-weight: 600; }
+        .rf-classic { font-size: 13px; }
+        .rf-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 13px; color: var(--rf-muted); }
+        .rf-live { display: inline-flex; align-items: center; }
+        .rf-clock { font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 600; color: var(--rf-text); }
+        .rf-range { display: flex; background: var(--rf-soft); border-radius: 10px; padding: 3px; gap: 2px; }
+        .rf-range .time-range-btn { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; color: var(--rf-muted); }
+        .rf-range .time-range-btn.active { background: var(--rf-card); color: var(--rf-text); box-shadow: 0 1px 2px rgba(16,24,40,.18); }
+        .rf-btn { height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--rf-border); background: var(--rf-card); color: var(--rf-text); font-size: 14px; cursor: pointer; }
+        .rf-btn:hover { background: var(--rf-soft2); }
+        .rf-btn-sm { height: 36px; font-size: 13px; padding: 0 12px; border-radius: 8px; }
+        .rf-btn-soft { background: var(--rf-soft); font-weight: 600; }
+        .rf-btn-accent { background: var(--rf-accent); color: var(--rf-onaccent); border-color: var(--rf-accent); font-weight: 600; }
+        .rf-btn-accent:hover { background: var(--rf-accent); filter: brightness(1.08); }
+        .rf-strip { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 14px; }
+        .rf-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--rf-border); background: var(--rf-card); color: var(--rf-text); font-size: 13px; cursor: pointer; }
+        .rf-pill i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+        .rf-pill b { font-weight: 600; } .rf-pill span { color: var(--rf-muted); }
+        .rf-storm { background: var(--rf-badbg); color: var(--rf-bad); font-weight: 600; font-size: 14px; padding: 10px 0; border-bottom: 1px solid var(--rf-border); }
+        .rf-main { display: flex; flex-direction: column; gap: 22px; padding-top: 22px; padding-bottom: 32px; }
+        .rf-nodata { background: var(--rf-warnbg) !important; color: var(--rf-warnfg); border-radius: 12px; padding: 14px 18px; }
+        .rf-card { background: var(--rf-card); border: 1px solid var(--rf-border); border-radius: 14px; color: var(--rf-text); }
+        .rf-pad { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+        .rf-card h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--rf-text); }
+        .rf-h3 { margin: 6px 0 0; font-size: 14px; font-weight: 700; color: var(--rf-text); }
+        .rf-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid var(--rf-line); }
+        .rf-card-head h2 { flex: 1 1 auto; }
+        .rf-card-head.rf-flat { padding: 0; border: 0; }
+        .rf-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+        .rf-kpi { padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+        .rf-kpi-btn { cursor: pointer; font: inherit; }
+        .rf-kpi-btn:hover { border-color: var(--rf-accent); }
+        .rf-kpi-label { font-size: 13px; color: var(--rf-muted); font-weight: 500; }
+        .rf-kpi-big { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: var(--rf-text); }
+        .rf-linkish { border: 0; background: transparent; padding: 0; cursor: pointer; color: var(--rf-bad); text-align: left; }
+        .rf-kpi-sub { font-size: 13px; color: var(--rf-muted); }
+        .rf-kpi-sub b { color: var(--rf-text); }
+        .rf-snrlist { max-height: 96px; overflow-y: auto; }
+        .rf-snrlist > * { display: flex; justify-content: space-between; }
+        .rf-failbar { display: flex; gap: 1px; height: 10px; border-radius: 5px; overflow: hidden; background: var(--rf-soft); }
+        .rf-failbar span { display: block; height: 100%; }
+        .rf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .rf-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--rf-border); background: var(--rf-card); color: var(--rf-muted); font-size: 12px; cursor: pointer; }
+        .rf-chip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+        .rf-chip b { color: var(--rf-text); }
+        .rf-chip:hover { border-color: var(--rf-text); color: var(--rf-text); }
+        .rf-cols { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+        .rf-partners { flex: 999 1 640px; min-width: 0; }
+        .rf-side { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+        /* v1.5.50: VHF path history */
+        .rf-paths-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; }
+        .rf-paths-head select { margin-left: 4px; padding: 4px 6px; border: 1px solid var(--rf-border); border-radius: 6px; background: var(--rf-card); color: var(--rf-text); }
+        .rf-path { border-top: 1px solid var(--rf-line); padding-top: 12px; }
+        .rf-path-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 8px; }
+        .rf-path-title b { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 15px; }
+        table.rf-pgrid { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
+        .rf-pgrid th { color: var(--rf-muted); font-weight: 500; padding: 0 2px; text-align: center; }
+        .rf-pgrid th.rf-pday { text-align: right; padding-right: 6px; white-space: nowrap; font-weight: 600; }
+        .rf-pgrid td { width: 22px; min-width: 18px; height: 20px; border-radius: 3px; text-align: center; vertical-align: middle; font-weight: 800; font-size: 11px; line-height: 1; padding: 0; }
+        .rf-ph { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; }
+        .rf-ph0 { background: var(--rf-line); }
+        .rf-ph1 { background: rgba(22, 163, 74, 0.30); }
+        .rf-ph2 { background: rgba(22, 163, 74, 0.58); }
+        .rf-ph3 { background: rgba(22, 163, 74, 0.88); }
+        .rf-pfut { background: transparent; border: 1px dashed var(--rf-line); }
+        .rf-pok { color: #065F46; }
+        .rf-pbad { color: #B91C1C; }
+        [data-theme="dark"] .rf-pok { color: #A7F3D0; }
+        [data-theme="dark"] .rf-pbad { color: #FCA5A5; }
+        .rf-pgrid td.rf-ph3 .rf-pok { color: #fff; }
+        .rf-pgrid td.rf-pbadcell { box-shadow: inset 0 0 0 2px #DC2626; }
+        .rf-paths-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; border-top: 1px solid var(--rf-line); padding-top: 10px; }
+        .rf-modems-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+        .rf-scroll { overflow-x: auto; }
+        .rf-empty { padding: 28px 20px; text-align: center; color: var(--rf-muted); font-size: 14px; }
+        .rf-error { padding: 10px 20px; color: var(--rf-bad); font-size: 13px; border-top: 1px solid var(--rf-line); }
+        .rf-legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 20px; border-top: 1px solid var(--rf-line); font-size: 12px; color: var(--rf-muted); }
+        .rf-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+        table.rf-ptable { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 720px; }
+        .rf-ptable th { text-align: left; color: var(--rf-muted); font-size: 12px; font-weight: 600; padding: 10px 8px; }
+        .rf-ptable td { padding: 11px 8px; border-top: 1px solid var(--rf-line); vertical-align: middle; }
+        .rf-ptable th:first-child, .rf-ptable td:first-child { padding-left: 20px; }
+        .rf-ptable th:last-child, .rf-ptable td:last-child { padding-right: 20px; }
+        .rf-call { border: 0; background: transparent; padding: 0; font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 600; font-size: 14px; color: var(--rf-accent); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; text-align: left; }
+        .rf-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+        .rf-note { font-size: 12px; font-weight: 600; }
+        .rf-band { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #fff; }
+        .rf-q { display: inline-block; min-width: 22px; text-align: center; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--rf-warnbg); color: var(--rf-warnfg); }
+        .rf-days { display: flex; gap: 3px; }
+        .rf-days span { display: block; width: 18px; height: 18px; border-radius: 3px; }
+        .rf-modem { border: 1px solid var(--rf-line); border-radius: 10px; padding: 12px 14px; font-size: 13px; }
+        .rf-modem-name { font-weight: 700; margin-bottom: 4px; }
+        /* v1.5.46: modem chip in Recent connections and the 7-day history */
+        .rf-modem-chip { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; background: var(--rf-line); color: var(--rf-muted); border: 1px solid var(--rf-border); white-space: nowrap; }
+        .rf-modem-chip.rf-modem-merc { background: #CCFBF1; color: #115E59; border-color: #99F6E4; cursor: help; }
+        [data-theme="dark"] .rf-modem-chip.rf-modem-merc { background: #134E4A; color: #99F6E4; border-color: #0F766E; }
+        .rf-modem-chip.rf-modem-vhf { background: #E0E7FF; color: #3730A3; border-color: #C7D2FE; cursor: help; }
+        [data-theme="dark"] .rf-modem-chip.rf-modem-vhf { background: #312E81; color: #C7D2FE; border-color: #4338CA; }
+        .rf-modem-chip.rf-modem-d2g { background: #FFEDD5; color: #9A3412; border-color: #FED7AA; cursor: help; }   /* v1.5.56 */
+        [data-theme="dark"] .rf-modem-chip.rf-modem-d2g { background: #7C2D12; color: #FED7AA; border-color: #C2410C; }
+        .rf-modem .text-2xl, .rf-modem .text-4xl, .rf-modem .sm\:text-4xl, .rf-modem .sm\:text-2xl { font-size: 18px !important; line-height: 1.3 !important; }
+        .rf-modem .text-gray-900 { color: var(--rf-text) !important; }
+        .rf-modem .text-gray-600, .rf-modem .text-gray-500 { color: var(--rf-muted) !important; }
+        .rf-modem [class*="border-sky-200"], .rf-modem [class*="border-emerald-200"] { border-color: var(--rf-line) !important; }
+        .rf-modem [class*="text-sky-700"], .rf-modem [class*="text-emerald-700"] { color: var(--rf-accent) !important; }
+        .rf-vara-row { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 10px; color: var(--rf-muted); }
+        .rf-vara-row b { text-align: right; }
+        .rf-vara-row b { color: var(--rf-text); font-weight: 600; }
+        .rf-idx { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .rf-idx > div { background: var(--rf-soft2); border-radius: 10px; padding: 8px 12px; display: flex; flex-direction: column; }
+        .rf-idx span { font-size: 12px; color: var(--rf-muted); } .rf-idx b { font-size: 22px; font-weight: 700; color: var(--rf-text) !important; } .rf-idx small { font-size: 12px; color: var(--rf-muted) !important; }
+        .rf-bb { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .rf-bb-slot { border: 1px solid var(--rf-line); background: var(--rf-soft2); border-radius: 8px; padding: 8px; font-size: 12px; min-width: 0; }
+        .rf-bb-slot.rf-now { border: 2px solid var(--rf-accent); background: var(--rf-accentbg); }
+        .rf-bb-when { color: var(--rf-muted); font-weight: 600; margin-bottom: 2px; }
+        .rf-bb-slot [class*="text-xl"], .rf-bb-slot [class*="text-2xl"] { font-size: 16px !important; color: var(--rf-text) !important; }
+        .rf-bb-stats { margin-top: 2px; font-size: 11px; color: var(--rf-muted); }
+        .rf-bb-stats > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rf-hsum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center; font-size: 12px; }
+        .rf-tabs-card { overflow: hidden; }
+        .rf-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--rf-border); }
+        .rf-tabs button { height: 44px; padding: 0 14px; border: 0; background: transparent; font-size: 14px; font-weight: 500; color: var(--rf-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        .rf-tabs button[aria-selected="true"] { color: var(--rf-text); font-weight: 700; border-bottom-color: var(--rf-accent); }
+        .rf-count { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 999px; background: var(--rf-soft); color: var(--rf-muted); font-size: 12px; font-weight: 700; }
+        .rf-panel { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+        .rf-panel.hidden { display: none; }
+        /* old blocks moved into the tabs: drop their card chrome */
+        .rf-panel > div[class*="shadow-lg"], .rf-panel > div[class*="stat-card"], .rf-panel > div[class*="rounded-xl"] { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+        .rf-panel .stat-card:hover { transform: none; box-shadow: none; }
+        .rf-panel h2.gradient-text, .rf-panel .gradient-text { background: none !important; -webkit-text-fill-color: currentColor !important; color: var(--rf-text) !important; font-size: 16px !important; margin-bottom: 8px !important; }
+        .rf-panel .text-amber-700.uppercase { color: var(--rf-text) !important; text-transform: none; font-size: 15px; }
+        #rfTab-recent #recentConnectionsHeading { display: none; }
+        #messagesPanelArrow, #messagesCountOld { display: none !important; }
+        #stationMap { height: 460px; border-radius: 10px; }
+        #propagationReportContent { max-height: none !important; }
+        /* the 7-day history becomes a panel from the right */
+        #stationInfoModal { background: rgba(8,12,18,0.45) !important; }
+        #stationInfoModal > div { position: fixed !important; top: 0 !important; right: 0 !important; left: auto !important; margin: 0 !important; width: 100% !important; max-width: 640px !important; height: 100% !important; overflow-y: auto; border-radius: 0 !important; border: 0 !important; background: var(--rf-card) !important; color: var(--rf-text); box-shadow: -12px 0 40px rgba(0,0,0,0.3) !important; }
+        #stationInfoModal [class*="from-yellow-50"] { background: var(--rf-soft2) !important; border-color: var(--rf-border) !important; }
+        #stationInfoModal [class*="from-yellow-50"] .bg-white, #stationInfoModal [class*="from-yellow-50"] [class*="bg-white"] { background: var(--rf-card) !important; }
+        #stationInfoModal [class*="from-yellow-50"] .text-gray-700, #stationInfoModal [class*="from-yellow-50"] .text-gray-600, #stationInfoModal [class*="from-yellow-50"] h4 { color: var(--rf-text) !important; }
+        .rf-hist-extra { display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; }
+        .rf-hist-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+        .rf-hist-days div { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--rf-muted); }
+        .rf-hist-days span { display: block; width: 100%; height: 22px; border-radius: 4px; }
+        .rf-hist-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .rf-hist-note { background: var(--rf-warnbg); color: var(--rf-warnfg); border-radius: 10px; padding: 9px 12px; font-size: 13px; }
+        /* v1.5.44: Conditions across the page (indices left, the six best-band slots right) */
+        .rf-cond { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 16px 24px; align-items: start; }
+        .rf-cond-left, .rf-cond-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+        .rf-cond-bbhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+        .rf-cond .rf-bb { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+        .rf-cond-right > .rf-btn { align-self: flex-start; }
+        @media (max-width: 1100px) { .rf-cond .rf-bb { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 760px) { .rf-cond { grid-template-columns: minmax(0, 1fr); } .rf-cond .rf-bb { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media print { .rf-head, .rf-banner, .rf-tabs, .rf-strip { display: none !important; } }
+    
+        /* v1.5.63: Modem performance tab (rf-modem-report.js) */
+        :root { --mp-vara:#2457C5; --mp-merc:#0D9488; --mp-d2g:#C2410C; --mp-kp:#B45309; --mp-kp5:#B91C1C; }
+        [data-theme="dark"] { --mp-vara:#8DB4FF; --mp-merc:#2DD4BF; --mp-d2g:#FB923C; --mp-kp:#F59E0B; --mp-kp5:#F87171; }
+        .mp-lede { margin: 0; font-size: 14px; line-height: 1.55; color: var(--rf-text); max-width: 78ch; }
+        .mp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        .mp-tile { border: 1px solid var(--rf-border); border-radius: 10px; padding: 12px 14px; background: var(--rf-soft2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .mp-tile-h { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--rf-text); font-size: 13px; }
+        .mp-big { font-size: 30px; font-weight: 700; color: var(--rf-text); font-variant-numeric: tabular-nums; line-height: 1.15; }
+        .mp-kv { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--rf-muted); }
+        .mp-kv b { color: var(--rf-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+        .mp-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+        .mp-key { display: inline-block; width: 16px; height: 10px; border-radius: 2px; flex: none; }
+        .mp-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--rf-muted); }
+        .mp-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .mp-chart { position: relative; min-width: 0; }
+        .mp-chart svg { display: block; overflow: visible; }
+        .mp-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+        .mp-two > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+        .mp-c-vara { background: var(--mp-vara); fill: var(--mp-vara); stroke: var(--mp-vara); }
+        .mp-c-merc { background: var(--mp-merc); fill: var(--mp-merc); stroke: var(--mp-merc); }
+        .mp-c-d2g  { background: var(--mp-d2g);  fill: var(--mp-d2g);  stroke: var(--mp-d2g); }
+        .mp-dot { stroke: var(--rf-card); stroke-width: 1; fill-opacity: .88; cursor: default; }
+        .mp-x { fill: none; stroke-width: 1.8; }
+        .mp-kpfill { fill: var(--mp-kp); } .mp-kpfill-5 { fill: var(--mp-kp5); }
+        .mp-kp-3 { background: var(--mp-kp); opacity: .35; } .mp-kp-5 { background: var(--mp-kp5); opacity: .5; }
+        .mp-o-ok { background: var(--rf-good); fill: var(--rf-good); } .mp-o-warn { background: var(--rf-dotwarn); fill: var(--rf-dotwarn); }
+        .mp-o-muted { background: var(--rf-muted); fill: var(--rf-muted); opacity: .55; } .mp-o-bad { background: var(--rf-bad); fill: var(--rf-bad); }
+        .mp-grid { stroke: var(--rf-line); stroke-width: 1; }
+        .mp-ax { fill: var(--rf-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+        .mp-lbl { fill: var(--rf-text); font-size: 12px; font-weight: 600; }
+        .mp-in { fill: var(--rf-card); font-size: 11px; font-weight: 700; pointer-events: none; }
+        .mp-tw { overflow-x: auto; }
+        .mp-table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+        .mp-table th, .mp-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--rf-line); white-space: nowrap; color: var(--rf-text); }
+        .mp-table th { color: var(--rf-muted); font-weight: 600; }
+        .mp-table th:first-child, .mp-table td:first-child { text-align: left; }
+        .mp-table td.mp-warn { color: var(--rf-warn); font-weight: 700; } .mp-table td.mp-bad { color: var(--rf-bad); font-weight: 700; }
+        .mp-findings { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.55; color: var(--rf-text); max-width: 82ch; }
+        .mp-notes { font-size: 12px; color: var(--rf-muted); max-width: 82ch; line-height: 1.55; }
+        .mp-notes summary { cursor: pointer; color: var(--rf-text); }
+        .mp-tip { position: absolute; z-index: 20; pointer-events: none; background: var(--rf-card); border: 1px solid var(--rf-border); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.18); padding: 8px 10px; font-size: 12px; line-height: 1.45; color: var(--rf-text); max-width: 280px; }
+    </style>
+
 </head>
 <body class="min-h-screen" data-nav-page="rf">
     <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
          Replaces the previously-duplicated <nav> block. The active link is
          driven by the data-nav-page attribute on <body>. -->
-    <script src="bpq-nav-loader.js?v=2026-11-12-4"></script>
+    <script src="bpq-nav-loader.js?v=2026-11-16-1"></script>
+    <script src="rf-modem-report.js?v=1.5.66" defer></script>
 
-    <!-- ═══ GITHUB RIBBON — compact open-source notice ═════════════════════ -->
-    <div id="githubBanner" style="
-        margin: 0 0.5rem 0.75rem;
-        background: linear-gradient(90deg, rgba(124,58,237,0.25) 0%, rgba(37,99,235,0.25) 100%);
-        border: 1px solid rgba(167,139,250,0.5);
-        border-radius: 8px;
-        padding: 10px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        flex-wrap: wrap;
-        font-size: 13px;
-        box-shadow: 0 2px 8px rgba(124,58,237,0.15);
-    ">
-        <style>
-            #githubBanner a:hover { filter: brightness(1.3); text-decoration: underline; }
-            #githubBannerClose:hover { opacity: 1 !important; }
-            /* Match the page's "RF Connections" gradient — purple to blue.
-               Light mode (default) and dark mode use different gradient stops. */
-            #githubBanner .gh-text {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                font-weight: 600;
-            }
-            [data-theme="dark"] #githubBanner .gh-text {
-                background: linear-gradient(135deg, #c4b5fd 0%, #93c5fd 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            }
-        </style>
-        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px">
-            <svg height="16" width="16" viewBox="0 0 16 16" fill="#667eea" style="flex-shrink:0">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-            </svg>
-            <span class="gh-text">BPQ Dashboard is open-source and free —</span>
-            <a href="https://github.com/bpq-dashboard/bpq-dashboard"
-               target="_blank"
-               class="gh-text"
-               style="text-decoration:none;font-weight:700;transition:filter .15s ease">
-                run it on your own station ↗
-            </a>
+    <!-- ═══ v1.5.44 RF Connections redesign ("layout A") ══════════════════════
+         Same data code and element ids as before; the old page is kept as
+         bpq-rf-connections-classic.html for comparison. -->
+    <div id="githubBanner" class="rf-banner">
+        <div class="rf-wrap rf-banner-in">
+            <svg height="16" width="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;fill:currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            <span style="flex:1 1 auto">BPQ Dashboard is open source and free: <a href="https://github.com/bpq-dashboard/bpq-dashboard" target="_blank" rel="noopener">github.com/bpq-dashboard/bpq-dashboard</a> — run it on your own station, star it, or report an issue.</span>
+            <button id="githubBannerClose" type="button" aria-label="Close the GitHub banner" onclick="document.getElementById('githubBanner').style.display='none';localStorage.setItem('bpq_banner_dismissed','1')">×</button>
         </div>
-        <button id="githubBannerClose"
-                onclick="document.getElementById('githubBanner').style.display='none';localStorage.setItem('bpq_banner_dismissed','1')"
-                style="background:none;border:none;color:#c4b5fd;font-size:18px;cursor:pointer;padding:0 4px;line-height:1;opacity:.7;transition:all .15s ease"
-                title="Dismiss">×</button>
     </div>
     <script>
-        // Don't show banner if user already dismissed it
-        if (localStorage.getItem('bpq_banner_dismissed') === '1') {
-            document.getElementById('githubBanner').style.display = 'none';
-        }
+        if (localStorage.getItem('bpq_banner_dismissed') === '1') document.getElementById('githubBanner').style.display = 'none';
     </script>
 
-    <div class="p-2 sm:p-4 lg:p-8">
-        <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
-            <div class="mb-6 sm:mb-10 flex flex-col lg:flex-row justify-between items-center gap-4">
-                <div class="text-center flex-1">
-                    <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
-                        <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">RF Connections</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.42</span>
-                    </div>
-                    <p class="text-gray-600 text-sm sm:text-lg">VARA HF Analytics with Frequency Tracking</p>
-                    <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
-                    <!-- Time Range Selector -->
-                    <div class="flex justify-center gap-2 mt-3">
-                        <button onclick="setTimeRange(1)" id="range1d" class="time-range-btn active px-3 py-1.5 text-xs font-bold rounded-lg transition-all">Today</button>
-                        <button onclick="setTimeRange(7)" id="range7d" class="time-range-btn px-3 py-1.5 text-xs font-bold rounded-lg transition-all">7 Days</button>
-                        <button onclick="setTimeRange(30)" id="range30d" class="time-range-btn px-3 py-1.5 text-xs font-bold rounded-lg transition-all">30 Days</button>
-                        <button onclick="setTimeRange(90)" id="range90d" class="time-range-btn px-3 py-1.5 text-xs font-bold rounded-lg transition-all">90 Days</button>
-                    </div>
+    <header class="rf-head">
+        <div class="rf-wrap rf-head-row">
+            <div class="rf-title">
+                <div class="rf-title-line">
+                    <h1>RF Connections</h1>
+                    <span class="rf-ver">v1.5.66</span>
+                    <a class="rf-classic" href="bpq-rf-connections-classic.html" title="The page as it was before v1.5.44, for comparison">Classic view</a>
                 </div>
-                <div class="w-full sm:w-auto">
-                    <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-100">
-                        <div class="flex items-center mb-2 sm:mb-3"><span id="statusIndicator" class="status-indicator status-loading"></span><span id="statusText" class="text-xs sm:text-sm">Loading...</span></div>
-                        <p id="lastUpdate" class="text-xs text-gray-500 mb-2 sm:mb-3"></p>
-                        <button onclick="refreshData()" class="modern-button w-full text-white font-semibold py-2 sm:py-2.5 px-4 sm:px-6 rounded-lg text-xs sm:text-sm">🔄 Refresh</button>
-                        <button onclick="showGenerateReportModal()" class="w-full mt-2 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 sm:py-2.5 px-4 sm:px-6 rounded-lg text-xs sm:text-sm transition-colors">📄 Station Report</button>
-                    </div>
+                <div class="rf-sub">
+                    <span id="dateRange">Loading...</span>
+                    <span class="rf-live"><span id="statusIndicator" class="status-indicator status-loading"></span><span id="statusText">Loading...</span></span>
+                    <span id="lastUpdate"></span>
+                    <span class="rf-clock" title="UTC"><span id="zuluTime">--:--</span>Z</span>
                 </div>
             </div>
+            <div class="rf-range" role="group" aria-label="Date range">
+                <button type="button" onclick="setTimeRange(1)" id="range1d" class="time-range-btn active">Today</button>
+                <button type="button" onclick="setTimeRange(7)" id="range7d" class="time-range-btn">7 days</button>
+                <button type="button" onclick="setTimeRange(30)" id="range30d" class="time-range-btn">30 days</button>
+                <button type="button" onclick="setTimeRange(90)" id="range90d" class="time-range-btn">90 days</button>
+            </div>
+            <button type="button" class="rf-btn" onclick="refreshData()">Refresh</button>
+            <button type="button" class="rf-btn" onclick="showGenerateReportModal()">Station report</button>
+            <button type="button" class="rf-btn rf-btn-soft" onclick="if (window.toggleDarkMode) toggleDarkMode(); rfThemeLabel()" id="rfThemeBtn">Dark</button>
+        </div>
+        <div class="rf-wrap rf-strip" id="rfStatusStrip" aria-label="Station status"></div>
+    </header>
 
-            <!-- No Data Warning (hidden by default, shown when no log files found) -->
-            <div id="noDataWarning" class="hidden mb-6 p-4 sm:p-6 bg-amber-50 border-2 border-amber-200 rounded-xl text-center"></div>
+    <div id="geoStormAlert" class="hidden rf-storm" role="alert">
+        <div class="rf-wrap">⚠ Geomagnetic conditions: <span id="stormLevel">Storm</span>. Expect poorer HF, worst on the higher bands. Details under Geomagnetic history.</div>
+    </div>
 
-            <div id="statCardsGrid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-5 mb-6 sm:mb-10">
-                <div class="stat-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-green-200">
-                    <div class="text-green-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">RF Connections Status</div>
-                    <div id="successfulConnections" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                    <div class="text-xs text-gray-500 mt-1">Successful of <span id="totalConnections">0</span> total</div>
-                    <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-green-200">
-                        <div class="flex justify-between"><span>Success Rate:</span><span id="successRate" class="font-bold text-blue-600">0%</span></div>
-                        <div class="flex justify-between"><span>Avg Bitrate:</span><span id="avgBitrate" class="font-bold text-cyan-600">-- bps</span></div>
-                    </div>
+    <main class="rf-wrap rf-main">
+        <div id="noDataWarning" class="hidden rf-nodata"></div>
+
+        <section class="rf-kpis" aria-label="Headline numbers">
+            <div class="rf-card rf-kpi">
+                <div class="rf-kpi-label">Success rate</div>
+                <div id="successRate" class="rf-kpi-big">0%</div>
+                <div class="rf-kpi-sub"><span id="successfulConnections">0</span> of <span id="totalConnections">0</span> connections · avg bitrate <b id="avgBitrate">-- bps</b></div>
+            </div>
+            <div class="rf-card rf-kpi">
+                <div class="rf-kpi-label">Failed connections</div>
+                <div class="rf-kpi-row"><button type="button" id="failedConnections" class="rf-kpi-big rf-linkish" onclick="showFailures('failed')" title="List every failed connection">0</button></div>
+                <div id="rfFailBar" class="rf-failbar" aria-hidden="true"></div>
+                <div class="rf-chips">
+                    <button type="button" class="rf-chip" onclick="showFailures('timeout')" title="List these connections"><i style="background:#C2410C"></i>Timeout <b id="failedTimeout">0</b></button>
+                    <button type="button" class="rf-chip" onclick="showFailures('channelBusy')" title="List these connections"><i style="background:#E8A33D"></i>Busy <b id="failedChannelBusy">0</b></button>
+                    <button type="button" class="rf-chip" onclick="showFailures('portInSession')" title="Port already attached to another session (&quot;Error - Port in use&quot;). List them."><i style="background:#9A6700"></i>Port in use <b id="failedPortSession">0</b></button>
+                    <button type="button" class="rf-chip" onclick="showFailures('incoming')" title="List these connections"><i style="background:#7C5CD6"></i>Incoming <b id="failedIncoming">0</b></button>
+                    <button type="button" class="rf-chip" onclick="showFailures('nodata')" title="List these connections"><i style="background:#6B7280"></i>No data <b id="failedNoData">0</b></button>
+                    <span id="failedOtherRow" class="rf-chip hidden"><i style="background:#9AA3AF"></i>Other <b id="failedOther">0</b></span>
                 </div>
-                <div class="stat-card bg-gradient-to-br from-red-50 to-red-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-red-200">
-                    <div class="text-red-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">RF Connections Failures</div>
-                    <div id="failedConnections" class="text-2xl sm:text-4xl font-bold text-gray-900 cursor-pointer hover:underline" onclick="showFailures('failed')" title="Click to list every failed connection below">0</div>
-                    <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-red-200">
-                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('timeout')" title="Click to list these connections below"><span>Timeout (no prop):</span><span id="failedTimeout" class="font-semibold text-red-600">0</span></div>
-                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('channelBusy')" title="Click to list these connections below"><span>Channel Busy:</span><span id="failedChannelBusy" class="font-semibold text-orange-600">0</span></div>
-                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('nodata')" title="Click to list these connections below"><span>No Data:</span><span id="failedNoData" class="font-semibold text-gray-500">0</span></div>
-                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('portInSession')" title="Port already attached to another session (&quot;Error - Port in use&quot;). Same event the System Logs page shows as Port in Use, counted per failed session here. Click to list them below."><span>Port in Use:</span><span id="failedPortSession" class="font-semibold text-yellow-700">0</span></div>
-                        <div class="flex justify-between cursor-pointer hover:underline" onclick="showFailures('incoming')" title="Click to list these connections below"><span>Incoming Failed:</span><span id="failedIncoming" class="font-semibold text-purple-600">0</span></div>
-                        <div id="failedOtherRow" class="flex justify-between hidden"><span>Other:</span><span id="failedOther" class="font-semibold text-gray-500">0</span></div>
-                    </div>
-                    <div id="failedByBand" class="text-xs text-gray-600 mt-2 pt-2 border-t border-red-200"></div>
+                <div id="failedByBand" class="rf-kpi-sub"></div>
+            </div>
+            <div class="rf-card rf-kpi">
+                <div class="rf-kpi-label">Average S/N</div>
+                <div id="avgSNR" class="rf-kpi-big">--</div>
+                <div id="snrByBand" class="rf-kpi-sub rf-snrlist"></div>
+            </div>
+            <button type="button" class="rf-card rf-kpi rf-kpi-btn" onclick="showStationsModal()">
+                <span class="rf-kpi-label">Stations</span>
+                <span id="uniqueStations" class="rf-kpi-big">0</span>
+                <span class="rf-kpi-sub">RF connected in this period · <span class="rf-a">see the list</span></span>
+            </button>
+        </section>
+
+        <div class="rf-cols">
+            <section class="rf-card rf-partners" aria-labelledby="rfPartnersH">
+                <div class="rf-card-head">
+                    <h2 id="rfPartnersH">Forwarding partners</h2>
+                    <span class="rf-muted rf-small">Needs attention first · click a call for its 7-day history</span>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="loadFwdQueue()">Refresh queue</button>
+                    <button type="button" class="rf-btn rf-btn-sm rf-btn-accent" onclick="showAddPartnerModal()">+ Add</button>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="showManagePartnersModal()">Manage</button>
                 </div>
-                <div class="stat-card bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-cyan-200">
-                    <div class="text-cyan-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">RF Connections Avg S/N</div>
-                    <div id="avgSNR" class="text-2xl sm:text-4xl font-bold text-gray-900">--</div>
-                    <div id="snrByBand" class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-cyan-200 max-h-32 overflow-y-auto custom-scrollbar pr-3"></div>
+                <div id="tprfnHubList" class="rf-scroll"><div class="rf-empty">Loading...</div></div>
+                <div id="fwdQueueError" class="hidden rf-error"></div>
+                <div class="rf-legend">
+                    <span><i style="background:var(--rf-good)"></i>forwarded</span>
+                    <span><i style="background:#E8A33D"></i>good and failed</span>
+                    <span><i style="background:var(--rf-barbad)"></i>failed</span>
+                    <span><i style="background:var(--rf-border)"></i>no attempt</span>
+                    <span>· one block per UTC day, oldest left</span>
                 </div>
-                <div class="stat-card bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-200 cursor-pointer" onclick="showStationsModal()">
-                    <div class="text-purple-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">RF Connected Stations</div>
-                    <div id="uniqueStations" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                    <div class="text-xs text-purple-600 font-semibold hidden sm:block">Quick Overview</div>
+            </section>
+        </div>
+
+        <!-- v1.5.48: Modems full width, one modem per column (they wrap on narrow screens) -->
+        <section class="rf-card rf-pad" aria-labelledby="rfModemsH">
+            <h2 id="rfModemsH">Modems</h2>
+            <div class="rf-modems-row">
+                <div class="rf-modem" id="rfVaraCard"></div>
+                <div id="mercuryStatusCard" class="hidden rf-modem">
+                    <div class="rf-modem-name">Mercury HF</div>
+                    <div id="mercuryStatusBody"></div>
                 </div>
-                <!-- v1.5.28: VHF Connections Status — one block per LinBPQ sound-modem
-                     port (KISS over TCP, e.g. QtSoundModem); was a badge in the
-                     status box (v1.5.23). Hidden when the station has none. -->
-                <div id="vhfStatusCard" class="hidden stat-card bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-emerald-200">
-                    <div class="text-emerald-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase">VHF Connections Status</div>
-                    <div id="vhfStatusBody" class="space-y-3"></div>
+                <div id="data2gStatusCard" class="hidden rf-modem">
+                    <div class="rf-modem-name">Data2G HF</div>
+                    <div id="data2gStatusBody"></div>
+                </div>
+                <div id="vhfStatusCard" class="hidden rf-modem">
+                    <div class="rf-modem-name">VHF packet</div>
+                    <div id="vhfStatusBody"></div>
                 </div>
             </div>
+        </section>
 
-            <!-- TPRFN Hub Station Forwarding Partners Card — merged with the
-                 former separate "Messages To Be Forwarded by RF" card. Each
-                 partner tile now shows both last-connect status and its live
-                 FWD QUEUE pending-message count in one place. -->
-            <div class="mb-6 sm:mb-10">
-                <div class="stat-card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200">
+        <section class="rf-card rf-pad rf-cond" aria-labelledby="rfCondH">
+                    <div class="rf-cond-left">
+                    <h2 id="rfCondH">Conditions</h2>
+                    <div class="rf-idx">
+                        <div><span>K-index now</span><b id="currentKIndex">--</b><small id="kIndexStatus">--</small></div>
+                        <div><span>A index</span><b id="currentAIndex">--</b><small id="aIndexStatus">--</small></div>
+                        <div><span>Solar flux</span><b id="solarFlux">--</b><small>SFI</small></div>
+                        <div><span>Sunspots</span><b id="sunspotNumber">--</b><small>SSN</small></div>
+                    </div>
+                    <div class="rf-muted rf-small" id="geoConditionsUpdate">Loading NOAA data...</div>
+                    </div>
+                    <div class="rf-cond-right">
+                    <div class="rf-cond-bbhead"><h3 class="rf-h3" style="margin:0">Best band by time of day (UTC)</h3><span class="rf-small rf-muted" id="bbSunTimes">Based on propagation and connection history</span></div>
+                    <div class="rf-bb">
+                        <div class="rf-bb-slot" data-slot="1"><div class="rf-bb-when" id="bbSlotLabel1">00–04Z</div><div id="bestBand1"><div>--</div></div><div id="bandStats1" class="rf-bb-stats"></div></div>
+                        <div class="rf-bb-slot" data-slot="2"><div class="rf-bb-when" id="bbSlotLabel2">04–08Z</div><div id="bestBand2"><div>--</div></div><div id="bandStats2" class="rf-bb-stats"></div></div>
+                        <div class="rf-bb-slot" data-slot="3"><div class="rf-bb-when" id="bbSlotLabel3">08–12Z</div><div id="bestBand3"><div>--</div></div><div id="bandStats3" class="rf-bb-stats"></div></div>
+                        <div class="rf-bb-slot" data-slot="4"><div class="rf-bb-when" id="bbSlotLabel4">12–16Z</div><div id="bestBand4"><div>--</div></div><div id="bandStats4" class="rf-bb-stats"></div></div>
+                        <div class="rf-bb-slot" data-slot="5"><div class="rf-bb-when" id="bbSlotLabel5">16–20Z</div><div id="bestBand5"><div>--</div></div><div id="bandStats5" class="rf-bb-stats"></div></div>
+                        <div class="rf-bb-slot" data-slot="6"><div class="rf-bb-when" id="bbSlotLabel6">20–24Z</div><div id="bestBand6"><div>--</div></div><div id="bandStats6" class="rf-bb-stats"></div></div>
+                    </div>
+                    <div id="bbConditionsInfo" class="rf-small rf-muted">Recommendations blend success history with current conditions and seasonal day/night patterns.</div>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="rfTab('map'); if (typeof toggleBestPaths === 'function' &amp;&amp; !showBestPaths) toggleBestPaths()">Show best paths on map</button>
+                    </div>
+                </section>
+
+        <section class="rf-card rf-pad" aria-labelledby="rfActH">
+            <div class="rf-card-head rf-flat">
+                <h2 id="rfActH">Activity by hour (UTC)</h2>
+                <span class="rf-muted rf-small">Connections and messages per hour in this period</span>
+            </div>
+            <div style="height: 280px;"><canvas id="hourlyChart"></canvas></div>
+            <div id="hourlyChartSummary" class="rf-hsum"></div>
+        </section>
+
+        <section class="rf-card rf-tabs-card" aria-label="Details">
+            <div class="rf-tabs" role="tablist" aria-label="Details">
+                <button type="button" role="tab" data-tab="recent" onclick="rfTab('recent')">Recent connections</button>
+                <button type="button" role="tab" data-tab="messages" onclick="rfTab('messages')">Forwarded messages <span id="messagesCount" class="rf-count">0</span></button>
+                <button type="button" role="tab" data-tab="report" onclick="rfTab('report')">Propagation report</button>
+                <button type="button" role="tab" data-tab="map" onclick="rfTab('map')">Map</button>
+                <button type="button" role="tab" data-tab="bands" onclick="rfTab('bands')">Bands and channel quality</button>
+                <button type="button" role="tab" data-tab="geo" onclick="rfTab('geo')">Geomagnetic history</button>
+                <button type="button" role="tab" data-tab="modems" onclick="rfTab('modems')">Modem performance</button>
+                <button type="button" role="tab" data-tab="paths" onclick="rfTab('paths')">VHF paths</button>
+                <button type="button" role="tab" data-tab="netmap" onclick="rfTab('netmap')">Packet Live NetRom/Node Map</button>
+            </div>
+            <div class="rf-panel" id="rfTab-recent" role="tabpanel"><div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:mb-4">
+                    <h2 class="text-lg sm:text-2xl font-bold gradient-text" id="recentConnectionsHeading">Recent Connections</h2>
+                    <span id="failFilterChip" class="hidden px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 cursor-pointer" onclick="showFailures(null)" title="Show all connections again"></span>
+                    <div class="relative">
+                        <input type="text" id="recentConnectionsSearch" placeholder="Search callsign..." 
+                               class="w-full sm:w-64 px-4 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                               onkeyup="debouncedFilterRecentConnections()">
+                        <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                    </div>
+                    <label id="recentModemFilterWrap" class="hidden text-xs text-gray-600 flex items-center gap-1">Modem
+                        <select id="recentModemFilter" class="px-2 py-2 border border-gray-300 rounded-lg text-sm" onchange="filterRecentConnections()" aria-label="Show connections from which modem">
+                            <option value="all">All</option><option value="vara">VARA HF</option><option value="mercury">Mercury HF</option><option value="data2g">Data2G HF</option><option value="vhf">VHF packet</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar max-h-72 sm:max-h-96">
+                    <table class="w-full text-xs sm:text-sm table-responsive">
+                        <thead class="bg-gray-100 sticky top-0"><tr><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Time</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Call</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left hide-mobile">Type</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left hide-mobile" title="Which modem carried the call">Modem</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left hide-mobile">Freq</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Band</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Status</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile">S/N</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile" title="Each modem's own figure: VARA its peak speed level, Data2G its best minute's delivered rate, Mercury none. Not comparable between modems.">Modem rate</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile" title="Bytes both ways x 8, over the time connected: the same for every modem, so compare with this">Effective</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile">TX/RX</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile">Time</th></tr></thead>
+                        <tbody id="recentConnectionsTable"></tbody>
+                    </table>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100">
+                    <div id="recentConnectionsCount" class="text-xs text-gray-500"></div>
+                    <div id="recentConnectionsPagination" class="flex items-center gap-1">
+                        <button onclick="goToFirstPage()" id="btnFirst" class="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed" title="First Page">⟪</button>
+                        <button onclick="prevPage()" id="btnPrev" class="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">← Prev</button>
+                        <span id="pageIndicator" class="px-3 py-1 text-xs font-semibold text-purple-700 bg-purple-50 rounded">Page 1 of 1</span>
+                        <button onclick="nextPage()" id="btnNext" class="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">Next →</button>
+                        <button onclick="goToLastPage()" id="btnLast" class="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed" title="Last Page">⟫</button>
+                    </div>
+                </div>
+            </div></div>
+            <div class="rf-panel hidden" id="rfTab-messages" role="tabpanel"><div class="stat-card bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-amber-200">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
-                        <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase">🌐 RF Forwarding Partners</div>
-                        <div class="flex gap-2">
-                            <button onclick="loadFwdQueue()" class="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-colors">🔄 Refresh Queue</button>
-                            <button onclick="showAddPartnerModal()" class="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold rounded transition-colors">+ Add</button>
-                            <button onclick="showManagePartnersModal()" class="px-2 py-1 bg-gray-400 hover:bg-gray-500 text-white text-xs font-semibold rounded transition-colors">Manage</button>
-                        </div>
-                    </div>
-                    <div id="tprfnHubList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-xs">
-                        <div class="text-gray-400 text-center py-2">Loading...</div>
-                    </div>
-                    <div id="fwdQueueError" class="hidden text-xs text-red-600 mt-2 pt-2 border-t border-indigo-200"></div>
-                </div>
-            </div>
-
-            <!-- Propagation Report Button -->
-
-            <!-- Forwarded Messages Panel -->
-            <div class="mb-6 sm:mb-10">
-                <div class="stat-card bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-amber-200">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
-                        <div class="flex items-center gap-2 cursor-pointer" onclick="toggleMessagesPanel()">
+                        <div class="flex items-center gap-2 cursor-pointer" >
                             <span id="messagesPanelArrow" class="text-amber-600 text-sm transition-transform">▶</span>
                             <div class="text-amber-700 text-xs sm:text-sm font-bold uppercase">📨 Forwarded Messages</div>
-                            <span id="messagesCount" class="px-2 py-0.5 bg-amber-200 text-amber-800 text-xs font-bold rounded-full">0</span>
+                            <span id="messagesCountOld" class="px-2 py-0.5 bg-amber-200 text-amber-800 text-xs font-bold rounded-full">0</span>
                         </div>
                         <div class="flex gap-2 items-center">
                             <select id="messagesPartnerFilter" onchange="updateMessagesPanel()" class="px-2 py-1 text-xs border border-amber-300 rounded bg-white">
@@ -393,7 +675,7 @@
                             </select>
                         </div>
                     </div>
-                    <div id="messagesPanelBody" class="hidden">
+                    <div id="messagesPanelBody">
                         <div class="flex flex-wrap gap-3 mb-3" id="messagesSummaryCards">
                         </div>
                         <div class="overflow-auto max-h-96 custom-scrollbar">
@@ -419,75 +701,73 @@
                         </div>
                         <div id="messagesFooter" class="text-xs text-gray-500 mt-2 text-right"></div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Propagation Report Button -->
-            <div class="mb-6 sm:mb-10">
-                <div class="stat-card bg-gradient-to-br from-indigo-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200">
-                    <div class="flex flex-col sm:flex-row justify-between items-center gap-3">
-                        <div>
-                            <div class="text-indigo-700 text-xs sm:text-sm font-bold uppercase mb-1">📊 HUB Station Propagation Report</div>
-                            <p class="text-xs text-gray-600">7-day connection analysis for forwarding partners</p>
-                        </div>
-                        <button onclick="showPropagationReport()" class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg">
-                            📈 Generate Report
-                        </button>
+                </div></div>
+            <div class="rf-panel hidden" id="rfTab-report" role="tabpanel">
+                <div class="rf-card-head rf-flat">
+                    <div style="flex:1 1 320px">
+                        <h3 class="rf-h3" style="margin:0">Hub propagation report</h3>
+                        <div class="rf-small rf-muted" id="reportDateRange">7-day connection analysis for forwarding partners</div>
                     </div>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="generatePropagationReport()">Rebuild</button>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="printPropagationReport()">Print / PDF</button>
                 </div>
+                <div id="propagationReportContent"><div class="rf-empty">Opens when you choose this tab.</div></div>
             </div>
-
-            <!-- Geomagnetic Conditions Card -->
-            <div class="mb-6 sm:mb-10 bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
+            <div class="rf-panel hidden" id="rfTab-map" role="tabpanel"><div class="mb-6 sm:mb-10 bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
-                    <div class="flex items-center gap-3 flex-wrap">
-                        <h2 class="text-lg sm:text-2xl font-bold gradient-text">🌍 Geomagnetic Conditions</h2>
-                        <div class="px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-bold rounded-lg">
-                            <span id="zuluTime">--:--</span>Z
+                    <h2 class="text-lg sm:text-2xl font-bold gradient-text">📍 Station Map</h2>
+                    <div class="flex items-center gap-3">
+                        <button id="toggleBestPathsBtn" onclick="toggleBestPaths()" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold rounded border border-gray-300 transition-colors">
+                            🛤️ Best Paths
+                        </button>
+                        <button onclick="showAddLocationModal()" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg transition-colors">
+                            + Add Location
+                        </button>
+                        <div class="text-xs sm:text-sm text-gray-500">
+                            <span id="mappedCount">0</span> mapped
+                            <span id="unmappedInfo" class="ml-2 text-orange-500 hidden">| <span id="unmappedCount">0</span> unmapped</span>
                         </div>
-                        <div id="geoStormAlert" class="hidden px-3 py-1 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold rounded-lg animate-pulse">
-                            ⚠️ <span id="stormLevel">Storm</span>
-                        </div>
-                    </div>
-                    <div class="text-xs text-gray-500">
-                        <span id="geoConditionsUpdate">Loading NOAA data...</span>
                     </div>
                 </div>
-                
-                <!-- Current Indices Display -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
-                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 text-center border border-blue-200">
-                        <div class="text-xs font-bold text-blue-700 uppercase">K-Index (Now)</div>
-                        <div id="currentKIndex" class="text-2xl sm:text-3xl font-bold text-blue-600">--</div>
-                        <div id="kIndexStatus" class="text-xs text-gray-500">--</div>
-                    </div>
-                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 text-center border border-purple-200">
-                        <div class="text-xs font-bold text-purple-700 uppercase">A-Index (Daily)</div>
-                        <div id="currentAIndex" class="text-2xl sm:text-3xl font-bold text-purple-600">--</div>
-                        <div id="aIndexStatus" class="text-xs text-gray-500">--</div>
-                    </div>
-                    <div class="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-3 text-center border border-cyan-200">
-                        <div class="text-xs font-bold text-cyan-700 uppercase">Solar Flux</div>
-                        <div id="solarFlux" class="text-2xl sm:text-3xl font-bold text-cyan-600">--</div>
-                        <div class="text-xs text-gray-500">SFI (10.7cm)</div>
-                    </div>
-                    <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-3 text-center border border-amber-200">
-                        <div class="text-xs font-bold text-amber-700 uppercase">Sunspot #</div>
-                        <div id="sunspotNumber" class="text-2xl sm:text-3xl font-bold text-amber-600">--</div>
-                        <div class="text-xs text-gray-500">SSN</div>
-                    </div>
+                <div id="stationMap"></div>
+                <p class="text-xs text-gray-400 mt-2 hidden sm:block">Click dots for station details. Location data from QRZ.com via callsign-lookup.php.</p>
+                <div id="unmappedStations" class="hidden mt-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
+                    <div class="text-xs font-semibold text-orange-700 mb-1">⚠️ Unmapped Stations (click to add location):</div>
+                    <div id="unmappedList" class="text-xs text-orange-600 flex flex-wrap gap-2"></div>
                 </div>
-                
-                <!-- Storm History Banner (hidden when no storms) -->
-                <div id="stormHistoryBanner" class="hidden mb-4 p-3 bg-gradient-to-r from-red-100 to-orange-100 rounded-xl border border-red-200">
+                <div class="flex flex-wrap gap-2 sm:gap-4 mt-2 text-xs items-center">
+                    <span class="text-gray-500">Success Rate:</span>
+                    <span><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:50%;vertical-align:middle;margin-right:4px;border:1px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2)"></span>≥80%</span>
+                    <span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:50%;vertical-align:middle;margin-right:4px;border:1px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2)"></span>50-80%</span>
+                    <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:50%;vertical-align:middle;margin-right:4px;border:1px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2)"></span>&lt;50%</span>
+                    <span class="ml-2 sm:ml-4 pl-2 sm:pl-4 border-l border-gray-300"><span style="display:inline-block;width:14px;height:14px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;vertical-align:middle;margin-right:4px;border:2px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2);font-size:8px;text-align:center;line-height:10px;">🏠</span>Home</span>
+                    <span class="ml-2 sm:ml-4 pl-2 sm:pl-4 border-l border-gray-300 text-gray-500">Lines:</span>
+                    <span title="VARA HF, coloured by success rate"><svg width="22" height="8" aria-hidden="true" style="vertical-align:middle"><line x1="0" y1="4" x2="22" y2="4" stroke="#10b981" stroke-width="3"/></svg> VARA</span>
+                    <span title="Mercury HF calls (dot = reached by Mercury only)"><svg width="22" height="8" aria-hidden="true" style="vertical-align:middle"><line x1="0" y1="4" x2="22" y2="4" stroke="#0d9488" stroke-width="3" stroke-dasharray="7 4"/></svg> Mercury</span>
+                    <span title="Data2G HF calls (dot = reached by Data2G only)"><svg width="22" height="8" aria-hidden="true" style="vertical-align:middle"><line x1="0" y1="4" x2="22" y2="4" stroke="#c2410c" stroke-width="3" stroke-dasharray="8 3 2 3"/></svg> Data2G</span>
+                    <span title="VHF packet calls (dot = reached by VHF only)"><svg width="22" height="8" aria-hidden="true" style="vertical-align:middle"><line x1="0" y1="4" x2="22" y2="4" stroke="#4f46e5" stroke-width="3" stroke-dasharray="2 4"/></svg> VHF</span>
+                    <button onclick="showManageLocationsModal()" class="ml-auto text-blue-500 hover:text-blue-700 underline">Manage Saved Locations</button>
+                </div>
+            </div></div>
+            <div class="rf-panel hidden" id="rfTab-bands" role="tabpanel">
+                <h3 class="rf-h3">Band activity by hour (UTC)</h3>
+                <div id="hourlyBandHeatmap" class="overflow-x-auto custom-scrollbar"></div>
+                <canvas id="hourlyBandChart" style="display:none;"></canvas>
+                <div id="bandSummaryContainer" class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4"></div>
+                <div class="mb-6 sm:mb-10">
+                <h2 class="text-lg sm:text-2xl font-bold gradient-text mb-4 sm:mb-6">📡 VARA Channel Quality</h2>
+                <p class="text-xs text-gray-500 mb-3">Derived from observed VARA modem bitrates and S/N reports. Bitrate maps to modulation tier (BFSK→BPSK→4PSK→8QAM→16QAM→32QAM) — higher tiers require better propagation.</p>
+                <div id="varaChannelQualityContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4"></div>
+                <div id="varaChannelQualityEmpty" class="text-gray-400 text-center text-sm py-6 hidden">No bitrate or S/N data available yet</div>
+            </div>
+            </div>
+            <div class="rf-panel hidden" id="rfTab-geo" role="tabpanel"><div id="stormHistoryBanner" class="hidden mb-4 p-3 bg-gradient-to-r from-red-100 to-orange-100 rounded-xl border border-red-200">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="text-red-600 font-bold">⚡ Geomagnetic Storm Activity (Last 24h)</span>
                     </div>
                     <div id="stormHistoryList" class="text-sm text-gray-700 space-y-1"></div>
                 </div>
-                
-                <!-- K-Index and A-Index Charts -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <!-- K-Index 3-Day Chart -->
                     <div class="bg-gray-50 rounded-xl p-3">
                         <div class="text-xs font-bold text-gray-600 mb-2">K-Index (Last 3 Days) - 3-Hour Intervals</div>
@@ -517,165 +797,65 @@
                             <span><span class="inline-block w-3 h-3 rounded mr-1 align-middle" style="background: #ef4444;"></span>Major (50+)</span>
                         </div>
                     </div>
+                </div></div>
+            <!-- v1.5.50: VHF path history: watched stations heard hour by hour + scheduled test connects -->
+            <div class="rf-panel hidden rf-pad" id="rfTab-paths" role="tabpanel">
+                <div class="rf-paths-head">
+                    <div>
+                        <h3 class="rf-h3" style="margin:0">VHF path history</h3>
+                        <div class="rf-small rf-muted">Watched stations, hour by hour (UTC): when they were heard, and the scheduled test connects. Set them on Admin → Maintenance → Watched stations.</div>
+                    </div>
+                    <label class="rf-small rf-muted">Show
+                        <select id="pathsDays" onchange="loadPaths()" aria-label="Days to show">
+                            <option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option><option value="90">90 days</option>
+                        </select>
+                    </label>
+                </div>
+                <div id="pathsBody"><div class="rf-empty">Loading…</div></div>
+                <div class="rf-paths-legend rf-small rf-muted">
+                    <span><i class="rf-ph rf-ph1"></i>heard once</span>
+                    <span><i class="rf-ph rf-ph2"></i>2–3 times</span>
+                    <span><i class="rf-ph rf-ph3"></i>4 or more</span>
+                    <span><i class="rf-ph rf-ph0"></i>not heard</span>
+                    <span><b class="rf-pok">✓</b> test connect answered</span>
+                    <span><b class="rf-pbad">✗</b> no answer / busy</span>
                 </div>
             </div>
-
-            <!-- Best Band Recommendations -->
-            <div class="mb-6 sm:mb-10 bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
-                    <h2 class="text-lg sm:text-2xl font-bold gradient-text">🎯 Best Band Recommendations</h2>
-                    <div class="text-xs text-gray-500">
-                        <span id="bbSunTimes">Based on propagation + connection history</span>
+            <!-- v1.5.63: modem performance report (rf-modem-report.js), loaded when the tab is opened -->
+            <div class="rf-panel hidden rf-pad" id="rfTab-modems" role="tabpanel">
+                <div class="rf-paths-head">
+                    <div>
+                        <h3 class="rf-h3" style="margin:0">Modem performance</h3>
+                        <div class="rf-small rf-muted">How VARA HF, Mercury and Data2G have done: success, how calls ended, S/N and bands, with NOAA's A and K indices for each day.</div>
                     </div>
+                    <label class="rf-small rf-muted">Show
+                        <select id="mpDays" onchange="loadModemReport()" aria-label="Days to show">
+                            <option value="7">7 days</option><option value="14" selected>14 days</option><option value="30">30 days</option>
+                        </select>
+                    </label>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-                    <!-- Slot 1: 00:00-03:59Z -->
-                    <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-2 sm:p-3 border-2 border-indigo-200">
-                        <div class="text-xs font-bold mb-1 text-indigo-700" id="bbSlotLabel1">🌙 00–04Z</div>
-                        <div id="bestBand1" class="text-center">
-                            <div class="text-xl sm:text-2xl font-bold text-indigo-600">--</div>
-                        </div>
-                        <div id="bandStats1" class="mt-1 pt-1 border-t border-indigo-200 text-xs space-y-0.5"></div>
+                <div id="mpBody" style="position:relative"><div class="rf-empty">Loading…</div></div>
+            </div>
+            <!-- v1.5.62: live NetRom / node map from the UK Packet Radio Network, loaded only when the tab is opened -->
+            <div class="rf-panel hidden rf-pad" id="rfTab-netmap" role="tabpanel">
+                <div class="rf-paths-head">
+                    <div>
+                        <h3 class="rf-h3" style="margin:0">Packet Live NetRom/Node Map</h3>
+                        <div class="rf-small rf-muted">Live map of packet nodes and their NetRom links, from the UK Packet Radio Network's node map (<span class="font-mono">nodes.ukpacketradio.network</span>). Not from this station's data.</div>
                     </div>
-                    <!-- Slot 2: 04:00-07:59Z -->
-                    <div class="bg-gradient-to-br from-violet-50 to-indigo-100 rounded-xl p-2 sm:p-3 border-2 border-violet-200">
-                        <div class="text-xs font-bold mb-1 text-violet-700" id="bbSlotLabel2">🌙 04–08Z</div>
-                        <div id="bestBand2" class="text-center">
-                            <div class="text-xl sm:text-2xl font-bold text-violet-600">--</div>
-                        </div>
-                        <div id="bandStats2" class="mt-1 pt-1 border-t border-violet-200 text-xs space-y-0.5"></div>
-                    </div>
-                    <!-- Slot 3: 08:00-11:59Z -->
-                    <div class="bg-gradient-to-br from-orange-50 to-yellow-100 rounded-xl p-2 sm:p-3 border-2 border-orange-200">
-                        <div class="text-xs font-bold mb-1 text-orange-700" id="bbSlotLabel3">🌅 08–12Z</div>
-                        <div id="bestBand3" class="text-center">
-                            <div class="text-xl sm:text-2xl font-bold text-orange-600">--</div>
-                        </div>
-                        <div id="bandStats3" class="mt-1 pt-1 border-t border-orange-200 text-xs space-y-0.5"></div>
-                    </div>
-                    <!-- Slot 4: 12:00-15:59Z -->
-                    <div class="bg-gradient-to-br from-blue-50 to-cyan-100 rounded-xl p-2 sm:p-3 border-2 border-blue-200">
-                        <div class="text-xs font-bold mb-1 text-blue-700" id="bbSlotLabel4">☀️ 12–16Z</div>
-                        <div id="bestBand4" class="text-center">
-                            <div class="text-xl sm:text-2xl font-bold text-blue-600">--</div>
-                        </div>
-                        <div id="bandStats4" class="mt-1 pt-1 border-t border-blue-200 text-xs space-y-0.5"></div>
-                    </div>
-                    <!-- Slot 5: 16:00-19:59Z -->
-                    <div class="bg-gradient-to-br from-amber-50 to-orange-100 rounded-xl p-2 sm:p-3 border-2 border-amber-200">
-                        <div class="text-xs font-bold mb-1 text-amber-700" id="bbSlotLabel5">🌆 16–20Z</div>
-                        <div id="bestBand5" class="text-center">
-                            <div class="text-xl sm:text-2xl font-bold text-amber-600">--</div>
-                        </div>
-                        <div id="bandStats5" class="mt-1 pt-1 border-t border-amber-200 text-xs space-y-0.5"></div>
-                    </div>
-                    <!-- Slot 6: 20:00-23:59Z -->
-                    <div class="bg-gradient-to-br from-purple-50 to-pink-100 rounded-xl p-2 sm:p-3 border-2 border-purple-200">
-                        <div class="text-xs font-bold mb-1 text-purple-700" id="bbSlotLabel6">🌙 20–24Z</div>
-                        <div id="bestBand6" class="text-center">
-                            <div class="text-xl sm:text-2xl font-bold text-purple-600">--</div>
-                        </div>
-                        <div id="bandStats6" class="mt-1 pt-1 border-t border-purple-200 text-xs space-y-0.5"></div>
-                    </div>
+                    <a class="rf-small" id="netmapOpen" href="https://nodes.ukpacketradio.network/maps/packet" target="_blank" rel="noopener noreferrer" style="white-space:nowrap;font-weight:600">Open in a new tab ↗</a>
                 </div>
-                <div id="bbConditionsInfo" class="mt-3 p-2 bg-gray-50 rounded-lg text-xs text-gray-600 text-center">
-                    💡 Recommendations blend success history with current conditions &amp; seasonal day/night patterns
+                <div style="position:relative;height:72vh;min-height:480px;border:1px solid var(--rf-border, #e5e7eb);border-radius:10px;overflow:hidden">
+                    <div class="rf-empty" id="netmapNote" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:0">Loading the map… If it stays blank, the site isn't letting other pages show it: use <b>&nbsp;Open in a new tab ↗</b>.</div>
+                    <iframe id="netmapFrame" title="Packet Live NetRom/Node Map" referrerpolicy="no-referrer" loading="lazy"
+                        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms"
+                        style="position:relative;z-index:1;width:100%;height:100%;border:0;background:transparent"></iframe>
                 </div>
             </div>
+        </section>
 
-            <!-- Station Map -->
-            <div class="mb-6 sm:mb-10 bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg border border-gray-100">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
-                    <h2 class="text-lg sm:text-2xl font-bold gradient-text">📍 Station Map</h2>
-                    <div class="flex items-center gap-3">
-                        <button id="toggleBestPathsBtn" onclick="toggleBestPaths()" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold rounded border border-gray-300 transition-colors">
-                            🛤️ Best Paths
-                        </button>
-                        <button onclick="showAddLocationModal()" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg transition-colors">
-                            + Add Location
-                        </button>
-                        <div class="text-xs sm:text-sm text-gray-500">
-                            <span id="mappedCount">0</span> mapped
-                            <span id="unmappedInfo" class="ml-2 text-orange-500 hidden">| <span id="unmappedCount">0</span> unmapped</span>
-                        </div>
-                    </div>
-                </div>
-                <div id="stationMap"></div>
-                <p class="text-xs text-gray-400 mt-2 hidden sm:block">Click dots for station details. Location data from QRZ.com via callsign-lookup.php.</p>
-                <div id="unmappedStations" class="hidden mt-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
-                    <div class="text-xs font-semibold text-orange-700 mb-1">⚠️ Unmapped Stations (click to add location):</div>
-                    <div id="unmappedList" class="text-xs text-orange-600 flex flex-wrap gap-2"></div>
-                </div>
-                <div class="flex flex-wrap gap-2 sm:gap-4 mt-2 text-xs items-center">
-                    <span class="text-gray-500">Success Rate:</span>
-                    <span><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:50%;vertical-align:middle;margin-right:4px;border:1px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2)"></span>≥80%</span>
-                    <span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:50%;vertical-align:middle;margin-right:4px;border:1px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2)"></span>50-80%</span>
-                    <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:50%;vertical-align:middle;margin-right:4px;border:1px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2)"></span>&lt;50%</span>
-                    <span class="ml-2 sm:ml-4 pl-2 sm:pl-4 border-l border-gray-300"><span style="display:inline-block;width:14px;height:14px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;vertical-align:middle;margin-right:4px;border:2px solid white;box-shadow:0 1px 2px rgba(0,0,0,0.2);font-size:8px;text-align:center;line-height:10px;">🏠</span>Home</span>
-                    <button onclick="showManageLocationsModal()" class="ml-auto text-blue-500 hover:text-blue-700 underline">Manage Saved Locations</button>
-                </div>
-            </div>
-
-            <!-- Hourly Activity: Vertical bar chart + Heatmap grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-10">
-                <div class="bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-2 h-6 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-full"></div>
-                        <h2 class="text-base sm:text-xl font-bold text-gray-800">Hourly RF Connections & Messages (UTC)</h2>
-                    </div>
-                    <div style="height: 280px;"><canvas id="hourlyChart"></canvas></div>
-                    <div id="hourlyChartSummary" class="mt-2 grid grid-cols-4 gap-2 text-center text-xs"></div>
-                </div>
-                <div class="bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-2 h-6 bg-gradient-to-b from-purple-500 to-orange-500 rounded-full"></div>
-                        <h2 class="text-base sm:text-xl font-bold text-gray-800">Hourly Band Activity (UTC)</h2>
-                    </div>
-                    <div id="hourlyBandHeatmap" class="overflow-x-auto custom-scrollbar"></div>
-                    <canvas id="hourlyBandChart" style="display:none;"></canvas>
-                </div>
-            </div>
-
-            <div class="mb-6 sm:mb-10"><h2 class="text-lg sm:text-2xl font-bold gradient-text mb-4 sm:mb-6">Band Summary</h2><div id="bandSummaryContainer" class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4"></div></div>
-
-            <!-- VARA Channel Quality Analysis -->
-            <div class="mb-6 sm:mb-10">
-                <h2 class="text-lg sm:text-2xl font-bold gradient-text mb-4 sm:mb-6">📡 VARA Channel Quality</h2>
-                <p class="text-xs text-gray-500 mb-3">Derived from observed VARA modem bitrates and S/N reports. Bitrate maps to modulation tier (BFSK→BPSK→4PSK→8QAM→16QAM→32QAM) — higher tiers require better propagation.</p>
-                <div id="varaChannelQualityContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4"></div>
-                <div id="varaChannelQualityEmpty" class="text-gray-400 text-center text-sm py-6 hidden">No bitrate or S/N data available yet</div>
-            </div>
-
-            <div class="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-6 shadow-lg">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:mb-4">
-                    <h2 class="text-lg sm:text-2xl font-bold gradient-text" id="recentConnectionsHeading">Recent Connections</h2>
-                    <span id="failFilterChip" class="hidden px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 cursor-pointer" onclick="showFailures(null)" title="Show all connections again"></span>
-                    <div class="relative">
-                        <input type="text" id="recentConnectionsSearch" placeholder="Search callsign..." 
-                               class="w-full sm:w-64 px-4 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                               onkeyup="debouncedFilterRecentConnections()">
-                        <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
-                    </div>
-                </div>
-                <div class="overflow-x-auto custom-scrollbar max-h-72 sm:max-h-96">
-                    <table class="w-full text-xs sm:text-sm table-responsive">
-                        <thead class="bg-gray-100 sticky top-0"><tr><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Time</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Call</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left hide-mobile">Type</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left hide-mobile">Freq</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Band</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-left">Status</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile">S/N</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile">Bitrate</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile">TX/RX</th><th class="px-2 sm:px-3 py-2 sm:py-3 text-right hide-mobile">Time</th></tr></thead>
-                        <tbody id="recentConnectionsTable"></tbody>
-                    </table>
-                </div>
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-2 mt-3 pt-3 border-t border-gray-100">
-                    <div id="recentConnectionsCount" class="text-xs text-gray-500"></div>
-                    <div id="recentConnectionsPagination" class="flex items-center gap-1">
-                        <button onclick="goToFirstPage()" id="btnFirst" class="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed" title="First Page">⟪</button>
-                        <button onclick="prevPage()" id="btnPrev" class="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">← Prev</button>
-                        <span id="pageIndicator" class="px-3 py-1 text-xs font-semibold text-purple-700 bg-purple-50 rounded">Page 1 of 1</span>
-                        <button onclick="nextPage()" id="btnNext" class="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed">Next →</button>
-                        <button onclick="goToLastPage()" id="btnLast" class="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed" title="Last Page">⟫</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+        <p class="rf-small rf-muted">Layout introduced in v1.5.44. The previous layout is still available as <a href="bpq-rf-connections-classic.html">Classic view</a>.</p>
+    </main>
 
     <div id="stationsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
@@ -750,9 +930,11 @@
                                 <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Time (Z)</th>
                                 <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Band</th>
                                 <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Frequency</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-gray-600">Modem</th>
                                 <th class="px-3 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                                 <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600">S/N</th>
-                                <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600">Bitrate</th>
+                                <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600" title="Each modem's own figure: VARA its peak speed level, Data2G its best minute's delivered rate. Not comparable between modems.">Modem rate</th>
+                                <th class="px-3 py-2 text-right text-xs font-semibold text-gray-600" title="Bytes both ways x 8, over the time connected: the same for every modem">Effective</th>
                             </tr>
                         </thead>
                         <tbody id="stationInfoTimeline"></tbody>
@@ -891,7 +1073,7 @@
                     <span class="text-3xl">📊</span>
                     <div>
                         <h3 class="text-xl font-bold gradient-text">HUB Station Propagation Report</h3>
-                        <p class="text-sm text-gray-500" id="reportDateRange">7-Day Connection Analysis</p>
+                        <p class="text-sm text-gray-500" id="reportDateRangeModal">7-Day Connection Analysis</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -902,7 +1084,7 @@
                 </div>
             </div>
             
-            <div id="propagationReportContent" class="mt-4 overflow-y-auto custom-scrollbar" style="max-height: calc(90vh - 120px);">
+            <div id="propagationReportContentModal" class="mt-4 overflow-y-auto custom-scrollbar" style="max-height: calc(90vh - 120px);">
                 <div class="text-center py-8 text-gray-400">
                     <div class="animate-spin inline-block w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mb-3"></div>
                     <p>Generating report...</p>
@@ -990,6 +1172,18 @@
             return '<div style="text-align:center;min-width:120px;"><b style="font-size:16px;">' + HOME_STATION.callsign +
                 '</b><br><span style="color:#10b981;font-weight:bold;">🏠 Home Station</span>' +
                 (HOME_STATION.grid ? '<br>Grid: ' + HOME_STATION.grid : '') + '</div>';
+        }
+        // v1.5.52: zoom to the stations around home, home in the centre.
+        // Also run when the Map tab opens (a hidden map has no size, so a
+        // fit done then comes out wrong).
+        function rfCenterHome() {
+            if (typeof stationMap === 'undefined' || !stationMap) return;
+            const pts = window._rfMapPts;
+            if (!(HOME_STATION.lat || HOME_STATION.lon)) return;
+            if (pts && pts.length > 1 && stationMap.getSize().x > 0) {
+                stationMap.fitBounds(pts, { padding: [40, 40], maxZoom: 9, animate: false });
+            }
+            stationMap.setView([HOME_STATION.lat, HOME_STATION.lon], stationMap.getZoom(), { animate: false });
         }
         function applyHomeStation() {
             if (typeof stationMap === 'undefined' || !stationMap || !homeMarker) return;
@@ -1877,12 +2071,41 @@
             stationMarkers.forEach(m => stationMap.removeLayer(m));
             stationMarkers = [];
             
-            const callsigns = Object.keys(stats.stations);
+            // v1.5.59: the blue lines are VARA's only. With Mercury or Data2G
+            // in the headline numbers (config.php <modem>.in_headlines) their
+            // rows are in `connections` and stats.stations too, so the VARA
+            // set is rebuilt here from VARA rows, and each modem keeps its own
+            // line below whether or not it counts in the headlines.
+            const isVara = c => !c.modem || c.modem === 'vara';
+            let mapStations = stats.stations, mapByCall = connectionsByCallsign;
+            if (mercuryInHeadlines || data2gInHeadlines) {
+                mapStations = {}; mapByCall = {};
+                for (const c of connections) {
+                    if (!isVara(c)) continue;
+                    const st = mapStations[c.callsign] = mapStations[c.callsign] || { successful: 0, failed: 0, snrValues: [], bands: new Set(), bitrates: [] };
+                    const ok = c.status === 'success';
+                    st[ok ? 'successful' : 'failed']++;
+                    if (c.snr !== undefined) st.snrValues.push(c.snr);
+                    if (c.band && c.band !== 'Unknown') st.bands.add(c.band);
+                    if (ok && c.maxBps > 0) st.bitrates.push(c.maxBps);
+                    (mapByCall[c.callsign] = mapByCall[c.callsign] || []).push(c);
+                }
+            }
+            const callsigns = Object.keys(mapStations);
             let mapped = 0;
+
+            // v1.5.53: Mercury HF, Data2G and VHF packet calls in the same
+            // range, by base callsign
+            const extraByBase = {};
+            for (const c of mercuryConnections.concat(data2gConnections, vhfConnections).filter(c => c._ts >= rangeCutoffTs)) {
+                const b = (c.baseCall || c.callsign || '').replace(/-\d+$/, '');
+                if (!b) continue;
+                ((extraByBase[b] = extraByBase[b] || {})[c.modem] = extraByBase[b][c.modem] || []).push(c);
+            }
             
             // First pass: resolve from user locations, manual locations, and localStorage cache
             const needServerLookup = [];
-            for (const callsign of callsigns) {
+            for (const callsign of callsigns.concat(Object.keys(extraByBase))) {
                 const baseCall = callsign.replace(/-\d+$/, '');
                 if (stationLocations[baseCall]) continue;
                 
@@ -1945,11 +2168,13 @@
             const realMsgCountsForMap = getRealMessageCountsByPartner();
 
             // Second pass: create markers and connection lines
+            const varaMapped = new Set();
             for (const callsign of callsigns) {
                 const baseCall = callsign.replace(/-\d+$/, '');
                 const loc = stationLocations[baseCall];
                 if (loc && loc.lat && loc.lon) {
-                    const stationData = stats.stations[callsign];
+                    varaMapped.add(baseCall);
+                    const stationData = mapStations[callsign];
                     const total = stationData.successful + stationData.failed;
                     const bands = Array.from(stationData.bands).join(', ') || 'Unknown';
                     const avgSNR = stationData.snrValues.length > 0 
@@ -1963,7 +2188,7 @@
                         : null;
                     
                     // OPTIMIZATION: Use callsign index instead of connections.filter() per station
-                    const stationConnections = connectionsByCallsign[callsign] || [];
+                    const stationConnections = mapByCall[callsign] || [];
                     const lastConn = stationConnections[stationConnections.length - 1];
                     
                     // Compute VARA-specific stats from connection history
@@ -2126,6 +2351,66 @@
                 }
             }
             
+            // v1.5.53: Mercury (teal) and VHF packet (indigo) as dashed lines
+            // from home; a station reached only that way gets its own dot.
+            // v1.5.56: Data2G (orange, dash-dot).
+            const MODEM_LOOK = { mercury: { name: 'Mercury HF', color: '#0d9488', cls: 'dot-merc', dash: '10 7' },
+                                 data2g:  { name: 'Data2G HF',  color: '#c2410c', cls: 'dot-d2g',  dash: '12 5 2 5' },
+                                 vhf:     { name: 'VHF packet', color: '#4f46e5', cls: 'dot-vhf',  dash: '3 6' } };
+            const modemSummary = (base, modem, rows, distance) => {
+                const look = MODEM_LOOK[modem];
+                const good = rows.filter(c => c.status === 'success');
+                const tx = rows.reduce((a, c) => a + (c.txBytes || 0), 0), rx = rows.reduce((a, c) => a + (c.rxBytes || 0), 0);
+                const bandsM = [...new Set(rows.map(c => c.band).filter(b => b && b !== 'Unknown'))].join(', ') || '--';
+                const last = rows.reduce((a, c) => (!a || c._ts > a._ts) ? c : a, null);
+                const tests = modem === 'vhf' ? rows.filter(c => c.linkMode === 'test').length : 0;
+                return '<div style="font-size:10px;color:' + look.color + ';font-weight:bold;margin:6px 0 4px">' + look.name + '</div>' +
+                    '<table style="font-size:11px;width:100%">' +
+                    '<tr><td>Calls:</td><td style="text-align:right"><b>' + rows.length + '</b>' + (tests ? ' <span style="color:#888">(' + tests + ' test)</span>' : '') + '</td></tr>' +
+                    '<tr><td>Connected:</td><td style="text-align:right"><b>' + good.length + '</b> (' + Math.round(100 * good.length / rows.length) + '%)</td></tr>' +
+                    (modem !== 'vhf' ? '<tr><td>Data TX/RX:</td><td style="text-align:right">' + tx + ' / ' + rx + ' bytes</td></tr>' : '') +
+                    '<tr><td>Bands:</td><td style="text-align:right">' + bandsM + '</td></tr>' +
+                    (last ? '<tr><td>Last:</td><td style="text-align:right">' + last.startTime + ' ' + (last.status === 'success' ? '✓' : '✗') + '</td></tr>' : '') +
+                    '</table>';
+            };
+            for (const [base, byModem] of Object.entries(extraByBase)) {
+                const loc = stationLocations[base];
+                if (!(loc && loc.lat && loc.lon)) {
+                    if (!varaMapped.has(base) && !unmapped.includes(base)) unmapped.push(base);
+                    continue;
+                }
+                const distance = calculateDistance(HOME_STATION.lat, HOME_STATION.lon, loc.lat, loc.lon);
+                let popupAll = '';
+                for (const modem of ['mercury', 'data2g', 'vhf']) {
+                    const rows = byModem[modem];
+                    if (!rows || !rows.length) continue;
+                    const look = MODEM_LOOK[modem];
+                    const html = modemSummary(base, modem, rows, distance);
+                    popupAll += html;
+                    const okShare = rows.filter(c => c.status === 'success').length / rows.length;
+                    const line = L.polyline([[HOME_STATION.lat, HOME_STATION.lon], [loc.lat, loc.lon]], {
+                        color: look.color, weight: Math.min(1.5 + Math.log2(rows.length + 1), 5),
+                        opacity: okShare > 0 ? 0.85 : 0.45, dashArray: look.dash
+                    }).addTo(stationMap);
+                    line.bindPopup('<div style="min-width:200px"><b style="color:#667eea">' + HOME_STATION.callsign + ' ↔ ' + base + '</b>' +
+                        '<div style="font-size:11px;color:#666">' + distance + ' mi</div>' + html + '</div>');
+                    stationMarkers.push(line);
+                }
+                if (!varaMapped.has(base) && popupAll) {
+                    const kinds = Object.keys(byModem);
+                    const icon = L.divIcon({ className: 'station-dot ' + MODEM_LOOK[['mercury', 'data2g', 'vhf'].find(k => kinds.includes(k)) || 'vhf'].cls,
+                                             html: '', iconSize: [14, 14], iconAnchor: [7, 7] });
+                    const m = L.marker([loc.lat, loc.lon], { icon }).addTo(stationMap).bindPopup(
+                        '<div style="min-width:220px"><div style="text-align:center;margin-bottom:6px"><b style="font-size:16px;color:#667eea">' + base + '</b>' +
+                        (loc.name ? '<br><span style="color:#666">' + loc.name + '</span>' : '') +
+                        (loc.city ? '<br><span style="color:#888;font-size:11px">' + loc.city + '</span>' : '') + '</div>' +
+                        '<table style="font-size:11px;width:100%"><tr><td>Grid:</td><td style="text-align:right"><b>' + (loc.grid || '--') + '</b></td></tr>' +
+                        '<tr><td>Distance:</td><td style="text-align:right"><b>' + distance + ' mi</b></td></tr></table>' + popupAll + '</div>');
+                    stationMarkers.push(m);
+                    mapped++;
+                }
+            }
+
             document.getElementById('mappedCount').textContent = mapped;
             
             // Show unmapped stations if any
@@ -2141,15 +2426,26 @@
                 document.getElementById('unmappedStations').classList.add('hidden');
             }
             
-            // Fit bounds if we have markers
-            if (mapped > 0) {
-                const allPoints = [[HOME_STATION.lat, HOME_STATION.lon]];
+            // Zoom so every mapped station fits, but keep the home station in
+            // the CENTRE (v1.5.52): each station is also mirrored through home,
+            // so the bounds are symmetric around it. Before, fitBounds centred
+            // on the middle of all stations, far from home when partners are
+            // overseas.
+            if (mapped > 0 && (HOME_STATION.lat || HOME_STATION.lon)) {
+                const hLat = HOME_STATION.lat, hLon = HOME_STATION.lon;
+                const pts = [[hLat, hLon]];
                 Object.values(stationLocations).forEach(loc => {
-                    if (loc && loc.lat && loc.lon) allPoints.push([loc.lat, loc.lon]);
+                    if (!loc || !loc.lat || !loc.lon) return;
+                    let lon = loc.lon;
+                    if (lon - hLon > 180) lon -= 360;          // the short way round
+                    if (hLon - lon > 180) lon += 360;
+                    pts.push([loc.lat, lon]);
+                    pts.push([Math.max(-85, Math.min(85, 2 * hLat - loc.lat)), 2 * hLon - lon]);
                 });
-                if (allPoints.length > 1) {
-                    stationMap.fitBounds(allPoints, { padding: [50, 50] });
-                }
+                window._rfMapPts = pts;
+                rfCenterHome();
+            } else if (HOME_STATION.lat || HOME_STATION.lon) {
+                stationMap.setView([HOME_STATION.lat, HOME_STATION.lon], stationMap.getZoom());
             }
         }
         
@@ -2588,6 +2884,7 @@
             superseded: 'timeout',
             incomplete_no_disconnect: 'timeout',
             channel_busy: 'channelBusy',
+            busy: 'channelBusy',            // v1.5.59: Data2G / Mercury "the other station was busy"
         };
 
         function apiRowToConnection(row) {
@@ -2622,7 +2919,7 @@
             // Frequency: API may have it (if parser filled it in) or it
             // will be null and enrichConnectionsWithFrequency() will
             // backfill from BBS RADIO commands.
-            const freqMHz = row.freq_khz ? row.freq_khz / 1000 : null;
+            const freqMHz = row.freq_khz ? parseFloat(row.freq_khz) / 1000 : null;   // DECIMAL kHz since v1.5.54
             const band = row.band || (freqMHz ? null : 'Unknown');
 
             // Some rows have direction='unknown' (mostly failures);
@@ -2643,8 +2940,14 @@
                 rxBytes: parseInt(row.rx_bytes || 0),
                 txBps: parseInt(row.tx_max_bps || 0),
                 rxBps: parseInt(row.rx_max_bps || 0),
-                maxBps: Math.max(parseInt(row.tx_max_bps || 0),
-                                 parseInt(row.rx_max_bps || 0)),
+                // v1.5.64: maxBps stays VARA's own "Max bps" (its peak speed level), which the
+                // VARA statistics, path scores and band tiers are built on. Data2G's figure is
+                // a different thing (delivered bytes over its best minute), so it is kept in
+                // modemBps and shown only as Data2G's own number.
+                maxBps: (['mercury', 'vhf', 'data2g'].includes(row.modem) ? 0 : Math.max(parseInt(row.tx_max_bps || 0), parseInt(row.rx_max_bps || 0))),
+                modemBps: Math.max(parseInt(row.tx_max_bps || 0), parseInt(row.rx_max_bps || 0)),
+                durSec: dur,
+                linkSec: row.link_sec != null ? parseInt(row.link_sec) : null,
                 durationStr: durationStr,
                 status: status,
                 failureType: failureType,
@@ -2652,7 +2955,119 @@
                 inferredFreq: false,      // API rows are direct DB lookups
                 _ts: startMs,             // pre-computed for date filtering
                 _fromApi: true,           // marker for debugging/enrichment
+                // v1.5.46: which modem carried it; Mercury rows also have the
+                // link mode and how the link ended
+                modem: ['mercury', 'vhf', 'data2g'].includes(row.modem) ? row.modem : 'vara',   // 'vhf' v1.5.51, 'data2g' v1.5.56
+                linkMode: row.link_mode || null,
+                endReason: row.end_reason || null,
+                failureReason: row.failure_reason || null,
+                bandwidth: row.bandwidth ? parseInt(row.bandwidth) : null,
             };
+        }
+
+        // ── v1.5.46: Mercury HF rows ──────────────────────────────────────
+        // parse-mercury-log.py writes Mercury calls into the same table. They
+        // are kept apart from `connections` so the headline numbers (success
+        // rate, failures, S/N, stations, best band, propagation report) stay
+        // VARA's, unless config.php mercury.in_headlines = true. Recent
+        // connections, the partner strips, the 7-day history and the hourly
+        // activity chart show them alongside VARA.
+        let mercuryConnections = [];
+        let vhfConnections = [];          // v1.5.51: VHF packet rows (never in the headlines)
+        let data2gConnections = [];       // v1.5.56: Data2G HF rows (parse-data2g-log.py), kept apart like Mercury's
+        let mercuryInHeadlines = false;
+        let data2gInHeadlines = false;    // v1.5.56: config.php data2g.in_headlines
+        let rangeCutoffTs = 0;
+        // The rows kept out of `connections` (Mercury, Data2G, VHF), added to
+        // a list for the views that show every modem. The name is historical.
+        function rfWithMercury(list, sinceTs) {
+            const pool = (mercuryInHeadlines ? [] : mercuryConnections)
+                .concat(data2gInHeadlines ? [] : data2gConnections).concat(vhfConnections);
+            if (!pool.length) return list;
+            const extra = sinceTs == null ? pool : pool.filter(c => c._ts >= sinceTs);
+            if (!extra.length) return list;
+            const desc = list.length > 1 && list[0]._ts > list[list.length - 1]._ts;
+            return list.concat(extra).sort((a, b) => desc ? b._ts - a._ts : a._ts - b._ts);
+        }
+        const MERCURY_END = { peer_ack: 'ended normally', rx_disconnect: 'the other station hung up',
+            timeout: 'the link timed out', local_disconnect: 'we hung up', disconnect: 'ended normally',
+            abort: 'we hung up' };   // v1.5.55: LinBPQ's DISCONNECT then ABORT once nothing was left
+        const MERCURY_FAIL = { incoming_failed: 'call not completed', no_answer: 'no answer', no_data: 'nothing received',
+            linbpq_restart: 'LinBPQ restarted', modem_restart: 'Mercury restarted' };
+        function mercuryTitle(c) {
+            const p = ['Mercury HF'];
+            if (c.linkMode) p.push('mode ' + c.linkMode);
+            if (c.bandwidth) p.push(c.bandwidth + ' Hz');
+            if (c.endReason) p.push(hfCutShort(c) ? HF_CUT_TEXT : MERCURY_END[c.endReason] || c.endReason.replace(/_/g, ' '));
+            if (c.status !== 'success' && c.failureReason) p.push(MERCURY_FAIL[c.failureReason] || c.failureReason.replace(/_/g, ' '));
+            return p.join(' · ');
+        }
+        // v1.5.56: Data2G HF rows (parse-data2g-log.py). end_reason is how the
+        // link ended as Data2G says it (client = we hung up, peer = they did);
+        // a call turned away is refused_<why>.
+        const DATA2G_END = { client: 'we hung up', peer: 'the other station hung up', abort: 'we hung up',
+            link_failed: 'the link was lost', link_lost: 'nothing heard from the other station (link lost)', peer_reconnected: 'the other station called again',
+            client_unconfirmed: 'we hung up (not confirmed)', peer_unconfirmed: 'they hung up (not confirmed)',
+            no_answer: 'no answer', busy: 'the other station was busy', not_listening: 'the other station was not listening',
+            refused_busy: 'turned away: we were busy', refused_not_listening: 'turned away: we were not listening (scanning or the other modem had the radio)',
+            refused_refused: 'turned away', refused_version: 'turned away: Data2G versions differ' };
+        const DATA2G_FAIL = { incoming_failed: 'call not completed', no_answer: 'no answer', no_data: 'nothing received',
+            busy: 'busy', not_listening: 'not listening', refused: 'refused', version_mismatch: 'Data2G versions differ',
+            superseded: 'replaced by a new call', linbpq_restart: 'LinBPQ restarted', modem_restart: 'Data2G restarted' };
+        function data2gTitle(c) {
+            const p = ['Data2G HF'];
+            if (c.linkMode) p.push('mode ' + c.linkMode);
+            if (c.bandwidth) p.push(c.bandwidth + ' Hz');
+            if (c.snr != null && !isNaN(c.snr)) p.push('S/N ' + c.snr + ' dB');
+            if (c.endReason) p.push(hfCutShort(c) ? HF_CUT_TEXT : DATA2G_END[c.endReason] || c.endReason.replace(/_/g, ' '));
+            if (c.status !== 'success' && c.failureReason) p.push(DATA2G_FAIL[c.failureReason] || c.failureReason.replace(/_/g, ' '));
+            return p.join(' · ');
+        }
+        // v1.5.61: traffic passed, then the link dropped before the sign-off
+        // (Data2G LINK_LOST / LINK_FAILED, Mercury timeout on a successful call).
+        const HF_CUT_SHORT = { data2g: ['link_lost', 'link_failed'], mercury: ['timeout'] };
+        const HF_CUT_TEXT = 'traffic passed, link lost before sign-off';
+        function hfCutShort(c) {
+            return c.status === 'success' && (HF_CUT_SHORT[c.modem] || []).includes(c.endReason)
+                && ((c.txBytes || 0) + (c.rxBytes || 0)) > 0;
+        }
+        // v1.5.64: one throughput worked out the same way for every modem:
+        // bytes both ways x 8 / seconds connected (VARA: its Session Time;
+        // Mercury, Data2G: link_sec, the time the link was up, or the whole
+        // call for rows stored before link_sec existed).
+        function effBps(c) {
+            if (c.status !== 'success' || c.modem === 'vhf') return null;
+            const bytes = (c.txBytes || 0) + (c.rxBytes || 0);
+            let secs = c.linkSec != null ? c.linkSec : c.durSec;
+            if (secs == null && c.durationStr) { const mm = String(c.durationStr).split(':'); secs = (+mm[0] || 0) * 60 + (+mm[1] || 0); }
+            if (!bytes || !secs) return null;
+            return Math.round((bytes * 8) / secs);
+        }
+        function modemRateOf(c) { return c.modem === 'data2g' ? (c.modemBps || 0) : (c.modem === 'vara' || !c.modem) ? (c.maxBps || 0) : 0; }
+        function modemRateTitle(c) {
+            if (c.modem === 'data2g') return "Data2G's own figure: bytes it delivered and had acknowledged, over its best minute (or the whole session if shorter). Compare modems with Effective.";
+            if (c.modem === 'mercury') return 'Mercury logs no rate. Compare modems with Effective.';
+            return "VARA's own figure: the fastest speed level it reached in this session (the mode's rate, not data delivered). Compare modems with Effective.";
+        }
+        const EFF_TITLE = 'Effective: bytes both ways x 8, over the time connected. Worked out the same way for every modem, so this is the one to compare.';
+        function hfModemTitle(c) { return c.modem === 'data2g' ? data2gTitle(c) : mercuryTitle(c); }
+        // v1.5.51: VHF packet rows (parse-vhf-connections.py): link_mode says
+        // where they came from: 'BBS' (BBS log), 'node' (ConnectLog, heard on
+        // the VHF port), 'test' (a scheduled test connect, link-probe.py)
+        const VHF_FAIL = { no_answer: 'no answer', busy: 'busy' };
+        function vhfTitle(c) {
+            const p = ['VHF packet'];
+            p.push(c.linkMode === 'test' ? 'scheduled test connect' : c.linkMode === 'node' ? 'connect to the node (ConnectLog, heard on the VHF port)' : 'BBS connect (BBS log)');
+            if (c.status !== 'success') p.push(VHF_FAIL[c.failureReason] || 'failed');
+            if (c.durationStr && c.durationStr !== '0:00') p.push(c.durationStr);
+            return p.join(' · ');
+        }
+        function modemChip(c) {
+            if (c.modem === 'vhf') return '<span class="rf-modem-chip rf-modem-vhf" title="' + vhfTitle(c) + '">VHF</span>';
+            if (c.modem === 'data2g') return '<span class="rf-modem-chip rf-modem-d2g" title="' + data2gTitle(c) + '">Data2G</span>';
+            return c.modem === 'mercury'
+                ? '<span class="rf-modem-chip rf-modem-merc" title="' + mercuryTitle(c) + '">Mercury</span>'
+                : '<span class="rf-modem-chip">VARA</span>';
         }
 
         // Fetch connection data from the API. Resolves to an array of
@@ -2688,8 +3103,18 @@
                     return null;
                 }
                 const rows = json.data.sessions;
-                const conns = rows.map(apiRowToConnection).filter(c => c !== null);
-                console.log('[RF API] Loaded ' + conns.length + ' connections from DB');
+                const all = rows.map(apiRowToConnection).filter(c => c !== null);
+                // v1.5.46: Mercury rows apart unless they count in the headlines
+                mercuryInHeadlines = !!json.data.mercury_in_headlines;
+                data2gInHeadlines = !!json.data.data2g_in_headlines;
+                mercuryConnections = all.filter(c => c.modem === 'mercury');
+                data2gConnections = all.filter(c => c.modem === 'data2g');
+                vhfConnections = all.filter(c => c.modem === 'vhf');
+                const conns = all.filter(c => c.modem === 'vara' || (mercuryInHeadlines && c.modem === 'mercury')
+                                              || (data2gInHeadlines && c.modem === 'data2g'));
+                console.log('[RF API] Loaded ' + conns.length + ' connections from DB'
+                            + (mercuryConnections.length ? ' (+' + mercuryConnections.length + ' Mercury)' : '')
+                            + (data2gConnections.length ? ' (+' + data2gConnections.length + ' Data2G)' : ''));
                 return conns;
             } catch (e) {
                 console.warn('[RF API] Fetch failed: ' + e.message + ' — falling back to log parsing');
@@ -2840,7 +3265,9 @@
             const partners = getForwardingPartners();
             // Use a Set for O(1) membership testing in the loop
             const partnersSet = new Set(partners);
-            for (const conn of connections) {
+            // v1.5.47: a good Mercury session counts as contact too, so a
+            // partner forwarded to over Mercury only isn't shown as silent
+            for (const conn of rfWithMercury(connections, null)) {
                 // Only track SUCCESSFUL connections to known partners
                 if (conn.status !== 'success') continue;
                 if (!partnersSet.has(conn.callsign)) continue;
@@ -2851,6 +3278,7 @@
                         time: connTimestamp,
                         band: conn.band || 'Unknown',
                         snr: conn.snr,
+                        modem: conn.modem || 'vara',
                     };
                 }
             }
@@ -4157,6 +4585,7 @@
             // OPTIMIZATION: Use pre-computed _ts timestamp for fast numeric comparison
             // instead of re-parsing "Jan 10" date strings per connection
             connections = allConnections.filter(conn => conn._ts >= cutoffTs);
+            rangeCutoffTs = cutoffTs;              // v1.5.46: Mercury rows use the same range
             
             // Rebuild callsign index for filtered connections
             connectionsByCallsign = {};
@@ -4566,6 +4995,26 @@
             window.hourlyChart.data.datasets[1].data = hours.map(h => stats.hourlyActivity.failed[h] || 0);
             window.hourlyChart.data.datasets[2].data = hours.map(h => stats.hourlyMessages.sent[h] || 0);
             window.hourlyChart.data.datasets[3].data = hours.map(h => stats.hourlyMessages.received[h] || 0);
+            // v1.5.46: Mercury calls (good and failed) in their own bar
+            const mercHours = {};
+            const mercList = mercuryInHeadlines ? connections.filter(c => c.modem === 'mercury')
+                                                : mercuryConnections.filter(c => c._ts >= rangeCutoffTs);
+            for (const c of mercList) mercHours[c.h] = (mercHours[c.h] || 0) + 1;
+            const mercDs = window.hourlyChart.data.datasets[4];
+            if (mercDs) {
+                mercDs.data = hours.map(h => mercHours[h] || 0);
+                mercDs.hidden = mercList.length === 0 || mercuryInHeadlines;   // in the Success/Failed bars then
+            }
+            // v1.5.56: Data2G calls in their own bar too
+            const d2gHours = {};
+            const d2gList = data2gInHeadlines ? connections.filter(c => c.modem === 'data2g')
+                                              : data2gConnections.filter(c => c._ts >= rangeCutoffTs);
+            for (const c of d2gList) d2gHours[c.h] = (d2gHours[c.h] || 0) + 1;
+            const d2gDs = window.hourlyChart.data.datasets[5];
+            if (d2gDs) {
+                d2gDs.data = hours.map(h => d2gHours[h] || 0);
+                d2gDs.hidden = d2gList.length === 0 || data2gInHeadlines;
+            }
             window.hourlyChart.update();
             
             // Summary strip under the chart
@@ -4584,7 +5033,8 @@
                     <div class="bg-red-50 rounded-lg p-2"><span class="font-bold text-red-600">${totalFail}</span><div class="text-gray-500">Failed</div></div>
                     <div class="bg-blue-50 rounded-lg p-2"><span class="font-bold text-blue-600">${totalMSent}↑ ${totalMRecv}↓</span><div class="text-gray-500">Messages</div></div>
                     <div class="bg-purple-50 rounded-lg p-2"><span class="font-bold text-purple-700">${peakHour.h}Z</span><div class="text-gray-500">Peak Hour</div></div>
-                `;
+                ` + (mercList.length ? `<div class="bg-teal-50 rounded-lg p-2" title="Mercury HF calls in this period (not in the VARA numbers)"><span class="font-bold text-teal-700">${mercList.filter(c => c.status === 'success').length} / ${mercList.length}</span><div class="text-gray-500">Mercury good / calls</div></div>` : '')
+                  + (d2gList.length ? `<div class="bg-orange-50 rounded-lg p-2" title="Data2G HF calls in this period (not in the VARA numbers)"><span class="font-bold text-orange-700">${d2gList.filter(c => c.status === 'success').length} / ${d2gList.length}</span><div class="text-gray-500">Data2G good / calls</div></div>` : '');
             }
             
             // Hourly Band Activity heatmap
@@ -5630,7 +6080,20 @@
 
         function filterRecentConnections(resetPage = true) {
             const searchTerm = document.getElementById('recentConnectionsSearch').value.toUpperCase().trim();
-            filteredConnections = connections.slice().reverse().filter(failMatches);
+            // v1.5.46: Mercury rows too (not when a Failures-card filter is on:
+            // those counts are VARA's), and the modem filter
+            const modemSel = document.getElementById('recentModemFilter');
+            const modemWrap = document.getElementById('recentModemFilterWrap');
+            const haveMerc = mercuryConnections.length > 0 || vhfConnections.length > 0 || data2gConnections.length > 0
+                || connections.some(c => c.modem === 'mercury' || c.modem === 'data2g');
+            if (modemWrap) modemWrap.classList.toggle('hidden', !haveMerc);
+            const modemWant = haveMerc && modemSel ? modemSel.value : 'all';
+            const listed = failFilter ? connections : rfWithMercury(connections, rangeCutoffTs);
+            // Newest first, whichever order the rows came in (the API sends
+            // newest first, the in-browser VARA parse oldest first; until
+            // v1.5.55 the API path listed the oldest first).
+            filteredConnections = listed.slice().sort((a, b) => b._ts - a._ts).filter(failMatches)
+                .filter(c => modemWant === 'all' || (c.modem || 'vara') === modemWant);
             
             // Apply search filter if there's a search term
             if (searchTerm) {
@@ -5652,7 +6115,7 @@
             const startNum = filteredConnections.length > 0 ? startIdx + 1 : 0;
             const endNum = Math.min(endIdx, filteredConnections.length);
             if (searchTerm) {
-                countEl.textContent = `Showing ${startNum}-${endNum} of ${filteredConnections.length} matches for "${searchTerm}" (${connections.length} total)`;
+                countEl.textContent = `Showing ${startNum}-${endNum} of ${filteredConnections.length} matches for "${searchTerm}" (${listed.length} total)`;
             } else {
                 countEl.textContent = `Showing ${startNum}-${endNum} of ${filteredConnections.length} ` + (failFilter ? (failFilter === 'failed' ? 'failed' : (FAIL_FILTER_LABEL[failFilter] || 'failed')) + ' connections' : 'connections');
             }
@@ -5661,24 +6124,35 @@
             updatePaginationControls();
             
             document.getElementById('recentConnectionsTable').innerHTML = recent.length === 0 
-                ? '<tr><td colspan="10" class="px-4 py-8 text-center text-gray-500">' + (searchTerm ? 'No connections matching "' + searchTerm + '"' :  (failFilter ? 'No connections of this kind in this range' : 'No connections')) + '</td></tr>' 
+                ? '<tr><td colspan="12" class="px-4 py-8 text-center text-gray-500">' + (searchTerm ? 'No connections matching "' + searchTerm + '"' :  (failFilter ? 'No connections of this kind in this range' : 'No connections')) + '</td></tr>' 
                 : recent.map((c, i) => {
-                const bitrateDisplay = c.status === 'success' && c.maxBps > 0 ? c.maxBps + ' bps' : '--';
-                const bitrateColor = c.maxBps >= 200 ? 'text-green-600' : (c.maxBps >= 100 ? 'text-blue-600' : 'text-gray-600');
+                const mRate = modemRateOf(c), eff = effBps(c);
+                const bitrateDisplay = c.status === 'success' && mRate > 0 ? mRate + ' bps' : '--';
+                const bitrateColor = 'text-gray-600';
+                const effDisplay = eff != null ? eff + ' bps' : '--';
+                const effColor = eff == null ? 'text-gray-400' : eff >= 200 ? 'text-green-600' : (eff >= 60 ? 'text-blue-600' : 'text-gray-600');
                 // Highlight matching callsign and make clickable
                 const callDisplayText = searchTerm ? c.callsign.replace(new RegExp('(' + searchTerm + ')', 'gi'), '<mark class="bg-yellow-200 rounded px-0.5">$1</mark>') : c.callsign;
                 const callDisplay = '<span class="cursor-pointer hover:underline hover:text-purple-900 transition-colors" onclick="event.stopPropagation(); showStationInfoModal(\'' + c.callsign.replace(/'/g, "\\'") + '\')" title="Click to view 7-day connection history">' + callDisplayText + '</span>';
                 return '<tr class="' + (i % 2 ? 'bg-gray-50' : 'bg-white') + ' hover:bg-purple-50">' +
                     '<td class="px-3 py-2 text-xs text-gray-700">' + c.startTime + '</td>' +
                     '<td class="px-3 py-2 font-semibold text-purple-700">' + callDisplay + '</td>' +
-                    '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.type === 'incoming' ? 'bg-blue-100 text-blue-700">⬇ In' : 'bg-orange-100 text-orange-700">⬆ Out') + '</span></td>' +
-                    '<td class="px-3 py-2 text-xs font-mono text-gray-700">' + (c.freqMHz ? c.freqMHz.toFixed(4) + ' MHz' + (c.inferredFreq ? ' <span class="text-cyan-500" title="Inferred from nearby activity">~</span>' : '') : '--') + '</td>' +
+                    '<td class="px-3 py-2 hide-mobile"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.type === 'incoming' ? 'bg-blue-100 text-blue-700">⬇ In' : 'bg-orange-100 text-orange-700">⬆ Out') + '</span></td>' +
+                    '<td class="px-3 py-2 hide-mobile">' + modemChip(c) + '</td>' +
+                    '<td class="px-3 py-2 text-xs font-mono text-gray-700 hide-mobile">' + (c.freqMHz ? c.freqMHz.toFixed(4) + ' MHz' + (c.inferredFreq ? ' <span class="text-cyan-500" title="Inferred from nearby activity">~</span>' : '') : '--') + '</td>' +
                     '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-bold text-white" style="background:' + getBandColor(c.band) + '">' + c.band + '</span></td>' +
-                    '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.status === 'success' ? 'bg-green-100 text-green-700">✓' : 'bg-red-100 text-red-700" title="' + (FAIL_SHORT[c.failureType] || 'failed') + '">✗' + (c.failureType && FAIL_SHORT[c.failureType] ? ' ' + FAIL_SHORT[c.failureType] : '')) + '</span></td>' +
-                    '<td class="px-3 py-2 text-right text-xs ' + (c.snr !== undefined ? (c.snr >= 0 ? 'text-green-600' : 'text-orange-600') : 'text-gray-400') + '">' + (c.snr !== undefined ? c.snr.toFixed(1) : '--') + '</td>' +
-                    '<td class="px-3 py-2 text-right text-xs font-semibold ' + bitrateColor + '">' + bitrateDisplay + '</td>' +
-                    '<td class="px-3 py-2 text-right text-xs text-gray-600">' + c.txBytes + '/' + c.rxBytes + '</td>' +
-                    '<td class="px-3 py-2 text-right text-xs text-gray-700">' + c.durationStr + '</td>' +
+                    (c.modem === 'vhf'
+                        ? '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.status === 'success' ? 'bg-green-100 text-green-700" title="' + vhfTitle(c) + '">✓' + (c.linkMode === 'test' ? ' <span class="font-normal">test connect</span>' : '') : 'bg-red-100 text-red-700" title="' + vhfTitle(c) + '">✗ ' + (VHF_FAIL[c.failureReason] || 'failed') + (c.linkMode === 'test' ? ' <span class="font-normal">(test)</span>' : '')) + '</span></td>'
+                        : c.modem === 'mercury'
+                        ? '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (hfCutShort(c) ? 'bg-amber-100 text-amber-700" title="' + mercuryTitle(c) + '">⚠ <span class="font-normal">' + HF_CUT_TEXT + '</span>' : c.status === 'success' ? 'bg-green-100 text-green-700" title="' + mercuryTitle(c) + '">✓' + (c.endReason && MERCURY_END[c.endReason] ? ' <span class="font-normal">' + MERCURY_END[c.endReason] + '</span>' : '') : 'bg-red-100 text-red-700" title="' + mercuryTitle(c) + '">✗ ' + (MERCURY_FAIL[c.failureReason] || 'failed')) + '</span></td>'
+                        : c.modem === 'data2g'
+                        ? '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (hfCutShort(c) ? 'bg-amber-100 text-amber-700" title="' + data2gTitle(c) + '">⚠ <span class="font-normal">' + HF_CUT_TEXT + '</span>' : c.status === 'success' ? 'bg-green-100 text-green-700" title="' + data2gTitle(c) + '">✓' + (c.endReason && DATA2G_END[c.endReason] ? ' <span class="font-normal">' + DATA2G_END[c.endReason] + '</span>' : '') : 'bg-red-100 text-red-700" title="' + data2gTitle(c) + '">✗ ' + ((c.endReason || '').startsWith('refused_') ? 'turned away' : DATA2G_FAIL[c.failureReason] || 'failed')) + '</span></td>'
+                        : '<td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs font-medium ' + (c.status === 'success' ? 'bg-green-100 text-green-700">✓' : 'bg-red-100 text-red-700" title="' + (FAIL_SHORT[c.failureType] || 'failed') + '">✗' + (c.failureType && FAIL_SHORT[c.failureType] ? ' ' + FAIL_SHORT[c.failureType] : '')) + '</span></td>') +
+                    '<td class="px-3 py-2 text-right text-xs hide-mobile ' + (c.snr !== undefined ? (c.snr >= 0 ? 'text-green-600' : 'text-orange-600') : 'text-gray-400') + '">' + (c.snr !== undefined ? c.snr.toFixed(1) : '--') + '</td>' +
+                    '<td class="px-3 py-2 text-right text-xs hide-mobile ' + bitrateColor + '" title="' + modemRateTitle(c).replace(/"/g, '&quot;') + '">' + bitrateDisplay + '</td>' +
+                    '<td class="px-3 py-2 text-right text-xs font-semibold hide-mobile ' + effColor + '" title="' + EFF_TITLE + '">' + effDisplay + '</td>' +
+                    '<td class="px-3 py-2 text-right text-xs text-gray-600 hide-mobile">' + (c.modem === 'vhf' ? '--' : c.txBytes + '/' + c.rxBytes) + '</td>' +
+                    '<td class="px-3 py-2 text-right text-xs text-gray-700 hide-mobile">' + c.durationStr + '</td>' +
                     '</tr>';
             }).join('');
         }
@@ -5904,9 +6378,9 @@
             // Always use allConnections (not connectionsByCallsign which reflects the
             // current page date filter). Modal always shows full 7-day history regardless
             // of what date range is selected on the main page.
-            let stationConnections = allConnections.filter(c =>
+            let stationConnections = rfWithMercury(allConnections, sevenDaysAgoTs).filter(c =>
                 c.baseCall === baseCallsign && c._ts >= sevenDaysAgoTs
-            );
+            );            // v1.5.46: Mercury calls too
             
             // Sort by _ts descending (most recent first)
             stationConnections.sort((a, b) => b._ts - a._ts);
@@ -5953,13 +6427,15 @@
             
             // Connection timeline table
             const timelineHTML = stationConnections.length === 0 
-                ? '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">No connections in the last 7 days</td></tr>'
+                ? '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-400">No connections in the last 7 days</td></tr>'
                 : stationConnections.map((c, i) => {
                     const statusClass = c.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
                     const statusIcon = c.status === 'success' ? '✓' : '✗';
                     const snrDisplay = c.snr !== undefined ? c.snr.toFixed(1) + ' dB' : '--';
                     const snrColor = c.snr !== undefined ? (c.snr >= 0 ? 'text-green-600' : 'text-orange-600') : 'text-gray-400';
-                    const bitrateDisplay = c.status === 'success' && c.maxBps > 0 ? c.maxBps + ' bps' : '--';
+                    const mRate = modemRateOf(c), eff = effBps(c);
+                    const bitrateDisplay = c.status === 'success' && mRate > 0 ? mRate + ' bps' : '--';
+                    const effDisplay = eff != null ? eff + ' bps' : '--';
                     const freqDisplay = c.freqMHz ? c.freqMHz.toFixed(4) + ' MHz' : '--';
                     
                     return `<tr class="${i % 2 ? 'bg-gray-50' : 'bg-white'} hover:bg-purple-50">
@@ -5967,19 +6443,24 @@
                         <td class="px-3 py-2 text-xs text-gray-600">${c.h}:${c.m}:${c.s || '00'}</td>
                         <td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-xs font-bold text-white" style="background: ${getBandColor(c.band)}">${c.band || '--'}</span></td>
                         <td class="px-3 py-2 text-xs font-mono text-gray-600">${freqDisplay}</td>
-                        <td class="px-3 py-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${statusClass}">${statusIcon}</span></td>
+                        <td class="px-3 py-2">${modemChip(c)}</td>
+                        <td class="px-3 py-2 text-center"><span class="px-2 py-0.5 rounded text-xs font-medium ${statusClass}"${(c.modem === 'mercury' || c.modem === 'data2g') ? ` title="${hfModemTitle(c)}"` : ''}>${statusIcon}</span></td>
                         <td class="px-3 py-2 text-right text-xs ${snrColor}">${snrDisplay}</td>
-                        <td class="px-3 py-2 text-right text-xs text-blue-600 font-semibold">${bitrateDisplay}</td>
+                        <td class="px-3 py-2 text-right text-xs text-gray-600" title="${modemRateTitle(c).replace(/"/g, '&quot;')}">${bitrateDisplay}</td>
+                        <td class="px-3 py-2 text-right text-xs text-blue-600 font-semibold" title="${EFF_TITLE}">${effDisplay}</td>
                     </tr>`;
                 }).join('');
             document.getElementById('stationInfoTimeline').innerHTML = timelineHTML;
             
             // Calculate Most Efficient Band
-            const efficiencyHTML = calculateBandEfficiency(stationConnections);
+            const efficiencyHTML = calculateBandEfficiency(stationConnections.filter(c => c.modem !== 'mercury' && c.modem !== 'data2g'));
             document.getElementById('stationInfoEfficiency').innerHTML = efficiencyHTML;
             
             // Footer info
-            document.getElementById('stationInfoFooter').textContent = `${stationConnections.length} connection${stationConnections.length !== 1 ? 's' : ''} in the last 7 days`;
+            const nMerc = stationConnections.filter(c => c.modem === 'mercury').length;
+            const nD2g = stationConnections.filter(c => c.modem === 'data2g').length;    // v1.5.56
+            const byOther = [nMerc ? `${nMerc} by Mercury HF` : '', nD2g ? `${nD2g} by Data2G HF` : ''].filter(Boolean).join(', ');
+            document.getElementById('stationInfoFooter').textContent = `${stationConnections.length} connection${stationConnections.length !== 1 ? 's' : ''} in the last 7 days` + (byOther ? ` (${byOther})` : '');
             
             // Show modal
             document.getElementById('stationInfoModal').classList.remove('hidden');
@@ -7136,7 +7617,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.42 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.66 | HF Efficiency Report
                 </p>
             `;
             
@@ -7619,7 +8100,9 @@
                         { label: 'Success', data: [], backgroundColor: 'rgba(16,185,129,0.85)', borderColor: 'rgba(16,185,129,1)', borderWidth: 1, borderRadius: 3, stack: 'connections' }, 
                         { label: 'Failed', data: [], backgroundColor: 'rgba(239,68,68,0.85)', borderColor: 'rgba(239,68,68,1)', borderWidth: 1, borderRadius: 3, stack: 'connections' },
                         { label: 'Msgs Sent', data: [], backgroundColor: 'rgba(249,115,22,0.85)', borderColor: 'rgba(249,115,22,1)', borderWidth: 1, borderRadius: 3, stack: 'messages' },
-                        { label: 'Msgs Recv', data: [], backgroundColor: 'rgba(59,130,246,0.85)', borderColor: 'rgba(59,130,246,1)', borderWidth: 1, borderRadius: 3, stack: 'messages' }
+                        { label: 'Msgs Recv', data: [], backgroundColor: 'rgba(59,130,246,0.85)', borderColor: 'rgba(59,130,246,1)', borderWidth: 1, borderRadius: 3, stack: 'messages' },
+                        { label: 'Mercury', data: [], backgroundColor: 'rgba(13,148,136,0.85)', borderColor: 'rgba(13,148,136,1)', borderWidth: 1, borderRadius: 3, stack: 'mercury', hidden: false },
+                        { label: 'Data2G', data: [], backgroundColor: 'rgba(194,65,12,0.85)', borderColor: 'rgba(194,65,12,1)', borderWidth: 1, borderRadius: 3, stack: 'data2g', hidden: true }
                     ] 
                 }, 
                 options: { 
@@ -7762,18 +8245,28 @@
             loadModemBadges();
             setInterval(loadModemBadges, 60000);   // sound-modem badge every minute (v1.5.23)
             loadWatchdog(); setInterval(loadWatchdog, 120000);   // Connect Watchdog pauses (v1.5.35)
+            loadMercury(); setInterval(loadMercury, 60000);       // Mercury HF tile (v1.5.43)
+            loadData2g(); setInterval(loadData2g, 60000);         // Data2G HF tile (v1.5.56)
         });
 
         // Sound-modem ports (QtSoundModem / Direwolf, KISS over TCP): v1.5.23
         // badge, v1.5.28 the "VHF Connections Status" card. up = LinBPQ
         // connected to the modem; nolink = modem listening but LinBPQ isn't
         // connected; down = nothing on its KISS port.
-        function setVhfCardShown(on) {
-            const card = document.getElementById('vhfStatusCard');
+        // The optional cards (VHF, Mercury) widen the row: 4, 5 or 6 columns
+        // (6 as 3 + 3 on mid-size screens). v1.5.43
+        function updateStatGridCols() {
             const grid = document.getElementById('statCardsGrid');
-            card.classList.toggle('hidden', !on);
-            grid.classList.toggle('lg:grid-cols-4', !on);
-            grid.classList.toggle('lg:grid-cols-5', on);
+            if (!grid) return;
+            const n = 4 + ['vhfStatusCard', 'mercuryStatusCard', 'data2gStatusCard'].filter(id => !document.getElementById(id).classList.contains('hidden')).length;
+            grid.classList.toggle('lg:grid-cols-4', n === 4);
+            grid.classList.toggle('lg:grid-cols-5', n === 5);
+            grid.classList.toggle('lg:grid-cols-3', n === 6);
+            grid.classList.toggle('xl:grid-cols-6', n === 6);
+        }
+        function setVhfCardShown(on) {
+            document.getElementById('vhfStatusCard').classList.toggle('hidden', !on);
+            updateStatGridCols();
         }
         async function loadModemBadges() {
             const box = document.getElementById('vhfStatusBody');
@@ -7782,7 +8275,7 @@
                 const r = await fetch(RF_API_URL + '?action=soundmodem&days=' + selectedDays + '&t=' + Date.now(), { cache: 'no-store' });
                 const j = await r.json();
                 if (!j.ok) throw new Error(j.error || 'failed');
-                d = j.data;
+                d = j.data; window._rfVhf = d;
             } catch (e) { setVhfCardShown(false); return; }
             if (!d.modems || !d.modems.length) { setVhfCardShown(false); return; }
             const esc = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -7826,9 +8319,536 @@
             }).join('');
             setVhfCardShown(true);
         }
+        // v1.5.43: Mercury HF Status. Mercury (open-source HF modem, VARA-style
+        // TNC) is a LinBPQ VARA port; LinBPQ holds its one control connection,
+        // so the API reads the process, its TNC sockets and Mercury's log
+        // (rf-connections-api.php?action=mercury).
+        async function loadMercury() {
+            const card = document.getElementById('mercuryStatusCard');
+            const box = document.getElementById('mercuryStatusBody');
+            let d;
+            try {
+                const r = await fetch(RF_API_URL + '?action=mercury&t=' + Date.now(), { cache: 'no-store' });
+                const j = await r.json();
+                if (!j.ok) throw new Error(j.error || 'failed');
+                d = j.data; window._rfMercury = d;
+            } catch (e) { card.classList.add('hidden'); updateStatGridCols(); return; }
+            if (!d || !d.enabled) { card.classList.add('hidden'); updateStatGridCols(); return; }
+            const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const ago = s => {
+                if (!s) return 'never';
+                const m = Math.max(0, Math.round((Date.now() - new Date(s.replace(' ', 'T') + 'Z').getTime()) / 60000));
+                return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+            };
+            const hm = s => s ? s.slice(11, 16) + 'Z' : '';
+            const md = s => s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' ' + hm(s) : '';
+            const port = d.bpq_port ? `LinBPQ port ${d.bpq_port.num}` : `TNC ${d.tnc_port}`;
+            const S = {
+                session: ['success', 'In session',          `Connected with ${d.session ? d.session.peer : ''}`],
+                up:      ['success', 'On air',               'Mercury running, LinBPQ attached to its TNC'],
+                nolink:  ['warn',    'LinBPQ not attached',  `Mercury is running but LinBPQ is not connected to its TNC port ${d.tnc_port}: check the port's ADDR line in bpq32.cfg, then restart LinBPQ`],
+                audio:   ['error',   'No audio',             'Mercury reports the sound card delivers no audio: check the radio\'s USB sound card (and, if it is shared with VARA, that VARA still runs)'],
+                down:    ['error',   'Modem not running',    `Nothing is listening on Mercury's TNC port ${d.tnc_port}: check the service (systemctl status mercury)`],
+                unknown: ['unknown', 'Status unknown',       'The server could not read its process and network lists'],
+            };
+            const [cls, txt, tip] = S[d.status] || S.unknown;
+            const row = (k, v, t = '') => `<div class="flex justify-between gap-2"${t ? ` title="${esc(t)}"` : ''}><span class="whitespace-nowrap">${k}</span><span class="font-semibold text-right">${v}</span></div>`;
+            const rows = [];
+            if (d.session) {
+                const x = d.session;
+                rows.push(row(x.dir === 'in' ? 'From:' : 'To:', `<span class="font-mono">${esc(x.peer)}</span> since ${hm(x.since)}`,
+                    `${x.frames} frames received, ${x.rx_bytes} bytes` + (x.snr_last !== null ? `, S/N ${x.snr_min} to ${x.snr_max} dB` : '')));
+            }
+            if (d.calling && !d.session) rows.push(row('Calling:', `<span class="font-mono">${esc(d.calling.peer)}</span> ${ago(d.calling.at)}`));
+            const last = (d.sessions || [])[0];
+            if (last) {
+                const bytes = last.tx_bytes !== undefined ? `${last.tx_bytes} bytes sent, ${last.rx_bytes_total} received`
+                                                         : `${last.frames} frames, ${last.rx_bytes} bytes received`;
+                const good = last.tx_bytes !== undefined ? (last.rx_bytes_total > 0 && last.reason !== 'timeout') : true;
+                rows.push(row('Last session:', `<span class="font-mono">${esc(last.peer)}</span> ${good ? '' : '<span class="text-amber-700">⚠</span> '}${ago(last.ended_at)}`,
+                    `${last.dir === 'in' ? 'Incoming' : 'Outgoing'}${last.mode ? ' (' + last.mode + ')' : ''}, ${md(last.since)} to ${hm(last.ended_at)}; ${bytes}`
+                    + (last.snr_last !== null ? `; S/N ${last.snr_min} to ${last.snr_max} dB` : '') + `; ${last.end}`));
+            }
+            const cs = d.calls_24h;
+            if (cs && (cs.in || cs.out)) {
+                const parts = [];
+                if (cs.in)  parts.push(`in ${cs.in_connected}/${cs.in}`);
+                if (cs.out) parts.push(`out ${cs.out_connected}/${cs.out}`);
+                const missed = (cs.in - cs.in_connected) + (cs.out - cs.out_connected);
+                rows.push(row('Calls (24 h):', `${missed ? '<span class="text-amber-700">' : '<span>'}${parts.join(' · ')}</span>`,
+                    'Connected / attempts in the last 24 h. An incoming call that is "not completed" was heard and answered, but the link was never set up: '
+                    + 'most often LinBPQ\'s frequency scan moves on (it holds a pending call only six scan intervals) or the caller did not hear the answer. '
+                    + 'Installation Manual §10.17, "Scanning".'));
+            }
+            if (d.last_rx) rows.push(row('Last decode:', `${esc(d.last_rx.snr)} dB, ${ago(d.last_rx.at)}`, 'S/N of the last frame Mercury decoded (any station on the channel)'));
+            rows.push(row('Last transmit:', ago(d.last_tx_at), 'Last time Mercury keyed the radio (through LinBPQ)'));
+            rows.push(row('Listening:', d.last_listen_at ? (d.listen ? 'on, ' : 'off, ') + ago(d.last_listen_at) : 'no LISTEN yet',
+                'LinBPQ switches Mercury\'s listening on and off as it scans and as the other modem on the radio (INTERLOCK) is busy'
+                + (d.scan_drops_24h ? `. In 24 h its scan hops cut ${d.scan_drops_24h} partly received frames (a hop drops what Mercury was decoding).` : '')));
+            if (d.errors_24h) rows.push(`<div class="flex justify-between gap-2 text-red-700 font-semibold" title="${esc(d.last_error ? md(d.last_error.t) + ' ' + d.last_error.text : '')}"><span>⚠ Errors (24 h):</span><span>${d.errors_24h}</span></div>`);
+            if (d.log_there && !d.log_readable) rows.push(`<div class="text-amber-700" title="The web server cannot read Mercury's log file: chmod 644 it (and 755 its folder)">⚠ Log not readable</div>`);
+            const evIcon = { start: '▶', stop: '■', call: '↗', in: '↘', connected: '🔗', end: '✕', audio: '🔊', missed: '↘✕', link: '⇄' };
+            const ev = d.events || [];
+            const evList = ev.length
+                ? `<div class="mt-1 max-h-28 overflow-y-auto custom-scrollbar pr-2 space-y-0.5">${ev.map(e =>
+                    `<div class="flex justify-between gap-2"><span class="truncate">${evIcon[e.kind] || '•'} ${esc(e.text)}</span><span class="text-gray-500 whitespace-nowrap">${md(e.t)}</span></div>`).join('')}</div>`
+                : `<div class="mt-1 text-gray-400">no sessions yet</div>`;
+            rows.push(`<div class="pt-1 mt-1 border-t border-sky-200" title="Newest first, from Mercury's log (times UTC)"><div class="font-semibold">Recent activity:</div>${evList}</div>`);
+            box.innerHTML = `<div title="${esc(tip)}">
+                <div class="flex items-center"><span class="status-indicator status-${cls} flex-shrink-0"></span><span class="${txt.length > 8 ? 'text-lg sm:text-2xl' : 'text-2xl sm:text-4xl'} font-bold text-gray-900 leading-tight">${esc(txt)}</span></div>
+                <div class="text-xs text-sky-700 font-semibold mt-1">📡 Mercury${d.version ? ' ' + esc(d.version) : ''} · ${esc(port)}${d.mycall ? ' · ' + esc(d.mycall) : ''}</div>
+                <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-sky-200">${rows.join('')}</div>
+            </div>`;
+            card.classList.remove('hidden');
+            updateStatGridCols();
+        }
+        // v1.5.56: Data2G HF Status. Data2G (open-source HF modem, VARA-style
+        // TNC) is a LinBPQ VARA port like Mercury; the API reads its process,
+        // TNC sockets, service file and log (rf-connections-api.php?action=data2g).
+        async function loadData2g() {
+            const card = document.getElementById('data2gStatusCard');
+            const box = document.getElementById('data2gStatusBody');
+            if (!card || !box) return;
+            let d;
+            try {
+                const r = await fetch(RF_API_URL + '?action=data2g&t=' + Date.now(), { cache: 'no-store' });
+                const j = await r.json();
+                if (!j.ok) throw new Error(j.error || 'failed');
+                d = j.data; window._rfData2g = d;
+            } catch (e) { card.classList.add('hidden'); updateStatGridCols(); return; }
+            if (!d || !d.enabled) { card.classList.add('hidden'); updateStatGridCols(); return; }
+            const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+            const ago = s => {
+                if (!s) return 'never';
+                const m = Math.max(0, Math.round((Date.now() - new Date(s.replace(' ', 'T') + 'Z').getTime()) / 60000));
+                return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+            };
+            const hm = s => s ? s.slice(11, 16) + 'Z' : '';
+            const md = s => s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' ' + hm(s) : '';
+            const port = d.bpq_port ? `LinBPQ port ${d.bpq_port.num}` : `TNC ${d.tnc_port}`;
+            const S = {
+                session: ['success', 'In session',          `Connected with ${d.session ? d.session.peer : ''}`],
+                up:      ['success', 'On air',               'Data2G running, LinBPQ attached to its TNC'],
+                nolink:  ['warn',    'LinBPQ not attached',  `Data2G is running but LinBPQ is not connected to its TNC port ${d.tnc_port}: check the port's ADDR line in bpq32.cfg, then restart LinBPQ`],
+                audio:   ['error',   'No audio',             'Data2G reports its sound card input ended: check the radio\'s USB sound card, then sudo systemctl restart data2g'],
+                down:    ['error',   'Modem not running',    `Nothing is listening on Data2G's TNC port ${d.tnc_port}: check the service (systemctl status data2g)`],
+                unknown: ['unknown', 'Status unknown',       'The server could not read its process and network lists'],
+            };
+            const [cls, txt, tip] = S[d.status] || S.unknown;
+            const ENDW = { CLIENT: 'we hung up', PEER: 'the other station hung up', ABORT: 'ended by LinBPQ', LINK_FAILED: 'link lost', LINK_LOST: 'nothing heard from them' };
+            const row = (k, v, t = '') => `<div class="flex justify-between gap-2"${t ? ` title="${esc(t)}"` : ''}><span class="whitespace-nowrap">${k}</span><span class="font-semibold text-right">${v}</span></div>`;
+            const rows = [];
+            if (d.session) {
+                const x = d.session;
+                rows.push(row(x.dir === 'in' ? 'From:' : 'To:', `<span class="font-mono">${esc(x.peer)}</span> since ${hm(x.since)}`,
+                    `${x.bursts} bursts heard` + (x.mode ? `, mode ${x.mode}` : '') + (x.snr_last !== null ? `, S/N ${x.snr_min} to ${x.snr_max} dB` : '')));
+            }
+            if (d.calling && !d.session) rows.push(row('Calling:', `<span class="font-mono">${esc(d.calling.peer)}</span> ${ago(d.calling.at)}`));
+            const last = (d.sessions || [])[0];
+            if (last) {
+                const first = String(last.end || '').split(' ')[0];
+                const bytes = last.tx_bytes !== undefined ? `${last.tx_bytes} bytes sent, ${last.rx_bytes} received` : `${last.bursts} bursts heard`;
+                const good = last.rx_bytes !== undefined ? last.rx_bytes > 0 || last.tx_bytes > 0 : last.bursts > 0;
+                rows.push(row('Last session:', `<span class="font-mono">${esc(last.peer)}</span> ${good ? '' : '<span class="text-amber-700">⚠</span> '}${ago(last.ended_at)}`,
+                    `${last.dir === 'in' ? 'Incoming' : 'Outgoing'}${last.mode ? ' (' + last.mode + ')' : ''}, ${md(last.since)} to ${hm(last.ended_at)}; ${bytes}`
+                    + (last.snr_last !== null ? `; S/N ${last.snr_min} to ${last.snr_max} dB` : '') + `; ${ENDW[first] || String(last.end || '').toLowerCase().replace(/_/g, ' ')}`));
+            }
+            const cs = d.calls_24h;
+            if (cs && (cs.in || cs.out)) {
+                const parts = [];
+                if (cs.in)  parts.push(`in ${cs.in_connected}/${cs.in}`);
+                if (cs.out) parts.push(`out ${cs.out_connected}/${cs.out}`);
+                const missed = (cs.in - cs.in_connected) + (cs.out - cs.out_connected);
+                rows.push(row('Calls (24 h):', `${missed ? '<span class="text-amber-700">' : '<span>'}${parts.join(' · ')}</span>`,
+                    'Connected / attempts in the last 24 h. Data2G turns a call away when it is not listening (LinBPQ scanning elsewhere, or the other modem has the radio) '
+                    + 'or is busy with another station: each try counts here. Installation Manual §10.18.'));
+            }
+            if (d.last_rx) rows.push(row('Last heard:', `${esc(d.last_rx.snr)} dB, ${ago(d.last_rx.at)}`, `S/N of the last burst Data2G decoded (${d.last_rx.mode})`));
+            rows.push(row('Last transmit:', ago(d.last_tx_at), 'Last time Data2G sent (LinBPQ keys the radio for it)'));
+            rows.push(row('Listening:', d.last_listen_at ? (d.listen ? 'on, ' : 'off, ') + ago(d.last_listen_at) : 'no LISTEN yet',
+                'LinBPQ switches Data2G\'s listening on and off as it scans and as the other modems on the radio (INTERLOCK) are busy'));
+            if (d.monitor) rows.push(row('Monitor page:', d.monitor.up === false ? '<span class="text-amber-700">not answering</span>' : `port ${esc(d.monitor.port)}` + (d.monitor.local_only ? ' (this machine)' : ' <span class="text-red-700">⚠ open to the network</span>'),
+                'Data2G\'s own web monitor (waterfall, bursts, link): open it on the station\'s desktop with the "Data2G Monitor" launcher (tools/data2g-monitor.sh)'));
+            if (d.errors_24h) rows.push(`<div class="flex justify-between gap-2 text-red-700 font-semibold" title="${esc(d.last_error ? md(d.last_error.t) + ' ' + d.last_error.text : '')}"><span>⚠ Errors (24 h):</span><span>${d.errors_24h}</span></div>`);
+            if (d.log_there && !d.log_readable) rows.push(`<div class="text-amber-700" title="The web server cannot read Data2G's log file: chmod 644 it (and 755 its folder)">⚠ Log not readable</div>`);
+            if (d.tz && d.tz !== 'UTC') rows.push(`<div class="text-amber-700" title="Data2G logs local time; the dashboard reads it as UTC">⚠ Service time zone ${esc(d.tz)}</div>`);
+            const evIcon = { start: '▶', stop: '■', call: '↗', in: '↘', connected: '🔗', end: '✕', audio: '🔊', missed: '↘✕', link: '⇄' };
+            const ev = d.events || [];
+            const evList = ev.length
+                ? `<div class="mt-1 max-h-28 overflow-y-auto custom-scrollbar pr-2 space-y-0.5">${ev.map(e =>
+                    `<div class="flex justify-between gap-2"><span class="truncate">${evIcon[e.kind] || '•'} ${esc(e.text)}</span><span class="text-gray-500 whitespace-nowrap">${md(e.t)}</span></div>`).join('')}</div>`
+                : `<div class="mt-1 text-gray-400">no sessions yet</div>`;
+            rows.push(`<div class="pt-1 mt-1 border-t border-orange-200" title="Newest first, from Data2G's log (times UTC)"><div class="font-semibold">Recent activity:</div>${evList}</div>`);
+            box.innerHTML = `<div title="${esc(tip)}">
+                <div class="flex items-center"><span class="status-indicator status-${cls} flex-shrink-0"></span><span class="${txt.length > 8 ? 'text-lg sm:text-2xl' : 'text-2xl sm:text-4xl'} font-bold text-gray-900 leading-tight">${esc(txt)}</span></div>
+                <div class="text-xs text-orange-700 font-semibold mt-1">📡 Data2G${d.version ? ' ' + esc(d.version) : ''} · ${esc(port)}${d.mycall ? ' · ' + esc(d.mycall) : ''}</div>
+                <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-orange-200">${rows.join('')}</div>
+            </div>`;
+            card.classList.remove('hidden');
+            updateStatGridCols();
+        }
     </script>
     <script>
     (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
     </script>
+    <script id="rf-redesign-script">
+    // ═══ v1.5.44 RF Connections layout A ═══════════════════════════════════
+    // The data code above is unchanged; this script arranges its output in the
+    // new layout: tabs, the status strip, partner rows with a 7-day strip, the
+    // VARA modem card, the failure bar, and the 7-day history as a side panel.
+    (function () {
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const utcStamp = d => `${MON[d.getUTCMonth()]} ${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}Z`;
+        const ago = ms => {
+            const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
+            return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+        };
+        const bandColor = b => (typeof getBandColor === 'function' ? getBandColor(b) : '#6B7280');
+        const safe = (fn, dflt) => { try { return fn(); } catch (e) { return dflt; } };
+
+        // ── tabs ───────────────────────────────────────────────────────────
+        const TABS = ['recent', 'messages', 'report', 'map', 'bands', 'geo', 'modems', 'paths', 'netmap'];
+        let reportBuilt = false;
+        const NETMAP_URL = 'https://nodes.ukpacketradio.network/maps/packet';
+        window.rfTab = function (name, opts) {
+            if (!TABS.includes(name)) name = 'recent';
+            for (const t of TABS) {
+                const p = $('rfTab-' + t);
+                if (p) p.classList.toggle('hidden', t !== name);
+            }
+            document.querySelectorAll('.rf-tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'));
+            try { localStorage.setItem('rf_tab', name); } catch (e) {}
+            if (name === 'map') setTimeout(() => { if (typeof stationMap !== 'undefined' && stationMap) { stationMap.invalidateSize(); if (typeof rfCenterHome === 'function') rfCenterHome(); } }, 60);
+            if (name === 'report' && (!reportBuilt || (opts && opts.rebuild))) {
+                reportBuilt = true;
+                if (typeof generatePropagationReport === 'function') generatePropagationReport();
+            }
+            if (name === 'paths') loadPaths();
+            if (name === 'modems' && typeof window.loadModemReport === 'function') window.loadModemReport();
+            if (name === 'netmap') {               // load the outside map only when it's wanted
+                const f = $('netmapFrame');
+                if (f && !f.getAttribute('src')) f.setAttribute('src', NETMAP_URL);
+            }
+            if (opts && opts.scroll) document.querySelector('.rf-tabs-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        // ── v1.5.50: VHF path history ───────────────────────────────────────
+        // ?action=paths: per watched station, heard counts per UTC day/hour
+        // (net_heard_history) and test connects (link_probes).
+        let pathsTimer = null;
+        window.loadPaths = async function () {
+            const body = $('pathsBody');
+            if (!body) return;
+            const days = Number(($('pathsDays') || {}).value || 14);
+            let d;
+            try {
+                const r = await fetch(RF_API_URL + '?action=paths&days=' + days + '&t=' + Date.now(), { cache: 'no-store' });
+                const j = await r.json();
+                if (!j.ok) throw new Error(j.error || 'failed');
+                d = j.data;
+            } catch (e) {
+                body.innerHTML = '<div class="rf-empty">Path history not available (' + escH(e.message) + ').</div>';
+                return;
+            }
+            clearTimeout(pathsTimer);
+            pathsTimer = setTimeout(() => { if (!$('rfTab-paths').classList.contains('hidden')) loadPaths(); }, 5 * 60000);
+            if (!d.stations.length) {
+                body.innerHTML = '<div class="rf-empty">No watched stations yet. Add one on Admin → Maintenance → Watched stations (callsign and port); set <b>Test connect</b> to try a connection on a schedule.</div>';
+                return;
+            }
+            const now = new Date(d.now.replace(' ', 'T') + 'Z');
+            const dayKey = t => t.toISOString().slice(0, 10);
+            const dayList = [];
+            for (let i = 0; i < d.days; i++) dayList.push(dayKey(new Date(now.getTime() - i * 86400000)));
+            const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const dayLabel = k => MON[Number(k.slice(5, 7)) - 1] + ' ' + Number(k.slice(8, 10));
+            const ago = s => {
+                if (!s) return 'never';
+                const m = Math.max(0, Math.round((now - new Date(s.replace(' ', 'T') + 'Z')) / 60000));
+                return m < 60 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago';
+            };
+            let html = d.tables ? '' : '<div class="rf-error" style="border:0;padding:0 0 8px">The history tables are missing: run update.sh.</div>';
+            for (const st of d.stations) {
+                const heard = {}; let heardHours = 0;
+                for (const [k, h, n] of st.heard) { heard[k + ' ' + h] = n; heardHours++; }
+                const probes = {};
+                for (const p of st.probes) { const k = p.probed_at.slice(0, 10) + ' ' + Number(p.probed_at.slice(11, 13)); (probes[k] = probes[k] || []).push(p); }
+                const good = st.probes.filter(p => p.result === 'connected');
+                const avg = good.length ? Math.round(good.reduce((a, p) => a + (p.connect_secs || 0), 0) / good.length) : null;
+                const totalHours = (d.days - 1) * 24 + now.getUTCHours() + 1;
+                html += '<div class="rf-path"><div class="rf-path-title"><b>' + escH(st.call) + '</b>' +
+                    '<span class="rf-small rf-muted">' + (st.port ? 'port ' + st.port : 'any port') + '</span>' +
+                    '<span class="rf-small">Last heard <b style="font-family:inherit;font-size:inherit">' + escH(ago(st.last_heard)) + '</b></span>' +
+                    '<span class="rf-small rf-muted">heard in ' + heardHours + ' of ' + totalHours + ' hours</span>' +
+                    (st.probe_hours
+                        ? '<span class="rf-small">Test connects: <b style="font-family:inherit;font-size:inherit">' + good.length + ' of ' + st.probes.length + '</b> answered' +
+                          (avg != null ? ', avg ' + avg + ' s' : '') + ' · every ' + st.probe_hours + ' h</span>'
+                        : '<span class="rf-small rf-muted">no test connects (listen only)</span>') +
+                    '</div><div class="rf-scroll"><table class="rf-pgrid" aria-label="' + escH(st.call) + ' heard by UTC hour"><thead><tr><th class="rf-pday">UTC</th>';
+                for (let h = 0; h < 24; h++) html += '<th>' + (h % 3 === 0 ? String(h).padStart(2, '0') : '') + '</th>';
+                html += '</tr></thead><tbody>';
+                for (const k of dayList) {
+                    html += '<tr><th class="rf-pday">' + dayLabel(k) + '</th>';
+                    for (let h = 0; h < 24; h++) {
+                        const future = k === dayKey(now) && h > now.getUTCHours();
+                        const n = heard[k + ' ' + h] || 0;
+                        const pr = probes[k + ' ' + h] || [];
+                        const cls = future ? 'rf-pfut' : 'rf-ph' + (n === 0 ? 0 : n === 1 ? 1 : n <= 3 ? 2 : 3);
+                        const ok = pr.some(p => p.result === 'connected'), bad = pr.length && !ok;
+                        let tip = dayLabel(k) + ' ' + String(h).padStart(2, '0') + ':00Z · ' + (future ? 'to come' : n ? 'heard ' + n + '×' : 'not heard');
+                        for (const p of pr) tip += ' · test ' + p.probed_at.slice(11, 16) + 'Z ' + p.result + (p.connect_secs != null ? ' in ' + Math.round(p.connect_secs) + ' s' : '') + (p.detail ? ' (' + p.detail + ')' : '');
+                        html += '<td class="' + cls + (bad ? ' rf-pbadcell' : '') + '" title="' + escH(tip) + '">' +
+                                (ok ? '<span class="rf-pok">✓</span>' : bad ? '<span class="rf-pbad">✗</span>' : '') + '</td>';
+                    }
+                    html += '</tr>';
+                }
+                html += '</tbody></table></div></div>';
+            }
+            body.innerHTML = html;
+        };
+        const escH = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        window.showPropagationReport = () => rfTab('report', { scroll: true, rebuild: true });
+        window.toggleMessagesPanel = function () {};
+        window.updateStatGridCols = function () {};
+        window.setVhfCardShown = on => { const c = $('vhfStatusCard'); if (c) c.classList.toggle('hidden', !on); };
+        const origShowFailures = window.showFailures;
+        window.showFailures = function (kind) {
+            rfTab('recent');
+            origShowFailures(kind);
+            if (kind) document.querySelector('.rf-tabs-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
+        window.rfThemeLabel = function () {
+            const b = $('rfThemeBtn');
+            if (b) b.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark';
+        };
+
+        // ── partners: one row each, problems first, 7-day strip ────────────
+        function dayStrip(base) {
+            const out = [];
+            const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+            const start = today.getTime() - 6 * 86400000;
+            const per = {};
+            const src = typeof allConnections !== 'undefined' ? (typeof rfWithMercury === 'function' ? rfWithMercury(allConnections, start) : allConnections) : [];
+            for (const c of src) {                          // v1.5.46: Mercury calls count too
+                if (c.baseCall !== base || c._ts < start) continue;
+                const k = Math.floor((c._ts - start) / 86400000);
+                per[k] = per[k] || { ok: 0, bad: 0 };
+                if (c.status === 'success') per[k].ok++; else per[k].bad++;
+            }
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(start + i * 86400000);
+                const p = per[i];
+                const kind = !p ? 'none' : p.ok && p.bad ? 'mixed' : p.ok ? 'good' : 'failed';
+                out.push({ day: d, kind, p });
+            }
+            return out;
+        }
+        const DAYC = { good: 'var(--rf-good)', mixed: '#E8A33D', failed: 'var(--rf-barbad)', none: 'var(--rf-border)' };
+        const DAYT = { good: 'forwarded', mixed: 'good and failed', failed: 'failed', none: 'no attempt' };
+        const stripHtml = (call, days) => `<div class="rf-days" role="img" aria-label="${esc(call)} last 7 days: ${days.map(d => DAYT[d.kind]).join(', ')}">` +
+            days.map(d => `<span title="${MON[d.day.getUTCMonth()]} ${d.day.getUTCDate()}: ${DAYT[d.kind]}${d.p ? ` (${d.p.ok} good, ${d.p.bad} failed)` : ''}" style="background:${DAYC[d.kind]}"></span>`).join('') + '</div>';
+
+        window.updateTPRFNHubStations = function () {
+            const box = $('tprfnHubList');
+            if (!box) return;
+            const partners = safe(() => getForwardingPartners(), []);
+            if (!partners.length) { box.innerHTML = '<div class="rf-empty">No forwarding partners configured. Use + Add.</div>'; return; }
+            const counts = {};
+            const haveMsgs = safe(() => haveRealMessageData(), false);
+            if (haveMsgs) for (const m of safe(() => getFilteredForwardedMessages(), [])) {
+                counts[m.partner] = counts[m.partner] || { sent: 0, recv: 0 };
+                if (m.direction === 'out') counts[m.partner].sent++; else counts[m.partner].recv++;
+            }
+            const now = Date.now();
+            const rows = partners.map(call => {
+                const base = call.split('-')[0];
+                const hub = (typeof hubLastConnect !== 'undefined') ? hubLastConnect[call] : null;
+                const lastMs = hub ? hub.time.getTime() : 0;
+                const q = (typeof _fwdQueueByCall !== 'undefined' && _fwdQueueByCall) ? (_fwdQueueByCall[call] ?? _fwdQueueByCall[base] ?? 0) : null;
+                const wd = (typeof _watchdog !== 'undefined' && _watchdog && _watchdog.partners) ? (_watchdog.partners[call] || _watchdog.partners[base]) : null;
+                const ageH = lastMs ? (now - lastMs) / 3600000 : Infinity;
+                let level = 'ok', notes = [];
+                if (wd && wd.paused) { level = 'bad'; notes.push(`Paused until ${(wd.resume_at || '').slice(11, 16)}Z (watchdog)`); }
+                else if (wd && wd.fails_in_a_row > 0) { level = 'warn'; notes.push(`${wd.fails_in_a_row} failed attempt${wd.fails_in_a_row === 1 ? '' : 's'}`); }
+                if (ageH >= 24 && level === 'ok') level = 'warn';
+                if (q > 0 && ageH >= 24) notes.push(`${q} waiting`);
+                if (!lastMs) notes.push('no RF contact in the data');
+                else if (ageH >= 72) notes.push(`no contact for ${Math.floor(ageH / 24)} days`);
+                const rank = { bad: 0, warn: 1, ok: 2 }[level];
+                return { call, base, hub, lastMs, q, wd, level, notes, rank, c: counts[base] };
+            }).sort((a, b) => a.rank - b.rank || (b.q || 0) - (a.q || 0) || b.lastMs - a.lastMs);
+            const dotC = { bad: 'var(--rf-bad)', warn: 'var(--rf-dotwarn)', ok: 'var(--rf-good)' };
+            const noteC = { bad: 'var(--rf-bad)', warn: 'var(--rf-warn)', ok: 'var(--rf-muted)' };
+            box.innerHTML = `<table class="rf-ptable"><thead><tr><th scope="col">Partner</th><th scope="col">Last good</th><th scope="col">Band</th><th scope="col">Waiting</th><th scope="col" title="Messages via RF in this period">Sent / rcvd</th><th scope="col">Last 7 days</th></tr></thead><tbody>` +
+                rows.map(r => {
+                    const last = r.lastMs ? `<span style="font-weight:600;color:${r.level === 'ok' ? 'var(--rf-text)' : noteC[r.level]}">${ago(r.lastMs)}</span><div class="rf-small rf-muted">${utcStamp(r.hub.time)}${r.hub.modem === 'mercury' ? ' · Mercury' : r.hub.modem === 'data2g' ? ' · Data2G' : ''}</div>` : '<span class="rf-muted">—</span>';
+                    const band = r.hub && r.hub.band && r.hub.band !== 'Unknown' ? `<span class="rf-band" style="background:${bandColor(r.hub.band)}">${esc(r.hub.band)}</span>` : '<span class="rf-muted">—</span>';
+                    const q = r.q === null ? '<span class="rf-muted" title="Loading the forward queue">…</span>'
+                        : r.q > 0 ? `<button type="button" class="rf-call" style="text-decoration:none" title="Show these messages under Forwarded messages" onclick="rfMessagesFor('${esc(r.base)}')"><span class="rf-q">${r.q}</span></button>` : '<span class="rf-muted">—</span>';
+                    const io = !haveMsgs ? '<span class="rf-muted">…</span>' : `<span class="rf-muted">${(r.c || { sent: 0 }).sent} / ${(r.c || { recv: 0 }).recv}</span>`;
+                    return `<tr>
+                        <td><div style="display:flex;align-items:center;gap:10px"><span class="rf-dot" style="background:${dotC[r.level]}"></span><div style="display:flex;flex-direction:column;gap:2px">
+                            <button type="button" class="rf-call" onclick="showStationInfoModal('${esc(r.call)}')" title="7-day history">${esc(r.call)}</button>
+                            ${r.notes.length ? `<span class="rf-note" style="color:${noteC[r.level]}">${esc(r.notes.join(' · '))}</span>` : ''}</div></div></td>
+                        <td style="white-space:nowrap">${last}</td><td>${band}</td><td>${q}</td><td>${io}</td>
+                        <td>${stripHtml(r.call, dayStrip(r.base))}</td></tr>`;
+                }).join('') + '</tbody></table>';
+        };
+
+        window.rfMessagesFor = function (base) {
+            const sel = $('messagesPartnerFilter');
+            if (sel && [...sel.options].some(o => o.value === base)) { sel.value = base; }
+            if (typeof updateMessagesPanel === 'function') updateMessagesPanel();
+            rfTab('messages', { scroll: true });
+        };
+
+        // ── VARA HF modem card ────────────────────────────────────────────
+        function renderVara() {
+            const box = $('rfVaraCard');
+            if (!box) return;
+            const all = (typeof allConnections !== 'undefined' ? allConnections : []).filter(c => !['mercury', 'data2g', 'vhf'].includes(c.modem));
+            const day0 = new Date(); day0.setUTCHours(0, 0, 0, 0);
+            let last = null, lastGood = null, today = 0, todayGood = 0;
+            for (const c of all) {
+                if (!last || c._ts > last._ts) last = c;
+                if (c.status === 'success' && (!lastGood || c._ts > lastGood._ts)) lastGood = c;
+                if (c._ts >= day0.getTime()) { today++; if (c.status === 'success') todayGood++; }
+            }
+            const fresh = lastGood && Date.now() - lastGood._ts < 86400000;
+            box.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span class="rf-dot" style="background:${fresh ? 'var(--rf-good)' : 'var(--rf-dotwarn)'}"></span><span class="rf-modem-name" style="margin:0;flex:1 1 auto">VARA HF</span>
+                <span style="font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:${fresh ? 'var(--rf-goodbg)' : 'var(--rf-warnbg)'};color:${fresh ? 'var(--rf-goodfg)' : 'var(--rf-warnfg)'}">${fresh ? 'Active' : 'Quiet'}</span></div>
+                <div class="rf-vara-row"><span>Last good</span><b>${lastGood ? esc(lastGood.callsign) + ' · ' + ago(lastGood._ts) : '—'}</b></div>
+                <div class="rf-vara-row"><span>Last try</span><b>${last ? esc(last.callsign) + ' · ' + (last.status === 'success' ? 'good' : 'failed') + ' · ' + ago(last._ts) : '—'}</b></div>
+                <div class="rf-vara-row"><span>Today</span><b>${todayGood} good of ${today} (UTC day)</b></div>`;
+            window._rfVara = { lastGood, fresh };
+        }
+
+        // ── failure bar under Failed connections ──────────────────────────
+        function renderFailBar() {
+            const bar = $('rfFailBar');
+            if (!bar) return;
+            const n = id => parseInt(($(id) || {}).textContent, 10) || 0;
+            const total = n('totalConnections');
+            const parts = [['successfulConnections', 'var(--rf-good)'], ['failedTimeout', '#C2410C'], ['failedChannelBusy', '#E8A33D'],
+                ['failedPortSession', '#9A6700'], ['failedIncoming', '#7C5CD6'], ['failedNoData', '#6B7280'], ['failedOther', '#9AA3AF']];
+            bar.innerHTML = total ? parts.map(([id, c]) => n(id) ? `<span style="width:${(n(id) / total * 100).toFixed(2)}%;background:${c}"></span>` : '').join('') : '';
+        }
+
+        // ── best band: outline the slot we are in ─────────────────────────
+        function markNowSlot() {
+            const slot = Math.floor(new Date().getUTCHours() / 4) + 1;
+            document.querySelectorAll('.rf-bb-slot').forEach(el => el.classList.toggle('rf-now', +el.dataset.slot === slot));
+        }
+
+        // ── status strip ──────────────────────────────────────────────────
+        function pill(label, value, color, onclick, title) {
+            return `<button type="button" class="rf-pill" onclick="${onclick}" title="${esc(title || '')}"><i style="background:${color}"></i><b>${esc(label)}</b><span>${esc(value)}</span></button>`;
+        }
+        function renderStrip() {
+            const box = $('rfStatusStrip');
+            if (!box) return;
+            const P = [];
+            const goModems = "document.getElementById('rfModemsH').scrollIntoView({behavior:'smooth',block:'center'})";
+            const v = window._rfVara;
+            if (v) P.push(pill('VARA HF', v.lastGood ? 'last good ' + ago(v.lastGood._ts) : 'no sessions in the data', v.fresh ? 'var(--rf-good)' : 'var(--rf-dotwarn)', goModems));
+            const m = window._rfMercury;
+            if (m && m.enabled) {
+                const L = { up: 'on air', session: 'in session', nolink: 'LinBPQ not attached', audio: 'no audio', down: 'not running' }[m.status] || 'status unknown';
+                const cs = m.calls_24h;
+                const extra = cs && cs.in ? ` · calls in ${cs.in_connected}/${cs.in}` : '';
+                const ok = m.status === 'up' || m.status === 'session';
+                const warn = ok && cs && cs.in && cs.in_connected < cs.in;
+                P.push(pill('Mercury', L + extra, !ok ? 'var(--rf-bad)' : warn ? 'var(--rf-dotwarn)' : 'var(--rf-good)', goModems));
+            }
+            const g = window._rfData2g;                     // v1.5.56
+            if (g && g.enabled) {
+                const L = { up: 'on air', session: 'in session', nolink: 'LinBPQ not attached', audio: 'no audio', down: 'not running' }[g.status] || 'status unknown';
+                const cs = g.calls_24h;
+                const extra = cs && cs.in ? ` · calls in ${cs.in_connected}/${cs.in}` : '';
+                const ok = g.status === 'up' || g.status === 'session';
+                const warn = ok && cs && cs.in && cs.in_connected < cs.in;
+                P.push(pill('Data2G', L + extra, !ok ? 'var(--rf-bad)' : warn ? 'var(--rf-dotwarn)' : 'var(--rf-good)', goModems));
+            }
+            const h = window._rfVhf;
+            if (h && h.modems && h.modems.length) {
+                const up = h.modems.every(x => x.status === 'up');
+                const heard = h.modems.reduce((s, x) => s + ((x.heard || []).length), 0);
+                P.push(pill('VHF', (up ? 'on air' : 'check modem') + ` · ${heard} heard`, up ? 'var(--rf-good)' : 'var(--rf-bad)', goModems));
+            }
+            if (typeof _watchdog !== 'undefined' && _watchdog && _watchdog.partners) {
+                const ps = Object.values(_watchdog.partners);
+                const paused = ps.filter(x => x.paused).length, failing = ps.filter(x => !x.paused && x.fails_in_a_row > 0).length;
+                P.push(pill('Watchdog', paused ? `${paused} paused` : failing ? `${failing} with a failed attempt` : 'none paused',
+                    paused ? 'var(--rf-bad)' : failing ? 'var(--rf-dotwarn)' : 'var(--rf-good)', "document.getElementById('rfPartnersH').scrollIntoView({behavior:'smooth',block:'start'})"));
+            }
+            const k = parseFloat(($('currentKIndex') || {}).textContent);
+            if (!isNaN(k)) P.push(pill('Kp', k + ' ' + (($('kIndexStatus') || {}).textContent || ''), k >= 5 ? 'var(--rf-bad)' : k >= 4 ? 'var(--rf-dotwarn)' : 'var(--rf-good)', "rfTab('geo',{scroll:true})"));
+            const msgs = typeof forwardedMessages !== 'undefined' ? forwardedMessages : [];
+            let newest = null;
+            for (const x of msgs) if (x && x._sort && (!newest || x._sort > newest._sort)) newest = x;
+            if (newest && /^\d{6}$/.test(newest.date)) {
+                const t = Date.UTC(2000 + +newest.date.slice(0, 2), +newest.date.slice(2, 4) - 1, +newest.date.slice(4, 6), +newest.time.slice(0, 2), +newest.time.slice(3, 5));
+                P.push(pill('Last message', `${newest.direction === 'out' ? 'sent to' : 'from'} ${newest.partner} · ${ago(t)}`, 'var(--rf-muted)', "rfTab('messages',{scroll:true})"));
+            }
+            box.innerHTML = P.join('');
+        }
+
+        // ── 7-day history: side panel plus a day strip and shortcuts ──────
+        const origInfo = window.showStationInfoModal;
+        window.showStationInfoModal = function (callsign) {
+            origInfo(callsign);
+            const base = String(callsign).replace(/-\d+$/, '');
+            const modal = $('stationInfoModal');
+            if (!modal) return;
+            let extra = modal.querySelector('.rf-hist-extra');
+            if (!extra) {
+                extra = document.createElement('div');
+                extra.className = 'rf-hist-extra';
+                const stats = $('stationInfoBands') && $('stationInfoBands').closest('.grid');
+                if (stats) stats.after(extra); else modal.firstElementChild.appendChild(extra);
+            }
+            const days = dayStrip(base);
+            const partner = safe(() => getForwardingPartners(), []).find(p => p.split('-')[0] === base);
+            const q = partner && typeof _fwdQueueByCall !== 'undefined' && _fwdQueueByCall ? (_fwdQueueByCall[partner] ?? _fwdQueueByCall[base] ?? 0) : 0;
+            const wd = partner && typeof _watchdog !== 'undefined' && _watchdog && _watchdog.partners ? (_watchdog.partners[partner] || _watchdog.partners[base]) : null;
+            const notes = [];
+            if (q > 0) notes.push(`${q} message${q === 1 ? '' : 's'} waiting for ${partner}`);
+            if (wd && wd.paused) notes.push(`paused by the watchdog until ${(wd.resume_at || '').slice(11, 16)}Z`);
+            else if (wd && wd.fails_in_a_row) notes.push(`${wd.fails_in_a_row} failed attempt${wd.fails_in_a_row === 1 ? '' : 's'} in a row`);
+            extra.innerHTML = `<div class="rf-small" style="font-weight:600">Last 7 days</div>
+                <div class="rf-hist-days" role="img" aria-label="${esc(base)} last 7 days: ${days.map(d => DAYT[d.kind]).join(', ')}">${days.map(d => `<div><span title="${DAYT[d.kind]}${d.p ? ` (${d.p.ok} good, ${d.p.bad} failed)` : ''}" style="background:${DAYC[d.kind]}"></span>${d.day.getUTCDate()}</div>`).join('')}</div>
+                ${notes.length ? `<div class="rf-hist-note">${esc(notes.join(' · '))}</div>` : ''}
+                <div class="rf-hist-actions">
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="closeStationInfoModal(); rfTab('map',{scroll:true})">Show on map</button>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="closeStationInfoModal(); rfTab('report',{scroll:true})">In propagation report</button>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="closeStationInfoModal(); rfMessagesFor('${esc(base)}')">Messages with this station</button>
+                    <a class="rf-btn rf-btn-sm" style="display:inline-flex;align-items:center;text-decoration:none" href="https://www.qrz.com/db/${encodeURIComponent(base)}" target="_blank" rel="noopener">Look up callsign</a>
+                </div>`;
+        };
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = $('stationInfoModal'); if (m && !m.classList.contains('hidden') && typeof closeStationInfoModal === 'function') closeStationInfoModal(); } });
+
+        // ── keep the composed parts current ───────────────────────────────
+        function refreshAll() {
+            safe(renderVara); safe(renderFailBar); safe(markNowSlot); safe(renderStrip); safe(rfThemeLabel);
+            const c = $('messagesCountOld'), n = $('messagesCount');
+            if (c && n) n.textContent = c.textContent;
+        }
+        window.rfRefreshAll = refreshAll;
+        document.addEventListener('DOMContentLoaded', () => {
+            let t = 'recent';
+            try { t = localStorage.getItem('rf_tab') || 'recent'; } catch (e) {}
+            if (t === 'report') t = 'recent';      // build the report only when asked
+            rfTab(t);
+            refreshAll();
+            let n = 0;
+            const fast = setInterval(() => { refreshAll(); if (++n >= 20) clearInterval(fast); }, 3000);
+            setInterval(refreshAll, 30000);
+        });
+    })();
+    </script>
+
 </body>
 </html>

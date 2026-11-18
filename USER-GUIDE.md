@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.42**
+**Version 1.5.66**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -105,7 +105,7 @@ Anything that **acts as your station** — sends, posts, transmits, or reads you
 | Use the Email Client (and its NTS Report), Chat, the admin pages, Install Check or Health Check | The **admin login** (your browser's login box) |
 | Post an NWS bulletin, send an APRS message, save the BBS station info on the APRS Map, save station locations or forwarding partners on RF Connections, clear the callsign-lookup cache | The **admin login**, when you press the button |
 | Open the VARA HF Terminal | The **admin login**, then the page's own login |
-| Change frequency in the VARA HF Terminal; change TX power or switch the power outlet on Rig Status | The page's own login: the **BBS password** (`bbs.pass` in `config.php`) |
+| Change frequency in the VARA HF Terminal; change TX power, the radio's settings (v1.5.60) or switch the power outlet on Rig Status | The page's own login: the **BBS password** (`bbs.pass` in `config.php`) |
 | Open the Telnet Client, then log in to the node | The **admin login** (installer setup; the two-site template limits it to your home network instead), then your **BPQ user name and password** (BPQ asks) |
 | Download a file the Telnet Client received by YAPP | The **admin login** (on a two-site setup: the same access as the Telnet Client) |
 | Use the Maintenance page's forwarding-partners editor | The admin login, then the **BBS password** |
@@ -125,7 +125,7 @@ Every page loads the same bar at the top.
 - **📡 BPQ Dashboard** — returns to the home page, RF Connections.
 - **Page links** — RF, Traffic, System, Connects, Messages, Email, Weather, Chat, APRS, VARA, Telnet, Rig, RF Power. The page you're on is highlighted.
 - **📖 Guide** — opens this guide as a PDF in a new tab.
-- **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit. These ask for the admin login.
+- **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit, Audio Map (v1.5.57). These ask for the admin login.
 - **Clocks** — UTC (purple, "Z") and your browser's local time ("L"), updated every second.
 - **Theme button** — 🌙 / ☀️ (Section 3).
 - **⚙** — on the admin pages only: *Dashboard Settings* for the forwarding tools (Section 19).
@@ -636,74 +636,233 @@ For per-message detail use the Email Client (reading) or the Forwarded Messages 
 
 **Page:** `/bpq-rf-connections.html` (menu: **RF** — also the home page)
 
-The main page: your VARA HF sessions, forwarding partners, forwarded messages and propagation, in one place.
+The main page: your VARA HF sessions, forwarding partners, forwarded messages and propagation, in one place. Since v1.5.46, stations running the **Mercury** HF modem also see its calls here (see *Mercury calls on this page* below), and since v1.5.56 those running **Data2G** (*Data2G calls on this page*).
+
+**New layout in v1.5.44.** The data and its sources are the same as before, but the page is arranged differently:
+
+- what needs attention is at the top;
+- partners are rows rather than tiles, with the modems beside them and conditions across the page below;
+- the details sit in tabs at the bottom;
+- light and dark themes both work.
+
+The previous layout is still there as **Classic view** (`/bpq-rf-connections-classic.html`, linked next to the title), so you can compare the two.
 
 ### At the top
 
-- **Today / 7 Days / 30 Days / 90 Days** — the range for everything below. Today is the default. Since v1.5.39 the page reads only the few lines it needs from each day's BBS log (frequencies, failure reasons, message proposals), filtered and cached on the server in `cache/bbs-lines/`. It used to download each whole day's log, which on a busy hub is 40–50 MB a day. The first time a day is opened it takes a moment while the server reads that day's log once; after that it's quick.
-- 🔄 **Refresh**, and 📄 **Station Report** — a PDF of one station's sessions: base callsign (all SSIDs), last 24 hours to a year, all/outgoing/incoming. It lists remote stations only, so your own callsign gives an empty report.
-- The status line shows how many connections were loaded; **"(DB)"** at the end means the fast database path is in use (Section 26).
+- **The GitHub banner**, with the link to the project (github.com/bpq-dashboard/bpq-dashboard). Close it with ×; it stays closed in that browser.
+- **The title line:**
+  - the version and the **Classic view** link;
+  - the period loaded;
+  - the live status (how many connections; **"(DB)"** means the fast database path is in use, Section 26);
+  - when the data was last updated;
+  - a UTC clock.
+- **Today / 7 days / 30 days / 90 days** sets the range for everything on the page; Today is the default. Since v1.5.39 the page reads only the lines it needs from each day's BBS log (frequencies, failure reasons, message proposals), filtered and cached on the server in `cache/bbs-lines/`. The first time a day is opened it takes a moment while the server reads that day's log once; after that it's quick.
+- **Refresh**.
+- **Station report:** a PDF of one station's sessions, by base callsign (all SSIDs), for the last 24 hours up to a year, with all, outgoing or incoming sessions. It lists remote stations only, so your own callsign gives an empty report.
+- **Dark / Light** switches the theme (the moon button in the menu bar does the same).
+- **The status strip**, one pill per item. Each pill opens its details:
+  - **VARA HF**: when the last good session was;
+  - **Mercury**: its state and **calls in completed / heard** in 24 h, shown only with Mercury;
+  - **Data2G** (v1.5.56): the same for Data2G, shown only with Data2G;
+  - **VHF**: modem state and stations heard, shown only with a VHF sound-modem port;
+  - **Watchdog**: partners paused, or with a failed attempt;
+  - **Kp**: the current K-index;
+  - **Last message**: the newest forwarded message, and with whom.
+- **A red storm line** appears under the header when NOAA reports a geomagnetic storm.
 
-### Cards
+### Headline numbers
 
-- **RF Connections Status** — successful sessions, success rate, average bitrate.
-- **RF Connections Failures** — every failed VARA session in the range, split into Timeout (no prop), Channel Busy, No Data, Port in Use and Incoming Failed (plus Other when a failure had no recognised reason); the rows add up to the total. **Timeout (no prop)** is a call nobody answered: VARA ran all its tries ("Connecting to … 15/15") and never logged "Connected to", usually propagation or the other station being off the air. **No Data** is a link that did come up and then carried nothing (0 bytes both ways, no S/N). Before v1.5.30 unanswered calls were counted as No Data; update.sh moves them to Timeout. This is the complete RF failure count; System Logs' **Port in Use** counter is only one of these kinds. **Click a row** (or the big number for all failures) to list just those sessions in **Recent Connections** (v1.5.21): time, callsign, frequency, band and the reason in the Status column. Click **✕** on the chip by the heading to show everything again.
-- **RF Connections Avg S/N**.
-- **RF Connected Stations** — click for a table of every station, sortable, with its sessions and messages.
-- **VHF Connections Status** (v1.5.28; a badge under Refresh's status line in v1.5.23–1.5.27) — one block per LinBPQ port that uses a KISS-over-TCP sound modem (QtSoundModem, Direwolf), named from `bpq32.cfg`. 🟢 **On air**: the modem is running and LinBPQ is connected to it. 🟠 **LinBPQ not connected**: restart LinBPQ. 🔴 **Modem not running**: check the modem's service (e.g. `systemctl status qtsoundmodem`). Below: the newest station in BPQ's MHeard list for that port, the watched stations on that port (Section 14), ⚠ when quiet too long, and (v1.5.29) **Heard today** — every station heard on that port in the page's reporting period, newest first, with its UTC time: **Today** is 00:00Z to now; **7 / 30 / 90 Days** add the date and change the heading to "Heard last N days". A link mark 🔗 before a call means BPQ flags that station as having connected. BPQ's MHeard list keeps each station once, with the last time it was heard, so a station heard at 02:00Z and again at 14:00Z shows once, at 14:00Z; it is a list of stations, not of every frame or contact. Updates every minute; stations without such a port don't see the card (the row keeps four cards). Setting up such a port: *Installation Manual* §10.13; checks: Maintenance → *Sound modem*.
+These numbers are **VARA's** (Mercury calls aren't in them unless you switch that on, see *Mercury calls on this page*).
 
-### 🌐 RF Forwarding Partners
+- **Success rate:** good sessions out of all sessions in the range, and the average bitrate.
+- **Failed connections:** every failed VARA session in the range.
+  - A coloured bar shows good sessions against each kind of failure.
+  - The chips split the failures into **Timeout**, **Busy**, **Port in use**, **Incoming**, **No data** and **Other** (Other appears only when a failure had no recognised reason). The chips add up to the total.
+  - **Timeout** is a call nobody answered: VARA ran all its tries ("Connecting to … 15/15") and never logged "Connected to". It's usually propagation, or the other station being off the air.
+  - **No data** is a link that came up and then carried nothing (0 bytes both ways, no S/N). Before v1.5.30, unanswered calls were counted as No data; update.sh moves them to Timeout.
+  - This is the complete RF failure count. System Logs' **Port in Use** counter covers only one of these kinds.
+  - **Click a chip**, or the big number for all failures: the **Recent connections** tab opens with just those sessions. Click ✕ on the chip by the table to show everything again.
+  - The line below gives the failures by band.
+- **Average S/N:** overall, and per band.
+- **Stations:** the number of stations connected over RF in the range. Click it for a sortable table of every station, with its sessions and messages.
 
-One tile per forwarding partner: when it last connected and on which band, how many messages are waiting for it in your BBS's forwarding queue (📨, from the sysop `FWD QUEUE` command), and how many messages went each way over RF.
+### Forwarding partners
 
-- **🔄 Refresh Queue**, **+ Add** and **Manage** (edit/remove). Adding and removing partners asks for the admin login. This list is stored on the server in `data/stations/partners.json`; it is separate from the propagation scheduler's list (Section 19).
-- The server asks the BBS for the queue at most once a minute and shares the answer with every visitor, so a refresh within the minute shows the same numbers.
-- **Connect Watchdog** (v1.5.35, optional, *Installation Manual* §10.1): when it runs, a partner that has failed forwarding attempts shows ⚠ *N failed attempts*, and one it has paused shows a red tile with ⏸ **Paused until HH:MMZ**. After 2 failed attempts in a row the watchdog pauses forwarding to that partner for 6 hours (its mail waits in the queue), then enables it again. If the partner connects to you during the pause, the pause ends within 5 minutes (v1.5.38). Hover the line for the reason. Maintenance → *Connect Watchdog* has the status, dry-run and resume commands.
-- The sent/received counts are RF (VARA HF) messages only. A message to the same base callsign over NET/ROM, AXIP, AX.25 or Telnet doesn't count here; see Forwarded Messages for those.
+One row per forwarding partner. Partners that need attention are at the top: paused by the watchdog, then those with failed attempts or no contact for a day or more.
 
-### 📨 Forwarded Messages (click ▶ to open)
+- **The partner's call:** click it for its **7-day history** (below).
+  - A coloured dot: green is fine, amber needs a look, red is paused.
+  - A short note under the call, e.g. "1 failed attempt · 5 waiting" or "no contact for 3 days".
+- **Last good:** how long ago the last good connection was, with its UTC date and time. A good Mercury session counts too and is marked **· Mercury** (v1.5.47), so a partner you forward to over Mercury only isn't shown as silent.
+- **Band** of that connection.
+- **Waiting:** messages in your BBS's forwarding queue for that partner, from the sysop `FWD QUEUE` command. Click the number to see them under Forwarded messages. The server asks the BBS at most once a minute and shares the answer with every visitor.
+- **Sent / rcvd:** messages each way over RF (VARA HF) in the range. NET/ROM, AXIP, AX.25 and Telnet messages don't count here; see Forwarded messages for those.
+- **Last 7 days:** one block per UTC day, oldest on the left. VARA and Mercury calls both count (v1.5.46).
+  - green: forwarded;
+  - amber: good and failed sessions that day;
+  - red: failed only;
+  - grey: no attempt.
 
-Every message your BBS forwarded to or received from a partner, one row per partner (a bulletin sent to three hubs shows three times).
+  Hover a block for its counts.
+- **Refresh queue**, **+ Add** and **Manage** (edit or remove). Adding and removing partners asks for the admin login. This list is stored on the server in `data/stations/partners.json`. It's separate from the propagation scheduler's list (Section 19).
+- **Connect Watchdog** (v1.5.35, optional, *Installation Manual* §10.1):
+  - After 2 failed attempts in a row, the watchdog pauses forwarding to that partner for 6 hours; its mail waits in the queue. It then enables it again.
+  - If the partner connects to you during the pause, the pause ends within 5 minutes (v1.5.38).
+  - The partner's row shows ⚠ *N failed attempts*, or **Paused until HH:MMZ** in red.
+  - Maintenance → *Connect Watchdog* has the status, dry-run and resume commands.
 
-- **Filters** — partner, type (bulletin, personal, traffic), **Via** and **Status**.
-- **Via** — how it travelled: 📡 RF (VARA), 🔗 NET/ROM, 🛰 AXIP, 🌐 Telnet, 📻 AX.25 or "Port N". *RF only* is the default. Outbound messages are matched to the connect script in `bpq32.cfg`, so the column is right in both directions.
-- **📮 Winlink (CMS)** (v1.5.24) — your BBS's Winlink traffic with the CMS (forwarding partner **RMS**), by either route: 🌐 Telnet = over the internet, 📻 AX.25 (or 📡 RF) = through an RF gateway when the internet route failed (*Installation Manual* §10.14). The *To* column shows the route, e.g. `WINLINK@CMS` or `WINLINK@KP2L-10`; *From* is the sender BPQ logged. These rows aren't in *RF only*, which counts VARA HF partners.
-- **Status** — ✅ delivered (default), ⛔ rejected (the partner already had it), ⏸ deferred, or all offers. Most rejections are normal: partners refuse duplicates they've already received from someone else.
-- **Received** — when the transfer finished (UTC) and how long after the offer.
-- Counts everywhere on the page (partner tiles, cards, charts) are **delivered** messages, not offers.
-- After upgrading from an older version, older messages can show no Via or Status until the one-time re-scan in the Installation Manual's "Updating to a newer version" has been run.
+### 7-day history (click any callsign)
 
-### 📊 HUB Station Propagation Report
+Clicking a callsign opens a panel from the right side; it works from the partner rows, Recent connections and the Stations table. Close it with ×, Close or Esc. It always covers the last 7 days, whatever range is selected. It shows:
 
-**📈 Generate Report** builds a 7-day analysis of your forwarding partners in a pop-up you can print: failure analysis, an hourly performance heatmap, daily performance, a station × band matrix, band efficiency, time-of-day analysis and recommendations.
+- the successful and failed sessions, average S/N and bands used;
+- one block per day, as in the partner rows;
+- messages waiting for that partner and any watchdog pause or failures;
+- band activity and the **most efficient band**, with the best time of day;
+- the **connection timeline**: date, UTC time, band, frequency, **modem** (VARA or Mercury, v1.5.46), status, S/N, modem rate and effective throughput (v1.5.64). Hover a Mercury status for its link mode and how the call ended. The successful/failed counts and the day blocks include Mercury calls; the most efficient band is worked out from VARA sessions only;
+- shortcuts: **Show on map**, **In propagation report**, **Messages with this station** (Forwarded messages filtered to it) and **Look up callsign** (QRZ.com).
 
-### 🌍 Geomagnetic Conditions
+### Modems
 
-From NOAA SWPC: the K-index now, the daily A-index, solar flux and sunspot number; a storm banner when conditions are disturbed; the K-index for the last 3 days and the A-index for the last 30 days, colour-coded from quiet to major storm. Refreshed every 15 minutes.
+A full-width card under the forwarding partners, one modem per column side by side (v1.5.48; they stack on a phone).
 
-### 🎯 Best Band Recommendations
+- **VARA HF:**
+  - **Active** when there was a good session in the last 24 hours, otherwise **Quiet**;
+  - the last good session and the last attempt, with how long ago;
+  - today's good sessions out of all (UTC day).
+- **Mercury HF** (v1.5.43, only on stations running the **Mercury** HF modem as a LinBPQ port, *Installation Manual* §10.17). The states:
+  - 🟢 **On air**: Mercury runs and LinBPQ is attached to its TNC.
+  - 🟢 **In session**: connected with the station shown.
+  - 🟠 **LinBPQ not attached**: check the port's `ADDR 127.0.0.1 8400` line in `bpq32.cfg`, then restart LinBPQ.
+  - 🔴 **No audio**: Mercury says the radio's sound card delivers nothing. If the card is shared with VARA, check that VARA still runs.
+  - 🔴 **Modem not running**: `systemctl status mercury`.
 
-The best band for each 4-hour UTC slot (00–04Z, 04–08Z, …), from your own success history over the last 30 days blended with current conditions and day/night patterns. It doesn't change with the range buttons.
+  Below the state: Mercury's version, its LinBPQ port and callsign, then:
+  - the current session (from/to, since when; hover for frames, bytes and the S/N range), or a call in progress;
+  - the **last session** (hover for its mode, times, bytes sent and received, and how it ended; ⚠ when nothing came back or it timed out);
+  - **Calls (24 h)**: connected / attempts, in and out. It turns amber when some didn't complete. A call heard but *not completed* is usually LinBPQ's frequency scan moving on before the link was set up (*Installation Manual* §10.17, "Scanning");
+  - **Last decode**: the S/N of the last frame Mercury decoded, from any station;
+  - **Last transmit**;
+  - **Listening** on/off. LinBPQ switches it every few seconds while it scans, and while the VARA port on the same radio is busy. Hover for how many partly received frames those scan hops cut in 24 h;
+  - errors in the last 24 h (hover for the newest);
+  - **Recent activity**, newest first, UTC: calls ↗ ↘, calls not completed ↘✕ (grouped per caller, ×n), connects 🔗, disconnects ✕ (with why), LinBPQ attaching / detaching ⇄ (each LinBPQ restart), audio 🔊, starts and stops.
 
-### 📍 Station Map
+  The card is read from Mercury's log; the dashboard never connects to Mercury. Since v1.5.46 its calls are also in Recent connections, the partner rows and the activity chart (*Mercury calls on this page*, below). `config.php` `'mercury' => ['enabled' => false]` hides the card and stops the calls being read. For a live waterfall and S/N on the station's own desktop, Mercury's built-in monitor can be switched on with `tools/mercury-monitor.sh` (v1.5.49, *Installation Manual* §10.17); it isn't part of this page.
+- **Data2G HF** (v1.5.56, only on stations running the **Data2G** HF modem as a LinBPQ port, *Installation Manual* §10.18). The same states as Mercury's: 🟢 **On air** / **In session**, 🟠 **LinBPQ not attached** (check the port's `ADDR 127.0.0.1 8500` line, then restart LinBPQ), 🔴 **No audio** (Data2G says its sound card input ended: `sudo systemctl restart data2g`), 🔴 **Modem not running** (`systemctl status data2g`).
 
-Every station you've connected with, coloured by success rate, plus your own station (🏠). Click a dot for its details; 🛤️ **Best Paths** draws your best paths.
+  Below the state: Data2G's version, its LinBPQ port and callsigns, then:
+  - the current session (hover for bursts heard, the waveform and the S/N range), or a call in progress;
+  - the **last session** (hover for its waveform, times, bytes each way, S/N range and who hung up; ⚠ when nothing moved);
+  - **Calls (24 h)**: connected / attempts, in and out. Data2G **turns a call away** when LinBPQ has its listening off (scanning another frequency, or VARA or Mercury using the radio) or when it's busy with another station; every try counts, so a caller who tried 5 times shows 0/5;
+  - **Last heard**: the S/N of the last burst Data2G decoded and its waveform;
+  - **Last transmit**, **Listening** on/off;
+  - **Monitor page**: its port once `tools/data2g-monitor.sh` has switched it on (⚠ if it isn't kept to this machine);
+  - errors in the last 24 h, ⚠ when the service doesn't run in UTC;
+  - **Recent activity**, newest first, UTC: calls ↗, callers turned away ↘✕ (grouped, ×n, with why), connects 🔗, disconnects ✕ (we hung up / the other station hung up / ended by LinBPQ), LinBPQ attaching / detaching ⇄, audio 🔊, starts and stops.
 
-- Locations come from QRZ.com (when `qrz` is set in `config.php`) or callook.info for US calls. Stations without a location are listed as **Unmapped**; click one, or **+ Add Location**, to place it by hand. Saving or removing locations asks for the admin login.
-- Your own marker comes from the `station` section of `config.php` (callsign and grid square); public pages show the centre of the grid square, never your exact position. Check after installing that it isn't still a placeholder.
+  The card is read from Data2G's log `/var/log/data2g/data2g.log` and its service file; the dashboard never connects to Data2G. Its calls are also rows on the page (*Data2G calls on this page*, below). `config.php` `'data2g' => ['enabled' => false]` hides the card and stops the calls being read. Data2G's own **monitor page** (waterfall, constellation, every burst with S/N, decoded packets; with a password) can be switched on with `tools/data2g-monitor.sh` for the station's desktop (*Installation Manual* §10.18); it isn't part of this page.
+- **VHF packet** (v1.5.28): one block per LinBPQ port that uses a KISS-over-TCP sound modem (QtSoundModem, Direwolf), named from `bpq32.cfg`. The states:
+  - 🟢 **On air**: the modem is running and LinBPQ is connected to it;
+  - 🟠 **LinBPQ not connected**: restart LinBPQ;
+  - 🔴 **Modem not running**: check the modem's service, e.g. `systemctl status qtsoundmodem`.
 
-### Charts and tables
+  Below the state:
+  - the newest station in BPQ's MHeard list for that port;
+  - the watched stations on that port (Section 14), with ⚠ when one has been quiet too long;
+  - **Heard today**: every station heard on that port in the period, newest first, with its UTC time. With 7, 30 or 90 days it adds the date. 🔗 marks a station BPQ flags as having connected. BPQ keeps each station once, with its last time, so it's a list of stations, not of every contact.
 
-- **Hourly RF Connections & Messages (UTC)** and **Hourly Band Activity (UTC)**.
-- **Band Summary** — sessions, success and failures per band.
-- **📡 VARA Channel Quality** — per band: average, median and best bitrate, the modulation tier that bitrate implies (BFSK/BPSK up to 32QAM), average S/N, and whether S/N and bitrate are rising or falling compared with earlier in the range.
-- **Recent Connections** — time, callsign, type, frequency, band, status, S/N, bitrate and TX/RX time, with a callsign search and pages. A Failures-card filter (above) narrows it to one kind of failure.
+  Setting such a port up: *Installation Manual* §10.13; checks: Maintenance → *Sound modem*.
+
+The Mercury, Data2G and VHF cards update every minute and are hidden on stations that don't have them.
+
+### Conditions (across the page, under the partners)
+
+- **From NOAA SWPC** (left): the current K-index, the daily A-index, solar flux and sunspot number, refreshed every 15 minutes.
+- **Best band by time of day** (right, six slots side by side): the best band for each 4-hour UTC slot (00–04Z, 04–08Z, …), with each band's success bars. The slot you're in now is outlined.
+  - It comes from your own success history over the last 30 days, blended with current conditions and day/night patterns.
+  - It doesn't change with the range buttons.
+  - **Show best paths on map** opens the Map tab with the paths drawn.
+
+### Activity by hour (UTC)
+
+Connections (good and failed) and messages sent and received for each UTC hour in the range, with totals and the peak hour underneath. With Mercury, a teal **Mercury** bar shows its calls per hour, and a tile underneath gives **Mercury good / calls** for the range (v1.5.46). Data2G gets an orange **Data2G** bar and a **Data2G good / calls** tile the same way (v1.5.56).
+
+### Tabs
+
+- **Recent connections:** every session in the range, newest first: time, callsign (click it for its 7-day history), type, **modem**, frequency, band, status, S/N, **Modem rate**, **Effective** and TX/RX, with a callsign search and pages. A failure chip (above) narrows it to one kind of failure (VARA sessions only, like the chips). With Mercury, Data2G or VHF packet, a **Modem** menu shows all, or one modem only (v1.5.46; VHF v1.5.51; Data2G v1.5.56).
+  - **Frequencies** are shown to 100 Hz (v1.5.54): the dial frequency of the RADIO command for an outgoing call, or LinBPQ's "Freq" for an incoming one. Rows from before v1.5.54 are rounded to the kHz until re-read.
+  - **Modem rate and Effective** (v1.5.64): *Modem rate* is each modem's own figure and they measure different things: VARA's is the fastest speed level it reached in the session (the mode's rate, not data delivered); Data2G's is the data it delivered and had acknowledged over its best minute; Mercury logs none. *Effective* is worked out the same way for every modem: bytes both ways × 8 over the seconds connected (VARA's Session Time; for Mercury and Data2G the time the link was up). Compare modems with Effective. It counts turnarounds, acknowledgements and idle time, so a short mail check reads far lower than the link could carry. VARA's statistics elsewhere on the page (Bands and channel quality, path scores, the propagation report) still use VARA's own rate, and Data2G's figure no longer mixes into them.
+  - **VHF packet rows** (v1.5.51, indigo **VHF** chip): AX.25 connects on a packet port (QtSoundModem, Direwolf, UZ7HO SoundModem or a hardware TNC). They include your BBS's outgoing connects (for example the Winlink fallback to a VHF gateway), calls into the BBS, calls into the node that were heard on the VHF port, and the scheduled **test connects** (marked *test connect*). Status is ✓ or ✗ *no answer* / *busy*, with the length. There's no S/N, bitrate or byte count, because LinBPQ doesn't log them for AX.25. VHF rows also show in the partners' 7-day blocks and the 7-day history, but never in the headline numbers.
+- **Forwarded messages** (the count is on the tab): every message your BBS forwarded to or received from a partner, one row per partner, so a bulletin sent to three hubs shows three times.
+  - **Filters:** partner, type (bulletin, personal, traffic), **Via** and **Status**.
+  - **Via** is how it travelled: 📡 RF (VARA), 🔗 NET/ROM, 🛰 AXIP, 🌐 Telnet, 📻 AX.25 or "Port N". *RF only* is the default. Outbound messages are matched to the connect script in `bpq32.cfg`, so the column is right in both directions.
+  - **📮 Winlink (CMS)** (v1.5.24) is your BBS's Winlink traffic with the CMS (forwarding partner **RMS**), by either route: 🌐 Telnet over the internet, or 📻 AX.25 / 📡 RF through an RF gateway when the internet route failed (*Installation Manual* §10.14). These rows aren't in *RF only*.
+  - **Status:** ✅ delivered (the default), ⛔ rejected (the partner already had it), ⏸ deferred, or all offers. Most rejections are normal: partners refuse duplicates they've already received from someone else.
+  - **Received** is when the transfer finished (UTC) and how long after the offer.
+  - Counts everywhere on the page are **delivered** messages, not offers.
+- **Propagation report:** a 7-day analysis of your forwarding partners, built when you open the tab:
+  - failure analysis, an hourly performance heatmap and daily performance;
+  - a station × band matrix, band efficiency and time-of-day analysis;
+  - recommendations.
+
+  **Rebuild** builds it again; **Print / PDF** prints it.
+- **Map:** every station you've connected with, coloured by success rate, plus your own station (🏠). Click a dot for its details; **Best Paths** draws your best paths. The map opens centred on your station (🏠), zoomed out just far enough to show the stations around it (v1.5.52). Since v1.5.53 it also shows **Mercury HF** calls as a teal dashed line and **VHF packet** calls as an indigo dotted line from your station, and since v1.5.56 **Data2G HF** calls as an orange dash-dot line. Each modem keeps its own line also when its calls count in the headline numbers (`in_headlines`; v1.5.59 — before, they were drawn as VARA lines then). A station reached only by one of them gets a teal, orange or indigo dot. Click a line or dot for that modem's calls, how many connected, the bands, the bytes (Mercury, Data2G) and the last call. Lines for calls that never connected are drawn faint. VARA lines and dots are unchanged, coloured by success rate.
+  - Locations come from QRZ.com (when `qrz` is set in `config.php`) or callook.info for US calls.
+  - Stations without a location are listed as **Unmapped**. Click one, or **+ Add Location**, to place it by hand; **Manage Saved Locations** edits, imports or exports them. Saving or removing locations asks for the admin login.
+  - Your own marker comes from the `station` section of `config.php` (callsign and grid square). Public pages show the centre of the grid square, never your exact position.
+- **Bands and channel quality:**
+  - the hourly band activity grid;
+  - **Band Summary**: sessions, success and failures per band;
+  - **VARA Channel Quality**, per band: average, median and best bitrate, the modulation tier that bitrate implies (BFSK/BPSK up to 32QAM), average S/N, and whether they're rising or falling.
+- **Geomagnetic history:** any storm activity in the last 24 hours, the K-index for the last 3 days and the A-index for the last 30 days, colour-coded from quiet to major storm.
+- **Modem performance** (v1.5.63): how VARA HF, Mercury and Data2G have done over the last 7, 14 or 30 days (**Show**), from this station's own connection records and NOAA's daily geomagnetic data.
+  - A line per modem (success rate, connections) and how quiet or disturbed the geomagnetic field was, then a card per modem: success rate, passed / attempted, median S/N of the good sessions, bytes moved, stations.
+  - **Every connection, by S/N, against the planetary K index:** a dot per connection that passed traffic at its S/N, squares for good sessions with no S/N (Mercury), crosses for failed calls, over shading for the 3-hourly planetary Kp (amber from Kp 2, red from Kp 5). Hover a mark for the station, band, frequency, result, bytes and Kp.
+  - **How each modem's calls ended:** passed traffic, connected but nothing passed, no answer or busy, other (turned away, not completed, restart).
+  - **Success rate by band**, with passed / attempted (hover for the median S/N).
+  - **Day by day:** planetary and Fredericksburg A index (amber from 16, active; red from 30, storm), the highest Kp, and per modem passed / attempted and median S/N.
+  - **Effective throughput** (v1.5.64) on each card: the median of the good sessions, and of the *message sessions* (500 bytes or more, so mail checks don't pull it down), bytes × 8 over the time connected, the same sum for every modem.
+  - **Head to head: the same station on the same band:** where a station has worked you on one band with more than one modem, each modem's passed / attempted and median effective throughput side by side. The fairest comparison, since the path and the station are the same.
+  - **What the numbers say:** worked out from the figures: each modem's best band, how many failures were unanswered calls (schedules rather than link quality) or links that carried nothing, and, once at least 5 calls fall in disturbed periods (Kp 4 or more), success and S/N then against quiet periods.
+  - S/N isn't comparable between modems (VARA measures it over a wider bandwidth). Incoming VARA calls only appear once connected. NOAA's file covers 30 days. Notes under the findings say so.
+- **VHF paths** (v1.5.50): a propagation history for each watched station (Section 14), one grid per station. It has one row per UTC day, newest at the top, and one column per UTC hour.
+  - **Green cells:** how often the station was heard in that hour, from the 5-minute MHeard poll (light: once; mid: 2–3 times; dark: 4 or more; grey: not heard).
+  - **✓ / ✗:** a scheduled **test connect** in that hour answered (✓), or got no answer or a busy (✗, red outline). Hover a cell for the times, seconds to connect and the node's answer.
+  - The line above each grid gives the last heard time, how many hours it was heard in, and how many test connects answered with their average time.
+  - **Show** picks 7, 14, 30 or 90 days. Hearings are kept 90 days (`system_logs.history_days`).
+  - Test connects are only made for a watched station with **Test connect** set on Admin → Maintenance → Watched stations (every 1–24 hours, on a port). They **transmit**, so use them only with the other station's sysop's agreement: a Winlink gateway opens a CMS session for every connect.
+- **Packet Live NetRom/Node Map** (v1.5.62): the live map of packet nodes and their NetRom links from the UK Packet Radio Network (`https://nodes.ukpacketradio.network/maps/packet`), shown inside the page. It's their data, not this station's, and it's only loaded when you open the tab. **Open in a new tab ↗** shows it full size; use it too if the map stays blank (the site can stop other pages showing it).
+
+The page remembers the last tab you used, except the propagation report, which is only built when you choose it.
+
+### Mercury calls on this page (v1.5.46)
+
+On stations running the Mercury HF modem (*Installation Manual* §10.17), every Mercury call is a row in the same table as the VARA sessions, read from Mercury's own log every 5 minutes by `scripts/parse-mercury-log.py` (Section 24).
+
+- **Where they show:** Recent connections (with **Mercury** in the Modem column), the partners' **Last good** time (v1.5.47) and 7-day blocks, the 7-day history panel and the hourly activity chart.
+- **Where they don't (by default):** the headline numbers (success rate, failures and their chips, average S/N, stations), Best band, Bands and channel quality, the propagation report and the Station report. Mercury and VARA calls aren't alike (Mercury logs no S/N for the session and no bitrate, and its scan hops leave many short failed calls), so mixing them would change what those numbers mean. To count Mercury there too, set `'in_headlines' => true` in the `mercury` section of `config.php`.
+- **What a Mercury row shows:**
+  - the frequency and bandwidth from LinBPQ's BBS log ("Incoming Connect … Freq …", or the RADIO line before an outgoing call). A call that never connected usually has no frequency;
+  - the bytes each way;
+  - the result in plain words: ✓ **ended normally**, ✓ **the other station hung up**, ✓ **we hung up** (LinBPQ ended it once nothing was left, v1.5.55), ⚠ **traffic passed, link lost before sign-off** (v1.5.61: data moved, then the link timed out before the call was closed; counts as a success, but LinBPQ may offer the last message again), ✗ **call not completed** (an incoming call that didn't come up, often LinBPQ's scan moving on), ✗ **no answer** (our call), ✗ **nothing received** (the link came up but carried nothing), ✗ **LinBPQ restarted** or **Mercury restarted** (a call cut off).
+  - Hover the status or the Mercury chip for the link mode (e.g. DATAC16) and bandwidth.
+- **No S/N and no modem rate** for Mercury rows: Mercury doesn't log them per session. *Effective* (v1.5.64) is worked out from its bytes and the time the link was up. The Mercury card shows the S/N of the last decoded frame.
+- The **Classic view** shows VARA sessions only.
+
+### Data2G calls on this page (v1.5.56)
+
+On stations running the Data2G HF modem (*Installation Manual* §10.18), every Data2G call is a row in the same table, read from Data2G's log every 5 minutes by `scripts/parse-data2g-log.py` (Section 24). They show and stay out of the same places as Mercury's (above): an orange **Data2G** chip in Recent connections, the partners' **Last good** (· Data2G) and 7-day blocks, the 7-day history, the activity chart and the Station Map; not in the headline numbers unless `'in_headlines' => true` in the `data2g` section of `config.php`.
+
+- **What a Data2G row shows:** the frequency and bandwidth from LinBPQ's BBS log (as for Mercury), bytes each way from Data2G's session summary, the **S/N** (the average of the bursts heard from the other station) and Data2G's own **rate** (the data delivered over its best minute, shown as *Modem rate*; v1.5.64: not comparable with VARA's, use *Effective*). The time the link was up is stored too (`link_sec`), so Effective doesn't count the connect tries.
+- **The result in plain words:** ✓ **we hung up** (LinBPQ ended it: DISCONNECT, or ABORT once it was done), ✓ **the other station hung up**, ⚠ **traffic passed, link lost before sign-off** (v1.5.61: data moved and was acknowledged, then nothing more was heard, LINK_LOST, before the sign-off; counts as a success, but LinBPQ may offer the last message again), ✗ **turned away** (a call to us while we weren't listening or were busy; a caller's tries within 2 minutes are one row — hover for why), ✗ **no answer**, ✗ **busy** / **not listening** (the station we called), ✗ **nothing received** (hover: *nothing heard from the other station* when Data2G gave up waiting, LINK_LOST), ✗ **LinBPQ restarted** / **Data2G restarted**.
+- Hover the status or the chip for the data waveform used most (e.g. `qpsk-r1/3`; v1.5.57: the data bursts', not the control bursts'), bandwidth, S/N and how it ended.
+- When LinBPQ ends a call with ABORT, Data2G writes no byte totals; the row then counts as good when data went either way (or uses the per-minute figures the service logs with `--stats-interval 60`).
 
 ### How to use it
 
 > 👤 **For visitors:** a live picture of HF propagation and of one station's forwarding network.
 
-> 📡 **For sysops:** check it before a VARA session — current conditions, the best band for the hour, how a partner has been doing — then open the VARA HF Terminal. Use the partner tiles and Forwarded Messages to spot a partner that has gone quiet or a queue that is building up.
+> 📡 **For sysops:** check it before a VARA session — the status strip, current conditions, the best band for the hour, how a partner has been doing — then open the VARA HF Terminal. The partner rows put a partner that has gone quiet, failed or has mail waiting at the top.
 
 ### Where the data comes from
 
@@ -758,7 +917,7 @@ Statistics and a searchable viewer for BPQ's daily logs, plus BPQ's live MHeard 
 - **Live Log Viewer** — the BBS log lines themselves: callsign search, event type (connections, disconnects, messages, errors), date range (today to 30 days), and 📄 **PDF Report**.
 - **Most Active Stations**.
 - **📻 Latest MHeard Stations** — stations BPQ has heard, one tab per BPQ port, with last heard and bytes, and grid, band and frequency where BPQ records them (VARA/ARDOP ports). Since v1.5.22 the tabs are your own ports, named from the `ID=` line of each PORT in `bpq32.cfg` (e.g. "VHF Packet 1200"); a port that has heard stations but isn't in the file shows as "Port N". If the web server can't read `bpq32.cfg`, name them in `config.php` → `'system_logs' => ['port_names' => [4 => 'VHF 1200']]`. The list is live (v1.5.25): every 5 minutes the dashboard logs in to the node with `bbs.user` and reads `MHU` for each port, and merges that with BPQ's `MHSave.txt` (which keeps bytes, grid and frequency); a station heard a minute ago shows within about 5 minutes. Switch the live reading off on **Admin → Maintenance → Watched stations** (v1.5.26), or with `'system_logs' => ['live_mheard' => false]` in `config.php`.
-- **👁 Watched stations** (v1.5.25), above the tabs: stations you want to know have gone quiet, e.g. a Winlink gateway you use as a backup. 👁 green = heard within its limit; ⚠ amber = not heard for longer, or never. Listen only: nothing is transmitted. Set them on **Admin → Maintenance → Watched stations** (v1.5.26): callsign with SSID, the port (or any), and after how many hours to flag it. (Before v1.5.26: `config.php` → `'system_logs' => ['watch' => [['call' => 'KP2L-10', 'port' => 4, 'hours' => 6]]]`; that list is still used until the Maintenance page saves one.) A watched station on a sound-modem port is also shown in that port's block of RF Connections' *VHF Connections Status* card.
+- **👁 Watched stations** (v1.5.25), above the tabs: stations you want to know have gone quiet, e.g. a Winlink gateway you use as a backup. 👁 green = heard within its limit; ⚠ amber = not heard for longer, or never. Listen only: nothing is transmitted. Set them on **Admin → Maintenance → Watched stations** (v1.5.26): callsign with SSID, the port (or any), and after how many hours to flag it, and optionally **Test connect** every 1–24 hours (v1.5.50, needs a port; it transmits). Every hearing is now kept, and RF Connections → **VHF paths** shows them hour by hour with the test connects (v1.5.50). (Before v1.5.26: `config.php` → `'system_logs' => ['watch' => [['call' => 'KP2L-10', 'port' => 4, 'hours' => 6]]]`; that list is still used until the Maintenance page saves one.) A watched station on a sound-modem port is also shown in that port's block of RF Connections' *VHF Connections Status* card.
 - **🗺️ Known Stations Routing Table** — BPQ's known stations, searchable, filtered by age (24 hours, 7 days, 30 days, stale).
 
 ### How to use it
@@ -820,6 +979,20 @@ Your radio as flrig sees it, updated every 3 seconds.
 - **📡 Scan Frequencies** — the channels LinBPQ scans, read from the FLRIG `RADIO` block in `bpq32.cfg` (`radio.bpq_radio` chooses the block). With several time bands, the one running now (UTC) is highlighted; during a VARA keyboard session the card says the scan is paused.
 - **⚡ Radio Control** — the PTT indicator (RX / TX), and, if you have a network power switch, the outlet state with ⏻ **Power ON**, ⏻ **Power OFF** and ↺ **Reboot**. The 🔒 button unlocks these with the BBS password. Off and Reboot are refused while the radio is transmitting.
 
+### 🎛️ Radio settings (Yaesu FTdx-3000, v1.5.60)
+
+Below the other cards: the radio's settings that matter to the data modems (VARA HF, Mercury, Data2G), read through flrig, so nothing competes with LinBPQ for the radio's CAT port. The card **only appears when flrig reports an FTdx-3000** (`FTDX3000`), because these commands differ between models; with another radio, or without flrig, the page doesn't show it (v1.5.66). To hide it on an FTdx-3000 station too: `'settings_panel' => false` in the `radio` section of `config.php`.
+
+- **Live transmit meters** — tick **Live** to read ALC, PO, SWR and COMP every 1.5 seconds (the radio's own 0–255 scale). They move only while the radio transmits: watch ALC while a modem sends, and turn the modem's output down if the bar goes orange or red.
+- **Receive** — width (the list flrig gives for the current mode; 2400 Hz keeps all of a 2300 Hz modem signal), narrow, IF shift, roofing filter, IPO / AMP 1 / AMP 2, attenuator, AGC.
+- **Noise and notch** — noise blanker, noise reduction and its level, auto notch, manual notch and its frequency.
+- **Transmit** — RF power (changed in 🔆 TX Power), speech processor and monitor (shown only; set them on the radio).
+- Each row has a ✓ or ⚠ hint for data use: the noise blanker, noise reduction, the notches and the processor should be off, the width 2400 Hz.
+- **Data menu (check on the radio)** — the FTdx-3000 doesn't answer menu (EX) reads through flrig, so the page lists the data menu items (067 DATA MODE to 079, 103, 104) with what each does, to check on the front panel.
+- **Recent changes** — the last 25 changes made from the page, with the radio's reading afterwards.
+
+Changes need the same 🔒 unlock in Radio Control (the BBS password, 1 hour). A change is refused, with the reason, while the radio is transmitting, if it transmitted in the last 45 seconds, or while Mercury or Data2G is in a session: the badge then shows **⏳ Busy**. Each change is read back from the radio and logged with the address it came from (`cache/rig-control-log.jsonl` and the web server's error log, `[rig-control]`).
+
 The power switch is set in `config.php` under `smartplug` (`host`, `user`, `pass`, `outlet`) — written for a Synaccess NP-05B-style switch (*Installation Manual* §10.7). Without one (`host` empty, as in `config.php.example`) the outlet shows **Not set up**, nothing is contacted, and the power buttons answer *No power switch is set up*. "Unknown" means a switch is set but didn't answer.
 
 ### How to use it
@@ -827,6 +1000,7 @@ The power switch is set in `config.php` under `smartplug` (`host`, `user`, `pass
 - Before keying up, confirm the radio is on the expected frequency and mode.
 - **Stuck PTT:** if PTT shows TX with no transmission scheduled, look at the radio and the cabling.
 - **Scan check:** on a scanning station the frequency should follow the highlighted time band.
+- **Data check:** with the radio idle, look down the ✓ / ⚠ hints in Radio settings before a schedule; fix any ⚠ with the control next to it.
 
 ### When flrig is offline
 
@@ -930,13 +1104,15 @@ Commands use the installer's defaults (`/var/www/bpq-dashboard`, database `bpqda
 - **Database & credentials** — test the database login exactly the way the pages and the parsers use it, file permissions for `db-config.php`, backups (kept outside the web root) and changing the database password.
 - **Log parsers** — dry runs and rebuilds for the RF Connections, Traffic and System Logs parsers, and how to tell whether they're keeping up.
 - **Backups** (v1.5.34; set-up command v1.5.42) — **optional, recommended.** `sudo bash <web root>/scripts/bpq-backup-setup.sh` sets up a nightly encrypted backup to a separate drive (*Installation Manual* §10.16); the section then shows the station's last backup as the backup reports it: when the last good one finished, whether the last run failed and why, the snapshot, and the backup drive's free space. Green **Up to date**; amber when the last good backup is older than 36 hours or the drive is 90% full; red when the last run failed. The dashboard doesn't make backups itself; setting one up and the small status file it writes: *Installation Manual* §10.16.
-- **Connect Watchdog** (v1.5.35) — status, dry run, resume / pause by hand, schedule and log for the script that pauses a forwarding partner for 6 hours after 2 failed attempts in a row.
-- **Watched stations** (v1.5.26) — add, change or remove the stations System Logs and RF Connections flag when they go quiet, see when each was last heard, and switch live MHeard on or off. Saved in `data/system-logs.json`.
+- **Connect Watchdog** (v1.5.35) — status, dry run, resume / pause by hand, **test notice** (v1.5.45: sends one test BBS message), schedule and log for the script that pauses a forwarding partner for 6 hours after 2 failed attempts in a row.
+- **Mercury HF modem** (v1.5.43, optional) — service status and LinBPQ attached, its log without the LISTEN lines, the firewall rule that keeps its ports local, checking the shared sound card, restarting it.
+- **Data2G HF modem** (v1.5.56, optional) — service status and LinBPQ attached, reading its log, switching on its monitor page (`tools/data2g-monitor.sh`), restarting it and the transmit level.
+- **Watched stations** (v1.5.26) — add, change or remove the stations System Logs and RF Connections flag when they go quiet, see when each was last heard, and switch live MHeard on or off. **Test connect** (v1.5.50) sets a scheduled connect every 1–24 hours (off by default; needs a port; it transmits), with the last result under it. Saved in `data/system-logs.json`.
 - **Email Client database** — **PKTNET forms**: installed vs the author's latest version, **Update forms** and **Undo** (v1.5.19); the schema check that 📌 pinned folders need, counts of saved message text and kept-after-kill copies, folder sizes, what the "⚠ killed on BBS" label really means, and the NTS and bulletin-folder diagnostics.
 - **Bulletin retention** — preview, run or review the daily 14-day clean-up.
 - **NTS forwarding report, RF forwarding queue, Rig Status & RF Power Monitor (flrig), VARA HF Terminal, VARA callsign validator, White Pages clean-up, YAPP, LinBPQ sysop commands** — troubleshooting for each feature.
 - **Propagation scheduler & storm monitor** — only if you run them.
-- **Forwarding partners editor** — edits `data/partners.json`, which the propagation scheduler and storm monitor read. Enter the BBS password from `config.php` and load; every save keeps the previous file in `data/backups/`. Five wrong passwords in 15 minutes lock it for the rest of the 15 minutes. (The partner tiles on the RF Connections page are a separate list, saved by that page in `data/stations/partners.json`.)
+- **Forwarding partners editor** — edits `data/partners.json`, which the propagation scheduler and storm monitor read. Enter the BBS password from `config.php` and load; every save keeps the previous file in `data/backups/`. Five wrong passwords in 15 minutes lock it for the rest of the 15 minutes. (The forwarding partners on the RF Connections page are a separate list, saved by that page in `data/stations/partners.json`.)
 - **Firewall & Audit sudo rules, Chat, APRS map & beacon, callsign lookups** — installing and testing the read-only sudo rules, the chat daemon's status, APRS-IS / beacon status and the CARTO key, and the QRZ login test.
 - **Install check, updates & backups** — the installed version and the latest release (⟳ *Check for a new release*), and the three commands that update in place with `update.sh` (v1.5.19; `--dry-run` first, `--rollback` to undo).
 - **Web server & PHP, Permissions, updates & backups, disk** — including which nginx file is really live and why `set-permissions.sh` is for first installs only.
@@ -974,6 +1150,8 @@ Shows which ports on the server can be reached, and from where.
 ### Tips
 
 - **Needs the read-only sudo rules** (`www-data-tools.sudoers`; `install.sh` offers to install them, or see the Installation Manual §11). Without them the page says what it couldn't read instead of showing zeros.
+- **Mercury HF** (v1.5.43) — its ports (8400–8402 on K1AJD's setup) are labelled *keep local*: Mercury listens on every interface with no password, so they should show **Blocked** (a DROP rule, *Installation Manual* §10.17).
+- **Data2G HF** (v1.5.56) — its ports (8500, 8501, 8510 and the monitor page 8520 on K1AJD's setup) are labelled *keep local*. Data2G listens on 127.0.0.1 only (`--listen 127.0.0.1` in its service), so they shouldn't appear as listening on the network at all.
 - **Station ports** — BPQ telnet / FBB (8010 / 8011 by default) send passwords unencrypted, and MariaDB, flrig and the dashboard's WebSockets should never be public. If one shows Public, close it or allow it only from your LAN.
 - **No firewall yet?** `sudo bash /var/www/bpq-dashboard/tools/setup-firewall.sh` sets up ufw with questions for each port (v1.5.19; the installer offers it as an optional last step). See Maintenance → *Firewall setup*.
 - Reachability is worked out from the rules (including ufw and fail2ban chains); a port forward on your router is still needed for anything to arrive from outside.
@@ -992,7 +1170,7 @@ Reads the server's logs from the browser, no SSH needed.
   - **Dashboard services** — bpq-telnet (Telnet Client and YAPP; passwords are redacted), bpq-vara, the message-text job, the Email Client's BBS sessions, the Dashboard log (NWS Post to BBS), NWS auto-post. Since v1.5.19 these are in `/var/log/bpq-dashboard/`, not LinBPQ's logs folder; until a new file has something in it, the viewer shows the older copy in `logs/`.
   - **Log parsers** — RF Connections, Traffic and System Logs parsers (every 5 minutes).
   - **Forwarding tools** — prop-scheduler, storm monitor, connect watchdog and its state, White Pages auto-clean (only if you run them).
-  - **VARA** — the VARA session log (config.php `logs.vara_file`), **VARA download** (v1.5.19, when the log comes from the TPRFN server) and the callsign validator.
+  - **VARA** — the VARA session log (config.php `logs.vara_file`), **VARA download** (v1.5.19, when the log comes from the TPRFN server) and the callsign validator, and **Mercury HF** (v1.5.43) and **Data2G HF** (v1.5.56), only where they are installed.
   - **BPQ Node** — today's BBS, TCP, Connect and CMS logs, and earlier BBS logs by date.
   - **System** — the web-server error log (PHP errors land here too) and the auth log.
   Each entry shows its size and last change; hover for what it is and where it lives. Logs for features you don't use say **not used here**.
@@ -1025,6 +1203,10 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 **Database:** connection exactly as the pages make it; the Email Client, RF Connections, Traffic and System Logs tables; the 2026-09/10 updates (📌 keep, Forwarded Messages "Via" and delivery status); data size against the InnoDB buffer pool; whether MariaDB listens on the network.
 
+**Mercury HF** (v1.5.43, only where Mercury is installed): OK when it runs with LinBPQ attached; Warn when it isn't running, LinBPQ isn't attached or its sound card delivers no audio. **Mercury TNC kept local** (Security): OK when a firewall rule drops its ports from the network; Warn when none does. Mercury listens on every interface with no password, so anyone who reaches it can key the transmitter; the fix line adds the rule.
+
+**Data2G HF** (v1.5.56, only where Data2G is installed): OK when it runs with LinBPQ attached; Warn when it isn't running, LinBPQ isn't attached, its sound card input ended, or its service has no `TZ=UTC` on a server that isn't on UTC. **Data2G TNC kept local** (Security): OK when its service has `--listen 127.0.0.1`. **Data2G monitor page kept local**: OK when the page listens on 127.0.0.1 (or a firewall rule drops it). **Data2G calls read into RF Connections** (Logs): as for Mercury.
+
 **Connect Watchdog** (v1.5.36, only once it has run): OK when running with no partner paused; Info listing paused partners and when they resume; Warn when it hasn't run for 30 minutes, or when an RF Forwarding Partner has no forwarding entry in `linmail.cfg` (so isn't watched).
 
 **Backups** (v1.5.34): the last backup reported (Info, with the optional set-up command, when none reports; Warn when older than 36 hours or the drive is 90% full; Critical when the last run failed). See Section 19 → Backups.
@@ -1045,6 +1227,24 @@ Runs dozens of checks on this install and reports each one with what it found an
 - The firewall, fail2ban, listening-port and `nginx -t` rows need the read-only sudo rules (`www-data-tools.sudoers`).
 - **Multi-domain SSL** — list your certificates in config.php `ssl_domains`; otherwise the address you opened the page on is checked.
 - Run it after an upgrade and once a month.
+
+### Audio Map (Admin → Audio Map, v1.5.57)
+
+One picture of how each LinBPQ radio port reaches its radio, worked out from what is running now:
+
+**LinBPQ port → modem program → ALSA device → sound card → radio**
+
+- **LinBPQ port** (blue): each radio port in `bpq32.cfg` that talks to a sound modem: VARA-type ports (`ADDR host port`: VARA, Mercury, Data2G) and KISS-over-TCP ports (`IPADDR` / `TCPPORT`: QtSoundModem, Direwolf, SoundModem), with INTERLOCK and bandwidth. The line to the modem is green when LinBPQ is connected to it, dashed amber when not. A port nothing answers on is a red dashed box at the bottom.
+- **Modem program** (green): the program listening on that port, how it runs (a systemd service, or *desktop login* for one started from the desktop, like VARA under Wine), its process number, its TCP ports and, for Data2G, its transmit level. A modem that stops listening once LinBPQ has connected (VARA does) still counts, through the connection; under Wine the ports are held by `wineserver` and are matched to the program (v1.5.58).
+- **ALSA device** (purple): the shared device in `/etc/asound.conf` (or the user's own `~/.asoundrc`) the program goes through, e.g. `scu17`, with its **dmix** (playback) and **dsnoop** (capture) parts and how many programs are attached to each (×3; ALSA's shared memory for them uses the `ipc_key` and the next two numbers). A program that has a card to itself goes straight to the card (blue-green line, *direct*).
+- **Sound card** (blue-green): its number and name, and the main playback and capture mixer levels.
+- **Radio** (orange): what keys it: *LinBPQ RADIO n* (flrig / Hamlib, PTT CAT) for VARA-type ports, or the modem itself for KISS ports. Name the radios in `config.php`: `'audio_map' => ['cards' => ['CODEC' => 'FTdx-3000 (SCU-17)', 'Device' => '2 m radio']]` (the card id in [brackets] in `/proc/asound/cards`, or its number).
+
+Below the picture: **Notes** (a modem port open to the network without a firewall rule, checked for IPv4 and, for a program listening on `::`, IPv6 too (v1.5.58); grouped per program, a LinBPQ port with no modem or not connected, a card one program has to itself), then tables of the programs on the cards (with how each reaches the card: `via scu17 → scu17_in dsnoop, scu17_out dmix`), the cards with all their mixer controls, the ALSA devices in `/etc/asound.conf`, and LinBPQ's radio ports with their keying.
+
+- It reads the system, never changes it. The web server usually runs with a private `/dev` without the sound devices (systemd `PrivateDevices=yes`), so the helper reads the mixers in the system's own view (`nsenter`, or a one-off `systemd-run`); if neither works the Mixer column says *not readable from the web server*. Which program has which card open, through which dmix/dsnoop, and the mixer levels need root: a small read-only helper, `/usr/local/sbin/bpq-dashboard-audio-map`, run through the admin pages' sudo rules (*Installation Manual* §11; update.sh installs it where those rules are in place). Without it the page still shows the cards, `/etc/asound.conf` and LinBPQ's ports, and says what's missing.
+- A modem that is stopped doesn't appear; its LinBPQ port shows as having nothing listening.
+- **⟳ Refresh** reads everything again.
 
 ---
 
@@ -1112,8 +1312,12 @@ The dashboard's own log files (bpq-telnet, bpq-vara, vara-validator, the Email C
 | Parser | Fills | Used by |
 |---|---|---|
 | `parse-vara-log.py` | VARA sessions, forwarded messages | RF Connections |
+| `parse-mercury-log.py` (v1.5.46, only with Mercury; run by `parse-vara-log.py`, no cron line of its own) | Mercury HF calls, from `/var/log/mercury/mercury.log` (`config.php mercury.log`) and the BBS log for frequencies | RF Connections |
+| `parse-data2g-log.py` (v1.5.56, only with Data2G; run by `parse-vara-log.py`) | Data2G HF calls, from `/var/log/data2g/data2g.log` (`config.php data2g.log`) and the BBS log for frequencies. `--backfill-link` (v1.5.64) re-reads the log and fills the time connected on rows already stored, changing nothing else; Mercury's parser has the same option | RF Connections |
 | `parse-traffic-report.py` | Traffic per station | Traffic Report |
-| `parse-system-logs.py` | Events, errors, RMS/TCP, MHeard (with the node's live list via `scripts/poll-mheard.php`, v1.5.25), routing | System Logs |
+| `parse-system-logs.py` | Events, errors, RMS/TCP, MHeard (with the node's live list via `scripts/poll-mheard.php`, v1.5.25), routing; since v1.5.50 also every hearing (`net_heard_history`, 90 days) | System Logs, RF Connections → VHF paths |
+| `parse-vhf-connections.py` (v1.5.51; run by `parse-system-logs.py`, no cron line of its own) | VHF packet connections (`rf_connections`, modem `vhf`) from the BBS log, LinBPQ's `ConnectLog` (only calls heard on the VHF port, so AXIP links are left out) and the test connects; re-reads the last 2 days | RF Connections |
+| `link-probe.py` (v1.5.50; started by `parse-system-logs.py`, no cron line of its own; log `link-probe.log`) | Test connects to watched stations with *Test connect* set: `C <port> <call>`, result and seconds, hangs up at once (`link_probes`) | RF Connections → VHF paths, Maintenance |
 
 Their logs are in `/var/log/bpq-dashboard/` and in the Log Viewer under *Log parsers*.
 
@@ -1129,6 +1333,8 @@ These edit `linmail.cfg` and restart LinBPQ, so they run as root, and only if yo
 
 | Script | When | What |
 |---|---|---|
+| `mercury.service` (optional, not part of the dashboard; v1.5.43 card) | always | The Mercury HF modem, a LinBPQ VARA-type port (*Installation Manual* §10.17). The RF Connections card reads its log `/var/log/mercury/mercury.log`; what it has read is kept in `cache/mercury-state.json` |
+| `data2g.service` (optional, not part of the dashboard; v1.5.56 card) | always | The Data2G HF modem, a LinBPQ VARA-type port (*Installation Manual* §10.18): `data2g-host`, or `data2g-web` with its monitor page. Its output goes to `/var/log/data2g/data2g.log` (logrotate weekly); what the card has read is kept in `cache/data2g-state.json` |
 | `connect-watchdog.py` (v1.5.35) | every 5 minutes | Pauses an RF Forwarding Partner for 6 hours after 2 failed forwarding attempts in a row, then enables it again (`Enabled` in `linmail.cfg`). Shown on the RF Connections tiles and Maintenance → *Connect Watchdog*; state `cache/watchdog-state.json` |
 | `prop-scheduler.py --apply` | every 2 days | Rewrites partners' ConnectScripts by band conditions and your history |
 | `storm-monitor.py` | hourly | Moves partners to 80 m in a geomagnetic storm, puts the schedules back after |
@@ -1155,7 +1361,7 @@ Some choices follow you to every browser; others stay in the browser where you m
 | APRS BBS station info and beacon settings | Theme (and the Chat and APRS pages' own theme) |
 | RF Connections forwarding partners and saved station locations | NWS callsign, destination, auto-refresh and the Post All password |
 | The propagation scheduler's partners (`data/partners.json`) and ⚙ Dashboard Settings (`data/settings.json`) | Telnet session log, YAPP *Received recently*, Chat callsign |
-| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the Connect Watchdog's limits (`watchdog`: failed attempts, pause hours, exclusions; v1.5.42), the optional pages (`pages`, `radio.enabled`), the VARA log source (`vara_remote`), System Logs tab names (`system_logs.port_names`, v1.5.22), live MHeard on/off and watched stations (Maintenance → *Watched stations*, kept in `data/system-logs.json` since v1.5.26; or `system_logs.live_mheard` / `system_logs.watch` in `config.php`) | Maintenance page *Your install* values |
+| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the Connect Watchdog's limits (`watchdog`: failed attempts, pause hours, exclusions; v1.5.42), the Mercury card and calls (`mercury`: enabled auto/true/false, log, ini, tnc_port; v1.5.43; `in_headlines`, v1.5.46: Mercury calls in the RF Connections headline numbers too, default false), the Data2G card and calls (`data2g`: enabled, log, unit, tnc_port, in_headlines; v1.5.56), the Audio Map's radio names (`audio_map.cards`; v1.5.57), the optional pages (`pages`, `radio.enabled`), the VARA log source (`vara_remote`), System Logs tab names (`system_logs.port_names`, v1.5.22), live MHeard on/off and watched stations with their test-connect schedule (Maintenance → *Watched stations*, kept in `data/system-logs.json` since v1.5.26; or `system_logs.live_mheard` / `system_logs.watch` in `config.php`), how long hearings are kept (`system_logs.history_days`, default 90; v1.5.50), test connects (`link_probe`: `enabled`, `offset_minutes` 7, `timeout` 150 s; v1.5.50), which LinBPQ ports are VHF packet (`vhf.ports`, v1.5.55; normally found in `bpq32.cfg`) | Maintenance page *Your install* values |
 | Which NWS alerts were already posted automatically (`cache/nws-auto-post-state.json`) | |
 
 Clearing a browser's site data resets the right-hand column for that browser only; nothing on the server is lost.
@@ -1188,17 +1394,27 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"Chat daemon not connected"* | `bpq-chat` isn't connected to BPQ | `sudo systemctl restart bpq-chat` |
 | *"WebSocket error — check: sudo systemctl status bpq-vara"* | The VARA page can't reach its service | Section 7. If the service stopped, `sudo journalctl -u bpq-vara -n 20` says why (e.g. no VARA port found, `bbs` login not set) |
 | *"flrig offline"* | The server can't reach flrig | Section 16 |
+| *"Not now: the radio transmitted N s ago …"* / **⏳ Busy** (Rig Status, Radio settings) | A modem session or transmission is running; settings aren't changed in the middle of one | Wait until the radio has been idle for 45 seconds |
+| *"The radio reports … after the change"* (Radio settings) | The radio didn't take the value (some aren't allowed in every mode) | Check the radio's display; Recent changes shows what it reads now |
 | *"No VARA Log File Found"* (RF Connections) | No VARA log yet, and no database data | VARA HF's Syslog setting, the rsyslog receiver and `vara-logger` (*Installation Manual* §10.11), or the TPRFN download (`vara_remote`, v1.5.19); Install Check's *VARA HF log* rows say which step is missing |
 | "API KEY REQUIRED" across the APRS map | No CARTO key | Section 8, *Map tiles* |
 | A page looks old or its menu is missing an item after an update | Browser cache | Ctrl+Shift+R |
 | *"Failed to load: JSON.parse: unexpected end of data"* (Log Viewer, v1.5.16 and earlier) | The log held characters that weren't valid UTF-8 (raw BBS text), so the server sent an empty reply | Update to v1.5.17 or later, then Ctrl+Shift+R |
 | *"Empty reply from the server"* / *"Server reply was not JSON"* (Log Viewer) | The Log Viewer's PHP stopped with an error | Open **Web Server Errors** in the Log Viewer (or `sudo tail -30 /var/log/nginx/error.log`) for the PHP error |
 | BBS message *"Watchdog: N3MEL forwarding paused 6h"* (v1.5.35) | The Connect Watchdog saw 2 forwarding attempts in a row that N3MEL didn't answer and turned its forwarding off for 6 hours; its mail waits in the queue | Nothing: it resumes by itself (*"… forwarding resumed"*). Sooner: `sudo python3 <web root>/scripts/connect-watchdog.py --resume N3MEL` |
-| *"no forwarding block in linmail.cfg — not watched"* (Connect Watchdog log or `--status`: *not in linmail*) | A call on the RF Forwarding Partners tiles has no forwarding entry of that name in `linmail.cfg` (N3MEL-2 looks for `N3MEL`) | Fix the tile's call, or nothing if that partner isn't one you forward to |
+| *"no forwarding block in linmail.cfg — not watched"* (Connect Watchdog log or `--status`: *not in linmail*) | A call in RF Connections' forwarding partners has no forwarding entry of that name in `linmail.cfg` (N3MEL-2 looks for `N3MEL`) | Fix the partner's call there, or nothing if that partner isn't one you forward to |
 | *"FAILED: backup drive not mounted at /mnt/backup"* (backup log; Maintenance → Backups red) | The nightly backup found no drive at the backup folder | Plug the drive in, `sudo mount /mnt/backup`, then `sudo systemctl start bpq-backup.service` |
 | *"Backups aren't set up"* (running `bpq-backup.sh` by hand) | The optional backup was never set up | `sudo bash <web root>/scripts/bpq-backup-setup.sh` |
 | BBS message *"Watchdog: N4SFL forwarding resumed early"* (v1.5.38) | A paused partner had a good session with you (usually it called you), so its pause ended before the 6 hours | Nothing |
-| *"BBS message not sent: … (last text from the BBS: '…')"* (Connect Watchdog log) | The watchdog couldn't log in to the BBS to send its notice; the quoted text is the last thing the BBS said (passwords masked) | Check `bbs.user` / `bbs.pass` in config.php (the same login the System Logs live MHeard poll uses); the pause or resume itself still happened |
+| *"BBS message not sent: … (last text from the BBS: '…')"* (Connect Watchdog log) | The watchdog couldn't log in to the BBS to send its notice; the quoted text is the last thing the BBS said (passwords masked) | Check `bbs.user` / `bbs.pass` in config.php (the same login the System Logs live MHeard poll uses); the pause or resume itself still happened. Test with `connect-watchdog.py --test-notice` (Maintenance → Connect Watchdog). Before v1.5.45, *no BBS prompt after login* also appeared when the node's greeting didn't end in `}`; that's fixed |
+| *"unable to initialize sum ring buffer"* (VARA's output, with a sound card shared with Mercury) | The two `ipc_key` numbers of the shared device in `/etc/asound.conf` are too close; VARA keys the radio with no audio | Keep them thousands apart (e.g. 27017 and 37017), restart VARA (*Installation Manual* §10.17) |
+| Mercury card: **LinBPQ not attached** | Mercury runs but LinBPQ isn't connected to its TNC port | Check the Mercury port's `ADDR 127.0.0.1 8400` in `bpq32.cfg` and that no other program holds Mercury, then restart LinBPQ |
+| System Audit: **Mercury monitor (port 8403) may be reachable from the network** (v1.5.49) | `ui_enabled = true` in mercury.ini and no firewall rule for its port | Run the command it shows (blocks the port except from this machine), or `tools/mercury-monitor.sh`, which adds it |
+| System Audit: **Test connects to CALL not running** (v1.5.50) | No test connect recorded for more than twice its interval | Look at Log Viewer → *Link Probe*; run `sudo -u www-data python3 <web root>/scripts/link-probe.py --list`. *login refused*: check `bbs.user` / `bbs.pass`. The probe starts from `parse-system-logs.py`'s 5-minute run, so that must be scheduled too |
+| Data2G card: **LinBPQ not attached** (v1.5.56) | Data2G runs but LinBPQ isn't connected to its TNC port | Check the Data2G port's `ADDR 127.0.0.1 8500` in `bpq32.cfg`, then restart LinBPQ |
+| Data2G log: *"refusing CONNECT from W1ABC: NOT_LISTENING"* | A station called while LinBPQ had Data2G's listening off (scanning another frequency, or VARA / Mercury using the radio) | Nothing, or agree a schedule with that station (*Installation Manual* §10.18). Shown as *turned away* |
+| No **Data2G** rows in Recent connections (v1.5.56), though the card shows calls | The database upgrade hasn't run, or the parser can't read Data2G's log | System Audit → *Data2G calls read into RF Connections*; run update.sh again, or `parse-data2g-log.py --dry-run` |
+| No **Mercury** rows in Recent connections (v1.5.46), though the Mercury card shows calls | The database upgrade hasn't run, or the parser can't read Mercury's log | System Audit → *Mercury calls read into RF Connections* says which; run update.sh again, or Maintenance → *Log parsers* → `parse-mercury-log.py --dry-run` |
 | *"Change due … but forwarding is in progress … next run"* (Connect Watchdog log) | A pause or resume was due, but a forwarding session was running, so LinBPQ wasn't restarted | Nothing: the next run (5 minutes) does it |
 | *"nws-auto-post: disabled …"* (journal) | Automatic NWS bulletins are off | Nothing, or turn them on (*Installation Manual* §10.4) |
 | *"Set config.php nws.auto_post.area to your 2-letter state code"* | Turned on, but no state chosen | Set `'area'` in `config.php` `nws` → `auto_post` |
@@ -1207,14 +1423,18 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.25
+## 27. Known limitations in v1.5.66
 
 These affect what you see in this release. Each says what to do meanwhile.
 
 - **VARA retunes only `RADIO 2`.** Frequency changes and the End Session restore rewrite the `RADIO 2` block in `bpq32.cfg`; a station whose FLRIG radio has another number can't QSY from the page yet.
 - **VARA quick frequencies are fixed** (3.596, 7.103, 10.148, 14.103, 14.106 MHz). Type any other frequency in the box.
-- **Two partner lists:** the connect watchdog (v1.5.35) watches the RF Forwarding Partners tiles (`data/stations/partners.json`), while the propagation scheduler and storm monitor use their own list (⚙ Dashboard Settings or the partners editor, Section 19).
+- **Two partner lists:** the connect watchdog (v1.5.35) watches RF Connections' forwarding partners (`data/stations/partners.json`), while the propagation scheduler and storm monitor use their own list (⚙ Dashboard Settings or the partners editor, Section 19).
+- **Mercury calls have no S/N or modem rate** on RF Connections (v1.5.46): Mercury doesn't log them per session (Effective is shown, v1.5.64). The headline numbers are VARA's unless `mercury.in_headlines` is set (Section 12). `parse-mercury-log.py --reset` can only rebuild from the Mercury log still on disk (`mercury.log` and `mercury.log.1`, about 40 MB).
+- **Data2G rows ended by LinBPQ's ABORT have no byte counts** (v1.5.56): Data2G writes its totals only when a session closes normally. `parse-data2g-log.py --reset` can only rebuild from `data2g.log` and `data2g.log.1` (one to two weeks).
+- **Forwarded messages say 📡 RF (VARA) for Mercury and Data2G forwards too**: LinBPQ logs all three as VARA ports.
 - **RF Power Monitor watt-hours** always read 0 (flrig has no energy reading).
+- **Radio settings is for the Yaesu FTdx-3000 only** (v1.5.60; other stations don't see it, v1.5.66), and its menu (EX) settings, such as DATA GAIN and DATA OUT LEVEL, can't be read through flrig: check them on the radio's front panel. The speech processor and monitor are shown only.
 - **Traffic Report's Messages card** leaves out NTS traffic (Section 13).
 - **The NWS page doesn't know which alerts were posted automatically**, so it can't stop you posting one again by hand.
 - **Behind a reverse proxy** (dashboard on its own port, v1.5.19), the dashboard sees every visitor as 127.0.0.1: per-address limits (wrong-password lock-outs) then count all visitors together. Its own host name or port is needed; a sub-path (`/dashboard/`) doesn't work, because the pages use absolute links.
@@ -1246,6 +1466,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Page | URL | Login |
 |---|---|---|
 | RF Connections (home) | `http://YOUR_SERVER/` or `/bpq-rf-connections.html` | None (saving partners/locations: admin) |
+| RF Connections, classic view (v1.5.44) | `/bpq-rf-connections-classic.html` | Same as RF Connections |
 | Traffic Report | `http://YOUR_SERVER/bpq-traffic.html` | None |
 | System Logs | `http://YOUR_SERVER/bpq-system-logs.html` | None |
 | Connect Log | `http://YOUR_SERVER/bpq-connect-log.html` | None |
@@ -1262,11 +1483,12 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Firewall Status | `http://YOUR_SERVER/admin/firewall-status.html` | Admin |
 | Log Viewer | `http://YOUR_SERVER/admin/log-viewer.html` | Admin |
 | System Audit | `http://YOUR_SERVER/admin/system-audit.html` | Admin |
+| Audio Map (v1.5.57) | `http://YOUR_SERVER/admin/audio-map.html` | Admin |
 | Install Check | `http://YOUR_SERVER/install-check.php` | Admin |
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.42-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.66-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1293,7 +1515,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.42 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.66 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1308,6 +1530,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.42 — User Guide**
+**73 — BPQ Dashboard v1.5.66 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

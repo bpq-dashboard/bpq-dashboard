@@ -1,6 +1,6 @@
 <?php
 /**
- * BPQ Dashboard v1.5.42 — Post-Installation Check
+ * BPQ Dashboard v1.5.66 — Post-Installation Check
  * Checks every component installed by bpq-dashboard-install.sh
  * Access: https://your.domain/install-check.php  (behind the admin login)
  *
@@ -250,6 +250,7 @@ chk('Web Server','HTTPS/SSL active', $ssl,
 // ═══════════════════════════════════════════════════════════════════
 $htmlFiles = [
     'bpq-rf-connections.html' => 'RF Connections',
+    'bpq-rf-connections-classic.html' => 'RF Connections (classic view, v1.5.44)',
     'bpq-traffic.html'        => 'Traffic Report',
     'bpq-system-logs.html'    => 'System Logs',
     'bpq-connect-log.html'    => 'Connect Log',
@@ -264,6 +265,7 @@ $htmlFiles = [
     'admin/firewall-status.html' => 'Firewall Status',
     'admin/system-audit.html'    => 'System Audit',
     'admin/log-viewer.html'      => 'Log Viewer',
+    'admin/audio-map.html'       => 'Audio Map',
 ];
 foreach ($htmlFiles as $f => $label) {
     chk('Dashboard HTML',"$label ($f)", fileOk("$BASE/$f"),
@@ -313,6 +315,10 @@ $scripts = [
     'scripts/prop-scheduler.py'         => 'Propagation scheduler',
     'scripts/storm-monitor.py'          => 'Storm monitor',
     'scripts/connect-watchdog.py'       => 'Connection watchdog',
+    'scripts/link-probe.py'             => 'Test connects to watched stations (v1.5.50)',
+    'scripts/parse-vhf-connections.py'  => 'VHF packet connections for RF Connections (v1.5.51)',
+    'scripts/parse-mercury-log.py'      => 'Mercury HF calls for RF Connections (v1.5.46)',
+    'scripts/parse-data2g-log.py'       => 'Data2G HF calls for RF Connections (v1.5.56)',
     'scripts/wp_manager.py'             => 'WP.cfg manager',
     'scripts/wp_scanner.py'             => 'WP.cfg scanner',
     'scripts/vara-callsign-validator.py'=> 'VARA callsign validator',
@@ -962,7 +968,7 @@ function renderPage($results,$pass,$fail,$warn,$score,$sc) {
 $total = $pass+$fail+$warn; ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BPQ Dashboard v1.5.42 — Install Check</title>
+<title>BPQ Dashboard v1.5.66 — Install Check</title>
 <style>
 :root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;
       --acc:#4a9eff;--grn:#3fb950;--red:#f85149;--org:#d29922;--pur:#bc8cff;}
@@ -1008,7 +1014,7 @@ h1{font-size:20px;color:var(--acc);margin-bottom:4px;}
         color:var(--org);font-size:12px;text-align:center;line-height:1.8;}
 .footer strong{color:var(--red);}
 </style></head><body>
-<h1>🔧 BPQ Dashboard v1.5.42 — Post-Installation Check</h1>
+<h1>🔧 BPQ Dashboard v1.5.66 — Post-Installation Check</h1>
 <p class="sub"><?=date('Y-m-d H:i:s T')?> · PHP <?=phpversion()?> · <?=htmlspecialchars(php_uname('n'))?></p>
 
 <div class="card">

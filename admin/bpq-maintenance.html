@@ -524,7 +524,7 @@
 <body data-nav-page="maint">
 <!-- Shared navigation (loaded from /_nav.html via /bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
-<script src="/bpq-nav-loader.js?v=2026-11-12-4"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-16-1"></script>
 
 <!--
   Maintenance reference — v1.5.19 (rebuilt 2026-10-03, checked against the code 2026-10-25)
@@ -537,7 +537,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.42 · updated November 2026
+    v1.5.66 · updated November 2026
   </div>
 </header>
 
@@ -550,6 +550,7 @@
   <a href="/admin/firewall-status.html"><span class="tl-icon">🛡️</span><span><strong style="color:var(--green)">Firewall Status</strong><small>iptables rules · fail2ban</small></span></a>
   <a href="/admin/system-audit.html"><span class="tl-icon">🔍</span><span><strong style="color:var(--blue)">System Audit</strong><small>services · security · database</small></span></a>
   <a href="/admin/log-viewer.html"><span class="tl-icon">📋</span><span><strong style="color:var(--cyan)">Log Viewer</strong><small>daemon and BBS logs</small></span></a>
+  <a href="/admin/audio-map.html"><span class="tl-icon">🎛️</span><span><strong style="color:var(--purple)">Audio Map</strong><small>ports · modems · sound cards · radios</small></span></a>
   <a href="/install-check.php"><span class="tl-icon">✅</span><span><strong style="color:var(--amber)">Install Check</strong><small>full self-test</small></span></a>
   <a href="#partners-editor"><span class="tl-icon">📡</span><span><strong style="color:var(--purple)">Partners Editor</strong><small>partners.json</small></span></a>
 </div>
@@ -568,7 +569,7 @@
     <button type="button" class="editor-btn reload" id="installReset">Reset to defaults</button></p>
 </details>
 
-<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#optional-pages">Optional pages</a><a href="#firewall-setup">Firewall setup</a><a href="#homefolder">LinBPQ in a home folder</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#watch">Watched stations</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#wp">Winlink White Pages clean-up</a><a href="#watchdog">Connect Watchdog</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#backup">Backups</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
+<nav class="toc" aria-label="Sections"><a href="#health">Health check</a><a href="#protection">Admin login</a><a href="#optional-pages">Optional pages</a><a href="#firewall-setup">Firewall setup</a><a href="#homefolder">LinBPQ in a home folder</a><a href="#sudo">Firewall &amp; Audit sudo rules</a><a href="#database">Database &amp; credentials</a><a href="#parsers">Log parsers</a><a href="#watch">Watched stations</a><a href="#messages">Email Client</a><a href="#retention">Bulletin retention</a><a href="#nwsauto">NWS auto-post</a><a href="#nts">NTS forwarding report</a><a href="#fwdqueue">RF forwarding queue</a><a href="#rig">Rig Status &amp; RF Power Monitor</a><a href="#vara">VARA HF Terminal</a><a href="#validator">VARA callsign validator</a><a href="#mercury">Mercury HF modem</a><a href="#data2g">Data2G HF modem</a><a href="#wp">Winlink White Pages clean-up</a><a href="#watchdog">Connect Watchdog</a><a href="#prop">Propagation scheduler &amp; storm monitor</a><a href="#partners-editor">Partners editor</a><a href="#geomag">Geomagnetic data proxy</a><a href="#chat">Chat</a><a href="#aprs">APRS map &amp; beacon</a><a href="#lookups">Callsign lookups</a><a href="#yapp">YAPP file transfer</a><a href="#linbpq">LinBPQ &amp; sysop commands</a><a href="#web">Web server &amp; PHP</a><a href="#perms">Permissions</a><a href="#backup">Backups</a><a href="#update">Install check, updates &amp; backups</a><a href="#disk">Logs, disk &amp; archives</a><a href="#nav">Shared navigation bar</a><a href="#harmless">Messages you can ignore</a><a href="#paths">Key paths</a></nav>
 
 <div class="section" id="health">
   <h2 class="section-title green">Health check — is everything running?</h2>
@@ -769,7 +770,7 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
 
 <div class="section" id="sudo">
   <h2 class="section-title purple">Firewall &amp; System Audit — read-only sudo rules</h2>
-  <p class="intro">The <a href="/admin/firewall-status.html">Firewall</a> and <a href="/admin/system-audit.html">System Audit</a> pages read the firewall (IPv4 and IPv6), fail2ban, the listening ports and <span class="kw">nginx -t</span> through read-only sudo rules (plus the admin-password helper, v1.5.19) in <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers</span>. <span class="kw">install.sh</span> offers to install them. Without them those rows say "not checked" (they never guess), and everything else on both pages still works.</p>
+  <p class="intro">The <a href="/admin/firewall-status.html">Firewall</a> and <a href="/admin/system-audit.html">System Audit</a> pages read the firewall (IPv4 and IPv6), fail2ban, the listening ports and <span class="kw">nginx -t</span> through read-only sudo rules (plus the admin-password helper, v1.5.19, and the <a href="/admin/audio-map.html">Audio Map</a>'s read-only helper <span class="kw">/usr/local/sbin/bpq-dashboard-audio-map</span>, v1.5.57) in <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers</span>. <span class="kw">install.sh</span> offers to install them. Without them those rows say "not checked" (they never guess), and everything else on both pages still works.</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> cp <var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers /etc/sudoers.d/www-data-tools &amp;&amp; <span class="sudo">sudo</span> chmod 440 /etc/sudoers.d/www-data-tools &amp;&amp; <span class="sudo">sudo</span> visudo <span class="flag">-c</span></code>
@@ -822,12 +823,12 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
 
 <div class="section" id="watch">
   <h2 class="section-title green">System Logs — watched stations &amp; live MHeard</h2>
-  <p class="intro">v1.5.26. <b>Watched stations</b>: stations you rely on (a Winlink gateway used as a backup, a forwarding partner's node) that should be flagged when they haven't been heard for a while. Listen only: nothing is transmitted. They appear above System Logs' MHeard tabs, and in their port's block of RF Connections' VHF Connections Status card. Saved in <span class="kw">data/system-logs.json</span> (not config.php); once saved here, this list replaces any <span class="kw">system_logs.watch</span> in config.php.</p>
+  <p class="intro">v1.5.26. <b>Watched stations</b>: stations you rely on (a Winlink gateway used as a backup, a forwarding partner's node) that should be flagged when they haven't been heard for a while. Watching is listen only: nothing is transmitted. They appear above System Logs' MHeard tabs, and in their port's block of RF Connections' VHF Connections Status card. Since v1.5.50 every hearing is kept, and RF Connections → <b>VHF paths</b> shows it hour by hour. <b>Test connect</b> (v1.5.50, optional, <i>transmits</i>): every N hours <span class="kw">scripts/link-probe.py</span> logs in to the node, sends <span class="kw">C &lt;port&gt; &lt;call&gt;</span>, records whether it connected and how long it took, and hangs up at once; results show in the same view. Use it only with the other station's sysop's agreement: a Winlink gateway opens a CMS session for every connect. Saved in <span class="kw">data/system-logs.json</span> (not config.php); once saved here, this list replaces any <span class="kw">system_logs.watch</span> in config.php.</p>
   <div class="cmd note"><div class="cmd-inner">
     <div class="note-head">Watched stations</div>
     <div class="cmd-label" id="wsSource">Loading…</div>
     <table class="opt-table" id="wsTable">
-      <thead><tr><th>Callsign (with SSID)</th><th>Port</th><th>Flag after (hours)</th><th>Last heard</th><th></th></tr></thead>
+      <thead><tr><th>Callsign (with SSID)</th><th>Port</th><th>Flag after (hours)</th><th title="v1.5.50: connect to the station on this schedule and record whether it answered (transmits; needs a port)">Test connect</th><th>Last heard</th><th></th></tr></thead>
       <tbody id="wsBody"></tbody>
     </table>
     <div class="mini-row">
@@ -840,6 +841,14 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
       <span class="editor-status info" id="wsStatus" role="status"></span>
     </div>
   </div><div class="cmd-tag green">watch</div></div>
+  <div class="cmd"><div class="cmd-inner">
+    <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/link-probe.py <span class="flag">--list</span></code>
+    <div class="cmd-label">v1.5.50: the test-connect schedule (slots from 00:07 UTC, e.g. 00:07, 04:07 … for every 4 h) and each station's last result. <span class="kw">--now KP2L-10</span> makes one test connect now and prints the node's dialogue (password masked); <span class="kw">--due --dry-run</span> says what is due without transmitting. Run it as <span class="kw">www-data</span> so its log stays writable. Results: RF Connections → VHF paths; log: Log Viewer → <i>Link Probe</i>. <i>login refused</i>: bbs.user / bbs.pass in config.php. <i>no answer from the node in 150 s</i>: LinBPQ didn't report Connected or Failure (config.php <span class="kw">link_probe.timeout</span>).</div>
+  </div><div class="cmd-tag purple">test connect</div></div>
+  <div class="cmd"><div class="cmd-inner">
+    <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-vhf-connections.py <span class="flag">--dry-run --days 7</span></code>
+    <div class="cmd-label">v1.5.51: the VHF packet connections RF Connections → Recent connections shows (modem <i>VHF</i>): the BBS's connects out on a VHF port (BBS log), calls into the BBS on it, calls into the node heard on it (ConnectLog, needs <span class="kw">LogAllConnects=1</span>; AXIP calls are left out) and the test connects. Runs every 5 minutes from the System Logs parser; <span class="kw">--reset</span> rebuilds the VHF rows. "no packet port found": set config.php <span class="kw">'vhf' =&gt; ['ports' =&gt; [4]]</span>. "can't hold VHF rows yet": run update.sh.</div>
+  </div><div class="cmd-tag purple">vhf</div></div>
 </div>
 
 <div class="section" id="parsers">
@@ -859,6 +868,18 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
       <div class="cmd-label">VARA sessions → <span class="kw">rf_connections</span>. Dry run: reads and reports, writes nothing. The cron line also passes <span class="kw">--bbs-log-dir</span> and <span class="kw">--my-callsign</span> for message tracking; keep them when you copy it.</div>
     </div><div class="cmd-tag purple">dry run</div></div>
     <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-mercury-log.py <span class="flag">--dry-run</span></code>
+      <div class="cmd-label">v1.5.46: Mercury HF calls → <span class="kw">rf_connections</span> (<span class="kw">modem = 'mercury'</span>). Lists each call it finds in Mercury's log (time, in/out, call, result, frequency, link mode, bytes, how it ended) and writes nothing. The VARA parser runs it every 5 minutes when Mercury's log is there (no cron line of its own); its summary line is in <span class="kw">parse-vara-log.log</span>. "rf_connections has no modem … columns" means the database upgrade hasn't run: run update.sh. No frequency on a call means the BBS log had no matching "Incoming Connect … Freq" or RADIO line (normal for calls that never connected).</div>
+    </div><div class="cmd-tag purple">dry run</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-data2g-log.py <span class="flag">--dry-run</span></code>
+      <div class="cmd-label">v1.5.56: Data2G HF calls → <span class="kw">rf_connections</span> (<span class="kw">modem = 'data2g'</span>). Lists each call in Data2G's log (time, in/out, call, result, frequency, waveform, S/N, bytes, how it ended) and writes nothing. The VARA parser runs it every 5 minutes when <span class="kw">/var/log/data2g/data2g.log</span> is there (summary line in <span class="kw">parse-vara-log.log</span>). "modem has no 'data2g'" means the database upgrade hasn't run: run update.sh. A caller turned away several times in two minutes (LinBPQ scanning, or VARA/Mercury had the radio) is one row, <i>turned away</i>. <span class="kw">--reset</span> clears Data2G's rows and reads <span class="kw">data2g.log.1</span> and <span class="kw">data2g.log</span> again.</div>
+    </div><div class="cmd-tag purple">dry run</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-data2g-log.py <span class="flag">--backfill-link</span>; <span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-mercury-log.py <span class="flag">--backfill-link</span></code>
+      <div class="cmd-label">v1.5.64, once after updating: fills <span class="kw">link_sec</span> (the time the link was up) on Data2G and Mercury calls already stored, read from the logs still on disk (<span class="kw">.log</span> and <span class="kw">.log.1</span>). Changes nothing else and never overwrites. RF Connections' <b>Effective</b> throughput uses it, so the connect tries aren't counted; older calls without it read a little low. Run only the line for a modem you have. "no link_sec yet" means update.sh's database step hasn't run.</div>
+    </div><div class="cmd-tag blue">once</div></div>
+    <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-traffic-report.py <span class="flag">--days</span> 8 <span class="flag">--dry-run</span> <span class="flag">--verbose</span></code>
       <div class="cmd-label">BPQ traffic reports → <span class="kw">traffic_stats</span>. BPQ writes <b>one Traffic_YYMMDD.txt per week</b> (named for the week start, written the following Saturday), so the cron line needs <span class="kw">--days 8</span>; without it every run logs "Processed 0 file(s)". BPQ writes them in the LinBPQ folder: the parser looks in <span class="kw">logs/</span> and in config.php <span class="kw">paths.linbpq</span> (since v1.5.18) and, when it finds none, says which folders it searched. Load all older reports once: same command with <span class="kw">--backfill</span> instead of <span class="kw">--days 8 --dry-run</span>.</div>
     </div><div class="cmd-tag purple">dry run</div></div>
@@ -868,11 +889,11 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
     </div><div class="cmd-tag purple">dry run</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> <span class="flag">-u</span> www-data python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/parse-vara-log.py <span class="flag">--reset</span> <span class="flag">--verbose</span></code>
-      <div class="cmd-label">Rebuild the RF Connections table from the whole VARA log (after a parser fix or a corrupted table). Takes a while on a big log. For Traffic and System Logs the equivalent is <span class="kw">--backfill</span>.</div>
+      <div class="cmd-label">Rebuild the RF Connections table from the whole VARA log (after a parser fix or a corrupted table). Takes a while on a big log. Since v1.5.46 it clears only the VARA rows; Mercury's are rebuilt with <span class="kw">parse-mercury-log.py --reset</span>, Data2G's with <span class="kw">parse-data2g-log.py --reset</span> (reads <span class="kw">mercury.log.1</span> and <span class="kw">mercury.log</span>, so only the last ~40 MB of Mercury's log). For Traffic and System Logs the equivalent is <span class="kw">--backfill</span>.</div>
     </div><div class="cmd-tag red">rebuild</div></div>
     <div class="cmd"><div class="cmd-inner">
-      <code><span class="sudo">sudo</span> mysql <var data-v="db">bpqdash</var> <span class="flag">-e</span> "SELECT log_file, last_line_no, last_parsed_at FROM rf_parser_state; SELECT MAX(session_start) AS newest_session FROM rf_connections;"</code>
-      <div class="cmd-label">Where the VARA parser has got to. <span class="kw">last_parsed_at</span> should be minutes old; <span class="kw">newest_session</span> should match your last VARA contact.</div>
+      <code><span class="sudo">sudo</span> mysql <var data-v="db">bpqdash</var> <span class="flag">-e</span> "SELECT log_file, last_line_no, last_parsed_at FROM rf_parser_state; SELECT modem, MAX(session_start) AS newest_session FROM rf_connections GROUP BY modem;"</code>
+      <div class="cmd-label">Where the VARA (and Mercury, Data2G) parsers have got to. <span class="kw">last_parsed_at</span> should be minutes old; <span class="kw">newest_session</span> should match your last contact on each modem. Before v1.5.46's database upgrade the second query fails on <span class="kw">modem</span>: use <span class="kw">SELECT MAX(session_start) FROM rf_connections</span>.</div>
     </div><div class="cmd-tag blue">freshness</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code>systemctl status vara-logger <span class="flag">--no-pager</span>; ls <span class="flag">-l</span> <var data-v="root">/var/www/bpq-dashboard</var>/logs/*.vara</code>
@@ -1050,7 +1071,7 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
 
 <div class="section" id="rig">
   <h2 class="section-title blue">Rig Status &amp; RF Power Monitor (flrig)</h2>
-  <p class="intro">Both pages read the radio through flrig via <span class="kw">vara-api.php</span>. Host and port come from the <span class="kw">radio</span> section of config.php (default 127.0.0.1:12345). The old WaveNode meter and its sync jobs are no longer used.</p>
+  <p class="intro">Both pages read the radio through flrig via <span class="kw">vara-api.php</span> (Rig Status's Radio settings card, v1.5.60: <span class="kw">rig-control-api.php</span>). Host and port come from the <span class="kw">radio</span> section of config.php (default 127.0.0.1:12345). The old WaveNode meter and its sync jobs are no longer used.</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code>pgrep <span class="flag">-af</span> 'VARA\.exe'; pgrep <span class="flag">-a</span> flrig; <span class="sudo">sudo</span> ss <span class="flag">-tnp</span> | grep <span class="flag">-E</span> ':8300|:8301|:12345' | grep <span class="flag">-c</span> linbpq</code>
@@ -1076,6 +1097,14 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
       <code><span class="sudo">sudo</span> cp <var data-v="root">/var/www/bpq-dashboard</var>/rig-history-poller.service /etc/systemd/system/ &amp;&amp; <span class="sudo">sudo</span> systemctl daemon-reload &amp;&amp; <span class="sudo">sudo</span> systemctl enable <span class="flag">--now</span> rig-history-poller</code>
       <div class="cmd-label">Optional: record history around the clock, not only while a Rig Status / RF Power page is open. Check the paths inside the unit file first.</div>
     </div><div class="cmd-tag green">optional</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>curl <span class="flag">-s</span> <span class="flag">-A</span> 'Mozilla/5.0' '<var data-v="site">https://bpq.example.com</var>/rig-control-api.php?action=state' | python3 <span class="flag">-m</span> json.tool | head <span class="flag">-40</span></code>
+      <div class="cmd-label">v1.5.60, Rig Status → <b>Radio settings</b> (Yaesu FTdx-3000 only): what the card reads from the radio through flrig. <span class="kw">"supported": false</span> = flrig reports another radio. A setting showing <span class="kw">"value": null</span> got no answer from the radio. <span class="kw">"busy"</span> says why changes are refused (transmitting, transmitted in the last 45 s, or a Mercury / Data2G session).</div>
+    </div><div class="cmd-tag blue">settings</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>tail <span class="flag">-n</span> 10 <var data-v="root">/var/www/bpq-dashboard</var>/cache/rig-control-log.jsonl; <span class="sudo">sudo</span> grep <span class="flag">-h</span> 'rig-control' /var/log/nginx/error.log | tail <span class="flag">-n</span> 5</code>
+      <div class="cmd-label">Every change made in Radio settings: the setting, before → after, the radio's reading afterwards and the address it came from. The menu (EX) settings can't be read through flrig: check them on the radio.</div>
+    </div><div class="cmd-tag cyan">changes</div></div>
   </div>
 </div>
 
@@ -1148,6 +1177,60 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
   </div>
 </div>
 
+<div class="section" id="mercury">
+  <h2 class="section-title cyan">Mercury HF modem (optional)</h2>
+  <p class="intro">v1.5.43. Mercury (Rhizomatica, open source) is an HF modem with a VARA-style TNC: LinBPQ attaches it as a <b>VARA-type port</b> (<span class="kw">DRIVER=VARA</span>, <span class="kw">ADDR 127.0.0.1 8400</span>), and with the same <span class="kw">INTERLOCK</span> number as the VARA port it shares the radio. It only talks to other Mercury stations. RF Connections shows a <b>Mercury HF Status</b> card (service, LinBPQ attached, last session, last decode S/N, last transmit, audio, recent activity) read from Mercury's log; System Audit checks it and that its ports are kept local. Settings for the card: config.php <span class="kw">'mercury' =&gt; ['enabled' =&gt; 'auto', 'log' =&gt; '/var/log/mercury/mercury.log', 'ini' =&gt; '/etc/mercury/mercury.ini']</span> (all optional). Since v1.5.46 its calls are also rows in RF Connections (Recent connections with a Modem column, the partners' 7-day strips, the 7-day history and the hourly chart) — read by <span class="kw">scripts/parse-mercury-log.py</span>, which the VARA parser runs every 5 minutes (see <a href="#parsers">Log parsers</a>). The headline numbers stay VARA's unless config.php <span class="kw">mercury.in_headlines</span> is <span class="kw">true</span>. Setting Mercury up: Installation Manual §10.17.</p>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code>systemctl status mercury <span class="flag">--no-pager</span>; ss <span class="flag">-tn</span> | grep ':8400 '</code>
+      <div class="cmd-label">Running, and LinBPQ attached (an ESTABLISHED line between linbpq and 8400). Mercury takes <b>one</b> program at a time on its TNC port: two LinBPQ ports, or another program, pointed at it are refused (its log says <i>refused: … is connected and keeps the TNC</i>).</div>
+    </div><div class="cmd-tag blue">status</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>tail <span class="flag">-f</span> /var/log/mercury/mercury.log | grep <span class="flag">-v</span> LISTEN</code>
+      <div class="cmd-label">Calls, sessions, decoded frames with S/N, audio problems (Log Viewer → Mercury HF). The <span class="kw">LISTEN OFF / LISTEN ON</span> pairs every few seconds are LinBPQ's scan and interlock: normal. Times are UTC with <span class="kw">log_utc = true</span> in <span class="kw">/etc/mercury/mercury.ini</span>.</div>
+    </div><div class="cmd-tag blue">log</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> iptables <span class="flag">-I</span> INPUT <span class="flag">-p</span> tcp <span class="flag">-m</span> multiport <span class="flag">--dports</span> 8400:8402 ! <span class="flag">-i</span> lo <span class="flag">-j</span> DROP &amp;&amp; <span class="sudo">sudo</span> netfilter-persistent save</code>
+      <div class="cmd-label">Mercury listens on <b>every</b> network interface and has no password: anyone who reaches 8400 can key your transmitter. This keeps its ports (TNC, data, broadcast) to the server itself. System Audit → <i>Mercury TNC kept local</i>.</div>
+    </div><div class="cmd-tag red">firewall</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> fuser <span class="flag">-v</span> /dev/snd/pcmC0D0*; aplay <span class="flag">-L</span> | grep <span class="flag">-A1</span> '^scu17$'</code>
+      <div class="cmd-label">When the radio's sound card is shared with VARA through an ALSA dsnoop/dmix device (Manual §10.17), VARA shows <span class="kw">F...m</span> (shared). <i>unable to initialize sum ring buffer</i> in VARA's output: the two <span class="kw">ipc_key</span> numbers in <span class="kw">/etc/asound.conf</span> are too close (dmix uses key+1, dsnoop key+2): keep them thousands apart. Card number 0 here = the radio's card in <span class="kw">aplay -l</span>.</div>
+    </div><div class="cmd-tag amber">sound card</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> bash <var data-v="root">/var/www/bpq-dashboard</var>/tools/mercury-monitor.sh</code>
+      <div class="cmd-label">v1.5.49: switch on <b>Mercury's own monitor</b> (waterfall, S/N, bitrate, TX/RX) on port 8403. Blocks the port from the network first (Mercury serves it on every interface with no password), sets <span class="kw">ui_enabled / ui_port / waterfall_enabled</span> in <span class="kw">/etc/mercury/mercury.ini</span> (backup in /root), restarts Mercury (waits for a session to end; LinBPQ reconnects), and puts a <i>Mercury Monitor</i> launcher on the desktop of the user Mercury runs as. View it on the station's own desktop: <span class="kw">http://127.0.0.1:8403/waterfall.html</span> (watch only). The full page <span class="kw">mercury.html</span> can change Mercury's audio, PTT and TX level — leave it alone while LinBPQ drives Mercury. Options: <span class="kw">--port N</span>, <span class="kw">--no-waterfall</span> (less CPU), <span class="kw">--off</span>.</div>
+    </div><div class="cmd-tag purple">monitor</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> systemctl restart mercury</code>
+      <div class="cmd-label">Restart after changing <span class="kw">/etc/mercury/mercury.ini</span>. Then check the card on RF Connections says <i>On air</i>; if it says <i>LinBPQ not attached</i>, restart LinBPQ. The <span class="kw">snd_pcm_pause</span> error at each stop is harmless with a shared sound card.</div>
+    </div><div class="cmd-tag amber">restart</div></div>
+  </div>
+</div>
+
+<div class="section" id="data2g">
+  <h2 class="section-title cyan">Data2G HF modem (optional)</h2>
+  <p class="intro">v1.5.56. Data2G (github.com/arodland/Data2G, open source) is an HF modem with a VARA-style TNC, like Mercury: LinBPQ attaches it as a <b>VARA-type port</b> (<span class="kw">DRIVER=VARA</span>, <span class="kw">ADDR 127.0.0.1 8500</span>) with the same <span class="kw">INTERLOCK</span> number, sharing the radio and the sound card (the ALSA <span class="kw">scu17</span> device). It only talks to other Data2G stations of the same version. It runs as the <span class="kw">data2g</span> service (<span class="kw">data2g-host</span>, or <span class="kw">data2g-web</span> once its monitor page is on), listening on 127.0.0.1 only. RF Connections shows a <b>Data2G HF</b> card (service, LinBPQ attached, last session, calls turned away, last S/N heard, last transmit, monitor page, recent activity) read from its log, and its calls are rows beside VARA's (Recent connections, partners' strips, 7-day history, hourly chart, Station Map) — read by <span class="kw">scripts/parse-data2g-log.py</span>, which the VARA parser runs. Headline numbers stay VARA's unless config.php <span class="kw">data2g.in_headlines</span> is <span class="kw">true</span>. Settings (all optional): config.php <span class="kw">'data2g' =&gt; ['enabled' =&gt; 'auto', 'log' =&gt; '/var/log/data2g/data2g.log', 'unit' =&gt; '/etc/systemd/system/data2g.service']</span>. Setting Data2G up: Installation Manual §10.18.</p>
+  <div class="cmd-group">
+    <div class="cmd"><div class="cmd-inner">
+      <code>systemctl status data2g <span class="flag">--no-pager</span>; ss <span class="flag">-tln</span> | grep <span class="flag">-E</span> ':85(00|01|10|20) '; ss <span class="flag">-tn</span> | grep ':8500 '</code>
+      <div class="cmd-label">Running, listening on <span class="kw">127.0.0.1</span> only (commands 8500, data 8501, KISS 8510, monitor page 8520 when on), and LinBPQ attached (an ESTABLISHED line on 8500). Data2G's defaults (8300 / 8100) would collide with VARA and QtSoundModem, so its service names its ports. System Audit → <i>Data2G</i>.</div>
+    </div><div class="cmd-tag blue">status</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code>tail <span class="flag">-f</span> /var/log/data2g/data2g.log | grep <span class="flag">-v</span> LISTEN</code>
+      <div class="cmd-label">Commands from LinBPQ, calls (<span class="kw">TX CONNECT</span>, <span class="kw">RX CONNECT_ACK</span>), every burst with its waveform and S/N, the <span class="kw">session … s: tx … B, rx … B</span> summary and <span class="kw">DISCONNECTED CLIENT</span> (we hung up) / <span class="kw">PEER</span> (they did) / <span class="kw">NO_ANSWER</span> (Log Viewer → Data2G HF). <span class="kw">RX CONNECT A&gt;B</span> appears for every CONNECT heard, also other stations'. <span class="kw">refusing CONNECT from X: NOT_LISTENING</span> = a call came while LinBPQ had Data2G's listening off (scanning, or VARA/Mercury using the radio). Times are UTC (the service sets <span class="kw">TZ=UTC</span>). Rotated weekly by logrotate.</div>
+    </div><div class="cmd-tag blue">log</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> bash <var data-v="root">/var/www/bpq-dashboard</var>/tools/data2g-monitor.sh</code>
+      <div class="cmd-label">v1.5.56: switch on <b>Data2G's own monitor page</b> (waterfall, constellation, link, every burst with S/N, decoded packets) on port 8520. Blocks the port from the network first, builds <span class="kw">data2g-web</span> from the Data2G source on the machine (adds Qt WebSockets; on Debian 12 a one-line Qt 6.4 fix), asks for the page's <b>password</b> (typed twice at the terminal, stored hashed and private), switches the <span class="kw">data2g</span> service to <span class="kw">data2g-web</span> with the same options (backup in /root; waits for a session to end; LinBPQ reconnects), and puts a <i>Data2G Monitor</i> launcher on the desktop. The Monitor tab watches (its Abort button ends a session); the <b>Settings tab changes Data2G</b> — leave it alone while LinBPQ drives it. Options: <span class="kw">--port N</span>, <span class="kw">--now</span>, <span class="kw">--password</span> (new password only), <span class="kw">--off</span> (back to data2g-host).</div>
+    </div><div class="cmd-tag purple">monitor</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> systemctl daemon-reload &amp;&amp; <span class="sudo">sudo</span> systemctl restart data2g</code>
+      <div class="cmd-label">Restart after changing <span class="kw">/etc/systemd/system/data2g.service</span>. LinBPQ reconnects by itself; the card should say <i>On air</i>. <i>LinBPQ not attached</i> for more than a minute: restart LinBPQ. Transmit level: <span class="kw">--output-volume</span> in dB below full scale (starts at -6), set by the radio's ALC like VARA's.</div>
+    </div><div class="cmd-tag amber">restart</div></div>
+  </div>
+</div>
+
 <div class="section" id="wp">
   <h2 class="section-title cyan">Winlink White Pages clean-up</h2>
   <p class="intro">Tools for removing junk entries from LinBPQ's <span class="kw">WP.cfg</span>. Every change makes a timestamped backup next to WP.cfg and restarts BPQ.</p>
@@ -1195,6 +1278,10 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
       <code><span class="sudo">sudo</span> python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py <span class="flag">--resume</span> N3MEL</code>
       <div class="cmd-label">Enable a paused partner now (<span class="kw">--resume all</span> for every paused one). <span class="kw">--pause N3MEL --hours 6</span> pauses one by hand. Both restart LinBPQ.</div>
     </div><div class="cmd-tag green">resume</div></div>
+    <div class="cmd"><div class="cmd-inner">
+      <code><span class="sudo">sudo</span> python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py <span class="flag">--test-notice</span></code>
+      <div class="cmd-label">v1.5.45: sends one test BBS message to the notice address (config.php <span class="kw">watchdog.notify_to</span>, else <span class="kw">station.callsign</span>) and changes nothing else. It checks <span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span> and the login to the BBS. <i>BBS message sent to …</i> means it worked: look for it in your BBS mail. <i>BBS message not sent: …</i> shows the last thing the BBS said, with the password masked.</div>
+    </div><div class="cmd-tag blue">test notice</div></div>
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> crontab <span class="flag">-l</span> | grep connect-watchdog; <span class="sudo">sudo</span> tail <span class="flag">-20</span> /var/log/bpq-dashboard/connect-watchdog.log</code>
       <div class="cmd-label">Scheduled? It runs from root's crontab every 5 minutes: <span class="kw">*/5 * * * * /usr/bin/python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py</span> (root: it edits linmail.cfg and restarts LinBPQ). The log shows each run's decision. Also in Admin → Log Viewer.</div>
@@ -1567,6 +1654,8 @@ cd bpq-dashboard-<span id="verLatest2">X.Y.Z</span> &amp;&amp; <span class="sudo
     <div class="paths-row"><div class="paths-key">LinBPQ</div><div class="paths-val"><var data-v="linbpq">/opt/linbpq</var>/  (bpq32.cfg, linmail.cfg, WP.cfg)</div></div>
     <div class="paths-row"><div class="paths-key">BPQ logs</div><div class="paths-val"><var data-v="root">/var/www/bpq-dashboard</var>/logs/  (link to LinBPQ's log folder)</div></div>
     <div class="paths-row"><div class="paths-key">RF Connections BBS lines</div><div class="paths-val"><var data-v="root">/var/www/bpq-dashboard</var>/cache/bbs-lines/ — the lines RF Connections needs from each day's BBS log (v1.5.39), kept so a day's log is read once. Safe to delete; it is rebuilt.</div></div>
+    <div class="paths-row"><div class="paths-key">Mercury HF</div><div class="paths-val">/etc/mercury/mercury.ini (settings) · /etc/systemd/system/mercury.service · /var/log/mercury/mercury.log (UTC, 20 MB, then .1) · <var data-v="root">/var/www/bpq-dashboard</var>/cache/mercury-state.json (what the card has read). See <a href="#mercury">Mercury HF modem</a>.</div></div>
+    <div class="paths-row"><div class="paths-key">Data2G HF</div><div class="paths-val">/etc/systemd/system/data2g.service (its options) · /usr/local/bin/data2g-host, data2g-web · /usr/local/src/data2g (source) · ~/.config/Data2G/data2g.conf of the service user (page password, hashed) · /var/log/data2g/data2g.log (UTC, weekly, then .1) · <var data-v="root">/var/www/bpq-dashboard</var>/cache/data2g-state.json. See <a href="#data2g">Data2G HF modem</a>.</div></div>
     <div class="paths-row"><div class="paths-key">Connect Watchdog</div><div class="paths-val"><var data-v="root">/var/www/bpq-dashboard</var>/cache/watchdog-state.json (state) · cache/linmail.lock (shared with the scheduler and storm monitor) · <var data-v="linbpq">/opt/linbpq</var>/linmail.cfg.watchdog.bak (copy before its last change) · /var/log/bpq-dashboard/connect-watchdog.log. See <a href="#watchdog">Connect Watchdog</a>.</div></div>
     <div class="paths-row"><div class="paths-key">Parser schedule</div><div class="paths-val">/etc/cron.d/bpq-dashboard</div></div>
     <div class="paths-row"><div class="paths-key">Admin sudo rules</div><div class="paths-val">/etc/sudoers.d/www-data-tools (copy of www-data-tools.sudoers)</div></div>
@@ -2081,11 +2170,15 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
       '<td><input class="ws-call" value="' + esc(w.call || '') + '" placeholder="KP2L-10" maxlength="9" style="text-transform:uppercase; width:9em" aria-label="Callsign"></td>' +
       '<td><select class="ws-port" aria-label="Port">' + opts + '</select></td>' +
       '<td><input class="ws-hours" type="number" min="0.5" max="720" step="0.5" value="' + esc(w.hours || 6) + '" style="width:6em" aria-label="Hours"></td>' +
+      '<td><select class="ws-probe" aria-label="Test connect every">' + [0, 1, 2, 3, 4, 6, 8, 12, 24].map(h =>
+        '<option value="' + h + '"' + (Number(w.probe_hours || 0) === h ? ' selected' : '') + '>' + (h ? 'every ' + h + ' h' : 'off') + '</option>').join('') + '</select>' +
+        (w.last_probe ? '<div style="font-size:0.75rem;color:' + (w.last_probe.result === 'connected' ? 'var(--green)' : 'var(--amber)') + '">' +
+          (w.last_probe.result === 'connected' ? '✓ ' : '✗ ') + esc(w.last_probe.result) + ' ' + esc(wsAgo(w.last_probe.probed_at)) + '</div>' : '') + '</td>' +
       '<td>' + heard + '</td>' +
       '<td><button class="editor-btn reload" type="button" title="Remove" onclick="this.closest(\'tr\').remove()">✕</button></td>';
     document.getElementById('wsBody').appendChild(tr);
   }
-  window.wsAdd = function () { wsRow({ call: '', port: null, hours: 6 }); };
+  window.wsAdd = function () { wsRow({ call: '', port: null, hours: 6, probe_hours: 0 }); };
   function wsFill(j) {
     wsPorts = j.ports || [];
     document.getElementById('wsBody').innerHTML = '';
@@ -2143,7 +2236,9 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
       const port = tr.querySelector('.ws-port').value;
       const hours = parseFloat(tr.querySelector('.ws-hours').value);
       if (!(hours >= 0.5 && hours <= 720)) { setSt(st, 'err', 'Hours for ' + call_ + ': 0.5 to 720'); return; }
-      watch.push({ call: call_, port: port ? Number(port) : null, hours });
+      const probe_hours = Number(tr.querySelector('.ws-probe').value) || 0;
+      if (probe_hours && !port) { setSt(st, 'err', 'Test connect for ' + call_ + ' needs a port'); return; }
+      watch.push({ call: call_, port: port ? Number(port) : null, hours, probe_hours });
     }
     setSt(st, 'info', 'Saving…');
     const j = await call('watch_save', 'POST', { watch, live_mheard: document.getElementById('wsLive').checked });
