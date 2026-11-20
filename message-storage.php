@@ -48,6 +48,23 @@ header('Content-Type: application/json');
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// v1.5.68: the "Mail store" view (Dovecot over IMAP on 127.0.0.1)
+require_once __DIR__ . '/includes/mail-store-actions.php';
+$msAction = $method === 'GET' ? (string)($_GET['action'] ?? '') : '';
+$msInput = null;
+if ($method === 'POST') {
+    $msRaw = file_get_contents('php://input');
+    $msInput = json_decode($msRaw, true);
+    $msAction = is_array($msInput) ? (string)($msInput['action'] ?? '') : '';
+}
+if (bpq_mail_store_action($method, $msAction, $msInput)) exit;
+// v1.5.72: the BBS Mail address book
+require_once __DIR__ . '/includes/contacts-actions.php';
+if (bpq_contacts_action($method, $msAction, $msInput)) exit;
+// v1.5.73: BBS Mail message filters
+require_once __DIR__ . '/includes/mail-filters-actions.php';
+if (bpq_mail_filters_action($method, $msAction, $msInput)) exit;
+
 try {
     if ($method === 'GET') {
         $action = $_GET['action'] ?? '';
@@ -55,6 +72,93 @@ try {
         switch ($action) {
             case 'rules':
                 echo json_encode(['success' => true, 'rules' => msgdb_get_setting('rules', [])]);
+                break;
+
+            // v1.5.78: BBS Mail → Tools (from the database, so every browser agrees)
+            case 'bbsSeen': {
+                // BBSes in the senders' full addresses (the "From: CALL@BBS.#AREA..."
+                // line BPQ puts at the top of a message), last 180 days
+                $pdo = tprfn_db();
+                $rows = $pdo->query("SELECT msg_type, from_call, first_seen_at, LEFT(body, 600) AS head
+                    FROM bpq_messages WHERE body IS NOT NULL AND first_seen_at >= NOW() - INTERVAL 180 DAY
+                    ORDER BY id DESC LIMIT 20000")->fetchAll(PDO::FETCH_ASSOC);
+                $seen = [];
+                foreach ($rows as $r) {
+                    if (!preg_match('/^\s*From:\s*([A-Z0-9\/-]+)@([A-Z0-9#.-]+)/mi', (string)$r['head'], $m)) continue;
+                    $route = strtoupper($m[2]);
+                    $key = explode('.', $route)[0];
+                    if (!preg_match('/^[A-Z0-9-]{3,12}$/', $key)) continue;
+                    $e = &$seen[$key];
+                    if (!$e) $e = ['bbs' => $key, 'route' => $route, 'count' => 0, 'personal' => 0, 'bulletins' => 0,
+                                   'first' => $r['first_seen_at'], 'last' => $r['first_seen_at'], 'senders' => []];
+                    $e['count']++;
+                    if ($r['msg_type'] === 'B') $e['bulletins']++; else $e['personal']++;
+                    if (strlen($route) > strlen($e['route'])) $e['route'] = $route;
+                    if ($r['first_seen_at'] < $e['first']) $e['first'] = $r['first_seen_at'];
+                    if ($r['first_seen_at'] > $e['last']) $e['last'] = $r['first_seen_at'];
+                    $who = strtoupper($m[1]);
+                    $e['senders'][$who] = ($e['senders'][$who] ?? 0) + 1;
+                    unset($e);
+                }
+                foreach ($seen as &$e) { arsort($e['senders']); $e['senders'] = array_slice(array_keys($e['senders']), 0, 5); }
+                unset($e);
+                usort($seen, fn($a, $b) => strcmp($b['last'], $a['last']));
+                echo json_encode(['success' => true, 'bbses' => array_values($seen), 'scanned' => count($rows)]);
+                break;
+            }
+
+            case 'mailStats': {
+                $pdo = tprfn_db();
+                $by = $pdo->query("SELECT msg_type, COUNT(*) AS n, SUM(first_seen_at >= NOW() - INTERVAL 1 DAY) AS d1,
+                        SUM(first_seen_at >= NOW() - INTERVAL 7 DAY) AS d7, SUM(first_seen_at >= NOW() - INTERVAL 30 DAY) AS d30,
+                        SUM(body IS NOT NULL AND body <> '') AS texts, MIN(first_seen_at) AS since
+                    FROM bpq_messages GROUP BY msg_type")->fetchAll(PDO::FETCH_ASSOC);
+                $senders = $pdo->query("SELECT CASE WHEN from_call LIKE 'RMS:%' OR from_call LIKE 'SMTP:%' THEN LOWER(SUBSTRING(from_call, LOCATE(':', from_call) + 1))
+                        ELSE REGEXP_REPLACE(UPPER(SUBSTRING_INDEX(from_call, '@', 1)), '-[0-9]+$', '') END AS who, COUNT(*) AS n
+                    FROM bpq_messages WHERE first_seen_at >= NOW() - INTERVAL 30 DAY GROUP BY who ORDER BY n DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+                $groups = $pdo->query("SELECT UPPER(SUBSTRING_INDEX(to_call, '@', 1)) AS grp, COUNT(*) AS n
+                    FROM bpq_messages WHERE msg_type = 'B' AND first_seen_at >= NOW() - INTERVAL 30 DAY GROUP BY grp ORDER BY n DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
+                $kills = null;
+                try {
+                    $kills = $pdo->query("SELECT COUNT(*) AS n, SUM(done_at IS NULL) AS waiting, SUM(result = 'killed') AS killed FROM bpq_bbs_kills")->fetch(PDO::FETCH_ASSOC);
+                } catch (Throwable $e) { /* table not there yet */ }
+                echo json_encode(['success' => true, 'byType' => $by, 'senders' => $senders, 'groups' => $groups, 'kills' => $kills]);
+                break;
+            }
+
+            case 'killList': {
+                $pdo = tprfn_db();
+                $rows = [];
+                try {
+                    $rows = $pdo->query("SELECT bbs_number, msg_type, from_call, LEFT(subject, 120) AS subject, source, queued_at, tries, done_at, result
+                        FROM bpq_bbs_kills ORDER BY id DESC LIMIT 300")->fetchAll(PDO::FETCH_ASSOC);
+                } catch (Throwable $e) { /* table not there yet: run update.sh */ }
+                $other = $pdo->query("SELECT bbs_number, msg_type, from_call, LEFT(subject, 120) AS subject, killed_on_bbs_at
+                    FROM bpq_messages WHERE killed_on_bbs_at IS NOT NULL ORDER BY killed_on_bbs_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode(['success' => true, 'queue' => $rows, 'kept' => $other]);
+                break;
+            }
+
+            case 'winlinkStatus':   // v1.5.77: Winlink mail the BBS collected or sent (Maintenance)
+                $pdo = tprfn_db();
+                $where = "msg_type <> 'B' AND (from_call LIKE 'RMS:%' OR from_call LIKE 'SMTP:%' OR to_call LIKE 'RMS:%' OR to_call LIKE 'SMTP:%' OR LOWER(to_call) LIKE '%@winlink.org' OR LOWER(from_call) LIKE '%@winlink.org')";
+                $in = $pdo->query("SELECT REGEXP_REPLACE(UPPER(SUBSTRING_INDEX(to_call, '@', 1)), '-[0-9]+$', '') AS account,
+                        COUNT(*) AS n, SUM(first_seen_at >= NOW() - INTERVAL 7 DAY) AS week, MAX(first_seen_at) AS last
+                    FROM bpq_messages WHERE $where AND (from_call LIKE 'RMS:%' OR from_call LIKE 'SMTP:%' OR LOWER(from_call) LIKE '%@winlink.org')
+                    GROUP BY account ORDER BY last DESC LIMIT 20")->fetchAll(PDO::FETCH_ASSOC);
+                $out = $pdo->query("SELECT COUNT(*) AS n, SUM(first_seen_at >= NOW() - INTERVAL 7 DAY) AS week, MAX(first_seen_at) AS last
+                    FROM bpq_messages WHERE $where AND NOT (from_call LIKE 'RMS:%' OR from_call LIKE 'SMTP:%' OR LOWER(from_call) LIKE '%@winlink.org')")->fetch(PDO::FETCH_ASSOC);
+                $acc = [];
+                try {
+                    $v = tprfn_query_one($pdo, "SELECT value FROM bpq_mail_prefs WHERE name = 'accounts'");
+                    foreach ((array)(json_decode((string)($v['value'] ?? ''), true)['accounts'] ?? []) as $x) $acc[] = $x['call'] ?? '';
+                } catch (Throwable $e) { /* table not there yet */ }
+                echo json_encode(['success' => true, 'received' => $in, 'sent' => $out, 'accounts' => array_values(array_filter($acc)),
+                    'now' => date('Y-m-d H:i:s')]);
+                break;
+
+            case 'readChanges':   // v1.5.68: read marks made in a mail app (bbs-mail-sync.py)
+                echo json_encode(msgdb_read_changes((string)($_GET['since'] ?? '')));
                 break;
 
             case 'unread':
@@ -202,6 +306,10 @@ try {
                     $input['number'] ?? null,
                     $input['folder'] ?? 'Saved'
                 ));
+                break;
+
+            case 'markUnread':    // v1.5.68: so the mail store (Thunderbird) shows it unread too
+                echo json_encode(msgdb_mark_unread($input['id'] ?? null, $input['number'] ?? null));
                 break;
 
             case 'markReadBulk':

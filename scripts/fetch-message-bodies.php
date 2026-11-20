@@ -26,7 +26,9 @@
  *      the saved row, because BPQ reuses message numbers. "Message N not
  *      found" replies are never stored;
  *   4. clears old "Message N not found" replies that earlier versions of
- *      the page saved as if they were message text.
+ *      the page saved as if they were message text;
+ *   5. (v1.5.70) kills on the BBS the messages that left the BBS mail
+ *      store's Trash (bpq_bbs_kills), after the same header check.
  *
  * Bulletins: config.php 'messages' => ['bulletin_text' => 'all'|'pinned'|'none']
  * (default 'all'; 'pinned' = only groups pinned 📌 in the Email Client).
@@ -465,10 +467,71 @@ if (!$opt['dry'] && $candidates) {
     saveState($stateFile, $state);
 }
 
+// 5. v1.5.70: kill on the BBS what left the mail store's Trash (bpq_bbs_kills,
+//    filled by the Email Client's Empty Trash / Delete for good and by
+//    bbs-mail-sync.py). R <n> first: only a number that still holds the same
+//    message (From/Title) is killed, because BPQ reuses numbers.
+$stats['bbs_killed'] = 0; $stats['bbs_kill_skipped'] = 0;
+$killTable = false;
+try {
+    $killTable = (int)$pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE()
+                                   AND TABLE_NAME = 'bpq_bbs_kills'")->fetchColumn() > 0;
+} catch (Throwable $e) { /* reported by System Audit */ }
+if ($killTable && !$opt['dry'] && isFeatureEnabled('bbs_write')) {
+    $kq = $pdo->query("SELECT * FROM bpq_bbs_kills WHERE done_at IS NULL AND tries < 3 ORDER BY id LIMIT 30")->fetchAll(PDO::FETCH_ASSOC);
+    if ($kq) {
+        $done = $pdo->prepare("UPDATE bpq_bbs_kills SET done_at = NOW(), result = ?, tries = tries + 1 WHERE id = ?");
+        $retry = $pdo->prepare("UPDATE bpq_bbs_kills SET tries = tries + 1,
+                                       done_at = IF(tries + 1 >= 3, NOW(), NULL), result = IF(tries + 1 >= 3, 'error', NULL) WHERE id = ?");
+        try {
+            $lock = lockOrThrow();
+            try {
+                $sock = bbsOpen();
+                $sessStart = microtime(true);
+                try {
+                    foreach ($kq as $row) {
+                        if (microtime(true) - $sessStart > 60) break;
+                        $num = (int)$row['bbs_number'];
+                        $label = "#$num {$row['msg_type']} {$row['from_call']} \"" . substr($row['subject'], 0, 40) . '"';
+                        $r = bbsCommand($sock, 'R ' . $num, 30);
+                        $verdict = $r['prompt'] ? judgeReply($r['text'], $row) : 'error';
+                        if ($verdict === 'ok') {
+                            $k = bbsCommand($sock, 'K ' . $num, 15);
+                            $kt = (string)$k['text'];
+                            if (stripos($kt, 'not yours') !== false || stripos($kt, 'Invalid') !== false || !$k['prompt']) {
+                                $retry->execute([$row['id']]);
+                                $stats['errors']++;
+                                out("WARNING: kill $label refused: " . trim(preg_replace('/\s+/', ' ', substr($kt, 0, 120))));
+                                continue;
+                            }
+                            $verdict = 'killed';
+                        }
+                        if ($verdict === 'error') { $retry->execute([$row['id']]); $stats['errors']++; vlog("  kill error $label"); continue; }
+                        $result = $verdict === 'not_found' ? 'gone' : $verdict;   // killed | gone | other
+                        $done->execute([$result, $row['id']]);
+                        if ($result === 'other') { $stats['bbs_kill_skipped']++; vlog("  not killed (number now another message) $label"); continue; }
+                        try { msgdb_kill_message($row['bbs_number'], $row['msg_type']); } catch (Throwable $e) { /* row already gone */ }
+                        if ($result === 'killed') $stats['bbs_killed']++;
+                        out(($result === 'killed' ? 'Killed on the BBS (left the mail store Trash): ' : 'Already gone from the BBS: ') . $label);
+                    }
+                } finally {
+                    bbsClose($sock);
+                }
+            } finally {
+                bpqTelnetUnlock($lock);
+            }
+        } catch (Throwable $e) {
+            $stats['errors']++;
+            out('WARNING: kill session: ' . $e->getMessage());
+        }
+    }
+}
+
 $s = $stats;
 out(sprintf('Done in %ds: listed P:%d T:%d B:%d (' . ($s['bulletin_list'] ?? 'LB') . '), %d new archived, %d to read, text saved %d, ' .
             'not on BBS %d, number reused %d, skipped (gone or failed before) %d, errors %d, "not found" junk cleared %d%s',
     (int)round(microtime(true) - $t0), $s['listed']['P'], $s['listed']['T'], $s['listed']['B'], $s['archived'],
     $s['candidates'], $s['saved'], $s['not_found'], $s['other_msg'], $s['skipped_failed'],
-    $s['errors'], $s['junk_cleared'], $opt['dry'] ? ' (DRY RUN: nothing read or written)' : ''));
+    $s['errors'], $s['junk_cleared'], ($s['bbs_killed'] || $s['bbs_kill_skipped'] ? sprintf(', killed from Trash %d (skipped, number reused %d)', $s['bbs_killed'], $s['bbs_kill_skipped']) : '')
+    . ($opt['dry'] ? ' (DRY RUN: nothing read or written)' : '')));
 exit($s['errors'] > 0 && $s['saved'] === 0 && $s['candidates'] > 0 ? 1 : 0);

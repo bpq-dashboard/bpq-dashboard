@@ -191,8 +191,10 @@ function validateAddress($addr) {
     // ISP Gateway (BPQ's direct SMTP relay, distinct from Winlink/RMS)
     // addressing: smtp:user@domain.tld — validate the part after the
     // prefix as a real email address rather than a callsign.
-    if (stripos($addr, 'smtp:') === 0) {
-        $email = substr($addr, 5);
+    // v1.5.77: rms:user@domain = internet mail through Winlink (BPQ's RMS
+    // forwarding), the form Winlink mail's sender arrives in
+    if (stripos($addr, 'smtp:') === 0 || stripos($addr, 'rms:') === 0) {
+        $email = trim(substr($addr, strpos($addr, ':') + 1));
         return (bool) preg_match('/^[^\s@]+@[^\s@]+\.[^\s@]+$/', $email);
     }
     // Allow callsigns with optional SSID, @routing, .hierarchical
@@ -1038,6 +1040,92 @@ function forwardMessage($msgNum, $toAddr) {
 // SEND MESSAGE
 // ===========================
 
+/** v1.5.76: where send records live (data/sends), or null if it can't be written. */
+function bpq_send_dir(): ?string
+{
+    $d = __DIR__ . '/data/sends';
+    if (!is_dir($d)) @mkdir($d, 0750, true);
+    return (is_dir($d) && is_writable($d)) ? $d : null;
+}
+
+/** The hash a send record is keyed on: the message as the send action reads it. */
+function bpq_send_hash(array $in): string
+{
+    $type = strtoupper((string)($in['type'] ?? 'P'));
+    if (!in_array($type, ['P', 'B', 'T'], true)) $type = 'P';
+    return hash('sha256', trim((string)($in['to'] ?? '')) . "\n" . $type . "\n" . trim((string)($in['subject'] ?? '')) . "\n" . trim((string)($in['body'] ?? '')));
+}
+
+/**
+ * Claim send_id for this request, or answer for it and exit (v1.5.76).
+ * Sets $GLOBALS['bpqSendRec'] when this request owns a new record.
+ */
+function bpq_send_claim(array $in): void
+{
+    header('Content-Type: application/json');
+    $sid = (string)$in['send_id'];
+    if (!preg_match('/^[A-Za-z0-9_-]{8,64}$/', $sid)) { echo json_encode(['success' => false, 'error' => 'Bad send id']); exit; }
+    $check = !empty($in['check_only']);
+    $dir = bpq_send_dir();
+    if ($dir === null) {
+        if ($check) { echo json_encode(['success' => false, 'unsupported' => true, 'error' => "This server keeps no send records (data/sends isn't writable)"]); exit; }
+        return;   // send as before, without the protection
+    }
+    $rec = "$dir/$sid.json";
+    $hash = bpq_send_hash($in);
+    if ($check && !is_file($rec)) { echo json_encode(['success' => false, 'unknown' => true, 'error' => 'No try of this message reached the server']); exit; }
+    $fh = $check ? false : @fopen($rec, 'x');   // atomic: only one request can claim an id
+    if ($fh) {
+        fwrite($fh, json_encode(['state' => 'sending', 'hash' => $hash, 'started' => time()]));
+        fclose($fh);
+        $GLOBALS['bpqSendRec'] = $rec; $GLOBALS['bpqSendHash'] = $hash;
+        ignore_user_abort(true);   // finish, and record the outcome, even if the browser has gone
+        @set_time_limit(240);
+        if (mt_rand(1, 20) === 1) bpq_send_prune($dir);
+        // a send that stops before reaching the BBS (bad address, BBS busy)
+        // gives the id back, so the same message can be tried again
+        register_shutdown_function(function () {
+            if (!empty($GLOBALS['bpqSendRec']) && empty($GLOBALS['bpqSendStarted'])) @unlink($GLOBALS['bpqSendRec']);
+        });
+        return;
+    }
+    $r = json_decode((string)@file_get_contents($rec), true) ?: [];
+    if (($r['hash'] ?? '') !== $hash) { echo json_encode(['success' => false, 'error' => 'That send id belongs to a different message']); exit; }
+    if (($r['state'] ?? '') === 'sending') {
+        $age = time() - (int)($r['started'] ?? 0);
+        if ($age < 300) { echo json_encode(['success' => false, 'pending' => true, 'error' => "Still sending (started {$age} s ago)"]); exit; }
+        echo json_encode(['success' => false, 'stale' => true,
+            'error' => 'An earlier try of this message never finished, so it may or may not be on the BBS. Check the BBS list or Sent before sending it again.']);
+        exit;
+    }
+    $res = (array)($r['result'] ?? ['success' => false, 'error' => 'No result recorded']);
+    $res['repeat'] = true;
+    logMessage("Send $sid repeated: answered from the first try");
+    echo json_encode($res, JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+
+/** Record the outcome of a claimed send: kept if sent, given back if not. */
+function bpq_send_finish(array $res): void
+{
+    $rec = $GLOBALS['bpqSendRec'] ?? null;
+    if (!$rec) return;
+    if (!empty($res['success'])) {
+        @file_put_contents($rec, json_encode(['state' => 'done', 'hash' => $GLOBALS['bpqSendHash'], 'done' => time(), 'result' => $res], JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
+    } else {
+        @unlink($rec);   // not sent: the same message may be tried again
+    }
+    $GLOBALS['bpqSendRec'] = null;
+}
+
+/** Remove send records older than 7 days. */
+function bpq_send_prune(string $dir): void
+{
+    foreach ((array)glob("$dir/*.json") as $f) {
+        if (is_file($f) && filemtime($f) < time() - 7 * 86400) @unlink($f);
+    }
+}
+
 function sendMessage($to, $type, $subject, $body) {
     global $config;
     
@@ -1089,7 +1177,8 @@ function sendMessage($to, $type, $subject, $body) {
         // Callsign addresses are conventionally uppercased; an smtp:
         // (ISP Gateway) address is a real email address and shouldn't
         // be — preserve it exactly as given.
-        $toForCmd = (stripos($to, 'smtp:') === 0) ? $to : strtoupper($to);
+        $toForCmd = (stripos($to, 'smtp:') === 0) ? $to
+                  : ((stripos($to, 'rms:') === 0) ? 'rms:' . trim(substr($to, 4)) : strtoupper($to));   // v1.5.77
         $sendCmd = "S{$type} " . $toForCmd;
         fwrite($socket, $sendCmd . "\r\n");
         logMessage("  >> $sendCmd");
@@ -1265,6 +1354,27 @@ function parseMessageList($raw) {
 // $config only, no request handling.
 if (defined('BPQ_MESSAGES_LIB')) return;
 
+// v1.5.76: one BBS message per send_id (the duplicate-send fix). The pages
+// give every message a one-time id. When the connection drops before the
+// answer comes (an iPad that locks its screen: "Load failed", a Wi-Fi
+// drop), they ask again with the same id instead of reporting an error.
+// The id is claimed here, before the BBS lock, so those questions are
+// answered at once from data/sends/<id>.json (outcome and a hash of the
+// message, never its text; kept 7 days) rather than waiting behind the
+// send itself:
+//   check_only + no record → unknown (no try arrived: sending is safe)
+//   record "sending"       → pending (still on the BBS), stale after 5 min
+//   record "done"          → the first answer again, repeat = true
+// A second send with the same id never posts a second copy.
+$bpqSendRec = null; $bpqSendHash = ''; $bpqSendStarted = false;
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $bpqIn = json_decode((string)file_get_contents('php://input'), true);
+    if (is_array($bpqIn) && ($bpqIn['action'] ?? '') === 'send' && isset($bpqIn['send_id']) && $bpqIn['send_id'] !== '') {
+        bpq_send_claim($bpqIn);
+    }
+    unset($bpqIn);
+}
+
 // Every request below talks to the BBS: take the shared lock first, and
 // release it when PHP finishes (all paths end in echo/exit/apiError).
 $bpqLock = bpqTelnetLock(40);
@@ -1304,12 +1414,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         
         // Validate type
         $type = strtoupper($type);
-        if (!in_array($type, ['P', 'B'])) {
+        // v1.5.74: T = NTS traffic (ST), e.g. to 30301@NTSGA
+        if (!in_array($type, ['P', 'B', 'T'])) {
             $type = 'P';
         }
         
-        logMessage("Sending message to: $to, type: $type");
-        echo json_encode(sendMessage($to, $type, $subject, $body), JSON_INVALID_UTF8_SUBSTITUTE);
+        logMessage("Sending message to: $to, type: $type" . (!empty($GLOBALS['bpqSendRec']) ? ' (send ' . basename($GLOBALS['bpqSendRec'], '.json') . ')' : ''));
+        $GLOBALS['bpqSendStarted'] = true;
+        $res = sendMessage($to, $type, $subject, $body);
+        bpq_send_finish($res);
+        echo json_encode($res, JSON_INVALID_UTF8_SUBSTITUTE);
         exit;
     }
     

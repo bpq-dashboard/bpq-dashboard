@@ -47,6 +47,11 @@ function bpq_mercury_settings(): array {
         'log'      => (string)($c['log'] ?? '/var/log/mercury/mercury.log'),
         'ini'      => $ini,
         'tnc_port' => $port > 0 ? $port : 8400,
+        // v1.5.80: 8400 is only Mercury's default guess, and Data2G's web
+        // monitor (data2g-web) also listens on 8400 by default. Something on
+        // that port only means Mercury when the port came from config.php or
+        // mercury.ini, or a mercury process is running.
+        'tnc_port_known' => $port > 0,
         'broadcast_port' => $bcast > 0 ? $bcast : 8100,     // Mercury's default; clashes with QtSoundModem's KISS port
         'ui_enabled' => $uiOn,                              // mercury.ini [main] ui_enabled (v1.5.49)
         'ui_port'    => $uiPort > 0 ? $uiPort : 10000,
@@ -315,6 +320,12 @@ function bpq_mercury_status(string $cacheDir): array {
         if (($bp['tnc_port'] ?? 0) === $p && in_array(strtolower($bp['tnc_host'] ?? ''), ['127.0.0.1', 'localhost', '::1'], true)) {
             $bpqPort = ['num' => $num, 'name' => $bp['name']]; break;
         }
+    }
+    if (!$cfg['tnc_port_known'] && $proc !== true) {
+        // the 8400 guess, no mercury process: whatever listens there isn't
+        // known to be Mercury (Data2G's web monitor, another program)
+        $listening = $attached = $socks === null ? null : false;
+        $bpqPort = null;
     }
     if ($cfg['enabled'] === 'auto' && !$logThere && !$listening && !$proc && !$bpqPort) return ['enabled' => false];
 

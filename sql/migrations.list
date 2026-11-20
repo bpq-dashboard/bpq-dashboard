@@ -17,3 +17,9 @@ sql/2026-11-15-rf-connections-vhf.sql
 sql/2026-11-15-rf-connections-freq-decimal.sql
 sql/2026-11-15-rf-connections-data2g.sql
 sql/2026-11-18-rf-connections-link-sec.sql
+sql/2026-11-18-bbs-mail-sync.sql
+sql/2026-11-18-bbs-mail-sync-read.sql
+sql/2026-11-18-bbs-kill-queue.sql
+sql/2026-11-18-contacts.sql
+sql/2026-11-18-mail-filters.sql
+sql/2026-11-18-mail-prefs.sql

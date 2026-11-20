@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.66**
+**Version 1.5.83**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -123,7 +123,7 @@ Every page loads the same bar at the top.
 ![The navigation bar on a desktop browser with the Admin menu open: brand, the 13 page links, the Guide link, the UTC and local clocks, the theme button and the Admin menu](docs/screenshots/nav-bar.png)
 
 - **📡 BPQ Dashboard** — returns to the home page, RF Connections.
-- **Page links** — RF, Traffic, System, Connects, Messages, Email, Weather, Chat, APRS, VARA, Telnet, Rig, RF Power. The page you're on is highlighted.
+- **Page links** — RF, Traffic, System, Connects, Messages, Email, Weather, Chat, APRS, VARA, Telnet, Rig, RF Power. The page you're on is highlighted. **Email** opens BBS Mail, the Thunderbird-style page, where the BBS mail store is set up (v1.5.71), otherwise the Email Client (Section 9).
 - **📖 Guide** — opens this guide as a PDF in a new tab.
 - **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit, Audio Map (v1.5.57). These ask for the admin login.
 - **Clocks** — UTC (purple, "Z") and your browser's local time ("L"), updated every second.
@@ -378,6 +378,8 @@ The `bpq-aprs` service keeps a connection to APRS-IS, filtered to your area (`ap
 
 A webmail-style client for your BBS: Personal mail, NTS traffic and bulletins, with folders, rules, an address book and a database copy of everything.
 
+> **v1.5.75: for stations without the mail store.** Where the mail store is set up (*Reading BBS mail in a mail app*, below), **Email** always opens **BBS Mail** instead, and this page isn't used: it switches there by itself, and the *Classic view* buttons are gone. Without the mail store this page works as before, with a blue note at the top on how to set it up (× hides the note for 30 days in that browser). Its Quick Check-In has moved into BBS Mail too, and the details you saved here are brought over the first time you open it there.
+
 ![Email Client with the folder list, message list and reading pane (illustration; the current page opens messages in a pop-up by default)](docs/screenshots/email-client.svg)
 
 ### What you see
@@ -457,7 +459,11 @@ The search box filters the **folder you're in** by from, to, subject and message
 4. **Subject** (BPQ keeps 60 characters) and **Body** (plain text).
 5. Click **Send**. The BBS stores the message and forwards it on its normal schedule.
 
+**If the connection drops while sending** (v1.5.76): sending takes a few seconds while the dashboard logs into the BBS. If the connection is lost before the answer comes back (a phone or iPad locking its screen or switching apps, Safari's *Load failed*, or a Wi-Fi drop), the page doesn't call it a failure. The status shows *Connection lost; checking with the server whether it went…*, then *Still sending on the BBS…*, and ends with **Sent** (*it had gone on the first try*), or sends it then if the first try never reached the server. Each message has a one-time id, so pressing Send again for the same text can't post a second copy. Only if the server can't be reached for about 2½ minutes does it say *Couldn't confirm whether it was sent*: check Sent or the BBS list before sending again.
+
 **Signature** (v1.5.19): set one in **Preferences** and it is added to every new message when the Compose window opens, so you can change or delete it before sending. Optionally also on replies (placed above the quoted message) and with the usual `-- ` line in front. It is never added to Quick Check-In, NTS radiograms or PKTNET forms, whose formats are fixed. Plain text, up to 10 lines; it is kept on the server, so every browser and device uses the same one.
+
+**Winlink mail** (v1.5.77): when the BBS collects Winlink mail (*Poll RMS*, Maintenance → *Winlink mail*), it arrives as ordinary personal mail and is marked **Winlink** in the list and the reader. Internet senders show as `RMS:user@domain`; Reply goes back to that address through Winlink. To write to an internet address through Winlink, put `rms:user@domain` in **To** (its case is kept); to a Winlink user, `CALL@winlink.org`.
 
 **Send via SMTP** sends to an internet e-mail address through BPQ's own Internet (ISP) Gateway; the dashboard adds the `smtp:` prefix. Use it only after the gateway is set up and tested in BPQ — on an unconfigured gateway BPQ has hung the whole node on a single message.
 
@@ -525,6 +531,102 @@ NTS traffic is filed into **NTS** automatically, with an unread count. **📄 NT
 ### Forwarding details
 
 Open a message and look at the forward-events panel to see which BBSes it was forwarded to and when.
+
+### Reading BBS mail in a mail app (optional, v1.5.67)
+
+The sysop can set up a small mail store on the station that keeps a copy of the BBS mail, so it can be read in Thunderbird, a phone's mail app or any other IMAP mail program, with folders, read marks and search:
+
+| Folder | What's in it |
+|---|---|
+| **INBOX** | Personal and NTS mail to the station's callsign (or SYSOP) |
+| **Sent** | Personal and NTS mail from the station's callsign |
+| **Bulletins/WX**, **Bulletins/SITREP** … | Every bulletin, one folder per group, kept 90 days |
+
+- **It's a copy.** The BBS stays the master: filing or deleting in the mail app changes nothing on the BBS or in this Email Client's own folders. Mail passing through for other stations isn't copied.
+- **Read marks are shared both ways** (v1.5.68). A message read in the mail app shows as read here, and one read (or marked *Unread*) here shows that way in the mail app, within about 2 minutes. If both sides changed the same message, read wins.
+- **New mail arrives within about 7 minutes**: the dashboard saves a message's text every 5 minutes (`message-bodies.timer`) and `bbs-mail-sync.timer` copies it every 2. A message whose text couldn't be saved within 2 days is copied with a note to read it on the BBS (`R <number>`).
+- **No sending from the mail app yet.** There's no outgoing mail: reply from this Email Client or the BBS. Senders show as `CALL@bbs.invalid`, an address that can never leave the station.
+- **From your own network only**, over encrypted IMAP (port 993). Logins from other addresses are refused even if the port is open.
+- **Mail app settings:** server = the name on the station's certificate (or its address on your network), IMAP, port **993**, **SSL/TLS**, normal password; user name = the callsign in lower case; the mail password the sysop chose (not the BBS password). No outgoing server is needed.
+
+Set up with `sudo bash tools/bbs-mail-setup.sh` (Installation Manual §10.19); `--status` shows what's copied and waiting.
+
+**From home, the name must reach the station.** The certificate's name usually points to your internet address, which most routers don't answer from inside. Add a line `<station's address> <name>` to the computer's hosts file (Windows: `C:\Windows\System32\drivers\etc\hosts`, edited as administrator) or to your router's local DNS. In Thunderbird, if *Re-test* or *Done* hangs, click **Advanced config** in the manual setup: it creates the account without testing it.
+
+### BBS Mail: the Thunderbird-style page (v1.5.71)
+
+Where the mail store is set up, **Email** in the menu opens **BBS Mail** (`/admin/bbs-mail.html`), laid out like Thunderbird's *Classic* layout: folders on the left, the message list on the right, the open message under it. It shows the mail store — the same folders, read marks and stars as Thunderbird on your PC.
+
+- **Folder pane:** your callsign as the account, Inbox (with your own folders under it), Sent, Bulletins ▸ groups, Trash; unread counts in bold. ▸/▾ fold a branch. Right-click a folder: *New Folder…*, *Rename…*, *Delete Folder…* (your folders), *Mark Folder Read*, *Empty Trash…* (kills on the BBS).
+- **Message list:** columns ★ (star), ● (read), Subject, Correspondents (the recipient in Sent), Date, Size, Type, and BBS # (off by default). Click a heading to sort (again to reverse), drag a heading's edge to resize, right-click the headings to show or hide columns. Click to read; Ctrl-click and Shift-click select several; click ★ or ● on a row to star it or toggle read. More load as you scroll.
+- **Right-click a message:** Open Message in New Tab, Reply, Forward, Mark ▸ (read, unread, folder read, starred), Move To ▸, Copy To ▸, Delete.
+- **Drag and drop** messages onto a folder to move them (hold Ctrl to copy). Dropping on Trash = Delete.
+- **Message pane:** sender, subject, recipient, date (with UTC), BBS number and BID, folder; buttons Reply, Forward, ★, Delete, ⋯ (open in tab, read/unread, move, copy, copy text). Opening a message marks it read everywhere.
+- **Tabs** along the top: the folder tab, each message opened in its own tab (double-click or Enter), and each message being written. Ctrl+W closes, Ctrl+Tab moves on.
+- **Write / Reply / Forward** open a tab: To (suggestions from the Email Client's address book), Type (Personal SP, Bulletin SB, or — v1.5.74 — NTS traffic ST, addressed `ZIP@NTSst` such as `30301@NTSGA`; the To field's hint changes with the type), Subject and text, with your signature from the Email Client's Preferences. **Send** (Ctrl+Enter) sends it over the BBS as the station; it shows in Sent once the BBS lists it. A dropped connection while sending is handled as in the Email Client (*If the connection drops while sending*, above, v1.5.76): it checks with the server, and the same text to the same address is never posted twice. Reply quotes the message (`> `), Forward puts it under *Forwarded Message*.
+- **Search all folders** (the box in the toolbar, Ctrl+K; Enter to search, Esc to go back) searches every folder but Trash. **Quick Filter** (Ctrl+Shift+K) filters the open folder: Unread, Starred, and text in Sender / Recipients / Subject / Body.
+- **Delete** moves to Trash; in Trash it deletes for good and kills the message on the BBS (as described below). Shift+Delete outside Trash also only moves to Trash.
+- **Get Messages** (F5) re-reads the mail store; it also does so every 2 minutes. New BBS mail reaches it within about 7 minutes (see above).
+- **Toolbar:** NTS Report, PKTNET Forms, **✅ Check-In**, ≡ (more, keyboard shortcuts). Until v1.5.74 there was also a *Classic view* button for the older Email Client; from v1.5.75 BBS Mail is the only Email page where the mail store is set up.
+- **✅ Check-In** (v1.5.75, also ≡ → *Quick Check-In…*; moved here from the older Email Client): a short form (where to send it, SB bulletin or SP personal, your name, callsign, town, state, grid, check-in type, band, mode, the station you came in through, comments) that fills in a net check-in and opens it in a Write tab, without a signature. Nothing is sent until you press **Send** there. The details (all but the comments) are kept on the station, so every browser and PC fills in the same ones; the first time, they're taken from the older Email Client's copy in that browser if there is one.
+- Pane sizes, columns, sort order, open branches and the Quick Filter bar are remembered in this browser. Light and dark follow the dashboard's 🌙/☀ button.
+- **Print** (Ctrl+P) and **Save As Text** (Ctrl+S) are under ⋯ in the message pane.
+- **Winlink mail** (v1.5.77): mail the BBS collected from Winlink (*Poll RMS*, Maintenance → *Winlink mail*) or sent through it has a **Winlink** label in the Type column and the message pane, and ✉ before the sender. Internet senders show by their address (`jane@example.net`; Thunderbird shows `jane@example.net (Winlink)`), and **Reply** goes back through Winlink (`rms:jane@example.net`). In **To** you can write `rms:user@domain` for any internet address, or `CALL@winlink.org` for a Winlink user.
+- **Forwarded to** (v1.5.79): under the message's details, *↗ Forwarded to K7EK 20 Nov 05:29, N4SD …*: the BBSes your BBS passed this message on to and when, matched by its BID in LinBPQ's BBS log (the last 7 days of logs). Nothing shows for a message that wasn't forwarded on, or when LinBPQ's logging is off.
+- **iPad and phones** (v1.5.79): every toolbar button stays on screen (on narrower screens the less-used ones show only their icon, and on a phone NTS Report, Forms and Check-In move into ≡). Touch and hold a message, folder or contact for half a second to get the menu a right-click gives; tapping a ▸ menu item opens its submenu.
+- **Drafts** (v1.5.78): a message being written is saved to the mail store's **Drafts** folder every 20 seconds while it changes, when the page is hidden (an iPad switching apps, a reload) and when you close its tab with ✕ (*Kept in Drafts*). The bar shows *Draft saved HH:MM*. Open a draft from Drafts (double-click or Enter) to carry on; it's removed from Drafts once sent. **Cancel** discards the message, and its draft, after asking. Thunderbird shows the same Drafts.
+- **Plain characters check** (v1.5.78): before sending, Write looks for characters other BBSes and packet may garble: curly quotes, long dashes, accents, symbols, emoji, odd spaces (common in text pasted from Word or a web page). It lists them with their plain replacements (“ → ", – → -, é → e, … → ...) and offers **Use plain characters and send**, **Send as written** or **Go back**.
+- **Tools** (v1.5.78, ≡ → Tools; moved here from the older Email Client, and shared by every browser because they read the server):
+  - **Forwarding Activity**: messages your BBS forwarded on, by time, BBS, type, from, to, subject, BID and size, for the last 6 hours to 7 days. Read from LinBPQ's BBS log, so empty if LinBPQ's logging is off.
+  - **BBSes Seen**: the BBSes in senders' full addresses over the last 180 days, with the longest route seen (to address mail as CALL@route), counts and the busiest senders through each.
+  - **Statistics**: messages the dashboard has seen by type (last day, 7 and 30 days, with text), what's in the mail store now, the busiest senders and bulletin groups over 30 days.
+  - **Killed on the BBS**: messages that left the mail store's Trash and were (or are waiting to be) killed on the BBS, with how and the result; and messages kept in the archive after a kill.
+- **Other accounts** (v1.5.77, ≡ → Settings): other BBS users whose mail you also read here, for example a club or tactical call the BBS collects Winlink mail for (up to 10). Each gets its own folder, Inbox ▸ *CALL*, made at once; what they send goes in Sent. Mail already on the BBS for them is copied within a few minutes. Filters apply to them as to the Inbox.
+- **Settings** (≡ → *Settings…*): how often to check for new mail (1–10 minutes, or only with Get Messages), a **desktop notification** for new Inbox mail (the browser asks once; it needs the page open in a tab, and https or the station itself), fixed-width or ordinary font for message text, names next to callsigns, and the **signature** (shared with the Email Client). The browser tab shows the number of unread Inbox messages, like *(3) BBS Mail*.
+
+#### Message Filters and marking folders read (v1.5.73)
+
+**≡ → Message Filters…** works like Thunderbird's. A filter has a name, *Match all* or *Match any* of its conditions, and actions:
+
+- **Conditions:** From (callsign), To, Subject, Body, Type (Personal, NTS, Bulletin) or Bulletin group (e.g. `WX`), with *contains*, *doesn't contain*, *is*, *isn't*, *begins with*, *ends with*. *From is N3MEL* also matches N3MEL-1. ＋ / － add and remove conditions.
+- **Actions:** move to a folder (any folder, or *New folder in Inbox…*), mark as read, star, and *stop filter processing*. A move ends filtering for that message.
+- **When:** ticked *to new mail as it arrives*, filters run as new BBS mail is copied into the mail store, so a message lands straight in its folder (within about 2 minutes of the dashboard saving it). Because they act on the mail store, Thunderbird sees the same result. Ticked *when run by hand*, **Run All** includes it.
+- The list: tick to enable or disable, ▲/▼ to set the order (top runs first), Edit / Delete, the number of messages each has acted on, and **Run Now** (the selected filter) or **Run All** on a folder you choose. Right-click a folder → *Run Filters on Folder* does Run All there.
+- **Right-click a message → Create Filter From Message…** starts one with its sender (or, for a bulletin, its group) filled in; after saving it offers to run it on the open folder.
+- Filters never touch the BBS. Sent mail isn't filtered.
+
+**Mark as read:** right-click a folder → *Mark Folder Read* (Shift+C); right-click **Bulletins** → *Mark All Bulletins Read* (every group at once); right-click Inbox (or one of your folders with folders under it) → *Mark … and Its Folders Read*. **≡ → Mark All Read ▸** offers Inbox, Inbox and its folders, All Bulletins, or Inbox and all Bulletins. Read marks reach Thunderbird and the Email Client as usual.
+
+#### Retention: cleaning out old bulletins (v1.5.74)
+
+Like Thunderbird's *Retention Policy*. **≡ → Settings → Bulletin retention:** *Delete bulletins more than N days old* (the default comes from `config.php` `bbs_mail.bulletin_days`, 90 if unset) or *Don't delete bulletins*, and *Always keep starred messages*. That applies to every **Bulletins ▸ group** that has no setting of its own. **Right-click any folder → Properties…** gives it its own: use the default, don't delete any messages, or delete messages more than N days old — so you can keep `Bulletins ▸ ARRL` for a year, clear `Bulletins ▸ WX` after 3 days, or tidy one of your own folders. Your own folders, Inbox and Sent are never cleaned unless you give them a number.
+
+The clean-up runs once a day (`bbs-mail-sync.py`, after 04:00) by the message's own date, and on demand with **Run retention cleanup now** (Settings, or ≡ → *Run Retention Cleanup Now…*). It removes the mail-store copies (here and in Thunderbird); it never kills anything on the BBS, and it isn't the Email Client's own 14-day database clean-up, which carries on separately. Trash is still emptied after 30 days (and what leaves Trash *is* killed on the BBS, see above).
+
+#### Address Book (v1.5.72)
+
+📇 **Address Book** in the toolbar (Ctrl+Shift+B) opens it in its own tab, laid out like Thunderbird's:
+
+- **Left:** All Address Books, **Personal Address Book** (with your **lists** under it), **Collected Addresses** (everyone you write to from BBS Mail who isn't in your Personal book is added here, as Thunderbird does) and Starred.
+- **Middle:** the contacts as cards (initials, name, callsign and BBS address), a search box (name, callsign, address, email, phone, location, notes), sort by name, callsign or last written to. Click, Ctrl-click and Shift-click select; ↑ ↓ move, Enter edits, Delete deletes. Right-click: Write, Edit, Add to List ▸, Move to Personal, Star, Export as vCard, Delete. Drag contacts onto a list to add them.
+- **Right:** the contact: name, callsign, BBS address, email, phone, grid, location, a QRZ.com link, notes, the lists they're in, and their **recent messages** in the mail store (click one to open it). Buttons Write, Edit, Messages (search all folders for them), Delete.
+- **＋ Contact:** callsign (required), first and last name (they fill the display name), display name, nickname, **BBS address** (where mail to them goes: `CALL@BBS.#REGION.ST.USA.NOAM`; blank = the callsign, which the BBS routes itself), email, phone, grid, location, notes, starred.
+- **👥 List:** a name, a description and members (tick them). Writing to a list sends one BBS message to each member.
+- **⋯:** import the older Email Client's address book, import everyone who has written to you, import a vCard (.vcf) or CSV file (Thunderbird's exports work), export all as vCard or CSV.
+
+The address book also works in the rest of BBS Mail: names show next to callsigns in the message list and pane (Settings can turn that off); click the sender's name for *Add to Address Book* / *Edit Contact*, *Write*, *Search Messages*, *Copy Callsign*. In **Write**, the To field suggests contacts and lists as you type (↑ ↓ and Enter or Tab to pick); several recipients go comma-separated (`Glenn <N3MEL@…>, Net members, K7EK`), and each gets its own BBS message (asks first, at most 25). A bulletin goes to one address.
+
+### 📬 Mail store in this Email Client (v1.5.68)
+
+Once the mail store is set up, a **📬 Mail store** section appears in the folder pane, below My Folders: **Inbox**, **Sent**, **Bulletins ▸** (each group with its unread count; click *Bulletins* to fold the groups away), any folder made in the mail app, and **Trash**. It is read live from the mail store, so it shows exactly what the mail app shows.
+
+- **Opening a message** marks it read in the mail store (and in the mail app), and in this Email Client's own lists at once.
+- **↩ Reply** and **→ Forward** go over the BBS as usual. **Unread** marks it unread everywhere. **Move to…** files it in another mail store folder. **🗑 Trash** moves it to the mail store's Trash.
+- **Trash kills on the BBS** (v1.5.70). Nothing in Trash is killed yet, so a message moved there by mistake can be moved back. Once it **leaves** Trash it is **killed on the BBS** too, within about 5 minutes: when you **empty Trash** (right-click *Trash* → *Empty Trash*, or ⋯ next to it), **✖ Delete for good + kill on BBS** in Trash, emptying Trash in Thunderbird, or Trash's own clean-up after 30 days. Before killing, the dashboard reads the message number on the BBS and kills it only if it still holds the same message (BPQ reuses numbers). Each kill is listed in Log Viewer → *Message text job*. Moving a message out of Trash into another folder doesn't kill it.
+- **Your own folders** (v1.5.70): right-click **Inbox** (or click its ⋯) → *New folder in Inbox…*; your folders show under Inbox with 📁, and right-click on one offers *New folder in …*, *Rename…* and *Delete folder…* (its messages go to Trash). Thunderbird shows the same folders; folders made there show here too.
+- **Selecting several** (v1.5.69): tick the boxes (or *Select all*; Ctrl-click a row adds it, Shift-click picks a range) and use the bar above the list: **Read**, **Unread**, **Move to…**, **🗑 Trash**. In **Trash** the bar offers **✖ Delete for good + kill on BBS** instead (asks first). A message trashed or deleted here isn't copied in again.
+- **The search box** searches the whole open folder (sender, subject and text) in the mail store. *Show more* loads the next 50.
+- Your own folders, rules, 📌 keep and muted groups work as before; the Mail store view is beside them, not instead of them.
 
 ---
 
@@ -645,13 +747,13 @@ The main page: your VARA HF sessions, forwarding partners, forwarded messages an
 - the details sit in tabs at the bottom;
 - light and dark themes both work.
 
-The previous layout is still there as **Classic view** (`/bpq-rf-connections-classic.html`, linked next to the title), so you can compare the two.
+The previous layout (*Classic view*) was retired in v1.5.75; update.sh removes `/bpq-rf-connections-classic.html`.
 
 ### At the top
 
 - **The GitHub banner**, with the link to the project (github.com/bpq-dashboard/bpq-dashboard). Close it with ×; it stays closed in that browser.
 - **The title line:**
-  - the version and the **Classic view** link;
+  - the version;
   - the period loaded;
   - the live status (how many connections; **"(DB)"** means the fast database path is in use, Section 26);
   - when the data was last updated;
@@ -710,6 +812,8 @@ One row per forwarding partner. Partners that need attention are at the top: pau
   - If the partner connects to you during the pause, the pause ends within 5 minutes (v1.5.38).
   - The partner's row shows ⚠ *N failed attempts*, or **Paused until HH:MMZ** in red.
   - Maintenance → *Connect Watchdog* has the status, dry-run and resume commands.
+  - **RMS** (the Winlink CMS) is never paused (v1.5.77): the BBS only collects Winlink mail when it forwards to RMS.
+  - **Fewer LinBPQ restarts** (v1.5.81): each change restarts LinBPQ for a few seconds, so a pause that's over waits up to 90 minutes for another change to share the restart (a partner that called in again: up to 30 minutes); its tile shows ⏸ *Resuming with the next restart*. When a restart happens, pauses ending within the next 90 minutes end with it, a little early. And a restart is never made while the radio is in use: any BBS session (any station), or a Mercury or Data2G call in progress, puts it off to a later run. (`watchdog.batch_mins`, default 90; 0 = one restart per change as before.)
 
 ### 7-day history (click any callsign)
 
@@ -795,7 +899,7 @@ Connections (good and failed) and messages sent and received for each UTC hour i
   - **VHF packet rows** (v1.5.51, indigo **VHF** chip): AX.25 connects on a packet port (QtSoundModem, Direwolf, UZ7HO SoundModem or a hardware TNC). They include your BBS's outgoing connects (for example the Winlink fallback to a VHF gateway), calls into the BBS, calls into the node that were heard on the VHF port, and the scheduled **test connects** (marked *test connect*). Status is ✓ or ✗ *no answer* / *busy*, with the length. There's no S/N, bitrate or byte count, because LinBPQ doesn't log them for AX.25. VHF rows also show in the partners' 7-day blocks and the 7-day history, but never in the headline numbers.
 - **Forwarded messages** (the count is on the tab): every message your BBS forwarded to or received from a partner, one row per partner, so a bulletin sent to three hubs shows three times.
   - **Filters:** partner, type (bulletin, personal, traffic), **Via** and **Status**.
-  - **Via** is how it travelled: 📡 RF (VARA), 🔗 NET/ROM, 🛰 AXIP, 🌐 Telnet, 📻 AX.25 or "Port N". *RF only* is the default. Outbound messages are matched to the connect script in `bpq32.cfg`, so the column is right in both directions.
+  - **Via** is how it travelled: 📡 RF (VARA), 📡 Mercury, 📡 Data2G (v1.5.82), 🔗 NET/ROM, 🛰 AXIP, 🌐 Telnet, 📻 AX.25 or "Port N". *RF only* is the default and includes all three HF modems; the filter can also show one modem. Mercury and Data2G use LinBPQ's VARA driver, so they're told apart by the port's TNC address (the modem's TCP port from `config.php`, `mercury.ini` or Data2G's service file) and, for incoming mail, by the modem's own call log. After updating to 1.5.82 the next parser run re-tags a year of forwarded messages once. Outbound messages are matched to the connect script in `bpq32.cfg`, so the column is right in both directions.
   - **📮 Winlink (CMS)** (v1.5.24) is your BBS's Winlink traffic with the CMS (forwarding partner **RMS**), by either route: 🌐 Telnet over the internet, or 📻 AX.25 / 📡 RF through an RF gateway when the internet route failed (*Installation Manual* §10.14). These rows aren't in *RF only*.
   - **Status:** ✅ delivered (the default), ⛔ rejected (the partner already had it), ⏸ deferred, or all offers. Most rejections are normal: partners refuse duplicates they've already received from someone else.
   - **Received** is when the transfer finished (UTC) and how long after the offer.
@@ -847,7 +951,6 @@ On stations running the Mercury HF modem (*Installation Manual* §10.17), every 
   - the result in plain words: ✓ **ended normally**, ✓ **the other station hung up**, ✓ **we hung up** (LinBPQ ended it once nothing was left, v1.5.55), ⚠ **traffic passed, link lost before sign-off** (v1.5.61: data moved, then the link timed out before the call was closed; counts as a success, but LinBPQ may offer the last message again), ✗ **call not completed** (an incoming call that didn't come up, often LinBPQ's scan moving on), ✗ **no answer** (our call), ✗ **nothing received** (the link came up but carried nothing), ✗ **LinBPQ restarted** or **Mercury restarted** (a call cut off).
   - Hover the status or the Mercury chip for the link mode (e.g. DATAC16) and bandwidth.
 - **No S/N and no modem rate** for Mercury rows: Mercury doesn't log them per session. *Effective* (v1.5.64) is worked out from its bytes and the time the link was up. The Mercury card shows the S/N of the last decoded frame.
-- The **Classic view** shows VARA sessions only.
 
 ### Data2G calls on this page (v1.5.56)
 
@@ -1107,6 +1210,7 @@ Commands use the installer's defaults (`/var/www/bpq-dashboard`, database `bpqda
 - **Connect Watchdog** (v1.5.35) — status, dry run, resume / pause by hand, **test notice** (v1.5.45: sends one test BBS message), schedule and log for the script that pauses a forwarding partner for 6 hours after 2 failed attempts in a row.
 - **Mercury HF modem** (v1.5.43, optional) — service status and LinBPQ attached, its log without the LISTEN lines, the firewall rule that keeps its ports local, checking the shared sound card, restarting it.
 - **Data2G HF modem** (v1.5.56, optional) — service status and LinBPQ attached, reading its log, switching on its monitor page (`tools/data2g-monitor.sh`), restarting it and the transmit level.
+- **BBS mail in a mail app** (v1.5.68, optional) — setting up the IMAP mail store (`tools/bbs-mail-setup.sh`), its status, what the next copy would do, a new mail password, Dovecot's login log and removing it.
 - **Watched stations** (v1.5.26) — add, change or remove the stations System Logs and RF Connections flag when they go quiet, see when each was last heard, and switch live MHeard on or off. **Test connect** (v1.5.50) sets a scheduled connect every 1–24 hours (off by default; needs a port; it transmits), with the last result under it. Saved in `data/system-logs.json`.
 - **Email Client database** — **PKTNET forms**: installed vs the author's latest version, **Update forms** and **Undo** (v1.5.19); the schema check that 📌 pinned folders need, counts of saved message text and kept-after-kill copies, folder sizes, what the "⚠ killed on BBS" label really means, and the NTS and bulletin-folder diagnostics.
 - **Bulletin retention** — preview, run or review the daily 14-day clean-up.
@@ -1152,6 +1256,7 @@ Shows which ports on the server can be reached, and from where.
 - **Needs the read-only sudo rules** (`www-data-tools.sudoers`; `install.sh` offers to install them, or see the Installation Manual §11). Without them the page says what it couldn't read instead of showing zeros.
 - **Mercury HF** (v1.5.43) — its ports (8400–8402 on K1AJD's setup) are labelled *keep local*: Mercury listens on every interface with no password, so they should show **Blocked** (a DROP rule, *Installation Manual* §10.17).
 - **Data2G HF** (v1.5.56) — its ports (8500, 8501, 8510 and the monitor page 8520 on K1AJD's setup) are labelled *keep local*. Data2G listens on 127.0.0.1 only (`--listen 127.0.0.1` in its service), so they shouldn't appear as listening on the network at all.
+- **BBS mail store** (v1.5.68, where set up) — 993 is labelled *IMAPS: BBS mail for mail apps (your network)* and 143 *IMAP (keep local)*. Logins are refused from outside your own network either way; forward 993 on your router only once remote access arrives in a later release.
 - **Station ports** — BPQ telnet / FBB (8010 / 8011 by default) send passwords unencrypted, and MariaDB, flrig and the dashboard's WebSockets should never be public. If one shows Public, close it or allow it only from your LAN.
 - **No firewall yet?** `sudo bash /var/www/bpq-dashboard/tools/setup-firewall.sh` sets up ufw with questions for each port (v1.5.19; the installer offers it as an optional last step). See Maintenance → *Firewall setup*.
 - Reachability is worked out from the rules (including ufw and fail2ban chains); a port forward on your router is still needed for anything to arrive from outside.
@@ -1167,7 +1272,7 @@ Reads the server's logs from the browser, no SSH needed.
 ### What you see
 
 - **Log list**, by group:
-  - **Dashboard services** — bpq-telnet (Telnet Client and YAPP; passwords are redacted), bpq-vara, the message-text job, the Email Client's BBS sessions, the Dashboard log (NWS Post to BBS), NWS auto-post. Since v1.5.19 these are in `/var/log/bpq-dashboard/`, not LinBPQ's logs folder; until a new file has something in it, the viewer shows the older copy in `logs/`.
+  - **Dashboard services** — bpq-telnet (Telnet Client and YAPP; passwords are redacted), bpq-vara, the message-text job, the Email Client's BBS sessions, the Dashboard log (NWS Post to BBS), NWS auto-post, and the BBS mail store copy (v1.5.68, where set up). Since v1.5.19 these are in `/var/log/bpq-dashboard/`, not LinBPQ's logs folder; until a new file has something in it, the viewer shows the older copy in `logs/`.
   - **Log parsers** — RF Connections, Traffic and System Logs parsers (every 5 minutes).
   - **Forwarding tools** — prop-scheduler, storm monitor, connect watchdog and its state, White Pages auto-clean (only if you run them).
   - **VARA** — the VARA session log (config.php `logs.vara_file`), **VARA download** (v1.5.19, when the log comes from the TPRFN server) and the callsign validator, and **Mercury HF** (v1.5.43) and **Data2G HF** (v1.5.56), only where they are installed.
@@ -1199,7 +1304,7 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 **Resources:** memory, swap, CPU load, free disk space (root and the web root's disk).
 
-**Web server & PHP:** which server is running; `nginx -t`; recent nginx errors (known harmless lines ignored, including the Maintenance page's own check that the admin pages are locked, logged as user `bpq-protection-probe`); the PHP version serving the dashboard, extra PHP-FPM versions running, missing PHP extensions; every PHP-FPM socket the enabled nginx sites name exists, by its versioned name (`php8.5-fpm.sock`, not the generic `php-fpm.sock`); unused files in sites-available.
+**Web server & PHP:** which server is running; `nginx -t`; recent nginx errors (known harmless lines ignored, including the Maintenance page's own check that the admin pages are locked, logged as user `bpq-protection-probe`); the PHP version serving the dashboard, extra PHP-FPM versions running, missing PHP extensions; every PHP-FPM socket the enabled nginx sites name exists, by its versioned name (`php8.5-fpm.sock`, not the generic `php-fpm.sock`); unused files in sites-available. Pages re-checked on each visit (v1.5.79): the site file sends `Cache-Control: no-cache` for pages, so an update shows without clearing the browser's cache; a warning names the two lines to add.
 
 **Database:** connection exactly as the pages make it; the Email Client, RF Connections, Traffic and System Logs tables; the 2026-09/10 updates (📌 keep, Forwarded Messages "Via" and delivery status); data size against the InnoDB buffer pool; whether MariaDB listens on the network.
 
@@ -1207,13 +1312,15 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 **Data2G HF** (v1.5.56, only where Data2G is installed): OK when it runs with LinBPQ attached; Warn when it isn't running, LinBPQ isn't attached, its sound card input ended, or its service has no `TZ=UTC` on a server that isn't on UTC. **Data2G TNC kept local** (Security): OK when its service has `--listen 127.0.0.1`. **Data2G monitor page kept local**: OK when the page listens on 127.0.0.1 (or a firewall rule drops it). **Data2G calls read into RF Connections** (Logs): as for Mercury.
 
+**BBS mail store** (v1.5.68, only where `tools/bbs-mail-setup.sh` has run): OK when Dovecot and `bbs-mail-sync.timer` run and the copier ran in the last 15 minutes without an error (the detail also says whether the Email Client's 📬 Mail store view has its login, v1.5.68); Warn otherwise, with what to run. *Trash → BBS kills* (v1.5.70) warns when kills from the mail store's Trash have waited more than 30 minutes or failed 3 times. A further check (security) warns if its settings drifted: plain IMAP not kept to this machine, the computer's own accounts able to log in, the mail password file readable by everyone, encryption not required, or the Email Client's login file readable by everyone.
+
 **Connect Watchdog** (v1.5.36, only once it has run): OK when running with no partner paused; Info listing paused partners and when they resume; Warn when it hasn't run for 30 minutes, or when an RF Forwarding Partner has no forwarding entry in `linmail.cfg` (so isn't watched).
 
 **Backups** (v1.5.34): the last backup reported (Info, with the optional set-up command, when none reports; Warn when older than 36 hours or the drive is 90% full; Critical when the last run failed). See Section 19 → Backups.
 
 **Logs & updates:** security updates waiting; /var/log size; log rotation for the dashboard's own logs; each log parser scheduled, running and error-free.
 
-**Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status (a service whose page is switched off in `config.php 'pages'` shows as *not in use*, v1.5.19); the VARA log download from the TPRFN server, when used (last good download under 30 minutes); APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry.
+**Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status (a service whose page is switched off in `config.php 'pages'` shows as *not in use*, v1.5.19); the VARA log download from the TPRFN server, when used (last good download under 30 minutes); APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry; forwarding scripts whose `TIMES` bands leave hours with no forwarding (v1.5.82, *Forwarding scripts with hours not covered*, read from `linmail.cfg`).
 
 ### Reading the results
 
@@ -1302,10 +1409,11 @@ The dashboard's own log files (bpq-telnet, bpq-vara, vara-validator, the Email C
 
 | Timer | When | What |
 |---|---|---|
-| `message-bodies.timer` | every 5 minutes | Saves the text of new BBS messages to the database. Lists bulletins with `LL 100` most runs and the full `LB` list once a day (v1.5.40; keeps BPQ's BBS log small) |
+| `message-bodies.timer` | every 5 minutes | Saves the text of new BBS messages to the database, and (v1.5.70) kills on the BBS the messages that left the mail store's Trash. Lists bulletins with `LL 100` most runs and the full `LB` list once a day (v1.5.40; keeps BPQ's BBS log small) |
 | `bulletin-retention.timer` | daily | Deletes unpinned bulletins older than 14 days |
 | `nws-auto-post.timer` (optional) | every 5 minutes | Posts new NWS Warnings/Watches for your state as bulletins |
 | `vara-remote.timer` (optional, v1.5.19) | every 5 minutes (:03, :08 …) | Downloads the new part of your VARA HF log from the TPRFN server (`config.php 'vara_remote'`) |
+| `bbs-mail-sync.timer` (optional, v1.5.67) | every 2 minutes | Copies new BBS mail (to and from your callsign, and bulletins) into the IMAP mail store — into the folder a BBS Mail message filter chooses, v1.5.74 — and keeps read marks in step with the Email Client (v1.5.68); once a day removes bulletins older than 90 days and Trash older than 30 days from it (Section 9, *Reading BBS mail in a mail app*). Runs as root; set up by `tools/bbs-mail-setup.sh` |
 
 ### Log parsers (`/etc/cron.d/bpq-dashboard`, every 5 minutes)
 
@@ -1357,12 +1465,13 @@ Some choices follow you to every browser; others stay in the browser where you m
 
 | Kept on the server (shared by every browser) | Kept in this browser only |
 |---|---|
-| Email Client folders, rules, address book, 📌 pins, read state of filed messages, all saved messages, the signature (v1.5.19) | Email Client preferences (auto-fetch, list size, pop-up/pane, body fetching), muted groups, column widths, Archived flags, the killed list |
+| BBS Mail's address book (`bpq_contacts`, v1.5.72), message filters (`bpq_mail_filters`, v1.5.73), retention policy (`bpq_mail_prefs`, v1.5.74) and signature; Email Client folders, rules, address book, 📌 pins, read state of filed messages, all saved messages, the signature (v1.5.19) | BBS Mail's layout (pane sizes, columns, sort, open folders, Quick Filter) and Settings (check interval, notifications, font, names); Email Client preferences (auto-fetch, list size, pop-up/pane, body fetching), muted groups, column widths, Archived flags, the killed list |
 | APRS BBS station info and beacon settings | Theme (and the Chat and APRS pages' own theme) |
 | RF Connections forwarding partners and saved station locations | NWS callsign, destination, auto-refresh and the Post All password |
 | The propagation scheduler's partners (`data/partners.json`) and ⚙ Dashboard Settings (`data/settings.json`) | Telnet session log, YAPP *Received recently*, Chat callsign |
-| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the Connect Watchdog's limits (`watchdog`: failed attempts, pause hours, exclusions; v1.5.42), the Mercury card and calls (`mercury`: enabled auto/true/false, log, ini, tnc_port; v1.5.43; `in_headlines`, v1.5.46: Mercury calls in the RF Connections headline numbers too, default false), the Data2G card and calls (`data2g`: enabled, log, unit, tnc_port, in_headlines; v1.5.56), the Audio Map's radio names (`audio_map.cards`; v1.5.57), the optional pages (`pages`, `radio.enabled`), the VARA log source (`vara_remote`), System Logs tab names (`system_logs.port_names`, v1.5.22), live MHeard on/off and watched stations with their test-connect schedule (Maintenance → *Watched stations*, kept in `data/system-logs.json` since v1.5.26; or `system_logs.live_mheard` / `system_logs.watch` in `config.php`), how long hearings are kept (`system_logs.history_days`, default 90; v1.5.50), test connects (`link_probe`: `enabled`, `offset_minutes` 7, `timeout` 150 s; v1.5.50), which LinBPQ ports are VHF packet (`vhf.ports`, v1.5.55; normally found in `bpq32.cfg`) | Maintenance page *Your install* values |
+| Everything in `config.php`, including automatic NWS bulletins (`nws.auto_post`: state, address, alert types), the Connect Watchdog's limits (`watchdog`: failed attempts, pause hours, exclusions; v1.5.42), the Mercury card and calls (`mercury`: enabled auto/true/false, log, ini, tnc_port; v1.5.43; `in_headlines`, v1.5.46: Mercury calls in the RF Connections headline numbers too, default false), the Data2G card and calls (`data2g`: enabled, log, unit, tnc_port, in_headlines; v1.5.56), the Audio Map's radio names (`audio_map.cards`; v1.5.57), the mail store for mail apps (`bbs_mail`: `user`, `bulletin_days` 90, `wait_for_text_hours` 48, `bulletins` true; v1.5.69; the mail password is in `/etc/dovecot/bpq-dashboard.passwd`, hashed; the Email Client's own login to it, v1.5.68, in `/etc/bpq-dashboard/bbs-mail.php`, readable by the web server only), the optional pages (`pages`, `radio.enabled`), the VARA log source (`vara_remote`), System Logs tab names (`system_logs.port_names`, v1.5.22), live MHeard on/off and watched stations with their test-connect schedule (Maintenance → *Watched stations*, kept in `data/system-logs.json` since v1.5.26; or `system_logs.live_mheard` / `system_logs.watch` in `config.php`), how long hearings are kept (`system_logs.history_days`, default 90; v1.5.50), test connects (`link_probe`: `enabled`, `offset_minutes` 7, `timeout` 150 s; v1.5.50), which LinBPQ ports are VHF packet (`vhf.ports`, v1.5.55; normally found in `bpq32.cfg`) | Maintenance page *Your install* values |
 | Which NWS alerts were already posted automatically (`cache/nws-auto-post-state.json`) | |
+| Which messages were already sent, so a retry after a dropped connection doesn't post them twice (`data/sends/`, one small file per message: outcome and a hash, not the text; kept 7 days; v1.5.76). Quick Check-In's details (`bpq_mail_prefs`, v1.5.75). BBS Mail's *Other accounts* (`bpq_mail_prefs`, `accounts`, v1.5.77). BBS Mail drafts (the mail store's Drafts folder, v1.5.78) | |
 
 Clearing a browser's site data resets the right-hand column for that browser only; nothing on the server is lost.
 
@@ -1373,6 +1482,8 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | You see | Meaning | What to do |
 |---|---|---|
 | The browser's login box | A station-acting or admin page (Section 1) | Give the admin login |
+| *Couldn't confirm whether it was sent* / *Not confirmed: check Sent* (Email Client, BBS Mail; v1.5.76) | The connection dropped while sending and the server couldn't be reached for about 2½ minutes, so the message may or may not be on the BBS | Look in Sent or the BBS list. If it isn't there, press Send again: the same text keeps its one-time id, so it can't be posted twice |
+| *An earlier try of this message never finished* | A send stopped part-way through more than 5 minutes ago (for example the web server was restarted mid-send) | Check the BBS list before sending again; the next Send is a new try |
 | *"needs the dashboard admin login, and the web server didn't ask for it"* | The web-server config is older than the dashboard files | Re-run `install.sh` or update the site file; Install Check shows what's missing |
 | *"No power switch is set up"* (Rig Status) | `config.php` has no `smartplug` host | Add the section (*Installation Manual* §10.7) if you have a switch; otherwise ignore |
 | *"Could not send the e-mail …"* / *"No sysop e-mail is set …"* (Chat or VARA access request) | The server has no working mail setup, or `station.email` is empty or an example address | Set `station.email`; set up mail on the server (e.g. a sendmail-compatible relay), or contact the sysop another way |
@@ -1423,7 +1534,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.66
+## 27. Known limitations in v1.5.83
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1432,9 +1543,9 @@ These affect what you see in this release. Each says what to do meanwhile.
 - **Two partner lists:** the connect watchdog (v1.5.35) watches RF Connections' forwarding partners (`data/stations/partners.json`), while the propagation scheduler and storm monitor use their own list (⚙ Dashboard Settings or the partners editor, Section 19).
 - **Mercury calls have no S/N or modem rate** on RF Connections (v1.5.46): Mercury doesn't log them per session (Effective is shown, v1.5.64). The headline numbers are VARA's unless `mercury.in_headlines` is set (Section 12). `parse-mercury-log.py --reset` can only rebuild from the Mercury log still on disk (`mercury.log` and `mercury.log.1`, about 40 MB).
 - **Data2G rows ended by LinBPQ's ABORT have no byte counts** (v1.5.56): Data2G writes its totals only when a session closes normally. `parse-data2g-log.py --reset` can only rebuild from `data2g.log` and `data2g.log.1` (one to two weeks).
-- **Forwarded messages say 📡 RF (VARA) for Mercury and Data2G forwards too**: LinBPQ logs all three as VARA ports.
 - **RF Power Monitor watt-hours** always read 0 (flrig has no energy reading).
 - **Radio settings is for the Yaesu FTdx-3000 only** (v1.5.60; other stations don't see it, v1.5.66), and its menu (EX) settings, such as DATA GAIN and DATA OUT LEVEL, can't be read through flrig: check them on the radio's front panel. The speech processor and monitor are shown only.
+- **BBS mail in a mail app can't send yet** (v1.5.67): replying and sending from the mail app come in a later release (kills reach the BBS through Trash, v1.5.70); reading from outside your own network too. Read marks are shared with this Email Client (v1.5.68), but not with the BBS itself (BPQ has no command to set them).
 - **Traffic Report's Messages card** leaves out NTS traffic (Section 13).
 - **The NWS page doesn't know which alerts were posted automatically**, so it can't stop you posting one again by hand.
 - **Behind a reverse proxy** (dashboard on its own port, v1.5.19), the dashboard sees every visitor as 127.0.0.1: per-address limits (wrong-password lock-outs) then count all visitors together. Its own host name or port is needed; a sub-path (`/dashboard/`) doesn't work, because the pages use absolute links.
@@ -1455,6 +1566,16 @@ These affect what you see in this release. Each says what to do meanwhile.
 | Email Client | Shift-click / Ctrl-click (⌘-click) | Select a range / add to selection |
 | Email Client (message window) | `←` / `→` | Previous / next message |
 | Email Client (message window) | `Esc` | Close the message window |
+| BBS Mail (v1.5.71) | `Ctrl+N` / `Ctrl+R` / `Ctrl+L` | Write / Reply / Forward |
+| BBS Mail | `F5` | Get Messages |
+| BBS Mail | `Ctrl+K` / `Ctrl+Shift+K` | Search all folders / Quick Filter |
+| BBS Mail | `↑` `↓` (Shift extends), `F` / `B`, `N` | Next / previous message, next unread |
+| BBS Mail | `M` / `S` | Read ↔ unread / star |
+| BBS Mail | `Delete` | To Trash (in Trash: delete for good and kill on the BBS) |
+| BBS Mail | `Enter`, `Ctrl+W`, `Ctrl+Tab` | Open in a tab, close the tab, next tab |
+| BBS Mail | `Ctrl+A`, `Shift+C`, `Tab` | Select all, mark folder read, folders ↔ list |
+| BBS Mail (v1.5.72) | `Ctrl+Shift+B`, `Ctrl+P`, `Ctrl+S` | Address Book, print, save as text |
+| BBS Mail, To field | `↑` / `↓`, `Enter` or `Tab` | Pick a suggested contact or list |
 | APRS Map | `Esc` | Cancel *Pick on map* / close the station-info editor |
 | Any page | `Ctrl+Shift+R` | Hard refresh (bypass cache) — do this after an update |
 | Any page | `F11` | Full screen |
@@ -1466,12 +1587,12 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Page | URL | Login |
 |---|---|---|
 | RF Connections (home) | `http://YOUR_SERVER/` or `/bpq-rf-connections.html` | None (saving partners/locations: admin) |
-| RF Connections, classic view (v1.5.44) | `/bpq-rf-connections-classic.html` | Same as RF Connections |
 | Traffic Report | `http://YOUR_SERVER/bpq-traffic.html` | None |
 | System Logs | `http://YOUR_SERVER/bpq-system-logs.html` | None |
 | Connect Log | `http://YOUR_SERVER/bpq-connect-log.html` | None |
 | Message Monitor | `http://YOUR_SERVER/bpq-email-monitor.html` | None (reading bulletins: admin) |
-| Email Client | `http://YOUR_SERVER/bbs-messages.html` | Admin |
+| Email Client | `http://YOUR_SERVER/bbs-messages.html` (stations without the mail store; otherwise it opens BBS Mail) | Admin |
+| BBS Mail, Thunderbird-style (v1.5.71) | `http://YOUR_SERVER/admin/bbs-mail.html` (Email opens it where the mail store is set up) | Admin |
 | NWS Weather Alerts | `http://YOUR_SERVER/nws-dashboard.html` | None (posting: admin) |
 | Chat Client | `http://YOUR_SERVER/bpq-chat.html` | Admin |
 | APRS Map | `http://YOUR_SERVER/bpq-aprs.html` | None (sending, BBS info: admin) |
@@ -1488,7 +1609,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.66-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.83-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1515,7 +1636,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.66 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.83 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1530,6 +1651,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.66 — User Guide**
+**73 — BPQ Dashboard v1.5.83 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

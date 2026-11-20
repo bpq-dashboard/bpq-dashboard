@@ -1,0 +1,12 @@
+[Unit]
+Description=Copy BBS mail into the IMAP mail store every 2 minutes
+
+[Timer]
+# New text reaches the database every 5 minutes (message-bodies.timer), so
+# a message shows in the mail app within about 7 minutes of being listed.
+OnBootSec=4min
+OnUnitInactiveSec=2min
+RandomizedDelaySec=15
+
+[Install]
+WantedBy=timers.target

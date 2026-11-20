@@ -1,12 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// v1.5.79: if the dashboard was updated since this browser stored this page,
+// load the new one (once). Covers web servers whose site file doesn't yet
+// tell browsers to re-check pages (Cache-Control: no-cache, CHANGELOG 1.5.79).
+(function () {
+    var BPQ_PAGE_VERSION = '1.5.83';
+    fetch('/VERSION', { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+        t = (t || '').trim();
+        if (!/^\d+\.\d+\.\d+$/.test(t) || t === BPQ_PAGE_VERSION) return;
+        try { if (sessionStorage.getItem('bpq_page_reload') === t + location.pathname) return; sessionStorage.setItem('bpq_page_reload', t + location.pathname); } catch (e) { return; }
+        location.reload();
+    }).catch(function () {});
+})();
+</script>
+<script>
+// v1.5.75: where the BBS mail store is set up, Email always opens BBS Mail
+// (/admin/bbs-mail.html, laid out like Thunderbird); this older Email
+// Client is only for stations that haven't set the mail store up yet, and
+// shows them a note on how to. The page stays hidden (up to 3 s) while
+// that's checked, so it doesn't flash before the switch.
+(function () {
+    var de = document.documentElement;
+    try { localStorage.removeItem('bpq_mail_view'); } catch (e) { /* ignore */ }
+    de.style.visibility = 'hidden';
+    var shown = false, show = function () { if (!shown) { shown = true; de.style.visibility = ''; } };
+    setTimeout(show, 3000);
+    window.bpqMailStoreCheck = fetch('message-storage.php?action=msStatus', { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.success && d.enabled) { location.replace('/admin/bbs-mail.html' + location.hash); return null; }
+            show();
+            return d || {};
+        })
+        .catch(function () { show(); return {}; });
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Email Client - BPQ Dashboard</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
+    .wl-tag { display: inline-block; padding: 0 5px; margin-left: 4px; border-radius: 3px; font-size: 10px; font-weight: 600; line-height: 15px; color: #fff; background: #0e7490; vertical-align: 1px; }
     :root {
         --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         --font-mono: "JetBrains Mono", "Menlo", "Consolas", monospace;
@@ -473,7 +510,37 @@ document.addEventListener('DOMContentLoaded', function () {
 </head>
 
 <body data-nav-page="bbs">
-<script src="bpq-nav-loader.js?v=2026-11-16-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-19-1"></script>
+<script src="bpq-send-once.js?v=1.5.76"></script>
+
+<!-- v1.5.75: this Email Client is for stations without the mail store;
+     the note says how to set it up (BBS Mail then replaces this page). -->
+<div id="msSetupNote" style="display:none; margin:10px 16px 0; padding:10px 14px; border:1px solid #c7d2fe; background:#eef2ff; color:#1e1b4b; border-radius:8px; font-size:14px; line-height:1.45;">
+    <button type="button" id="msSetupNoteX" title="Hide this note for 30 days" style="float:right; border:0; background:none; font-size:18px; line-height:1; cursor:pointer; color:inherit;">×</button>
+    <b>📬 BBS Mail is available.</b> A newer email page laid out like Thunderbird, with folders, filters,
+    an address book and Quick Check-In. It also lets you read BBS mail in Thunderbird or a phone's mail app.
+    It needs the station's mail store, set up once by the sysop:
+    <code style="background:#fff; padding:1px 5px; border-radius:4px;">sudo bash &lt;web root&gt;/tools/bbs-mail-setup.sh</code>
+    (Installation Manual §10.19). Once it's set up, Email opens BBS Mail and this page is no longer used.
+    <span id="msSetupWhy" style="display:block; color:#4338ca; font-size:13px;"></span>
+</div>
+<script>
+(window.bpqMailStoreCheck || Promise.resolve({})).then(function (d) {
+    if (!d) return;
+    var hideUntil = 0;
+    try { hideUntil = +localStorage.getItem('bpq_ms_note_hidden') || 0; } catch (e) { /* ignore */ }
+    if (Date.now() < hideUntil) return;
+    var el = document.getElementById('msSetupNote');
+    if (d.success === false || (d.reason && !/Not set up/.test(d.reason))) {
+        document.getElementById('msSetupWhy').textContent = 'Mail store check: ' + (d.reason || d.error || 'no answer');
+    }
+    el.style.display = '';
+    document.getElementById('msSetupNoteX').onclick = function () {
+        el.style.display = 'none';
+        try { localStorage.setItem('bpq_ms_note_hidden', String(Date.now() + 30 * 86400000)); } catch (e) { /* ignore */ }
+    };
+});
+</script>
 
 <!-- Top control bar -->
 <div id="controlBar">
@@ -652,7 +719,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </label>
             <h2 id="listTitle" style="flex:1;">Personal &amp; Traffic</h2>
             <span class="meta" id="listMeta">0 messages</span>
-            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.66</span>
+            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.83</span>
         </div>
         <!-- Selection toolbar — only visible when ≥1 message is selected.
              Bulk actions: Move-to-folder dropdown, Mark Read, Archive, Kill,
@@ -4536,6 +4603,11 @@ async function prefetchBodies(onlyNums = null) {
 // Folder & list rendering
 // ═══════════════════════════════════════════════════════════════
 function selectFolder(folder) {
+    // v1.5.68: a mail store folder ("ms:INBOX") is listed by bbs-mail-store.js
+    if (String(folder).startsWith('ms:')) {
+        if (typeof msSelectFolder === 'function') return msSelectFolder(folder);
+        folder = 'personal';
+    }
     currentFolder = folder;
     // Clear selection whenever we change folders — different message set
     clearSelection({ silent: true });
@@ -4713,7 +4785,15 @@ function visibleMessages() {
         : list;
 }
 
+// v1.5.77: mail through Winlink: BPQ writes its internet senders as
+// RMS:user@domain; Winlink users are CALL@winlink.org
+function isWinlinkMsg(m) {
+    const t = m && m.type;
+    if (!m || t === 'B') return false;
+    return [m.from, m.to].some(a => /^(RMS|SMTP):\S+@\S+$/i.test(String(a || '').trim()) || /@winlink\.org$/i.test(String(a || '').trim()));
+}
 function renderList() {
+    if (currentFolder.startsWith('ms:') && typeof msRenderList === 'function') return msRenderList();
     const list = currentFolderMessages();
     const filtered = visibleMessages();
 
@@ -4758,7 +4838,7 @@ function renderList() {
             <div class="row-flag"></div>
             <div class="row-body">
                 <div class="row-top">
-                    <span class="row-from">${escapeHtml(m.from || '(unknown)')}</span>
+                    <span class="row-from">${escapeHtml(m.from || '(unknown)')}${isWinlinkMsg(m) ? ' <span class="wl-tag" title="Through Winlink">Winlink</span>' : ''}</span>
                     <span class="row-date">${escapeHtml(m.date || '')}</span>
                 </div>
                 <div class="row-subject">${escapeHtml(m.subject || '(no subject)')}${folderChip}</div>
@@ -5034,6 +5114,7 @@ function toggleSelectRow(num) {
 // Toggle the master checkbox in the list header — selects all
 // currently-visible-and-filtered messages, or clears all.
 function toggleSelectAll() {
+    if (currentFolder.startsWith('ms:') && typeof msToggleAll === 'function') return msToggleAll();   // v1.5.69
     const list = currentFolderMessages();
     const q    = searchQuery.toLowerCase();
     const filtered = q
@@ -5051,6 +5132,7 @@ function toggleSelectAll() {
 
 function clearSelection(opts = {}) {
     selectedSet.clear();
+    if (typeof msState !== 'undefined' && msState.sel) msState.sel.clear();   // v1.5.69
     lastClickedRowNum = null;
     if (!opts.silent) renderList();
     updateSelectionToolbar();
@@ -5061,6 +5143,7 @@ function clearSelection(opts = {}) {
 function updateSelectAllCheckbox() {
     const cb = document.getElementById('selectAllCheckbox');
     if (!cb) return;
+    if (currentFolder.startsWith('ms:') && typeof msUpdateAllCheckbox === 'function') return msUpdateAllCheckbox(cb);   // v1.5.69
     const list = currentFolderMessages();
     const q    = searchQuery.toLowerCase();
     const filtered = q
@@ -5255,8 +5338,11 @@ function bulkMarkRead() {
     // Sync read-state to the server for any of these that are filed
     // in a custom folder (i.e. have a server-saved copy).
     const filed = msgs.filter(m => m._serverId);
+    // v1.5.68: the rest by number, so the mail store follows too
+    const byNum = msgs.filter(m => !m._serverId && m.number != null).map(m => ({ number: m.number }));
     (async () => {
         for (const m of filed) await markServerMessageRead(m);
+        if (byNum.length && serverFoldersAvailable) await postToStorageApi('markReadBulk', { reads: byNum });
     })();
 }
 
@@ -5782,6 +5868,9 @@ function selectMsg(num) {
         // copy), persist the read flag there too so the folder's
         // unread badge is correct from every browser, not just this one.
         if (msg._serverId) markServerMessageRead(msg);
+        // v1.5.68: and in the database by number, so the mail store
+        // (Thunderbird) shows it read too (bbs-mail-sync.py, 2 minutes)
+        else if (msg.number != null && serverFoldersAvailable) postToStorageApi('markRead', { number: msg.number });
     }
 
     // Keep the list highlight on the open message (renderList() above
@@ -5811,7 +5900,7 @@ function renderPreview(msg) {
 
     document.getElementById('previewHeader').innerHTML = `
         <h1>${escapeHtml(msg.subject || '(no subject)')}</h1>
-        <div class="header-row"><span class="lbl">From:</span><span class="val">${escapeHtml(msg.from)}</span></div>
+        <div class="header-row"><span class="lbl">From:</span><span class="val">${escapeHtml(msg.from)}${isWinlinkMsg(msg) ? ' <span class="wl-tag" title="Through Winlink">Winlink</span>' : ''}</span></div>
         <div class="header-row"><span class="lbl">To:</span><span class="val">${escapeHtml(msg.to)}${msg.route ? ' ' + escapeHtml(msg.route) : ''}</span></div>
         <div class="header-row"><span class="lbl">Date:</span><span class="val">${escapeHtml(msg.date)}</span></div>
         <div class="header-row"><span class="lbl">Type:</span><span class="val">${msg.typeName}</span></div>
@@ -6183,7 +6272,11 @@ function actMarkUnread() {
     persistInboxes();
     renderSidebarBadges();
     renderList();
-    // Local only: BPQ can't clear a read flag (see selectMsg()).
+    // BPQ can't clear a read flag (see selectMsg()); v1.5.68: the database
+    // can, and the mail store (Thunderbird) follows within 2 minutes.
+    if (serverFoldersAvailable && (selectedMsg._serverId || selectedMsg.number != null)) {
+        postToStorageApi('markUnread', { id: selectedMsg._serverId || null, number: selectedMsg.number });
+    }
     showToast('Marked unread', 'info');
 }
 
@@ -6599,6 +6692,7 @@ function toggleReaderMaximize() {
 function updateReaderTitle() {
     const t = document.getElementById('readerTitle');
     if (!t || !selectedMsg) return;
+    if (selectedMsg._ms && typeof msReaderTitle === 'function') return msReaderTitle(t);   // v1.5.68
     const list = visibleMessages();
     const i = list.findIndex(m => m.number === selectedMsg.number);
     const folderName = (document.getElementById('listTitle') || {}).textContent || '';
@@ -6613,6 +6707,7 @@ function updateReaderTitle() {
 
 function readerStep(delta) {
     if (!selectedMsg) return;
+    if (selectedMsg._ms && typeof msReaderStep === 'function') return msReaderStep(delta);   // v1.5.68
     const list = visibleMessages();
     const i = list.findIndex(m => m.number === selectedMsg.number);
     const target = list[i + delta];
@@ -6843,6 +6938,7 @@ function generateCheckInAndCompose() {
 // shared by every browser. kind: 'new' (default), 'reply' (replies:
 // placed above the quoted text) or 'fixed' (NTS radiograms,
 // PKTNET forms, Quick Check-In: never a signature).
+let lastSendTry = null;   // v1.5.76: {key, id} of the message being sent
 let emailSignature = { enabled: false, text: '', replies: true, separator: true };
 async function loadSignatureFromServer() {
     const d = await safeFetchJson(`${CONFIG.storageApiUrl}?action=signature`);
@@ -6901,6 +6997,15 @@ function sendComposed() {
             return;
         }
         to = 'smtp:' + email;
+    } else if (/^rms:/i.test(rawTo)) {
+        // v1.5.77: internet mail through Winlink (BPQ's RMS forwarding),
+        // e.g. a reply to a Winlink sender RMS:user@domain: keep its case
+        const email = rawTo.replace(/^rms:\s*/i, '');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showToast('After rms: give an email address (rms:user@domain)', 'error');
+            return;
+        }
+        to = 'rms:' + email;
     } else {
         to = rawTo.toUpperCase();
     }
@@ -6910,28 +7015,26 @@ function sendComposed() {
         return;
     }
 
+    // v1.5.76: sent exactly once (bpq-send-once.js). If the connection
+    // drops before the answer (an iPad locking its screen: "Load failed"),
+    // it asks the server whether the message went instead of showing an
+    // error, and pressing Send again for the same message can't post it
+    // twice: the same text keeps the same send id until it has gone.
+    const sendKey = [to, type, subject, body].join('\u0001');
+    if (!lastSendTry || lastSendTry.key !== sendKey) lastSendTry = { key: sendKey, id: window.bpqNewSendId() };
     setStatus('fetching', 'Sending…');
-    // NOTE: action goes in the POST body (where PHP looks for it),
-    // not in the URL query string. PHP reads $action from json_decode
-    // of php://input for POST requests.
-    fetch(`${CONFIG.apiUrl}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', to, type, subject, body }),
-    }).then(async r => {
-        const text = await r.text();
-        if (!text || !text.trim()) {
-            return { success: false, error: 'Empty response from server' };
-        }
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            return { success: false, error: 'Bad JSON from server: ' + e.message };
-        }
+    const sendBtn = document.querySelector('#composeModal [onclick="sendComposed()"]');
+    if (sendBtn) sendBtn.disabled = true;
+    window.bpqSendOnce({ to, type, subject, body }, {
+        url: CONFIG.apiUrl, sendId: lastSendTry.id,
+        onWait: msg => setStatus('fetching', msg),
     }).then(d => {
+        if (sendBtn) sendBtn.disabled = false;
+        if (d.success) lastSendTry = null;
+        else if (d.stale) lastSendTry = null;   // next press: a new try
         if (d.success) {
-            showToast('Sent', 'success');
-            setStatus('success', 'Sent');
+            showToast(d.repeat ? 'Sent (it had gone on the first try)' : 'Sent', 'success');
+            setStatus('success', d.repeat ? 'Sent (first try)' : 'Sent');
             closeModal('composeModal');
             // Add to sent folder
             inboxes.sent = inboxes.sent || [];
@@ -6951,13 +7054,13 @@ function sendComposed() {
             persistInboxes();
             renderSidebarBadges();
             if (currentFolder === 'sent') renderList();
+        } else if (d.unknown || d.stale) {
+            showToast(d.error, 'error');   // may have gone: don't call it a failure
+            setStatus('warning', 'Not confirmed: check Sent');
         } else {
             showToast('Send failed: ' + d.error, 'error');
             setStatus('error', d.error);
         }
-    }).catch(e => {
-        showToast('Send error: ' + e.message, 'error');
-        setStatus('error', e.message);
     });
 }
 
@@ -7034,7 +7137,7 @@ function showToast(message, type = 'info') {
     t.className = type;
     requestAnimationFrame(() => t.classList.add('show'));
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+    toastTimer = setTimeout(() => t.classList.remove('show'), message.length > 90 ? 10000 : 3500);
 }
 
 function closeModal(id) {

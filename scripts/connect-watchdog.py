@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BPQ Connect Watchdog — v2 (BPQ Dashboard v1.5.35)
+BPQ Connect Watchdog — v2 (BPQ Dashboard v1.5.35; restarts shared v1.5.81)
 ==================================================
 Pauses forwarding to a hub that stops answering, then tries it again later.
 
@@ -22,6 +22,13 @@ Pauses forwarding to a hub that stops answering, then tries it again later.
     All changes due in one run share one restart, and a run is put off while
     a forwarding session is in progress. A lock (cache/linmail.lock) keeps two
     scripts from editing linmail.cfg at the same time.
+  * v1.5.81, fewer restarts: a pause that's over waits up to `batch_mins`
+    (default 90) for another change to share its restart (a partner heard
+    from again: up to 30 minutes). When a restart does happen, every pause
+    ending within the next `batch_mins` ends with it, a little early. And no
+    restart while the radio is in use: any BBS session (any station, not
+    only the watched partners) or a Mercury or Data2G call in progress puts
+    the change off to a later run.
   * State: cache/watchdog-state.json (shown on the RF Forwarding Partners
     tiles). Log: connect-watchdog.log in the dashboard's log folder. A BBS
     message tells you of each pause and resume.
@@ -32,7 +39,8 @@ Settings (config.php, all optional):
         'pause_hours' => 6,      // how long a pause lasts
         'notify'      => true,   // BBS message on pause / resume
         'notify_to'   => '',     // default: station.callsign
-        'exclude'     => [],     // partners never to pause, e.g. ['RMS']
+        'exclude'     => [],     // partners never to pause, e.g. ['K7EK'] (RMS is never paused, v1.5.77)
+        'batch_mins'  => 90,     // v1.5.81: how long a resume may wait / be brought forward to share a restart (0 = off)
     ],
 The BBS login for the messages is config.php 'bbs' (user / pass), as used by
 the other pages.
@@ -84,12 +92,16 @@ CONFIG = {
     'pause_hours':   _int(_W.get('pause_hours'), 6, 1, 168),
     'notify':        bool(_W.get('notify', True)),
     'notify_to':     str(_W.get('notify_to') or ''),
-    'exclude':       [str(x).upper() for x in (_W.get('exclude') or []) if str(x).strip()],
+    # v1.5.77: RMS (the Winlink CMS) is never paused: the BBS collects
+    # Winlink mail only when it forwards to RMS
+    'exclude':       sorted({str(x).upper() for x in (_W.get('exclude') or []) if str(x).strip()} | {'RMS'}),
     'bpq_stop_cmd':  'systemctl stop bpq',
     'bpq_start_cmd': 'systemctl start bpq',
     'gap_secs':      20,    # quiet time after "Disconnected" that ends an attempt
     'stale_mins':    15,    # an attempt with no end after this long isn't counted
     'busy_mins':     10,    # a session active this recently puts a change off
+    'batch_mins':    _int(_W.get('batch_mins'), 90, 0, 360),   # v1.5.81
+    'early_wait_mins': 30,  # a partner heard from again waits at most this long
 }
 
 log = logging.getLogger('connect-watchdog')
@@ -508,6 +520,81 @@ def send_bbs_message(subject, body, dry_run=False):
 
 
 # ── main run ──────────────────────────────────────────────────────────────
+# ── is the radio in use? (v1.5.81) ───────────────────────────────────────
+def bbs_sessions_open(lines, now):
+    """Calls with a BBS session open right now (any station): it has had a
+    line within busy_mins and no "Disconnected" since its last activity."""
+    last, gone = {}, {}
+    for raw in lines[-4000:]:
+        m = RE_LINE.match(raw.rstrip('\r\n'))
+        if not m:
+            continue
+        ymd, hh, mi, ss, kind, call, text = m.groups()
+        if not call:
+            continue
+        try:
+            ts = datetime(2000 + int(ymd[:2]), int(ymd[2:4]), int(ymd[4:6]), int(hh), int(mi), int(ss), tzinfo=timezone.utc)
+        except ValueError:
+            continue
+        c = call.upper()
+        last[c] = ts
+        gone[c] = kind == '|' and text.upper().endswith('DISCONNECTED')
+    lim = CONFIG['busy_mins'] * 60
+    return sorted(c for c, t in last.items() if not gone.get(c) and (now - t).total_seconds() <= lim)
+
+
+def _load_parser(name):
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    spec = importlib.util.spec_from_file_location(name.replace('-', '_').replace('.py', ''), path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def modem_call_open(script, section):
+    """'CALL' when the Mercury / Data2G log shows a call still open (calling or
+    connected) and the log was written to within busy_mins; else None."""
+    if (bpq_db_config.load_config_section(section) or {}).get('enabled') is False:
+        return None
+    try:
+        mod = _load_parser(script)
+        path = mod.DEFAULT_LOG
+        st = os.stat(path)
+    except Exception:
+        return None
+    if time.time() - st.st_mtime > CONFIG['busy_mins'] * 60:
+        return None
+    try:
+        p = mod.Parser()
+        start = max(0, st.st_size - 512 * 1024)
+        for n, (off, line) in enumerate(mod.read_from(path, start)):
+            if n == 0 and start:
+                continue          # probably a partial line
+            p.feed(off, n, line)
+        c = p.cur
+        if not c or c.get('_disc_at'):        # none, or already disconnected
+            return None
+        return c.get('callsign') or '?'
+    except Exception as e:
+        log.info(f"{section} log not read for the busy check: {e}")
+        return None
+
+
+def radio_busy(lines, now):
+    """Why a LinBPQ restart now would cut someone off: [reason, ...]."""
+    why = []
+    open_ = bbs_sessions_open(lines, now)
+    if open_:
+        why.append('BBS session with ' + ', '.join(open_[:4]))
+    for script, section, label in (('parse-mercury-log.py', 'mercury', 'Mercury'),
+                                   ('parse-data2g-log.py', 'data2g', 'Data2G')):
+        c = modem_call_open(script, section)
+        if c:
+            why.append(f'{label} call with {c}')
+    return why
+
+
 def lock_or_exit():
     os.makedirs(os.path.dirname(CONFIG['lock_file']), exist_ok=True)
     fd = open(CONFIG['lock_file'], 'w')
@@ -549,7 +636,7 @@ def run(dry_run=False):
     if first:
         state['started_at'] = iso(now)   # count only attempts from now on
 
-    pauses, resumes, busy = [], [], []
+    pauses, due, upcoming, busy = [], [], [], []   # due: (block, due_at, early)
     for call, block, enabled, pst in rows:
         if not block:
             pst.update(status='not_in_linmail')
@@ -579,16 +666,18 @@ def run(dry_run=False):
                 # v1.5.38: it's back — a good session (usually the partner
                 # calling us) since the pause: end the pause now
                 pst['early_reason'] = f"good session with {block} at {heard.strftime('%H:%M')} UTC"
-                resumes.append(block)
+                pst.setdefault('resume_due_at', iso(now))
+                due.append((block, from_iso(pst['resume_due_at']), True))
                 continue
             if enabled is True:
                 # someone turned it back on by hand
                 log.info(f"{block}: enabled in linmail.cfg by hand — pause cleared")
                 pst.update(paused=False, resume_at=None, status='watching', counting_since=iso(now), fails_in_a_row=0)
             elif now >= (from_iso(pst.get('resume_at')) or now):
-                resumes.append(block)
+                due.append((block, from_iso(pst.get('resume_at')) or now, False))
             else:
                 pst['status'] = 'paused'
+                upcoming.append((block, from_iso(pst.get('resume_at'))))
             continue
         if enabled is False:
             pst['status'] = 'disabled'   # off in BPQ, not by us: leave it alone
@@ -600,11 +689,34 @@ def run(dry_run=False):
         if n >= CONFIG['fail_count']:
             pauses.append((block, n))
 
-    if (pauses or resumes) and busy:
-        log.info(f"Change due ({', '.join([b for b, _ in pauses] + resumes)}) but forwarding is in progress "
-                 f"with {', '.join(busy)} — next run")
-        save_state(state)
-        return 0
+    # v1.5.81: share restarts. A resume that's due waits (up to batch_mins,
+    # or early_wait_mins for a partner heard from again) for another change;
+    # once a restart is happening anyway, resumes due soon come along.
+    batch = timedelta(minutes=CONFIG['batch_mins'])
+    early_wait = timedelta(minutes=min(CONFIG['early_wait_mins'], CONFIG['batch_mins']))
+    must = [b for b, at, early in due if now - at >= (early_wait if early else batch)]
+    resumes, ahead = [], []
+    if pauses or must:
+        resumes = [b for b, _, _ in due]
+        ahead = [(b, at) for b, at in upcoming if at and at - now <= batch]
+        resumes += [b for b, _ in ahead]
+    elif due:
+        for b, at, early in due:
+            left = int(((early_wait if early else batch) - (now - at)).total_seconds() // 60) + 1
+            state['partners'][b]['status'] = 'resume_waiting'
+            log.info(f"{b}: pause over — waiting up to {left} min more for another change to share the LinBPQ restart")
+    ahead_set = {b for b, _ in ahead}
+
+    if pauses or resumes:
+        why = ([f"forwarding with {', '.join(busy)}"] if busy else []) + radio_busy(read_log_lines(now - timedelta(hours=2)), now)
+        if why:
+            for b, _, _ in due:
+                state['partners'][b]['status'] = 'resume_waiting'
+            log.info(f"Change due ({', '.join([b for b, _ in pauses] + resumes)}) but the radio is in use "
+                     f"({'; '.join(why)}) — next run")
+            if not dry_run:
+                save_state(state)
+            return 0
 
     changes = [(b, False) for b, _ in pauses] + [(b, True) for b in resumes]
     if changes and apply_changes(changes, dry_run):
@@ -625,22 +737,28 @@ def run(dry_run=False):
                 f"Resume now: sudo python3 {os.path.abspath(__file__)} --resume {block}\n", dry_run)
         for block in resumes:
             pst = state['partners'][block]
+            was_due = pst.get('resume_at')
             if not dry_run:
                 pst.update(paused=False, resume_at=None, status='watching', reason=None,
                            counting_since=iso(now), fails_in_a_row=0, resumed_at=iso(now))
+                pst.pop('resume_due_at', None)
             early = pst.pop('early_reason', None)
+            if not early and block in ahead_set and was_due:
+                mins = int((from_iso(was_due) - now).total_seconds() // 60)
+                early = f"{mins} min before its pause was due to end, to share the LinBPQ restart"
             if early:
-                log.info(f"{block}: heard from ({early}) — pause ended early, forwarding enabled again")
+                log.info(f"{block}: pause ended early ({early}), forwarding enabled again")
             else:
                 log.info(f"{block}: pause over — forwarding enabled again")
             send_bbs_message(
                 f"Watchdog: {block} forwarding resumed" + (" early" if early else ""),
                 f"Connect Watchdog {now.strftime('%Y-%m-%d %H:%M')} UTC\n\n"
-                + (f"{block} is back: {early}. The pause is ended early and\n"
+                + ((f"{block} is back: {early}. The pause is ended early and\n"
+                    if early.startswith('good session') else f"The pause is ended {early}:\n")
                    if early else f"The {CONFIG['pause_hours']} h pause is over:\n")
                 + f"forwarding to {block} is enabled again (Enabled = 1). It is paused again\n"
                 f"after {CONFIG['fail_count']} failed attempts in a row.\n", dry_run)
-    elif not changes:
+    elif not changes and not due:
         log.info("No changes: " + ', '.join(f"{c}={p.get('status')}"
                                             + (f"({p.get('fails_in_a_row', 0)} failed)" if p.get('fails_in_a_row') else '')
                                             for c, _, _, p in rows))
@@ -651,21 +769,25 @@ def run(dry_run=False):
 
 def cmd_status():
     state = load_state()
-    cfg = read_cfg()
+    try:
+        cfg = read_cfg()
+    except OSError as e:
+        print(f"Cannot read {CONFIG['linmail_cfg']}: {e}")
+        return 1
     rows = survey(state, cfg)
     now = now_utc()
     print(f"Connect Watchdog — {now.strftime('%Y-%m-%d %H:%M')} UTC — pause after {CONFIG['fail_count']} "
           f"failed attempts in a row, for {CONFIG['pause_hours']} h")
     print(f"Partners from {CONFIG['partners_file']}\n")
-    print(f"{'Partner':<12} {'Block':<9} {'Enabled':<8} {'Status':<16} {'Failed':<7} {'Last OK (UTC)':<17} Resumes")
+    print(f"{'Partner':<12} {'Block':<9} {'Enabled':<8} {'Status':<22} {'Failed':<7} {'Last OK (UTC)':<17} Resumes")
     for call, block, en, p in rows:
         since = max(filter(None, [from_iso(state.get('started_at')), from_iso(p.get('counting_since')),
                                   now - timedelta(days=2)]))
         n = fails_in_a_row(partner_events(read_log_lines(since), block, since)[0]) if block else 0
-        st = 'paused' if p.get('paused') else ('not in linmail' if not block else ('disabled' if en is False else 'watching'))
+        st = ('resuming next restart' if p.get('status') == 'resume_waiting' else 'paused') if p.get('paused') else ('not in linmail' if not block else ('disabled' if en is False else 'watching'))
         ok = (p.get('last_ok_at') or '-').replace('T', ' ')[:16]
         res = (p.get('resume_at') or '').replace('T', ' ')[:16] if p.get('paused') else ''
-        print(f"{call:<12} {block or '-':<9} {('-' if en is None else ('1' if en else '0')):<8} {st:<16} {n:<7} {ok:<17} {res}")
+        print(f"{call:<12} {block or '-':<9} {('-' if en is None else ('1' if en else '0')):<8} {st:<22} {n:<7} {ok:<17} {res}")
 
 
 def cmd_manual(target, on, hours):

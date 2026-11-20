@@ -710,6 +710,33 @@ function msgdb_mark_read($id, $number, $folder) {
     return ['success' => false, 'error' => 'Message not found'];
 }
 
+// v1.5.68: Mark unread (the mail store follows within 2 minutes)
+function msgdb_mark_unread($id, $number) {
+    $pdo = tprfn_db();
+    if ($id && tprfn_execute($pdo, 'UPDATE bpq_messages SET is_read = 0 WHERE client_id = ?', [$id]) > 0) return ['success' => true];
+    if ($number && tprfn_execute($pdo, 'UPDATE bpq_messages SET is_read = 0 WHERE bbs_number = ?', [$number]) > 0) return ['success' => true];
+    return ['success' => false, 'error' => 'Message not found'];
+}
+
+// v1.5.68: read marks changed from the mail store (a mail app) since $since
+// (the "now" this returned last time). Empty until the mail store is set up.
+function msgdb_read_changes($since) {
+    $pdo = tprfn_db();
+    $now = (string)$pdo->query('SELECT NOW()')->fetchColumn();
+    $has = (int)$pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE()
+                             AND TABLE_NAME = 'bpq_mail_sync' AND COLUMN_NAME = 'read_changed_at'")->fetchColumn();
+    if (!$has || !preg_match('/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/', $since)) {
+        return ['success' => true, 'now' => $now, 'changes' => []];
+    }
+    $rows = tprfn_query($pdo, 'SELECT m.client_id AS id, m.bbs_number AS number, m.msg_type AS type,
+                                      m.from_call AS `from`, m.is_read AS is_read
+                                 FROM bpq_mail_sync s JOIN bpq_messages m ON m.id = s.message_id
+                                WHERE s.read_changed_at >= ? ORDER BY s.read_changed_at LIMIT 2000', [$since]);
+    $out = array_map(fn($r) => ['id' => $r['id'], 'number' => ($r['number'] !== null && $r['number'] !== '') ? (int)$r['number'] : null,
+                                'type' => $r['type'], 'from' => $r['from'], 'read' => (bool)$r['is_read']], $rows);
+    return ['success' => true, 'now' => $now, 'changes' => $out];
+}
+
 function msgdb_mark_read_bulk($reads) {
     if (!is_array($reads) || empty($reads)) return ['success' => true, 'updated' => 0];
     $updated = 0;

@@ -57,6 +57,11 @@ if ($merc['enabled'] !== false && (@file_exists($merc['ini']) || @file_exists($m
     $LABELS[$merc['broadcast_port']] = 'Mercury HF broadcast (keep local)';
     if (!empty($merc['ui_enabled'])) $LABELS[$merc['ui_port']] = 'Mercury HF monitor page (keep local)';   // v1.5.55
 }
+// v1.5.67: BBS mail store for mail apps (tools/bbs-mail-setup.sh): IMAPS for the LAN, plain IMAP local only
+if (@file_exists('/etc/dovecot/conf.d/99-bpq-dashboard.conf')) {
+    $LABELS[993] = 'IMAPS: BBS mail for mail apps (your network)';
+    $LABELS[143] = 'IMAP (keep local)';
+}
 // v1.5.56: Data2G HF modem (VARA-style TNC; listens on 127.0.0.1 by default)
 require_once dirname(__DIR__) . '/includes/data2g-status.php';
 $d2g = bpq_data2g_settings();

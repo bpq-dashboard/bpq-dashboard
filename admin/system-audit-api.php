@@ -459,6 +459,24 @@ if ($isNginx) {
     }
 }
 
+// v1.5.79: pages re-checked each visit, so updates show without clearing the browser's cache
+if ($isNginx) {
+    $pcFiles = []; $pcHave = false;
+    foreach (array_merge(glob('/etc/nginx/sites-enabled/*') ?: [], glob('/etc/nginx/conf.d/*.conf') ?: []) as $f) {
+        if (!is_file($f) || !is_readable($f)) continue;
+        $t = (string)@file_get_contents($f);
+        if (strpos($t, $WEB_ROOT) === false && strpos($t, 'bpq') === false) continue;
+        $pcFiles[] = basename($f);
+        if (strpos($t, '$bpq_page_cache') !== false) $pcHave = true;
+    }
+    if ($pcFiles && !$pcHave) {
+        $findings[] = finding('page-cache','nginx','warn','Browsers may keep old pages after an update',
+            'The site file (' . implode(', ', $pcFiles) . ') doesn\'t tell browsers to re-check pages, so after an update a browser can go on showing the old version until its cache is cleared. Add the two v1.5.79 lines from CHANGELOG.md (a "map $sent_http_content_type $bpq_page_cache" block above the server blocks, and "add_header Cache-Control $bpq_page_cache always;" in each server block next to the other add_header lines), then: sudo nginx -t && sudo systemctl reload nginx');
+    } elseif ($pcFiles) {
+        $findings[] = finding('page-cache','nginx','ok','Pages are re-checked on each visit', 'Updates show without clearing the browser cache.');
+    }
+}
+
 // ═══════════════════════════════════════════════════════
 // 4. DATABASE
 // ═══════════════════════════════════════════════════════
@@ -849,7 +867,7 @@ $findings[] = $owner === $me
     : finding('webroot-perms','application','warn',"Web root owned by $owner", "$WEB_ROOT belongs to $owner, not $me (the web server). Files copied in by hand may not be writable where the dashboard needs them.",
         "sudo WEB_ROOT=$WEB_ROOT bash $WEB_ROOT/fix-permissions.sh --dry-run   (then without --dry-run)");
 $notW = [];
-foreach (['cache', 'cache/aprs', 'cache/chat-sessions', 'cache/telnet-sessions', 'data', 'data/stations'] as $d) {
+foreach (['cache', 'cache/aprs', 'cache/chat-sessions', 'cache/telnet-sessions', 'data', 'data/stations', 'data/sends'] as $d) {
     if (is_dir("$WEB_ROOT/$d") && !is_writable("$WEB_ROOT/$d")) $notW[] = $d;
 }
 if (!is_dir($CACHE_DIR)) {
@@ -900,6 +918,31 @@ if (is_readable($wdFile) && is_array($wd = json_decode((string)@file_get_content
             'RF Forwarding Partners with no forwarding entry of that name, so not watched: ' . implode(', ', $missing) . '.',
             'Fix the call on RF Connections → RF Forwarding Partners (N3MEL-2 looks for the linmail.cfg entry N3MEL).');
     }
+}
+
+// v1.5.82: forwarding scripts whose TIMES bands leave hours with no forwarding
+require_once dirname(__DIR__) . '/includes/fwd-times.php';
+$ft = bpq_fwd_times_report();
+if ($ft['readable']) {
+    $gapped = [];
+    foreach ($ft['partners'] as $name => $p) {
+        if ($p['enabled'] === false || !$p['gaps']) continue;
+        $gapped[] = $name . ': ' . implode(', ', array_map('bpq_fwd_span', $p['gaps']))
+                  . ' (' . round(array_sum(array_map('bpq_fwd_len', $p['gaps'])) / 60, 1) . ' h a day)';
+    }
+    $timed = count(array_filter($ft['partners'], fn($p) => $p['bands'] && $p['enabled'] !== false));
+    if ($gapped) {
+        $findings[] = finding('fwd-times','application','warn','Forwarding scripts with hours not covered',
+            'No TIMES band covers these hours (UTC), so LinBPQ doesn\'t forward to the partner then: it "connects", has nothing to run and hangs up, and the mail waits (or leaves another way, e.g. NetRom). ' . implode('; ', $gapped) . '.',
+            'If that isn\'t on purpose, widen a band in the partner\'s ConnectScript in linmail.cfg so the bands meet (e.g. 0000-1259 then 1300-2359). Edit only with LinBPQ stopped: sudo systemctl stop bpq, edit, sudo systemctl start bpq. Maintenance → Forwarding schedule gaps.');
+    } elseif ($timed) {
+        $findings[] = finding('fwd-times','application','ok','Forwarding scripts cover the whole day',
+            "$timed partner script(s) with TIMES bands, no hours left out.");
+    }
+} elseif ($ft['path'] !== '' && @file_exists($ft['path'])) {
+    $findings[] = finding('fwd-times','application','info','Forwarding schedule not checked',
+        'The web server can\'t read ' . $ft['path'] . ', so System Audit can\'t check its TIMES bands.',
+        'Check by hand: sudo grep -n ConnectScript ' . $ft['path'] . ' (don\'t loosen its permissions: linmail.cfg can hold mail-server passwords).');
 }
 
 // v1.5.34: the station's backup, if a backup script reports to the dashboard
@@ -1080,6 +1123,63 @@ if (!empty($dst['enabled'])) {
             }
         } catch (Throwable $e) { /* database checks above report it */ }
     }
+}
+
+// v1.5.67: BBS mail store for mail apps (optional, tools/bbs-mail-setup.sh)
+$bmConf = '/etc/dovecot/conf.d/99-bpq-dashboard.conf';
+if (@file_exists($bmConf)) {
+    $bmSetup = "sudo bash $WEB_ROOT/tools/bbs-mail-setup.sh";
+    $dvUp = sh_quiet('systemctl is-active dovecot') === 'active';
+    $tmUp = sh_quiet('systemctl is-active bbs-mail-sync.timer') === 'active';
+    $bmSt = json_decode((string)@file_get_contents('/var/lib/bpq-dashboard/bbs-mail-sync.json'), true) ?: [];
+    $lastRun = (int)($bmSt['last_run_ts'] ?? 0);
+    $runAge = $lastRun ? (int)round((time() - $lastRun) / 60) : null;
+    $okAll = $dvUp && $tmUp && $runAge !== null && $runAge <= 15 && empty($bmSt['last_error']);
+    $secOk = @is_readable('/etc/bpq-dashboard/bbs-mail.php');   // v1.5.68: Email Client → Mail store
+    $findings[] = finding('bbs-mail','application', $okAll ? 'ok' : 'warn',
+        !$dvUp ? 'BBS mail store: Dovecot not running' : (!$tmUp ? 'BBS mail store: copier timer off'
+            : (!empty($bmSt['last_error']) ? 'BBS mail store: last copy had an error' : ($okAll ? 'BBS mail store (IMAP) running' : 'BBS mail store: copier not running'))),
+        'Dovecot ' . ($dvUp ? 'running' : 'stopped') . ', bbs-mail-sync.timer ' . ($tmUp ? 'on' : 'off')
+        . ($runAge !== null ? ", last copy run $runAge min ago" : ', no copy run yet')
+        . (!empty($bmSt['last_copy']) ? ", last message copied {$bmSt['last_copy']}" : '')
+        . (!empty($bmSt['last_error']) ? '; error: ' . $bmSt['last_error'] : '')
+        . ($secOk ? '; Email Client can read it' : "; the Email Client's Mail store view has no login yet (run $bmSetup again)") . '.',
+        $okAll ? '' : (!$dvUp ? 'sudo systemctl restart dovecot; sudo journalctl -u dovecot -n 30'
+                     : "$bmSetup --status; journalctl -u bbs-mail-sync -n 20"));
+    // v1.5.70: kills waiting from the mail store's Trash (message-bodies.timer does them)
+    if (!empty($pdo)) {
+        try {
+            $hasK = (int)$pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bpq_bbs_kills'")->fetchColumn();
+            if ($hasK) {
+                $old = (int)$pdo->query("SELECT COUNT(*) FROM bpq_bbs_kills WHERE done_at IS NULL AND queued_at < NOW() - INTERVAL 30 MINUTE")->fetchColumn();
+                $err = (int)$pdo->query("SELECT COUNT(*) FROM bpq_bbs_kills WHERE result = 'error' AND done_at > NOW() - INTERVAL 7 DAY")->fetchColumn();
+                $ok7 = (int)$pdo->query("SELECT COUNT(*) FROM bpq_bbs_kills WHERE result IN ('killed','gone') AND done_at > NOW() - INTERVAL 7 DAY")->fetchColumn();
+                $findings[] = finding('bbs-mail-kills','application', ($old || $err) ? 'warn' : 'ok',
+                    ($old || $err) ? 'Trash → BBS kills not going through' : 'Trash → BBS kills up to date',
+                    "$ok7 killed (or already gone) in 7 days" . ($old ? "; $old waiting more than 30 minutes" : '') . ($err ? "; $err gave up after 3 tries" : '') . '.',
+                    ($old || $err) ? 'Log Viewer → Message text job; sudo systemctl status message-bodies.timer' : '');
+            }
+        } catch (Throwable $e) { /* database checks above report it */ }
+    }
+    // Kept to what it should be: plain IMAP local, computer accounts off, password file private
+    $bmText = (string)@file_get_contents($bmConf);
+    $auth = (string)@file_get_contents('/etc/dovecot/conf.d/10-auth.conf');
+    $pw = '/etc/dovecot/bpq-dashboard.passwd';
+    $pwPerm = @file_exists($pw) ? (fileperms($pw) & 0777) : null;
+    $issues = [];
+    if (!preg_match('/inet_listener imap \{\s*address = 127\.0\.0\.1/', $bmText)) $issues[] = 'plain IMAP (143) is not kept to this machine';
+    if (preg_match('/^\s*!include auth-system\.conf\.ext/m', $auth)) $issues[] = "the computer's own accounts can log in to Dovecot";
+    if ($pwPerm === null) $issues[] = 'no mail password file';
+    elseif ($pwPerm & 0007) $issues[] = sprintf('the mail password file is readable by everyone (%o)', $pwPerm);
+    if (!preg_match('/^ssl = required/m', $bmText)) $issues[] = 'encryption is not required';
+    // v1.5.68: the Email Client's own login (Mail store view): private to the web server
+    $sec = '/etc/bpq-dashboard/bbs-mail.php';
+    if (@file_exists($sec) && (fileperms($sec) & 0007)) $issues[] = sprintf('%s is readable by everyone (%o)', $sec, fileperms($sec) & 0777);
+    $findings[] = finding('bbs-mail-security','security', $issues ? 'warn' : 'ok',
+        $issues ? 'BBS mail store settings changed' : 'BBS mail store: encrypted, LAN logins, one mail login',
+        $issues ? ucfirst(implode('; ', $issues)) . '.'
+                : 'IMAP over TLS on 993, plain IMAP on 127.0.0.1 only, logins from your own network only, computer accounts off, no outgoing mail.',
+        $issues ? "Run $bmSetup again (it rewrites its settings)." : '');
 }
 
 // Shared nav: files present, and every page's ?v= matches the loader's NAV_VERSION

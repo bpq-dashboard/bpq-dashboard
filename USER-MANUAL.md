@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.66**
+**Version 1.5.83**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -48,6 +48,7 @@
     - 10.16 Backing up the station (optional, recommended)
     - 10.17 Mercury HF modem beside VARA (optional)
     - 10.18 Data2G HF modem beside VARA and Mercury (optional)
+    - 10.19 BBS mail in a mail app (IMAP, optional)
 11. Security Hardening
 12. Troubleshooting
 13. Quick Reference
@@ -86,6 +87,109 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.83
+
+- The forwarding schedule check reads only linmail.cfg's forwarding partners (it listed the Housekeeping, UIPORT and BBSUsers sections too).
+
+### In v1.5.82
+
+- **Forwarding schedule gaps:** System Audit warns when an enabled partner's ConnectScript `TIMES` bands leave hours uncovered (as N3MEL's 1100-1259Z did), and `sudo php <web root>/scripts/fwd-times.php` lists every partner's bands and gaps. Maintenance → *Forwarding schedule gaps*. If the web server can't read `linmail.cfg`, System Audit says so; don't loosen its permissions.
+- **Mercury and Data2G forwards labelled by modem:** RF Connections' Forwarded Messages show 📡 Mercury / 📡 Data2G instead of VARA, and the filter can pick each modem. A VARA-driver port whose `ADDR` port is Mercury's (`mercury.tnc_port` or `mercury.ini`) or Data2G's (`data2g.tnc_port` or the unit's `--command-port`) TNC port is that modem; incoming messages are matched to the modems' call logs. The VARA parser's next run re-tags a year of messages once (`cache/.media-modems-1.5.82`).
+
+### In v1.5.81
+
+- **Connect Watchdog: fewer LinBPQ restarts, never during a radio session.** Resumes wait up to `watchdog.batch_mins` (default 90) to share a restart, and pauses ending soon come along with one; any open BBS session (not only watched partners) or a Mercury or Data2G call in progress puts a restart off. Partner tiles show ⏸ *Resuming with the next restart* (§10.1).
+
+### In v1.5.80
+
+- **No phantom Mercury card.** On a station without Mercury, anything listening on port 8400 (Data2G's web monitor uses it by default) made RF Connections show a Mercury card stuck at *TNC not attached*, with matching System Audit findings. Auto-detect now needs Mercury's port to be known (config.php `mercury.tnc_port` or `mercury.ini`) or a `mercury` process running (§10.17).
+
+### In v1.5.79
+
+- **Pages are re-checked on each visit**, so a browser shows the new version straight after an update (scripts and styles keep their caching; they're loaded as `name.js?v=<version>`). New installs get it. **Existing nginx stations add two lines to their site file by hand** (update.sh never edits it; System Audit warns until it's done):
+  1. Above the first `server {` block:
+     ```nginx
+     map $sent_http_content_type $bpq_page_cache {
+         ~^text/html  "no-cache";
+         default      "";
+     }
+     ```
+  2. In each `server {` block, next to the other `add_header` lines (or under `root` if there are none):
+     ```nginx
+     add_header Cache-Control $bpq_page_cache always;
+     ```
+  3. `sudo nginx -t && sudo systemctl reload nginx`. Check: `curl -sI http://localhost/ | grep -i cache-control` shows `no-cache`.
+
+  Until then, BBS Mail and the Email Client reload themselves once when they find the dashboard was updated since the browser stored them.
+- **BBS Mail:** *Forwarded to* line in the message view (from LinBPQ's BBS log by BID); iPad and phone layout fixes (toolbar fits; NTS Report and Forms also in ≡); touch-and-hold for menus.
+- **System Audit:** *Pages are re-checked on each visit* check.
+
+### In v1.5.78
+
+- **BBS Mail Drafts:** Write saves itself to the mail store's Drafts folder (made when first needed) every 20 seconds while it changes, when the page is hidden and when its tab is closed; open a draft to carry on; sent or discarded drafts are removed. New actions `msDraftSave` / `msDraftDelete` (IMAP APPEND).
+- **Plain characters check** before sending in BBS Mail (curly quotes, dashes, accents, emoji and the like), with one-click replacement.
+- **BBS Mail → ≡ → Tools:** Forwarding Activity, BBSes Seen, Statistics and Killed on the BBS, moved from the older Email Client and read from the server (new `message-storage.php` actions `bbsSeen`, `mailStats`, `killList`).
+- Menus: a submenu with no room on the right opens to the left, and opens on a tap (touch screens).
+
+### In v1.5.77
+
+- **Winlink mail in the dashboard.** LinBPQ's BBS collects Winlink mail itself for every user with *Poll RMS* (and a *CMS Pass*) each time it forwards to RMS; the dashboard now handles that mail properly. Internet senders (`RMS:user@domain`) keep their address in BBS Mail and Thunderbird (shown as `user@domain (Winlink)`; new mail-store headers `X-BBS-From`, `X-BBS-To`, `X-BBS-Via`), are marked **Winlink** in both mail pages, and Reply goes back through Winlink: `bbs-messages.php` now accepts `rms:user@domain` (case kept). Mail copied before 1.5.77 keeps its old sender line.
+- **Other accounts in BBS Mail** (≡ → Settings): other BBS users, such as a club or tactical call, whose mail is copied into its own folder (Inbox ▸ CALL). Kept in `bpq_mail_prefs` (`accounts`); also `config.php` `'bbs_mail' => ['accounts' => ['TPRFN']]`. Mail already skipped for them is copied on the next run.
+- **Maintenance → Winlink mail:** what the dashboard has seen per account, how to set *Poll RMS* / *CMS Pass*, and a check command (new `message-storage.php?action=winlinkStatus`).
+- **The Connect Watchdog never pauses RMS** (the Winlink CMS), whatever `watchdog.exclude` says.
+
+### In v1.5.76
+
+- **No more double posts after a dropped connection.** Every message from the Email Client and BBS Mail now carries a one-time id. If the connection drops before the server answers (an iPad that locks its screen or switches apps: Safari's *Load failed*, or a Wi-Fi drop), the page asks the server whether the message went instead of showing an error: *Sent*, *still sending*, or, if the first try never arrived, it sends it then. Pressing Send again for the same message can't post a second copy. `bbs-messages.php` keeps a small record per id in `data/sends/` (the outcome and a hash, not the text; 7 days). New shared script `bpq-send-once.js`.
+- **The installer and `update.sh` offer to set up BBS Mail** (the mail store) where it isn't set up: default No, a No is remembered, never in an unattended run (§10.19, §4 Step 5, *Updating*).
+
+### In v1.5.75
+
+- **BBS Mail is the Email page** wherever the mail store is set up: `/bbs-messages.html` switches to `/admin/bbs-mail.html` every time (the *Classic view* button, the old `?classic=1` address and the remembered choice are gone), and the old page's mail-store folders (`bbs-mail-store.js`) are retired. Stations **without** the mail store keep the older Email Client, now with a note on how to set the mail store up (§10.19).
+- **Quick Check-In in BBS Mail** (toolbar ✅ Check-In, or ≡): the same check-in form, opening a Write tab. Its saved details are kept on the station (`bpq_mail_prefs`, name `checkin`; new actions `msCheckInGet` / `msCheckInSave` in `message-storage.php`) for every browser, brought over once from the older client's copy.
+- **RF Connections' Classic view is retired**; update.sh removes `bpq-rf-connections-classic.html`.
+
+### In v1.5.74
+
+- **BBS Mail → Write: NTS traffic (ST)** next to Personal (SP) and Bulletin (SB); `bbs-messages.php` now accepts type T and sends `ST <address>` (e.g. `30301@NTSGA`).
+- **Retention policy for the mail store**, like Thunderbird's: a default for bulletin groups (≡ → Settings; starts at `bbs_mail.bulletin_days`, 90), per-folder overrides (right-click a folder → Properties…), *always keep starred*, run daily by `bbs-mail-sync.py` and on demand. update.sh adds `bpq_mail_prefs`. Mail-store copies only; nothing on the BBS (User Guide §9).
+
+### In v1.5.73
+
+- **BBS Mail → Message Filters** (≡ menu), like Thunderbird's: conditions on From, To, Subject, Body, Type or Bulletin group; actions move to a folder, mark read, star, stop. They run on new mail as `bbs-mail-sync.py` copies it into the mail store (so it lands straight in its folder, for Thunderbird too) and on demand (Run Now / Run All, right-click a folder → Run Filters on Folder, right-click a message → Create Filter From Message). update.sh adds the table `bpq_mail_filters`.
+- **Mark read in bulk:** right-click Bulletins → Mark All Bulletins Read, Inbox → Mark Inbox and Its Folders Read, and ≡ → Mark All Read ▸ (Inbox, Inbox and its folders, All Bulletins, Inbox and all Bulletins) (User Guide §9).
+
+### In v1.5.72
+
+- **BBS Mail → 📇 Address Book**, laid out like Thunderbird's: Personal Address Book with mailing lists, Collected Addresses (filled as you write), Starred; contact cards with initials, details (BBS address, email, phone, grid, location, QRZ.com link, notes, lists, recent messages), editing, right-click menus, drag contacts onto lists, import (the older Email Client's address book, everyone who has written to you, vCard or CSV — Thunderbird's exports work) and export (vCard, CSV). Stored in the new `bpq_contacts` table (update.sh adds it), shared by every browser.
+- **Write** suggests contacts and lists as you type and sends to several recipients (one BBS message each); names show next to callsigns in the list and message pane; click the sender to add or edit them.
+- **Print** and **Save As Text** for messages, a **Settings** dialog (check interval, desktop notifications for new Inbox mail, message font, names, signature) and the unread count in the browser tab (User Guide §9, §25, §28).
+
+### In v1.5.71
+
+- **BBS Mail** (`/admin/bbs-mail.html`): the Email page laid out like Thunderbird (Classic layout) on top of the mail store — folder pane, sortable and resizable columns with stars and read dots, message pane, tabs for messages and for writing, Quick Filter, search across folders, right-click menus, drag and drop onto folders, Thunderbird's keyboard shortcuts. Write / Reply / Forward send over the BBS. Where the mail store is set up, **Email** in the menu opens it; *Classic view* goes back to the older Email Client (`/bbs-messages.html?classic=1`) for its rules, address book and check-in tools (User Guide §9, §28, §29). It lives under `/admin/`, so the web server's admin login covers it with no site-file change.
+
+### In v1.5.70
+
+- **Email Client → 📬 Mail store: Trash kills on the BBS.** Messages that leave the mail store's Trash — *Empty Trash* (right-click Trash, or ⋯), *Delete for good* in Trash, emptying Trash in Thunderbird, or the 30-day clean-up — are killed on the BBS within about 5 minutes. `message-bodies.timer` does it in its next BBS session, first reading the number (`R <n>`) and killing (`K <n>`) only if it still holds the same message. update.sh adds the table `bpq_bbs_kills` (what is waiting and what was done). Honours `features.bbs_write`.
+- **Your own mail store folders:** right-click Inbox → *New folder in Inbox…*; right-click your folders to make folders inside, rename or delete them (their messages go to Trash). **Move to…** in the selection bar and the reader. The same folders show in Thunderbird.
+
+### In v1.5.69
+
+- **Email Client → 📬 Mail store: select several messages** (checkboxes, Select all, Ctrl- and Shift-click) and mark them read or unread or move them to Trash; in Trash, delete them for good. The BBS copies are not touched (User Guide §9). Nothing to do after updating.
+
+### In v1.5.68
+
+- **Email Client → 📬 Mail store** (where the BBS mail store of 1.5.67 is set up): the mail store's folders in the Email Client's folder pane — Inbox, Sent, Bulletins ▸ groups with unread counts, folders made in a mail app, Trash — read live, with Reply / Forward over the BBS, Unread and Trash. Your own folders, rules and 📌 keep are unchanged (User Guide §9).
+- **Read marks shared both ways** between the Email Client and mail apps, every 2 minutes (`bbs-mail-sync.py`; update.sh adds three columns to `bpq_mail_sync`). Marking a message *Unread* in the Email Client now also reaches the database.
+- **Setup script fixes** from the first install on a real station: Dovecot's POP3 kept off port 110 (LinBPQ's own POP3) when `dovecot-pop3d` is installed, an older `protocols =` line elsewhere in Dovecot's settings commented out, a false "Dovecot already has settings" stop (`20-pop3.conf`), and port 993 opened to the station's own network on iptables firewalls with a closed INPUT policy (as it already was with ufw).
+- **After updating, run the setup once more** (`sudo bash <web root>/tools/bbs-mail-setup.sh`): it keeps your mail password and creates the Email Client's own login to the mail store (a Dovecot master login that works from the station itself only, kept in `/etc/bpq-dashboard/bbs-mail.php`, readable by the web server). Until then the Mail store section stays hidden.
+
+### In v1.5.67
+
+- **BBS mail in any mail app (optional):** `sudo bash tools/bbs-mail-setup.sh` sets up a small IMAP mail store (Dovecot) on the station with a copy of the BBS mail: **INBOX** (personal and NTS mail to your callsign or SYSOP), **Sent** (from your callsign) and **Bulletins/<group>** (every bulletin, kept 90 days). Read it in Thunderbird or a phone's mail app over encrypted IMAP (port 993), from your own network. New mail is copied every 2 minutes by `bbs-mail-sync.timer` from the text the dashboard already saves. It's a read-only copy: nothing goes back to the BBS, there's no outgoing mail and nothing on port 25. The mail login is the callsign in lower case with its own password, typed at the terminal; the computer's own accounts can't log in (§10.19).
+- update.sh adds the `bpq_mail_sync` table (which BBS messages have been copied). Nothing else changes unless you run the setup script.
 
 ### In v1.5.66
 
@@ -210,7 +314,7 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
   - the 7-day station history as a side panel, opened by clicking any callsign;
   - light and dark themes.
 
-  Nothing to set up. The previous page stays as **Classic view** (`bpq-rf-connections-classic.html`), linked from the new one, for comparison.
+  Nothing to set up. The previous page stayed as **Classic view** (`bpq-rf-connections-classic.html`) until v1.5.75, when it was retired.
 
 ### In v1.5.43
 
@@ -499,14 +603,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.66.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.83.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.66
+cd bpq-dashboard-1.5.83
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -539,6 +643,7 @@ Some questions are **yes/no**. The capital letter is the default:
 | Start the page helpers now (and at every boot)? | **Y** |
 | Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need, plus the Maintenance page's *Change admin password* helper and the Audio Map's read-only helper (v1.5.57) |
 | Set up a basic firewall (ufw) now? *(default No)* | **N** to do it later; **y** runs `tools/setup-firewall.sh` (§11) |
+| Set up BBS Mail now? *(optional, default No; v1.5.76)* | **y** to install the mail store now (§10.19): it installs Dovecot, opens port 993 to your home network only and asks you to type a mail password. Then Email opens BBS Mail, the Thunderbird-style page, and Thunderbird or a phone can read the BBS mail. **N** keeps the older Email Client; run `tools/bbs-mail-setup.sh` any time later. A No is remembered, so updates don't ask again |
 | Set up nightly backups now? *(optional, recommended; default No)* | **y** only if a backup drive is already formatted and mounted; it runs `scripts/bpq-backup-setup.sh`. Otherwise **N**, prepare the drive, and run it later (§10.16) |
 
 The whole run takes 5–15 minutes, mostly downloading. Everything the installer does is also written to a log file named on the first screen (`/tmp/bpq-dashboard-install-….log`).
@@ -676,7 +781,7 @@ If the stamp is still there with a key set, check in CARTO's dashboard that the 
 
 ### Updating to a newer version
 
-Since v1.5.19 every release has **`update.sh`**, which updates your dashboard in place: no reinstall, no questions, nothing to re-enter. It also works on an install of an older version.
+Since v1.5.19 every release has **`update.sh`**, which updates your dashboard in place: no reinstall, nothing to re-enter. Its one question (v1.5.76): where BBS Mail isn't set up, it asks once whether to set it up (default No, see §10.19). It also works on an install of an older version.
 
 1. Download and unzip the new version as in Step 3 (use its version number):
    ```bash
@@ -698,7 +803,7 @@ Since v1.5.19 every release has **`update.sh`**, which updates your dashboard in
 
 **What it keeps:** `config.php` (and `db-config.php` etc.), `data/` (partners, settings, saved stations), `cache/`, the `logs` link to LinBPQ, `pktnet-forms/`, `img/`, `yapp-files/`, everything in the database, your nginx or Apache site file, your firewall, and everything outside the dashboard folder.
 
-**What it does:** backs up every file it replaces or removes to `/root/bpq-dashboard-update-<date>/` (with a restore script and a log); copies the new and changed files, keeping owner and mode, and checks each one; removes files the release dropped (old PDFs, retired pages); applies the database updates in `sql/migrations.list` (each is safe to repeat); refreshes the systemd units and sudo rules the installer set up, only where they changed (a unit you wrote yourself is left alone); restarts only the helper services whose program or unit changed; and records the version in `VERSION` and `MANIFEST.md5`. Maintenance → *Install check, updates & backups* shows the installed and latest versions.
+**What it does:** backs up every file it replaces or removes to `/root/bpq-dashboard-update-<date>/` (with a restore script and a log); copies the new and changed files, keeping owner and mode, and checks each one; removes files the release dropped (old PDFs, retired pages); applies the database updates in `sql/migrations.list` (each is safe to repeat); refreshes the systemd units and sudo rules the installer set up, only where they changed (a unit you wrote yourself is left alone); restarts only the helper services whose program or unit changed; records the version in `VERSION` and `MANIFEST.md5`; and, where BBS Mail (the mail store, §10.19) isn't set up, asks once whether to set it up now (v1.5.76: default No; a No is remembered in `/etc/bpq-dashboard/bbs-mail-declined` so later updates don't ask; never asked with `--yes` or without a terminal, which print the command instead). Maintenance → *Install check, updates & backups* shows the installed and latest versions.
 
 **Files you edited on the server** (from v1.5.19 on it can tell, using the installed `MANIFEST.md5`) are listed before it starts; they are replaced with the new version and your copy stays in the backup. To keep them instead, run it with `--keep-local`. Files you always run in your own version go in a keep list, `/etc/bpq-dashboard/update-keep.txt` (one path per line relative to the dashboard folder, e.g. `callsign-lookup.php` or `scripts/wp_*.py`; `#` starts a comment): they are never replaced or removed, and every plan lists them so you can compare them with the CHANGELOG. The same list can name a hand-tuned unit or the sudo rules file to keep: `/etc/systemd/system/bpq-chat.service`, `/etc/sudoers.d/www-data-tools`.
 
@@ -1126,9 +1231,12 @@ Built-in profiles (each sets the right data mode for VARA): **Yaesu** FTdx3000, 
     'pause_hours' => 6,      // how long a pause lasts
     'notify'      => true,   // BBS message on pause / resume
     'notify_to'   => '',     // default: station.callsign
-    'exclude'     => [],     // partners never to pause, e.g. ['RMS']
+    'exclude'     => [],     // partners never to pause, e.g. ['K7EK'] (RMS is never paused, v1.5.77)
+    'batch_mins'  => 90,     // v1.5.81: a resume waits / is brought forward up to this long to share a restart (0 = off)
 ],
 ```
+
+**Fewer restarts** (v1.5.81): a pause that's over waits up to `batch_mins` for another change, so two changes share one LinBPQ restart; when a restart happens, pauses ending within `batch_mins` end with it. No restart is made while the radio is in use (any open BBS session, or a Mercury or Data2G call in progress): the change waits for a later run. Raising `fail_count` to 3 pauses partners less often, at the cost of one more failed call before a pause.
 
 The BBS messages use the `bbs` login in `config.php` (`user` / `pass`), as the pages do.
 
@@ -1954,7 +2062,7 @@ sudo bash /var/www/<dashboard>/tools/mercury-monitor.sh     # port 8403; --port 
 - The first run reads `mercury.log.1` and `mercury.log`, so it fills in Mercury's history as far back as those two files go. `--reset` deletes the Mercury rows and reads them again.
 - Mercury's log and LinBPQ's BBS log must be on the same clock: keep `log_utc = true` with a server on UTC (as at K1AJD), or both local.
 
-Settings (all optional) go in `config.php`: `'mercury' => ['enabled' => 'auto' | true | false, 'log' => '/var/log/mercury/mercury.log', 'ini' => '/etc/mercury/mercury.ini', 'tnc_port' => 8400, 'in_headlines' => false]`. `'enabled' => false` hides the card and stops its calls being read.
+Settings (all optional) go in `config.php`: `'mercury' => ['enabled' => 'auto' | true | false, 'log' => '/var/log/mercury/mercury.log', 'ini' => '/etc/mercury/mercury.ini', 'tnc_port' => 8400, 'in_headlines' => false]`. `'enabled' => false` hides the card and stops its calls being read. With `'enabled' => 'auto'`, a program listening on Mercury's TNC port counts as Mercury only when that port is known (`tnc_port` here, or `arq_tcp_base_port` in a readable `mercury.ini`) or a `mercury` process is running (v1.5.80): the bare default 8400 is also where Data2G's web monitor listens by default, which used to show a Mercury card on stations without Mercury.
 
 Elsewhere:
 
@@ -2067,6 +2175,73 @@ The Settings tab may show the sound card as empty even though Data2G is using th
 Elsewhere: **System Audit** (running, LinBPQ attached, TNC and monitor page kept local, calls read), **Maintenance → Data2G HF modem**, **Log Viewer → Data2G HF**, and the Firewall page's port labels.
 
 **Scanning.** With LinBPQ scanning frequencies, Data2G's listening is switched off while the radio is elsewhere or another modem has it. A Data2G station calling then is *turned away* (`refusing CONNECT from X: NOT_LISTENING`); its tries are one *turned away* row on RF Connections. Agree a frequency and time with Data2G partners as with Mercury.
+
+### 10.19 BBS mail in a mail app (IMAP, optional)
+
+v1.5.67. The Email Client reads the BBS through the dashboard. This adds a second way in: a small mail store on the station, kept filled with a copy of the BBS mail, which any IMAP mail program can read (Thunderbird, a phone's mail app), with its own folders, read marks and search.
+
+| Folder | What's copied into it |
+|---|---|
+| `INBOX` | Personal (P) and NTS (T) mail to your callsign or SYSOP |
+| `Sent` | Personal and NTS mail from your callsign |
+| `Bulletins/<group>` | Every bulletin, one folder per group (`Bulletins/WX`, `Bulletins/SITREP` …), for 90 days |
+
+Mail passing through your BBS for other stations isn't copied.
+
+**How it works.** The dashboard already saves the text of every message it lists (`message-bodies.timer`, every 5 minutes, into the `bpq_messages` table). `bbs-mail-sync.timer` runs `scripts/bbs-mail-sync.py` every 2 minutes, which hands each new message to Dovecot's delivery program (`dovecot-lda`) for the right folder and notes it in the `bpq_mail_sync` table so it's copied once. The BBS header (From, To, Type/Status, Date/Time, Bid, Title) becomes the mail's headers: the BID is its Message-ID, the BBS's date its Date, and senders are `CALL@bbs.invalid` (an address that can't reach the internet). A message whose text the dashboard couldn't save within 2 days is copied with a note to read it on the BBS. Once a day bulletins older than 90 days are removed from the mail store (the BBS and the Email Client keep theirs by their own rules). Nothing is ever written to the BBS.
+
+**Security.**
+
+- IMAP over TLS on port **993** only; plain IMAP (143) answers this computer only, for the dashboard's later use. No SMTP: nothing listens on port 25 and nothing can be sent.
+- One login: the callsign in lower case, with a password used for nothing else, typed at the terminal and kept hashed (SHA512-CRYPT) in `/etc/dovecot/bpq-dashboard.passwd`. The computer's own accounts **can't** log in to Dovecot (the setup turns `auth-system.conf.ext` off).
+- Logins are accepted from your own network only (127/8, 10/8, 172.16/12, 192.168/16 and the IPv6 equivalents), even if port 993 is reachable from outside; and wrong passwords are slowed down.
+- The mail is owned by its own system user, `bpqmail`, in `/var/mail/bpq-dashboard` (not readable by the web server).
+- Your Let's Encrypt certificate is used when there is one (you choose which when you have several; renewals reload Dovecot); otherwise Dovecot's own, which the mail app asks you to accept once.
+
+**Winlink mail and other accounts** (v1.5.77). Mail the BBS collects from Winlink (*Poll RMS*) goes into the Inbox like any personal mail, marked Winlink. To copy another BBS user's mail too (a club or tactical call), list it in BBS Mail → ≡ → Settings → *Other accounts*: it gets its own folder, `INBOX/<CALL>`. Maintenance → *Winlink mail* has the BBS-side settings.
+
+**Setting it up.** From v1.5.76 the installer (*Set up BBS Mail now?*) and `update.sh` (once, where it isn't set up) offer to run this for you; the answer defaults to No, and a No is remembered (delete `/etc/bpq-dashboard/bbs-mail-declined` to be asked again). By hand:
+
+```bash
+sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh --dry-run   # what it would do
+sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh
+```
+
+It installs Dovecot (`dovecot-imapd`), creates `bpqmail`, writes `/etc/dovecot/conf.d/99-bpq-dashboard.conf`, asks for the mail password (twice, not shown), installs and starts `bbs-mail-sync.timer`, copies the mail saved so far (the first time can take a few minutes with many bulletins), and prints the mail-app settings. It won't take over a Dovecot that already has other settings (`--force` if that one isn't used). Safe to run again. If the `bpq_mail_sync` table is missing, run update.sh once.
+
+**Mail app settings.** Incoming: IMAP, server = the certificate's name (for example `bpq.example.net`; the name must match the certificate, so on your own network it has to reach the station: if it doesn't, add it to your router's local DNS or the computer's hosts file), port 993, SSL/TLS, normal password; user name = the callsign in lower case. No outgoing server. With Dovecot's own certificate use the station's address and accept the certificate once.
+
+**Afterwards.**
+
+```bash
+sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh --status     # running, folders, counts, waiting
+sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh --password   # new mail password
+sudo python3 /var/www/bpq-dashboard/scripts/bbs-mail-sync.py --dry-run   # what the next run would copy
+journalctl -u bbs-mail-sync -n 20                                     # the copier's runs
+sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh --remove     # stop; keeps the copied mail
+sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh --remove --purge   # ... and deletes it
+```
+
+Settings (all optional) in `config.php`:
+
+```php
+'bbs_mail' => [
+    'user'                => 'n0call', // mail login (default: station callsign, lower case)
+    'bulletin_days'       => 90,       // keep bulletins this long in the mail store
+    'wait_for_text_hours' => 48,       // then copy a message without its text, with a note
+    'bulletins'           => true,     // false = personal and NTS mail only
+],
+```
+
+**The Email Client's view of it (v1.5.68).** The setup also creates a login for the dashboard itself: `<callsign>*bpqdash`, a Dovecot master login (`/etc/dovecot/bpq-dashboard-master.passwd`, hashed) accepted from 127.0.0.1 only, whose random password is in `/etc/bpq-dashboard/bbs-mail.php` (root:<web group>, 640). The Email Client uses it, through `message-storage.php`, to show the 📬 Mail store folders over plain IMAP on 127.0.0.1:143. Read marks are shared both ways by `bbs-mail-sync.py`: `bpq_messages.is_read` ↔ the `\Seen` flag, with `bpq_mail_sync.seen_synced` remembering what both sides last agreed on (whichever side changed wins; read wins if both did).
+
+**Firewall.** With ufw on, the setup lets your network reach 993. With plain iptables and a closed INPUT policy it adds `-s <your network> --dport 993 -j ACCEPT` (comment *BPQ Dashboard BBS mail (LAN)*) and saves it with netfilter-persistent; `--remove` takes it out again.
+
+**Reaching it from home.** The certificate's name usually points to your public address, and many routers don't answer that from inside (*connection refused* or a hang). Put `<station's LAN address> <name>` in each computer's hosts file or your router's local DNS. In Thunderbird, if *Re-test* or *Done* hangs, use **Advanced config** in the manual setup. To test without a mail app, from the station: `openssl s_client -connect 127.0.0.1:993 -servername <name> -verify_hostname <name> -brief </dev/null` (should show the certificate and *BBS mail ready.*). Don't test a login with `curl -v -u`: its log shows the password, only lightly encoded.
+
+**Trash and the BBS (v1.5.70).** A message leaving the mail store's Trash is queued in `bpq_bbs_kills`: straight away when Trash is emptied (or a message deleted for good) in the Email Client, and by `bbs-mail-sync.py` when it sees one gone from Trash (emptied in a mail app, or the 30-day clean-up; an empty answer from Dovecot is never taken as "all gone"). `scripts/fetch-message-bodies.php` works through the queue on its next run (every 5 minutes, up to 30 a run): `R <n>`, compare From and Title with the saved copy, then `K <n>`; results `killed`, `gone` (not on the BBS any more), `other` (the number now holds another message: left alone) or `error` (3 tries). `bbs-mail-sync.py --status` shows how many are waiting. To see the last ones: `sudo mysql <database> -e "SELECT bbs_number, from_call, subject, source, result, done_at FROM bpq_bbs_kills ORDER BY id DESC LIMIT 20"`.
+
+**Not yet** (later releases): reading from outside your network (needs port 993 forwarded and fail2ban watching Dovecot), sending and replying from the mail app through the BBS (LinBPQ's own SMTP on 127.0.0.1:25 is the likely route), and the BBS's own read marks (BPQ has no command for them).
 
 ## 11. Security Hardening
 
@@ -2540,10 +2715,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.66-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.83-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.66 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.83 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

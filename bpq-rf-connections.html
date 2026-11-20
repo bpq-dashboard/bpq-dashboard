@@ -435,12 +435,12 @@
     <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
          Replaces the previously-duplicated <nav> block. The active link is
          driven by the data-nav-page attribute on <body>. -->
-    <script src="bpq-nav-loader.js?v=2026-11-16-1"></script>
-    <script src="rf-modem-report.js?v=1.5.66" defer></script>
+    <script src="bpq-nav-loader.js?v=2026-11-19-1"></script>
+    <script src="rf-modem-report.js?v=1.5.83" defer></script>
 
     <!-- ═══ v1.5.44 RF Connections redesign ("layout A") ══════════════════════
-         Same data code and element ids as before; the old page is kept as
-         bpq-rf-connections-classic.html for comparison. -->
+         Same data code and element ids as before. The old page (Classic view)
+         was retired in v1.5.75. -->
     <div id="githubBanner" class="rf-banner">
         <div class="rf-wrap rf-banner-in">
             <svg height="16" width="16" viewBox="0 0 16 16" aria-hidden="true" style="flex:none;fill:currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
@@ -457,8 +457,7 @@
             <div class="rf-title">
                 <div class="rf-title-line">
                     <h1>RF Connections</h1>
-                    <span class="rf-ver">v1.5.66</span>
-                    <a class="rf-classic" href="bpq-rf-connections-classic.html" title="The page as it was before v1.5.44, for comparison">Classic view</a>
+                    <span class="rf-ver">v1.5.83</span>
                 </div>
                 <div class="rf-sub">
                     <span id="dateRange">Loading...</span>
@@ -661,6 +660,9 @@
                                 <option value="rf">📡 RF only</option>
                                 <option value="all">All methods</option>
                                 <option value="nonrf">🚫 Non-RF only</option>
+                                <option value="VARA">📡 VARA HF</option>
+                                <option value="MERCURY">📡 Mercury</option>
+                                <option value="DATA2G">📡 Data2G</option>
                                 <option value="NETROM">🔗 NET/ROM</option>
                                 <option value="AXIP">🛰 AXIP</option>
                                 <option value="TELNET">🌐 Telnet</option>
@@ -854,7 +856,7 @@
             </div>
         </section>
 
-        <p class="rf-small rf-muted">Layout introduced in v1.5.44. The previous layout is still available as <a href="bpq-rf-connections-classic.html">Classic view</a>.</p>
+        <p class="rf-small rf-muted">Layout introduced in v1.5.44.</p>
     </main>
 
     <div id="stationsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -3641,8 +3643,11 @@
         // or days ConnectLog wasn't retained for) don't silently hide
         // real messages. This deliberately errs toward showing a little
         // too much rather than hiding real RF traffic.
+        // v1.5.82: Mercury and Data2G (HF modems LinBPQ drives with its VARA
+        // driver) are radio too
+        const RF_MEDIUMS = new Set(['VARA', 'MERCURY', 'DATA2G']);
         function isRfMedium(m) {
-            return !m.medium || m.medium === 'VARA';
+            return !m.medium || RF_MEDIUMS.has(m.medium);
         }
 
         // Was this offer actually delivered? (2026-10-06) Only 'A' (partner
@@ -3708,8 +3713,8 @@
         function mediumMatches(medium, mode, partner) {
             if (mode === 'all') return true;
             if (mode === 'winlink') return partner === WINLINK_PARTNER;
-            if (mode === 'rf') return !medium || medium === 'VARA';
-            if (mode === 'nonrf') return !!medium && medium !== 'VARA';
+            if (mode === 'rf') return !medium || RF_MEDIUMS.has(medium);
+            if (mode === 'nonrf') return !!medium && !RF_MEDIUMS.has(medium);
             return medium === mode;
         }
 
@@ -3824,6 +3829,8 @@
         // say so in the tooltip rather than implying it's non-RF.
         const MEDIUM_BADGES = {
             'VARA':   { label: '📡 RF',     cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', title: 'VARA HF (RF)' },
+            'MERCURY': { label: '📡 Mercury', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', title: 'Mercury HF modem (RF)' },
+            'DATA2G': { label: '📡 Data2G', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200', title: 'Data2G HF modem (RF)' },
             'NETROM': { label: '🔗 NET/ROM', cls: 'bg-indigo-100 text-indigo-800 border-indigo-200',  title: 'NET/ROM — not counted as RF' },
             'TELNET': { label: '🌐 Telnet',  cls: 'bg-sky-100 text-sky-800 border-sky-200',           title: 'Telnet / Internet — not counted as RF' },
             'AX.25':  { label: '📻 AX.25',   cls: 'bg-teal-100 text-teal-800 border-teal-200',        title: 'AX.25 packet — not counted as RF' },
@@ -6338,7 +6345,10 @@
                 if (wd && wd.paused) {
                     statusClass = 'bg-red-50 border-red-300 text-red-800';
                     const until = wd.resume_at ? wd.resume_at.slice(11, 16) + 'Z' : '';
-                    wdHtml = `<div class="mt-1 text-[10px] font-bold text-red-700" title="Connect Watchdog: ${escapeHtmlRf(wd.reason || 'paused')} — forwarding to this partner is off (Enabled = 0) until ${escapeHtmlRf(wd.resume_at || '')} UTC; its mail waits in the queue">⏸ Paused until ${escapeHtmlRf(until)}</div>`;
+                    wdHtml = wd.status === 'resume_waiting'
+                        // v1.5.81: the pause is over; it ends with the next LinBPQ restart (shared with another change, at most 90 min)
+                        ? `<div class="mt-1 text-[10px] font-bold text-amber-700" title="Connect Watchdog: the pause is over; forwarding is switched back on at the next LinBPQ restart, shared with another change to save a restart (at most about 90 minutes, and never during a radio session)">⏸ Resuming with the next restart</div>`
+                        : `<div class="mt-1 text-[10px] font-bold text-red-700" title="Connect Watchdog: ${escapeHtmlRf(wd.reason || 'paused')} — forwarding to this partner is off (Enabled = 0) until ${escapeHtmlRf(wd.resume_at || '')} UTC; its mail waits in the queue">⏸ Paused until ${escapeHtmlRf(until)}</div>`;
                 } else if (wd && wd.fails_in_a_row > 0) {
                     wdHtml = `<div class="mt-1 text-[10px] font-bold text-amber-700" title="Connect Watchdog: failed forwarding attempts in a row; paused at ${(_watchdog.settings && _watchdog.settings.fail_count) || 2}">⚠ ${wd.fails_in_a_row} failed attempt${wd.fails_in_a_row === 1 ? '' : 's'}</div>`;
                 }
@@ -7617,7 +7627,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.66 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.83 | HF Efficiency Report
                 </p>
             `;
             

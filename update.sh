@@ -41,6 +41,9 @@
 #       set up, only where they changed, and restarts only the helper
 #       services whose program or unit changed;
 #    6. records the installed version (VERSION, MANIFEST.md5).
+#    7. where BBS Mail (the mail store) isn't set up, asks once whether to
+#       set it up (default No; never with --yes or without a terminal; a No
+#       is remembered in /etc/bpq-dashboard/bbs-mail-declined).
 #
 #  A full log is written next to the backup.
 # ============================================================================
@@ -491,6 +494,46 @@ install -o "$WEB_USER" -g "$WEB_GROUP" -m 644 "$SRC/MANIFEST.md5" "$WEB_ROOT/MAN
 [[ -f "$WEB_ROOT/VERSION" ]] || install -o "$WEB_USER" -g "$WEB_GROUP" -m 644 "$SRC/VERSION" "$WEB_ROOT/VERSION"
 ok "Installed version recorded: $(cat "$WEB_ROOT/VERSION")"
 
+# ── v1.5.76: offer BBS Mail where the mail store isn't set up ─────────────
+# Asked once, default No. Never in an unattended run (--yes or no terminal):
+# it installs Dovecot, opens IMAP 993 to the home network and needs a mail
+# password typed by hand. "No" is remembered in $MAIL_DECLINED, so later
+# updates don't ask again; the sysop can still run the setup any time.
+MAIL_SETUP="$WEB_ROOT/tools/bbs-mail-setup.sh"
+MAIL_DECLINED=/etc/bpq-dashboard/bbs-mail-declined
+MAIL_NOTE=""
+if [[ ! -f /etc/bpq-dashboard/bbs-mail.php && -f "$MAIL_SETUP" ]]; then
+    if [[ -f "$MAIL_DECLINED" ]]; then
+        MAIL_NOTE="declined"
+    elif [[ $YES == y || ! -t 0 ]] || (( ${#FAILS[@]} )); then
+        MAIL_NOTE="later"
+    else
+        hdr "BBS Mail (optional)"
+        say "BBS Mail is the newer Email page, laid out like Thunderbird: folders,"
+        say "message filters, an address book, Quick Check-In; and the same mail in"
+        say "Thunderbird or a phone's mail app on your home network. It needs a small"
+        say "mail server on this computer. Setting it up:"
+        say "  - installs Dovecot (an IMAP server) and copies your BBS mail into it"
+        say "    every 2 minutes (bulletins kept 90 days by default);"
+        say "  - opens port 993 (encrypted IMAP) to your home network only: nothing"
+        say "    to the internet, no port 25, no outgoing mail;"
+        say "  - asks you to type a mail password (separate from your other ones)."
+        say "Without it, Email stays the older Email Client. You can set it up later."
+        read -r -p "  Set up BBS Mail now? [y/N]: " a
+        if [[ "$a" =~ ^[Yy] ]]; then
+            if bash "$MAIL_SETUP"; then
+                ok "BBS Mail set up: Email now opens it (Ctrl+Shift+R once). To undo: sudo bash $MAIL_SETUP --remove"
+            else
+                warn "BBS Mail setup stopped (messages above). Nothing else is affected; run it again later: sudo bash $MAIL_SETUP"
+            fi
+        else
+            install -d -m 755 /etc/bpq-dashboard
+            echo "declined $(date -Is) at update to $NEW_VER" > "$MAIL_DECLINED"
+            say "Not set up, and not asked again. Any time later: sudo bash $MAIL_SETUP"
+        fi
+    fi
+fi
+
 # ── Done ───────────────────────────────────────────────────────────────────
 hdr "Done"
 if (( ${#FAILS[@]} )); then
@@ -508,6 +551,14 @@ cat <<EOF
   Backup and log: $BK
   Undo:           sudo bash $SRC/update.sh --rollback $BK
 EOF
+# v1.5.76: BBS Mail, when the question was skipped (unattended run or problems)
+if [[ "$MAIL_NOTE" == "later" ]]; then
+    cat <<EOF
+
+  ${YLW}Optional:${NC} BBS Mail (the Thunderbird-style Email page, and your BBS mail in
+  Thunderbird or a phone) isn't set up. In a terminal: ${BOLD}sudo bash $MAIL_SETUP${NC}  (Manual §10.19)
+EOF
+fi
 # v1.5.42: point out the optional station backup until something reports one
 if [[ ! -r /etc/bpq-dashboard/backup.conf && ! -s /var/lib/bpq-backup/status.json ]]; then
     cat <<EOF

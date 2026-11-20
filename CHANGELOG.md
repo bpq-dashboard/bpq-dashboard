@@ -4,6 +4,407 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.83] - 2026-11-20
+
+### Fixed
+- Forwarding schedule check (fwd-times.php): read partners only inside
+  linmail.cfg's BBSForwarding section. On ARSSYSTEM it also listed the
+  later sections (HOUSEKEEPING, UIPORT1-6, BBSUSERS) as partners.
+
+## [1.5.82] - 2026-11-20
+
+### Added (to-do #49: TIMES gap checker)
+- includes/fwd-times.php: linmail.cfg BBSForwarding partners, ConnectScript
+  `TIMES hhmm-hhmm` bands (over midnight too), uncovered spans.
+- System Audit `fwd-times`: warn for enabled partners with gaps (with hours
+  a day), ok when all timed scripts cover the day, info when linmail.cfg
+  isn't readable (no advice to loosen its permissions).
+- scripts/fwd-times.php (CLI only): bands and gaps per partner.
+- Maintenance → Forwarding schedule gaps.
+
+### Fixed (Mercury / Data2G forwards shown as VARA)
+- scripts/parse-vara-log.py: a DRIVER=VARA port whose `ADDR 127.0.0.1 <port>`
+  is Mercury's TNC port (config `mercury.tnc_port` / mercury.ini
+  `arq_tcp_base_port`) or Data2G's (`data2g.tnc_port` / unit
+  `--command-port`) is medium MERCURY / DATA2G (defaults not guessed);
+  incoming messages tagged VARA that fall inside a Mercury / Data2G
+  session with the partner (rf_connections) and no VARA session get that
+  modem. One-off: the next run re-tags 365 days (marker
+  cache/.media-modems-1.5.82).
+- RF Connections: RF_MEDIUMS (VARA, MERCURY, DATA2G) count as RF;
+  📡 Mercury / 📡 Data2G badges; filter options VARA HF / Mercury / Data2G.
+  Guide §27 limitation removed.
+- Docs: Guide §12 (Via), §22, §27; Manual What's New.
+
+## [1.5.81] - 2026-11-20
+
+### Changed (to-do #47: watchdog batching)
+- scripts/connect-watchdog.py: fewer LinBPQ restarts.
+  - A resume that's due waits up to `watchdog.batch_mins` (default 90; a
+    partner heard from again: 30) for another change to share the restart;
+    status `resume_waiting` (tile: ⏸ Resuming with the next restart).
+  - When a restart happens (a pause, or a resume that has waited long
+    enough), resumes due within `batch_mins` are applied with it, early.
+  - No restart while the radio is in use: any open BBS session (any
+    station, from the BBS log), or an open Mercury / Data2G call (their
+    parsers run on the last 512 KB of the log, only if written in the last
+    10 min). The change waits for a later run.
+  - `--status` no longer crashes when linmail.cfg is missing, and shows
+    "resuming next restart".
+  - `batch_mins` 0 = the old behaviour. Tested with a harness (fake
+    linmail.cfg / state / BBS log / Mercury log, stop/start commands
+    stubbed): wait, batch with early resume, defer for an open session,
+    restart after it ends, batch off.
+- RF Connections partner tile: *Resuming with the next restart*.
+- Docs: Guide §12 watchdog, Manual §10.1 + What's New, config.php.example,
+  Maintenance → Connect Watchdog.
+
+## [1.5.80] - 2026-11-20
+
+### Fixed (to-do #48: Mercury auto-detect vs port 8400)
+- includes/mercury-status.php: with `mercury.enabled` 'auto', a listener
+  on the default 8400 (Data2G's web monitor default, or any other program)
+  no longer counts as Mercury unless the port is known (config.php
+  `tnc_port` or a readable mercury.ini `arq_tcp_base_port`) or a `mercury`
+  process runs. Before, such stations got a Mercury card stuck at "TNC not
+  attached" and Mercury findings in System Audit. Same guard Data2G has had
+  since 1.5.64 (`tnc_port_known`). Reproduced and tested with a listener on
+  8400 (no ini → hidden; ini with 8400 → shown).
+- Docs: Manual §10.17, What's New.
+
+## [1.5.79] - 2026-11-20
+
+### Action needed (nginx stations): two lines in your site file
+Pages are now sent with `Cache-Control: no-cache` so browsers show a new
+version straight after an update (K1AJD's browser kept the 1.5.77 BBS Mail
+after updating to 1.5.78). update.sh doesn't edit site files, so add:
+- above the first `server {`:
+  `map $sent_http_content_type $bpq_page_cache { ~^text/html "no-cache"; default ""; }`
+- in each `server {` block, next to the other add_header lines:
+  `add_header Cache-Control $bpq_page_cache always;`
+- `sudo nginx -t && sudo systemctl reload nginx`
+Templates (bpq-dashboard.conf, nginx-bpq-dashboard.conf) and install.sh
+have it. System Audit (*page-cache*) warns until it's there. Meanwhile
+BBS Mail and the Email Client compare their version with /VERSION and
+reload once when the dashboard was updated.
+
+### Added (K1AJD)
+- BBS Mail: **Forwarded to** line in the message view (bbs-forwards.php
+  `for_bid`, by BID, last 7 days of BBS logs; hidden when none).
+- BBS Mail on iPad / phones: toolbar fits (≡ was off-screen on iPad
+  portrait; secondary buttons icon-only under 1180 px; on phones NTS
+  Report, Forms and Check-In hidden and added to ≡), bigger touch targets,
+  touch-and-hold opens the right-click menu, tapping a submenu item opens it.
+- Docs: Guide §9 (BBS Mail), §22; Manual What's New (site-file steps).
+
+### Correction
+- LinBPQ's logging was never off on ARSSYSTEM: linbpq runs with
+  `logdir=<web root>`, so logs are in `<web root>/logs/`.
+
+## [1.5.78] - 2026-11-19
+
+### Added (K1AJD: items 1, 2 and 4 of the BBS Mail ideas list)
+- **Tools** in BBS Mail (≡ → Tools), moved from the older Email Client and
+  read from the server: Forwarding Activity (bbs-forwards.php), BBSes Seen
+  (`message-storage.php?action=bbsSeen`, routes from the "From: CALL@BBS…"
+  line, 180 days), Statistics (`mailStats`), Killed on the BBS (`killList`:
+  bpq_bbs_kills and kept-after-kill messages).
+- **Drafts**: Write saves to the mail store's Drafts (special-use \Drafts,
+  created when first needed) every 20 s while it changes, on page hide /
+  unload (keepalive) and when the tab closes with ✕; opening a draft
+  reopens Write; sent or discarded (Cancel) drafts are expunged. imap-client
+  `append()` (LITERAL+, APPENDUID), `lastOk`; row `draft` from
+  `X-BBS-Draft-To` / `X-BBS-Draft-Type`; actions msDraftSave / msDraftDelete.
+  Drafts list shows recipients like Sent.
+- **Plain characters check** before sending: non-ASCII (curly quotes,
+  dashes, accents, symbols, emoji, odd spaces) listed with replacements;
+  Use plain characters and send / Send as written / Go back.
+
+### Fixed
+- BBS Mail menus: a submenu near the right edge opened on top of its own
+  item; it now opens to the left. Submenus also open on a tap.
+- Statistics shows Winlink senders by address, not "RMS:TONY".
+- Docs: Guide §9 (BBS Mail), §25; Manual What's New.
+
+## [1.5.77] - 2026-11-19
+
+### Added (K1AJD: "can we add Winlink polling?")
+LinBPQ's BBS polls Winlink itself (user flag *Poll RMS* + *CMS Pass*, on
+every RMS forwarding run); the dashboard now handles that mail.
+- bbs-mail-sync.py: `RMS:user@domain` / `SMTP:…` / `CALL@winlink.org`
+  senders and recipients keep their address (`"user@domain (Winlink)"
+  <rms.user.domain@bbs.invalid>`); new headers `X-BBS-From`, `X-BBS-To`,
+  `X-BBS-Via: Winlink`. Copies made earlier keep their old From line.
+- **Other accounts**: BBS Mail → Settings; `bpq_mail_prefs` `accounts`
+  (also `config.php` `bbs_mail.accounts`); mail to them → `INBOX/<CALL>`,
+  from them → Sent; saving re-queues messages skipped earlier and makes the
+  folders. Actions msAccountsGet / msAccountsSave.
+- BBS Mail: Winlink label (Type column, message pane, ✉ before the
+  sender); Reply to a Winlink sender goes to `rms:user@domain`; To accepts
+  `rms:` / `smtp:` addresses with their case. imap-client returns
+  `fromAddr`, `toAddr`, `winlink`.
+- Email Client: Winlink tag in the list and reader; `rms:` in To keeps its
+  case.
+- bbs-messages.php: `rms:user@domain` accepted and sent as `SP rms:…`.
+- Maintenance → **Winlink mail** (status from
+  `message-storage.php?action=winlinkStatus`, Poll RMS / CMS Pass steps,
+  check command).
+- connect-watchdog.py: RMS is always excluded.
+- Docs: Guide §9 (Email Client, BBS Mail), §12 watchdog, §25; Manual
+  What's New, §10.19, watchdog example.
+
+## [1.5.76] - 2026-11-19
+
+### Fixed (Glenn: "Load failed" after a bulletin that did send)
+- **No double posts after a dropped connection.** Both mail pages send
+  through `bpq-send-once.js`: each message carries a one-time `send_id`;
+  after a network error (iPad screen lock / app switch, Wi-Fi drop) the
+  page asks `bbs-messages.php` with `check_only` instead of showing an
+  error: done → the first answer (`repeat`), pending → wait, unknown → send
+  now with the same id; gives up after ~2½ minutes with "couldn't confirm".
+  `bbs-messages.php` claims the id atomically **before the BBS lock**
+  (`data/sends/<id>.json`: outcome and hash, no text; 7 days), never posts
+  an id twice, gives the id back when the send stops before reaching the
+  BBS or fails, keeps running if the browser goes (`ignore_user_abort`).
+  Sends without an id work as before.
+- Email Client: unconfirmed sends are shown as *Not confirmed: check Sent*,
+  not *Send failed*; long toasts stay 10 s. BBS Mail: per-tab ids per
+  recipient; unconfirmed recipients stay in To.
+
+### Added (K1AJD)
+- **install.sh (new STEP 17) and update.sh offer to set up BBS Mail**
+  (`tools/bbs-mail-setup.sh`) where `/etc/bpq-dashboard/bbs-mail.php` is
+  missing: default No; a No is remembered in
+  `/etc/bpq-dashboard/bbs-mail-declined`; never with `--yes` or without a
+  terminal (update.sh then prints the command; the install summary lists
+  it). Backups became STEP 18.
+- System Audit: `data/sends` in the writable-folders check.
+- Docs: Guide §9 (*If the connection drops while sending*, BBS Mail Write),
+  §25; Manual What's New, §4 Step 5 questions, *Updating*, §10.19;
+  Maintenance *BBS mail*.
+
+## [1.5.75] - 2026-11-19
+
+### Changed (K1AJD: "drop the Classic View for rf-connections and the old
+email client")
+- Where the mail store is set up, **Email always opens BBS Mail**:
+  bbs-messages.html switches to /admin/bbs-mail.html every time (hidden up
+  to 3 s while it checks msStatus, so no flash); `?classic=1` and the
+  `bpq_mail_view` choice are gone; BBS Mail's *Classic view* button and the
+  old page's *BBS Mail view* button and Mail store folders are removed;
+  `bbs-mail-store.js` retired. Stations without the mail store (or whose
+  mail server isn't answering) keep the older Email Client, with a note on
+  how to set the mail store up (× hides it 30 days in that browser).
+- **Quick Check-In moved into BBS Mail** (toolbar ✅ Check-In, ≡ → Quick
+  Check-In…): fills a Write tab (new compose kind `fixed`, no signature).
+  Details kept on the station (`bpq_mail_prefs` name `checkin`; actions
+  msCheckInGet / msCheckInSave), brought over once from the older
+  client's browser copy; band, mode, type and station are remembered too.
+- **RF Connections' Classic view retired**: bpq-rf-connections-classic.html
+  removed (update.sh deletes it), links and install-check entry dropped.
+- Docs: Guide §9, §12 and the page list; Manual What's New; README. Menu cache 2026-11-19-1.
+
+## [1.5.74] - 2026-11-18
+
+### Added (K1AJD)
+- BBS Mail → Write: **NTS traffic (ST)** type; the To hint follows the
+  type. bbs-messages.php `send` accepts type T (sends ST).
+- **Retention policy** for the mail store (Thunderbird-style): bulletin
+  default days (Settings), per-folder Properties (default / never / N days),
+  always keep starred; Run retention cleanup now. Table `bpq_mail_prefs`
+  (sql/2026-11-18-mail-prefs.sql); actions msRetentionGet/Save/Run;
+  bbs-mail-sync.py expire() follows it (sentbefore <date>, NOT FLAGGED),
+  Trash still 30 days. Never touches the BBS.
+- Docs: Guide §9, §25; Manual What's New; Maintenance *BBS mail*. Menu cache 2026-11-18-8.
+
+## [1.5.73] - 2026-11-18
+
+### Added (K1AJD: "message filtering so I can have messages directly in
+different folders, ability to mark inbox and bulletins as read")
+- BBS Mail → **Message Filters** dialog (list with enable, order, hit
+  count, Run Now / Run All on a folder) and filter editor (match all/any;
+  From, To, Subject, Body, Type, Bulletin group; contains / doesn't
+  contain / is / isn't / begins / ends; move to folder or new Inbox folder,
+  mark read, star, stop). Create Filter From Message; Run Filters on Folder.
+  Table `bpq_mail_filters` (sql/2026-11-18-mail-filters.sql); actions mf*
+  (includes/mail-filters-actions.php). `bbs-mail-sync.py` applies enabled
+  "new mail" filters while copying (apply_filters / filter_matches, same
+  rules as PHP), sets \Seen / \Flagged with doveadm, counts hits; the
+  dry run shows the filter per message.
+- Mark read in bulk: msMarkFolderRead `tree` (a folder and its subfolders);
+  folder menu Mark All Bulletins Read / Mark … and Its Folders Read;
+  ≡ → Mark All Read ▸.
+- Docs: Guide §9, §24, §25; Manual What's New; Maintenance *BBS mail*. Menu cache 2026-11-18-7.
+
+## [1.5.72] - 2026-11-18
+
+### Added (K1AJD: "an address book that looks and feels like Thunderbird's")
+- BBS Mail → **Address Book** tab: books pane (All, Personal with lists,
+  Collected Addresses, Starred), contact cards, details pane (fields, QRZ
+  link, lists, recent messages from the mail store), inline editing,
+  lists with members, right-click menus, keyboard, drag onto lists,
+  import (Email Client's book, senders, vCard/CSV) and export (vCard/CSV).
+  New table `bpq_contacts` (sql/2026-11-18-contacts.sql) and actions ab*
+  in message-storage.php (includes/contacts-actions.php).
+- Write: To suggestions (contacts, lists, Email Client addresses), several
+  recipients and lists (one BBS message each, max 25; bulletins one
+  address); recipients you write to land in Collected Addresses (abUsed).
+- Names next to callsigns; sender menu (add/edit contact, write, search,
+  copy); Print; Save As Text; Settings (check interval, desktop
+  notifications, font, names, signature via saveSignature); unread count in
+  the tab title.
+
+### Notes
+- update.sh adds `bpq_contacts`. Menu cache 2026-11-18-6. Docs: Guide §9, §25, §28; Manual What's New.
+
+## [1.5.71] - 2026-11-18
+
+### Added (K1AJD: "mimic a Thunderbird email page as much as possible")
+- **BBS Mail**, admin/bbs-mail.html + admin/bbs-mail.js: Thunderbird
+  Classic layout over the mail store — folder tree (unread counts, fold,
+  right-click: new/rename/delete folder, mark folder read, empty trash),
+  message list (★, ●, Subject, Correspondents, Date, Size, Type, BBS #;
+  sort by click, resize, show/hide via right-click, infinite scroll),
+  message pane (Reply, Forward, ★, Delete, ⋯), tabs (folder, messages,
+  Write), Quick Filter (Unread, Starred, Sender/Recipients/Subject/Body),
+  search across folders, right-click menus with Mark / Move To / Copy To,
+  drag and drop onto folders (Ctrl = copy), Thunderbird shortcuts, status
+  bar, light/dark. Write/Reply/Forward send via bbs-messages.php (send),
+  with the Email Client's address book and signature.
+- message-storage.php mail store actions: msList sort/dir/fields/flagged,
+  msSearchAll, msFlag, msCopy, msMarkFolderRead (imap-client query(),
+  setFlagged, copy, setSeenAll).
+- bbs-messages.html opens BBS Mail where the mail store is set up, unless
+  this browser chose Classic view (or ?classic=1); it gets a
+  "📬 BBS Mail view" button.
+
+### Fixed
+- Mail store dates: a weekday name that didn't match the date made PHP
+  move it to the next such weekday.
+
+### Notes
+- Lives in /admin/ so the existing admin login covers it (no web-server
+  change). Menu cache 2026-11-18-5. Docs: Guide §2, §9 (*BBS Mail*), §28,
+  §29; Manual What's New; Maintenance *BBS mail in a mail app*.
+
+## [1.5.70] - 2026-11-18
+
+### Added (asked for by K1AJD)
+- Email Client → 📬 Mail store: **Trash kills on the BBS.** Messages that
+  leave the mail store's Trash are killed on the BBS: *Empty Trash*
+  (right-click Trash or ⋯), *Delete for good + kill on BBS*, emptying Trash
+  in a mail app, and Trash's 30-day clean-up. New table `bpq_bbs_kills`
+  (sql/2026-11-18-bbs-kill-queue.sql), filled by
+  includes/mail-store-actions.php and scripts/bbs-mail-sync.py, worked
+  through by scripts/fetch-message-bodies.php (step 5: R <n>, From/Title
+  check, K <n>; killed / gone / other / error after 3 tries; honours
+  features.bbs_write). An empty message list from Dovecot is never taken
+  as "everything deleted".
+- **Your own folders** in the mail store: right-click Inbox (or ⋯) → New
+  folder in Inbox; New folder inside / Rename / Delete on your folders
+  (deleting moves its messages to Trash). **Move to…** in the selection bar
+  and the reader. Folder tree with 📁.
+- System Audit: *Trash → BBS kills* (waiting > 30 min, or failed).
+- Menu cache version 2026-11-18-4 (guide PDF link).
+- `bbs-mail-sync.py --status` shows messages removed from Trash and kills
+  waiting.
+- Docs: Guide §9, §22, §24, §27; Manual What's New and §10.19; Maintenance
+  *BBS mail in a mail app*.
+
+### Updating
+- update.sh adds `bpq_bbs_kills`. Nothing else to do.
+
+## [1.5.69] - 2026-11-18
+
+### Added
+- Email Client → 📬 Mail store: select several messages (checkboxes,
+  Select all, Ctrl-click, Shift-click range) with a bar for Read, Unread
+  and 🗑 Trash; in Trash, ✖ Delete for good (confirmed; new action
+  `msDelete`, Trash only). Asked for by K1AJD on the first day of use.
+- Menu cache version 2026-11-18-3 (guide PDF link).
+  The BBS copies are never touched. Guide §9.
+
+## [1.5.68] - 2026-11-18
+
+### Added
+- Email Client → **📬 Mail store**: the BBS mail store's folders (Inbox,
+  Sent, Bulletins ▸ groups, folders made in a mail app, Trash) in the
+  folder pane, read live over IMAP (`bbs-mail-store.js`, new actions
+  `ms*` in message-storage.php via `includes/mail-store-actions.php` and
+  `includes/imap-client.php`; no PHP imap extension, no web-server change).
+  Reply/Forward over the BBS, Unread, Trash, server-side search, paging,
+  reader Prev/Next. Hidden until the mail store is set up.
+- Read marks shared both ways: `bbs-mail-sync.py` syncs
+  `bpq_messages.is_read` ↔ `\Seen` (doveadm), new `bpq_mail_sync` columns
+  `msgid`, `seen_synced`, `read_changed_at` (sql/2026-11-18-bbs-mail-sync-read.sql);
+  the Email Client polls `action=readChanges` every 2 minutes; *Unread* now
+  reaches the database (`action=markUnread`), and reading a message that
+  isn't filed marks it read in the database by number. `--no-reads`.
+- tools/bbs-mail-setup.sh: the Email Client's own login (Dovecot master
+  user `<call>*bpqdash`, 127.0.0.1 only, random password in
+  /etc/bpq-dashboard/bbs-mail.php, root:<web group> 640); `--status` shows it.
+- Mail store Trash emptied after 30 days.
+
+### Fixed (found installing 1.5.67 on K1AJD's station)
+- Setup stopped with "Dovecot already has settings" because of Debian's
+  own `20-pop3.conf`.
+- Dovecot wouldn't start: an older `protocols = imap pop3` line in
+  dovecot.conf (after the conf.d include) won over the drop-in, so POP3
+  tried LinBPQ's port 110. Such lines are now commented out (backup in
+  /root), and with dovecot-pop3d installed its listeners are set to port 0.
+- Mail apps on the LAN hung on iptables stations with a closed INPUT
+  policy: the setup now adds an ACCEPT for 993 from the station's own
+  network (and saves it); `--remove` takes it out.
+- System Audit: notes whether the Email Client has its login, and warns if
+  its file is readable by everyone.
+- Docs: Guide §9 (*📬 Mail store in this Email Client*, hosts file,
+  Thunderbird *Advanced config*), §19, §22, §24, §25, §27; Manual What's New
+  and §10.19; Maintenance *BBS mail in a mail app* and Key paths.
+
+- Menu cache version 2026-11-18-2 (guide PDF link).
+
+### Updating
+- update.sh adds the new columns. Where the mail store is set up, run
+  `sudo bash <web root>/tools/bbs-mail-setup.sh` once afterwards (keeps the
+  mail password) to create the Email Client's login and the firewall rule.
+
+## [1.5.67] - 2026-11-18
+
+### Added
+- BBS mail in any mail app (optional, first part of a larger plan):
+  `tools/bbs-mail-setup.sh` sets up Dovecot as a small IMAP mail store with
+  a copy of the BBS mail (INBOX: personal and NTS mail to the callsign or
+  SYSOP; Sent: from the callsign; Bulletins/<group>: every bulletin, kept
+  90 days). `scripts/bbs-mail-sync.py` (bbs-mail-sync.timer, every 2
+  minutes, root) copies new messages from `bpq_messages` with dovecot-lda;
+  table `bpq_mail_sync` records what's been copied. Read only: nothing is
+  written to the BBS, no SMTP, nothing on port 25.
+- Security: IMAPS 993 only (plain 143 on 127.0.0.1), one mail login with
+  its own SHA512-CRYPT password typed at the terminal, the computer's own
+  accounts turned off in Dovecot, logins from private networks only
+  (allow_nets), the Let's Encrypt certificate when there is one (renewals
+  reload Dovecot). Options `--dry-run --status --password --domain --remove
+  [--purge] --force`. Works where IPv6 is switched off.
+- System Audit: *BBS mail store* (running, last copy) and its security
+  check. Log Viewer: *BBS mail store copy*. Firewall page labels 993 / 143.
+  Maintenance: new section *BBS mail in a mail app*, Key paths row.
+- Docs: Guide §9 (*Reading BBS mail in a mail app*), §19, §20, §21, §22,
+  §24 timers, §25 settings, §27 limitations; Manual What's New and §10.19;
+  config.php.example `bbs_mail`.
+
+### Changed
+- Menu cache version 2026-11-18-1 (the guide link in the menu names the
+  new PDF).
+
+### Fixed (same day)
+- scripts/bbs-mail-sync.py didn't compile on Python 3.11 (Debian 12): an
+  f-string reused its own quote marks, which only Python 3.12+ accepts.
+  Release check now compiles every script with Python 3.11.
+
+### Updating
+- update.sh adds the `bpq_mail_sync` table. Nothing else changes until you
+  run `sudo bash <web root>/tools/bbs-mail-setup.sh`.
+
 ## [1.5.66] - 2026-11-18
 
 ### Changed

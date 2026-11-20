@@ -800,6 +800,45 @@ def driver_to_medium(driver, port_id=''):
     return None
 
 
+# v1.5.82: Mercury and Data2G both speak VARA's TNC protocol, so LinBPQ
+# drives them with DRIVER=VARA (e.g. port 5 "ADDR 127.0.0.1 8400"). A VARA
+# port whose ADDR port is Mercury's or Data2G's TNC port is that modem.
+def _modem_tnc_ports():
+    """{tcp_port: 'MERCURY'|'DATA2G'} for the ports known for certain:
+    config.php mercury.tnc_port / mercury.ini arq_tcp_base_port, and
+    data2g.tnc_port / the data2g unit's --command-port. Defaults are not
+    guessed (8400 / 8300 are also other programs' ports)."""
+    out = {}
+    try:
+        mc = bpq_db_config.load_config_section('mercury') or {}
+        mp = int(mc.get('tnc_port') or 0)
+        if not mp:
+            ini = mc.get('ini') or '/etc/mercury/mercury.ini'
+            with open(ini, errors='replace') as f:
+                for line in f:
+                    m = re.match(r'\s*arq_tcp_base_port\s*=\s*(\d+)', line)
+                    if m:
+                        mp = int(m.group(1))
+        if mp:
+            out[mp] = 'MERCURY'
+    except (OSError, ValueError, TypeError):
+        pass
+    try:
+        dc = bpq_db_config.load_config_section('data2g') or {}
+        dp = int(dc.get('tnc_port') or 0)
+        if not dp:
+            unit = dc.get('unit') or '/etc/systemd/system/data2g.service'
+            with open(unit, errors='replace') as f:
+                m = re.search(r'--command-port[ =](\d+)', f.read())
+                if m:
+                    dp = int(m.group(1))
+        if dp:
+            out.setdefault(dp, 'DATA2G')
+    except (OSError, ValueError, TypeError):
+        pass
+    return out
+
+
 def parse_bpq_port_map(cfg_path, verbose=False):
     """Read bpq32.cfg and return {port_number: medium} for every PORT
     block whose driver we can classify. Missing/unreadable file → {}
@@ -821,6 +860,7 @@ def parse_bpq_port_map(cfg_path, verbose=False):
     in_port, seq = False, 0
     cur = {}
     in_comment = False
+    modem_ports = _modem_tnc_ports()
     for raw in lines:
         line = raw.split(';', 1)[0].strip()
         if in_comment:
@@ -847,6 +887,8 @@ def parse_bpq_port_map(cfg_path, verbose=False):
                 medium = driver_to_medium(
                     cur.get('DRIVER') or cur.get('DLLNAME') or cur.get('TYPE'),
                     cur.get('ID'))
+                if medium == 'VARA' and cur.get('_ADDR_PORT') in modem_ports:
+                    medium = modem_ports[cur['_ADDR_PORT']]   # v1.5.82
                 # TYPE=ASYNC with PROTOCOL=KISS is a plain KISS TNC
                 if medium is None and (cur.get('PROTOCOL') or '').upper() == 'KISS':
                     medium = 'AX.25'
@@ -854,6 +896,10 @@ def parse_bpq_port_map(cfg_path, verbose=False):
                     port_map[num] = medium
             in_port = False
             continue
+        if in_port and '_ADDR_PORT' not in cur:
+            am = re.match(r'ADDR\s+(\S+)\s+(\d+)', line, re.I)
+            if am and am.group(1).lower() in ('127.0.0.1', 'localhost', '::1'):
+                cur['_ADDR_PORT'] = int(am.group(2))
         if in_port and '=' in line:
             k, v = line.split('=', 1)
             k = k.strip().upper()
@@ -903,6 +949,48 @@ def load_outgoing_vara_sessions(conn, since=None):
         sys.stderr.write(f"WARNING: couldn't load VARA sessions for outbound "
                          f"medium fallback: {e}\n")
     return out
+
+
+def load_modem_sessions(conn, since=None):
+    """{base_call: [(start, end, 'MERCURY'|'DATA2G'), ...]} of connected
+    Mercury / Data2G sessions in rf_connections (v1.5.82)."""
+    out = defaultdict(list)
+    if conn is None or not _has_modem_column(conn):
+        return out
+    sql = ("SELECT base_call, session_start, COALESCE(session_end, session_start + INTERVAL 30 MINUTE), modem "
+           "FROM rf_connections WHERE modem IN ('mercury', 'data2g') AND status = 'success'")
+    params = ()
+    if since:
+        sql += " AND session_start >= %s"
+        params = (since - dt.timedelta(days=1),)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            for row in cur.fetchall():
+                if isinstance(row, dict):
+                    row = list(row.values())
+                if row[0] and row[1]:
+                    out[str(row[0]).upper()].append((row[1], row[2] or row[1], str(row[3]).upper()))
+    except Exception as e:  # never let enrichment break the parser run
+        sys.stderr.write(f"WARNING: couldn't load Mercury/Data2G sessions: {e}\n")
+    return out
+
+
+def refine_modem_medium(msgs, modem_sessions, vara_sessions):
+    """A message tagged 'VARA' (ConnectLog says "Mode VARA" for Mercury and
+    Data2G calls too) that falls inside a Mercury or Data2G session with the
+    partner, and inside no VARA session, gets that modem as its medium."""
+    if not modem_sessions:
+        return
+    slack = dt.timedelta(minutes=2)
+    for m in msgs:
+        if m.get('medium') != 'VARA' or not m.get('msg_time'):
+            continue
+        base = str(m.get('partner') or '').upper().split('-')[0]
+        t = m['msg_time']
+        hit = next((md for s, e, md in modem_sessions.get(base, ()) if s - slack <= t <= e + slack), None)
+        if hit and not any(s - slack <= t <= e + slack for s, e in vara_sessions.get(base, ())):
+            m['medium'] = hit
 
 
 def resolve_outbound_medium(sess, partner_base, vara_sessions, port_map):
@@ -2148,6 +2236,7 @@ def parse_log(log_path, conn, dry_run=False, verbose=False, bbs_log_dir=None,
             bbs_log_dir, since=msg_since, verbose=verbose,
             connect_events=connect_mode_events,
             vara_sessions=vara_sessions, port_map=port_map)
+        refine_modem_medium(forwarded_messages, load_modem_sessions(conn, since=msg_since), vara_sessions)
 
     messages_emitted = 0
     for msg in forwarded_messages:
@@ -2258,10 +2347,18 @@ def main():
             if not args.dry_run:
                 reset_parser_state(conn, os.path.basename(log_path))
 
+        # v1.5.82: once, re-tag a year of forwarded messages, so those that
+        # went over Mercury or Data2G (stored as VARA before) get their modem
+        marker = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              'cache', '.media-modems-1.5.82')
+        msg_days = args.rescan_messages_days
+        once = not msg_days and not args.dry_run and not os.path.exists(marker)
+        if once:
+            msg_days = 365
         result = parse_log(log_path, conn, dry_run=args.dry_run,
                            verbose=args.verbose, bbs_log_dir=bbs_log_dir,
                            our_callsign=args.my_callsign,
-                           messages_days=args.rescan_messages_days,
+                           messages_days=msg_days,
                            bpq_cfg=args.bpq_cfg or bpq_db_config.default_linbpq_path('bpq32.cfg'))
 
         sys.stdout.write(
@@ -2274,6 +2371,13 @@ def main():
         )
         if args.dry_run:
             sys.stdout.write("  [DRY RUN — no DB writes performed]\n")
+        if once:
+            try:
+                with open(marker, 'w') as f:
+                    f.write('forwarded messages re-tagged for Mercury / Data2G\n')
+                sys.stdout.write("  (one-off: a year of forwarded messages re-tagged by modem)\n")
+            except OSError:
+                pass
     finally:
         conn.close()
 

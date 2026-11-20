@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.66 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.83 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.66 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.83 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -1137,10 +1137,18 @@ if [[ "$WEBSERVER" == "nginx" ]]; then
     fi
     say "Writing nginx site config to /etc/nginx/sites-available/bpq-dashboard ..."
     cat > /etc/nginx/sites-available/bpq-dashboard <<NGINX
+# v1.5.79: pages (HTML) are re-checked on every visit, so a browser shows the
+# new version straight after an update instead of a stored copy. Scripts and
+# styles keep their 1-day caching: pages load them as name.js?v=<version>.
+map \$sent_http_content_type \$bpq_page_cache {
+    ~^text/html  "no-cache";
+    default      "";
+}
 server {
     listen $NGINX_LISTEN;
     server_name $WEB_SERVER_NAME;
     root $WEB_ROOT;
+    add_header Cache-Control           \$bpq_page_cache always;   # v1.5.79: pages re-checked each visit
     index bpq-rf-connections.html index.html index.php;
 
     # Logs
@@ -1905,7 +1913,41 @@ else
 fi
 
 # ============================================================================
-hdr "STEP 17 — Nightly backups (optional, recommended)"
+hdr "STEP 17 — BBS Mail (optional)"
+# ============================================================================
+# v1.5.76: never required, default No. tools/bbs-mail-setup.sh installs
+# Dovecot, copies the BBS mail into it, opens IMAP 993 to the home network
+# and asks for a mail password at the terminal. It can be run any time later
+# (Installation Manual §10.19). Without it, Email is the older Email Client.
+MAIL_DONE="n"
+if [[ -f /etc/bpq-dashboard/bbs-mail.php ]]; then
+    ok "BBS Mail is already set up (/etc/bpq-dashboard/bbs-mail.php)."
+    MAIL_DONE="y"
+elif [[ ! -t 0 ]]; then
+    say "BBS Mail not set up (no terminal to type its password). Later: sudo bash $WEB_ROOT/tools/bbs-mail-setup.sh"
+else
+    explain "OPTIONAL: BBS Mail is the newer Email page, laid out like Thunderbird (folders,"
+    explain "message filters, an address book, Quick Check-In), and the same mail in"
+    explain "Thunderbird or a phone's mail app on your home network. It needs a small mail"
+    explain "server on this computer: this installs Dovecot (IMAP), copies your BBS mail"
+    explain "into it every 2 minutes, opens port 993 (encrypted) to your home network only"
+    explain "(nothing to the internet, no port 25, no outgoing mail) and asks you to type a"
+    explain "mail password. Without it, Email is the older Email Client."
+    if yesno "Set up BBS Mail now?" N; then
+        if bash "$WEB_ROOT/tools/bbs-mail-setup.sh" && [[ -f /etc/bpq-dashboard/bbs-mail.php ]]; then
+            MAIL_DONE="y"
+        else
+            warn "BBS Mail setup stopped (messages above). Later: sudo bash $WEB_ROOT/tools/bbs-mail-setup.sh"
+        fi
+    else
+        install -d -m 755 /etc/bpq-dashboard
+        echo "declined $(date -Is) at install" > /etc/bpq-dashboard/bbs-mail-declined
+        say "Skipped (updates won't ask again). Later: sudo bash $WEB_ROOT/tools/bbs-mail-setup.sh  (Manual §10.19)"
+    fi
+fi
+
+# ============================================================================
+hdr "STEP 18 — Nightly backups (optional, recommended)"
 # ============================================================================
 # v1.5.42: never required, and never formats a drive. scripts/bpq-backup-setup.sh
 # asks for a mounted backup folder, makes the password, creates the store and
@@ -1973,6 +2015,7 @@ if [[ "$WEB_SHARED" == "y" ]]; then
     echo
 fi
 [[ "$FW_DONE" == "y" ]] || { echo "${BOLD}Firewall:${NC} not set up. When you're ready: sudo bash $WEB_ROOT/tools/setup-firewall.sh"; echo; }
+[[ "$MAIL_DONE" == "y" ]] || { echo "${BOLD}BBS Mail (optional):${NC} not set up; Email is the older Email Client. For the Thunderbird-style page:"; echo "   sudo bash $WEB_ROOT/tools/bbs-mail-setup.sh   ${DIM}(Installation Manual §10.19)${NC}"; echo; }
 [[ "$BK_DONE" == "y" ]] || { echo "${BOLD}Backups (optional, recommended):${NC} not set up. When you have a backup drive mounted:"; echo "   sudo bash $WEB_ROOT/scripts/bpq-backup-setup.sh   ${DIM}(Installation Manual §10.16)${NC}"; echo; }
 WEB_URL="http://$SERVER_IP$( [[ "$WEB_PORT" != "80" ]] && echo ":$WEB_PORT" )"
 [[ -n "$WEB_BIND" ]] && WEB_URL="http://127.0.0.1:$WEB_PORT  (through your reverse proxy from other machines)"

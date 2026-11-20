@@ -168,9 +168,10 @@ return [
     // 'watchdog' => [
     //     'fail_count'  => 2,      // failed attempts in a row before a pause
     //     'pause_hours' => 6,      // how long a pause lasts
+    //     'batch_mins'  => 90,     // v1.5.81: resumes wait / come early up to this long to share one LinBPQ restart (0 = off)
     //     'notify'      => true,   // BBS message on pause / resume (bbs.user / bbs.pass)
     //     'notify_to'   => '',     // default: station.callsign
-    //     'exclude'     => [],     // never pause these, e.g. ['RMS']
+    //     'exclude'     => [],     // never pause these, e.g. ['K7EK'] (RMS, Winlink, is never paused)
     // ],
 
     // ---- Backups (v1.5.34) ----
@@ -217,6 +218,18 @@ return [
     //     'unit'         => '/etc/systemd/system/data2g.service',
     //     'tnc_port'     => 8500,
     //     'in_headlines' => false,
+    // ],
+
+    // ---- BBS mail in a mail app (IMAP, v1.5.68, optional) ----
+    // Set up with: sudo bash tools/bbs-mail-setup.sh (Installation Manual
+    // §10.19). A copy of your BBS mail for Thunderbird or a phone: INBOX,
+    // Sent, Bulletins/<group>. The mail password is NOT kept here (the script
+    // asks for it and stores it hashed for Dovecot). Defaults below.
+    // 'bbs_mail' => [
+    //     'user'                => '',    // mail login; '' = station callsign, lower case
+    //     'bulletin_days'       => 90,    // bulletins kept this long in the mail store
+    //     'wait_for_text_hours' => 48,    // then a message is copied without its text
+    //     'bulletins'           => true,  // false = personal and NTS mail only
     // ],
 
     // ---- System Logs (v1.5.22) ----
