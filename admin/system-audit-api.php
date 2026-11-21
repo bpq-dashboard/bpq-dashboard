@@ -1167,7 +1167,7 @@ if (@file_exists($bmConf)) {
     $pw = '/etc/dovecot/bpq-dashboard.passwd';
     $pwPerm = @file_exists($pw) ? (fileperms($pw) & 0777) : null;
     $issues = [];
-    if (!preg_match('/inet_listener imap \{\s*address = 127\.0\.0\.1/', $bmText)) $issues[] = 'plain IMAP (143) is not kept to this machine';
+    if (!preg_match('/inet_listener imap \{\s*(?:address|listen) = 127\.0\.0\.1/', $bmText)) $issues[] = 'plain IMAP (143) is not kept to this machine';
     if (preg_match('/^\s*!include auth-system\.conf\.ext/m', $auth)) $issues[] = "the computer's own accounts can log in to Dovecot";
     if ($pwPerm === null) $issues[] = 'no mail password file';
     elseif ($pwPerm & 0007) $issues[] = sprintf('the mail password file is readable by everyone (%o)', $pwPerm);

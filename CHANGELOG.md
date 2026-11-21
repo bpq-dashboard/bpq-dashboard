@@ -4,6 +4,26 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.84] - 2026-11-20
+
+### Fixed (BBS mail store on Dovecot 2.4)
+- tools/bbs-mail-setup.sh: Dovecot 2.4 (Debian 13, Ubuntu 25.04 and later)
+  refuses 2.3 settings ("passdb { } is missing section name"). The script
+  now reads the installed version and writes the 2.4 form there: named
+  passdb/userdb with passwd_file_path and auth_username_format,
+  auth_allow_cleartext = no, mail_driver/mail_path/mail_inbox_path/
+  mailbox_list_layout, ssl_server_cert_file/ssl_server_key_file, listen in
+  the 143 listener, result_success = continue for the dashboard's master
+  login. 2.3 output unchanged (byte-identical on 2.3.21). A broken 2.3-style
+  file from an earlier run is replaced. Stock 30-dict-server.conf (2.4) no
+  longer trips the "settings this script didn't write" stop. Tested on
+  2.4.1-4: mail-app login on 993, master login on 143, PAM logins refused,
+  dovecot-lda into INBOX and Bulletins/<group>, the copier's doveadm
+  fetch/search/flags/expunge, the dashboard IMAP client (append, sort,
+  move, folders), --status and --remove.
+- System Audit BBS mail store security check: accepts 2.4's `listen =` in
+  the 143 listener (it would have warned "plain IMAP not kept local").
+
 ## [1.5.83] - 2026-11-20
 
 ### Fixed

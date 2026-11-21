@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.83**
+**Version 1.5.84**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -1534,7 +1534,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.83
+## 27. Known limitations in v1.5.84
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1609,7 +1609,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.83-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.84-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1636,7 +1636,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.83 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.84 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1651,6 +1651,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.83 — User Guide**
+**73 — BPQ Dashboard v1.5.84 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

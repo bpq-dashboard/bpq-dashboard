@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.83**
+**Version 1.5.84**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -87,6 +87,10 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.84
+
+- **BBS mail store on Dovecot 2.4** (Debian 13, Ubuntu 25.04 and later): `tools/bbs-mail-setup.sh` writes Dovecot 2.4's settings format there (2.4 refuses the older one with errors such as "passdb { } is missing section name"). Debian 12 (Dovecot 2.3) is unchanged. If the setup failed on 2.4 before, update and run it again: it replaces its old settings file. Don't edit that file by hand (§10.19).
 
 ### In v1.5.83
 
@@ -603,14 +607,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.83.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.84.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.83
+cd bpq-dashboard-1.5.84
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -2207,7 +2211,7 @@ sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh --dry-run   # what it w
 sudo bash /var/www/bpq-dashboard/tools/bbs-mail-setup.sh
 ```
 
-It installs Dovecot (`dovecot-imapd`), creates `bpqmail`, writes `/etc/dovecot/conf.d/99-bpq-dashboard.conf`, asks for the mail password (twice, not shown), installs and starts `bbs-mail-sync.timer`, copies the mail saved so far (the first time can take a few minutes with many bulletins), and prints the mail-app settings. It won't take over a Dovecot that already has other settings (`--force` if that one isn't used). Safe to run again. If the `bpq_mail_sync` table is missing, run update.sh once.
+It installs Dovecot (`dovecot-imapd`), creates `bpqmail`, writes `/etc/dovecot/conf.d/99-bpq-dashboard.conf`, asks for the mail password (twice, not shown), installs and starts `bbs-mail-sync.timer`, copies the mail saved so far (the first time can take a few minutes with many bulletins), and prints the mail-app settings. It won't take over a Dovecot that already has other settings (`--force` if that one isn't used). Safe to run again. Works with Dovecot 2.3 (Debian 12, Ubuntu 24.04) and 2.4 (Debian 13, Ubuntu 25.04+; v1.5.84): it writes the settings in the installed version's format, so the file is not portable between them and shouldn't be edited by hand; after a Dovecot upgrade from 2.3 to 2.4 (for example Debian 12 → 13), run the setup again. If the `bpq_mail_sync` table is missing, run update.sh once.
 
 **Mail app settings.** Incoming: IMAP, server = the certificate's name (for example `bpq.example.net`; the name must match the certificate, so on your own network it has to reach the station: if it doesn't, add it to your router's local DNS or the computer's hosts file), port 993, SSL/TLS, normal password; user name = the callsign in lower case. No outgoing server. With Dovecot's own certificate use the station's address and accept the certificate once.
 
@@ -2600,6 +2604,10 @@ cat /var/www/bpq-dashboard/cache/aprs/aprs-daemon.json | python3 -m json.tool | 
 
 Only one session with the BBS runs at a time (Get Mail, the message-text job, the forwarding-queue check). It waits up to 40 seconds; try again. If it happens all the time, check `sudo journalctl -u message-bodies.service -n 20`.
 
+### BBS mail setup: Dovecot errors such as "passdb { } is missing section name"
+
+That is Dovecot 2.4 (Debian 13, Ubuntu 25.04 and later) refusing settings written for 2.3 by a dashboard before 1.5.84. Update the dashboard, then run `sudo bash <web root>/tools/bbs-mail-setup.sh` again: it sees 2.4 and rewrites `/etc/dovecot/conf.d/99-bpq-dashboard.conf` in the 2.4 format, keeping your mail password if it was set. Hand edits to that file needn't be undone (it is replaced), but don't keep `auth_allow_cleartext = yes` anywhere else in Dovecot's settings: it allows passwords without encryption. Check with `sudo doveconf -n >/dev/null && echo OK` and `sudo bash <web root>/tools/bbs-mail-setup.sh --status`.
+
 ### A page is empty and its status has no "(DB)"
 
 The database path failed. Check the parser logs in `/var/log/bpq-dashboard/`, `cat /etc/cron.d/bpq-dashboard`, and System Audit's *Database* and *Logs* rows.
@@ -2715,10 +2723,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.83-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.84-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.83 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.84 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

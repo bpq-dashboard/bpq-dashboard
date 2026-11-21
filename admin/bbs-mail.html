@@ -8,7 +8,7 @@
 // load the new one (once). Covers web servers whose site file doesn't yet
 // tell browsers to re-check pages (Cache-Control: no-cache, CHANGELOG 1.5.79).
 (function () {
-    var BPQ_PAGE_VERSION = '1.5.83';
+    var BPQ_PAGE_VERSION = '1.5.84';
     fetch('/VERSION', { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
         t = (t || '').trim();
         if (!/^\d+\.\d+\.\d+$/.test(t) || t === BPQ_PAGE_VERSION) return;

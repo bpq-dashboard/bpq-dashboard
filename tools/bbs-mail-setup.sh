@@ -184,7 +184,7 @@ say "mail login: $LOGIN    station: ${CALL:-?}"
 # Dovecot already used for something else? Don't take it over.
 if [[ -d /etc/dovecot ]] && ! ours && [[ $FORCE != y ]]; then
     if dpkg -s dovecot-core >/dev/null 2>&1 && \
-       { [[ -f /etc/dovecot/local.conf ]] || ls /etc/dovecot/conf.d/*.conf 2>/dev/null | grep -qv -E '/(10|15|20|90)-[a-z0-9-]+\.conf$'; }; then
+       { [[ -f /etc/dovecot/local.conf ]] || ls /etc/dovecot/conf.d/*.conf 2>/dev/null | grep -qv -E '/(10|15|20|30|90)-[a-z0-9-]+\.conf$'; }; then
         die "Dovecot is already installed and has settings this script didn't write.
          It won't take over a mail server you use for something else.
          If this computer's Dovecot isn't used, run again with --force."
@@ -198,8 +198,8 @@ if [[ -z "$DOMAIN" && -d /etc/letsencrypt/live ]]; then
     if (( ${#DOMS[@]} == 1 )); then
         DOMAIN="${DOMS[0]}"
     elif (( ${#DOMS[@]} > 1 )); then
-        if [[ -f "$DROPIN" ]] && grep -q '^ssl_cert = </etc/letsencrypt/live/' "$DROPIN"; then
-            DOMAIN=$(sed -n 's|^ssl_cert = </etc/letsencrypt/live/\([^/]*\)/.*|\1|p' "$DROPIN")
+        if [[ -f "$DROPIN" ]] && grep -qE '^ssl(_server)?_cert(_file)? = <?/etc/letsencrypt/live/' "$DROPIN"; then
+            DOMAIN=$(sed -n -E 's#^ssl(_server)?_cert(_file)? = <?/etc/letsencrypt/live/([^/]*)/.*#\3#p' "$DROPIN" | head -1)
         elif [[ -t 0 ]]; then
             echo; say "You have several Let's Encrypt certificates. Mail apps connect to the name you choose:"
             for i in "${!DOMS[@]}"; do say "  $((i+1))) ${DOMS[$i]}"; done
@@ -226,6 +226,11 @@ if ! dpkg -s dovecot-imapd >/dev/null 2>&1; then
 fi
 [[ $DRY == y ]] || command -v doveadm >/dev/null || die "Dovecot didn't install"
 ok "Dovecot installed$([[ $DRY == y ]] || echo " ($(dovecot --version | cut -d' ' -f1))")"
+# v1.5.84: Dovecot 2.4 (Debian 13, Ubuntu 25.04+) renamed or regrouped most
+# settings, and refuses 2.3 ones. Write the form the installed version reads.
+DV=$( (dovecot --version 2>/dev/null || apt-cache policy dovecot-core 2>/dev/null | awk '/Candidate:/ {print $2}') | head -1 | sed -E 's/^[0-9]+://; s/[^0-9.].*$//')
+V24=n; [[ -n "$DV" ]] && [[ "$(printf '%s\n2.4\n' "$DV" | sort -V | head -1)" == "2.4" ]] && V24=y
+[[ $V24 == y ]] && say "Dovecot $DV: using the 2.4 settings format"
 
 # 2. mail owner
 if ! id "$MUSER" >/dev/null 2>&1; then
@@ -238,6 +243,8 @@ UIDN=$(id -u "$MUSER" 2>/dev/null || echo 999)
 LISTEN="*, ::"; [[ -s /proc/net/if_inet6 ]] || LISTEN="*"
 
 # 3. settings
+POP3OFF=$( dpkg -s dovecot-pop3d >/dev/null 2>&1 && printf '%s\n' '# dovecot-pop3d is installed: keep it off 110/995 (LinBPQ has its own POP3 on 110)' 'service pop3-login {' '  inet_listener pop3 {' '    port = 0' '  }' '  inet_listener pop3s {' '    port = 0' '  }' '}' || true )
+if [[ $V24 != y ]]; then
 DROPIN_TEXT="$MARK (tools/bbs-mail-setup.sh, $(date +%F)).
 # Re-written by the script; to change it, run the script again. Remove: --remove
 # Read-only copy of BBS mail: IMAP only, no outgoing mail, nothing on port 25.
@@ -299,6 +306,78 @@ service imap-login {
 }
 login_greeting = BBS mail ready.
 "
+else
+# Dovecot 2.4: the same settings in its format (named passdb/userdb, mail_*
+# instead of mail_location, ssl_server_*_file, listen inside listeners,
+# %{user | username | lower} instead of %Ln). Tested on 2.4.1.
+DROPIN_TEXT="$MARK (tools/bbs-mail-setup.sh, $(date +%F)), Dovecot 2.4 format.
+# Re-written by the script; to change it, run the script again. Remove: --remove
+# Read-only copy of BBS mail: IMAP only, no outgoing mail, nothing on port 25.
+
+protocols = imap
+listen = $LISTEN
+
+# Only the mail login in $PASSWD; this computer's own accounts can't log in.
+auth_allow_cleartext = no
+auth_mechanisms = plain login
+passdb bpq-mail {
+  driver = passwd-file
+  passwd_file_path = $PASSWD
+  auth_username_format = %{user | username | lower}
+}
+userdb bpq-mail {
+  driver = passwd-file
+  passwd_file_path = $PASSWD
+  auth_username_format = %{user | username | lower}
+}
+# The dashboard's own login (Email Client -> Mail store): \"$LOGIN*bpqdash\",
+# from this computer only (127.0.0.1); its password is in $SECRET.
+auth_master_user_separator = *
+passdb bpq-dashboard-master {
+  driver = passwd-file
+  master = yes
+  result_success = continue
+  passwd_file_path = $MASTERPW
+}
+first_valid_uid = $UIDN
+last_valid_uid = $UIDN
+auth_failure_delay = 4 secs
+
+# Folders: INBOX, Sent, Bulletins/WX ... INBOX is the Maildir itself, as with
+# Dovecot 2.3 (10-mail.conf would otherwise put it in /var/mail).
+mail_driver = maildir
+mail_path = $STORE/%{user | username | lower}/Maildir
+mail_inbox_path = $STORE/%{user | username | lower}/Maildir
+mailbox_list_layout = fs
+namespace inbox {
+  separator = /
+  mailbox Sent {
+    auto = subscribe
+  }
+  mailbox Trash {
+    auto = subscribe
+  }
+}
+
+# Encrypted only. 143 (plain IMAP) answers this computer only, for the
+# dashboard; mail apps use 993.
+ssl = required
+ssl_min_protocol = TLSv1.2
+$( [[ -n "$CERT" ]] && printf 'ssl_server_cert_file = %s\nssl_server_key_file = %s\n' "$CERT" "$KEY" || true )
+$POP3OFF
+service imap-login {
+  inet_listener imap {
+    listen = 127.0.0.1
+    port = 143
+  }
+  inet_listener imaps {
+    port = 993
+    ssl = yes
+  }
+}
+login_greeting = BBS mail ready.
+"
+fi
 if [[ $DRY == y ]]; then
     say "would write $DROPIN:"; echo "$DROPIN_TEXT" | sed 's/^/      /'
 else
