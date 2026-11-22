@@ -3,11 +3,13 @@
 generate-rf-report.py — Generate PDF activity report for a callsign
 
 Reads from the rf_connections MySQL table populated by parse-vara-log.py
+(and, since v1.5.85, the Mercury, Data2G and VHF parsers: --modem)
 and produces a styled PDF report. Invoked by the dashboard's
 generate-report.php endpoint when the user clicks Generate Report.
 
 Usage:
     generate-rf-report.py --callsign N4SD --hours 24 --output /tmp/report.pdf
+    generate-rf-report.py --callsign N4SD --modem data2g --output /tmp/report.pdf
     generate-rf-report.py --callsign N4SD --hours 168 --direction outgoing \
                           --output /tmp/report.pdf
 
@@ -52,6 +54,10 @@ DB_CONFIG = {
 
 CALLSIGN_RE = re.compile(r'^[A-Z0-9]{3,7}$')
 
+MODEMS = ['vara', 'mercury', 'data2g', 'vhf']
+MODEM_LABEL = {'vara': 'VARA HF', 'mercury': 'Mercury', 'data2g': 'Data2G',
+               'vhf': 'VHF packet', 'all': 'All modems'}
+
 
 def safe_callsign(callsign):
     """Validate callsign — uppercase, 3-7 alphanum chars (base call, no SSID)."""
@@ -66,7 +72,7 @@ def safe_callsign(callsign):
     return cs
 
 
-def fetch_data(callsign, hours, direction='all'):
+def fetch_data(callsign, hours, direction='all', modem='all'):
     """Query the DB for sessions matching the criteria."""
     conn = pymysql.connect(**DB_CONFIG)
     try:
@@ -75,20 +81,27 @@ def fetch_data(callsign, hours, direction='all'):
             where = ["base_call = %s",
                      "session_start >= DATE_SUB(NOW(), INTERVAL %s HOUR)"]
             params = [callsign, hours]
-            # v1.5.46: the propagation report is VARA's (Mercury rows have
-            # no S/N or speed); skip the filter before the migration ran.
+            # v1.5.85: any modem (VARA only until then). Mercury and VHF rows
+            # carry no S/N or speeds: those stay NULL, so the averages below
+            # (AVG over NULLIF) use only the sessions that have them.
             cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
                         "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rf_connections' "
                         "AND COLUMN_NAME = 'modem'")
-            if list((cur.fetchone() or {0: 0}).values())[0]:
-                where.append("modem = 'vara'")
+            has_modem = bool(list((cur.fetchone() or {0: 0}).values())[0])
+            mcol = "modem" if has_modem else "'vara'"
+            if modem != 'all':
+                if has_modem:
+                    where.append("modem = %s")
+                    params.append(modem)
+                elif modem != 'vara':
+                    where.append("1 = 0")   # before the modem column: VARA only
             if direction in ('outgoing', 'incoming'):
                 where.append("direction = %s")
                 params.append(direction)
 
             # Detail
             cur.execute(f"""
-                SELECT callsign, direction, status, failure_reason,
+                SELECT callsign, {mcol} AS modem, direction, status, failure_reason,
                        session_start, session_end, duration_sec,
                        avg_snr_db, tx_bytes, rx_bytes,
                        tx_max_bps, rx_max_bps,
@@ -143,9 +156,27 @@ def fetch_data(callsign, hours, direction='all'):
                 LIMIT 10
             """, params)
             freq_stats = cur.fetchall()
+
+            # Per-modem breakdown (shown when the report covers more than one)
+            cur.execute(f"""
+                SELECT {mcol} AS modem,
+                       COUNT(*)                                                   AS total,
+                       SUM(status='success')                                      AS successful,
+                       ROUND(SUM(status='success') * 100.0 / NULLIF(COUNT(*),0),1) AS success_pct,
+                       ROUND(AVG(NULLIF(avg_snr_db, 0)), 1)                       AS avg_snr,
+                       ROUND(AVG(NULLIF(GREATEST(COALESCE(tx_max_bps,0), COALESCE(rx_max_bps,0)), 0))) AS avg_peak,
+                       SUM(tx_bytes)                                              AS total_tx,
+                       SUM(rx_bytes)                                              AS total_rx,
+                       SUM(duration_sec)                                          AS total_dur
+                FROM rf_connections
+                WHERE {' AND '.join(where)}
+                GROUP BY 1
+                ORDER BY total DESC
+            """, params)
+            modem_stats = cur.fetchall()
     finally:
         conn.close()
-    return details, summary, freq_stats
+    return details, summary, freq_stats, modem_stats
 
 
 def fmt_dur(secs):
@@ -200,8 +231,13 @@ def fmt_bytes(n):
     return f"{n / (1024 * 1024):.1f}M"
 
 
+def fmt_airtime(secs):
+    t = int(secs or 0)
+    return f"{t // 3600:d}h {(t % 3600) // 60:02d}m {t % 60:02d}s"
+
+
 def build_pdf(callsign, hours, direction, details, summary, freq_stats,
-              output_path):
+              output_path, modem='all', modem_stats=None):
     """Render the PDF document."""
     doc = SimpleDocTemplate(
         output_path,
@@ -231,6 +267,7 @@ def build_pdf(callsign, hours, direction, details, summary, freq_stats,
                                 alignment=TA_CENTER, spaceAfter=14)
     elements.append(Paragraph(
         f"Last {hours} hours \u00b7 {dir_label} \u00b7 "
+        f"{MODEM_LABEL.get(modem, modem)} \u00b7 "
         f"Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         sub_style))
 
@@ -264,8 +301,10 @@ def build_pdf(callsign, hours, direction, details, summary, freq_stats,
             ['Average S/N',
              f"{summary['avg_snr']} dB" if summary.get('avg_snr') is not None
              else '-'],
-            ['Peak TX / RX', f"{peak_tx} / {peak_rx} bps"],
-            ['Avg peak TX / RX', f"{ap_tx} / {ap_rx} bps"],
+            ['Peak TX / RX',
+             f"{peak_tx} / {peak_rx} bps" if (peak_tx or peak_rx) else '-'],
+            ['Avg peak TX / RX',
+             f"{ap_tx} / {ap_rx} bps" if (ap_tx or ap_rx) else '-'],
             ['Effective avg rate',
              f"{summary.get('avg_rate') or 0} bps"],
             ['Total bytes TX / RX',
@@ -290,6 +329,45 @@ def build_pdf(callsign, hours, direction, details, summary, freq_stats,
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ]))
         elements.append(summary_table)
+        if modem == 'all' and any(m['modem'] in ('mercury', 'vhf') for m in (modem_stats or [])):
+            note = ParagraphStyle('Note', parent=styles['Normal'], fontSize=8,
+                                  textColor=colors.HexColor('#6b7280'), spaceBefore=3)
+            elements.append(Paragraph(
+                "S/N and speeds come from the VARA and Data2G sessions only: "
+                "Mercury and VHF packet don't record them.", note))
+        elements.append(Spacer(1, 0.25 * inch))
+
+    # By-modem section (v1.5.85), when the report covers more than one modem
+    if modem_stats and len(modem_stats) > 1:
+        elements.append(Paragraph("By Modem", h_style))
+        mrows = [['Modem', 'Connections', 'Successful', 'Avg S/N',
+                  'Avg peak bps', 'Bytes TX / RX', 'Airtime']]
+        for ms in modem_stats:
+            mrows.append([
+                MODEM_LABEL.get(ms['modem'], ms['modem']),
+                str(ms['total']),
+                f"{ms['successful'] or 0} ({ms.get('success_pct') or 0}%)",
+                f"{ms['avg_snr']} dB" if ms.get('avg_snr') is not None else '-',
+                f"{ms['avg_peak']}" if ms.get('avg_peak') else '-',
+                f"{fmt_bytes(ms['total_tx'])} / {fmt_bytes(ms['total_rx'])}",
+                fmt_airtime(ms['total_dur']),
+            ])
+        mtable = Table(mrows, colWidths=[1.2 * inch, 1.0 * inch, 1.2 * inch,
+                                         0.9 * inch, 1.1 * inch, 1.4 * inch, 1.2 * inch])
+        mtable.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6366f1')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONT', (0, 1), (-1, -1), 'Helvetica', 9),
+            ('FONT', (0, 1), (0, -1), 'Helvetica-Bold', 9),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1),
+             [colors.white, colors.HexColor('#f9fafb')]),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#e5e7eb')),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(mtable)
         elements.append(Spacer(1, 0.25 * inch))
 
     # Best-frequencies section — per-frequency success rate / avg S/N,
@@ -340,14 +418,18 @@ def build_pdf(callsign, hours, direction, details, summary, freq_stats,
             f"No connections to/from {callsign} in the last {hours} hours.",
             styles['Normal']))
     else:
+        show_modem = modem == 'all'
         headers = ['Station', 'Start', 'Dir', 'Result', 'Duration', 'SNR',
                    'TX/RX bytes', 'Max bps', 'Avg bps', 'Freq MHz', 'Band']
+        if show_modem:
+            headers.insert(1, 'Modem')
         table_data = [headers]
 
         for row in details:
             ts = row['session_start']
             ts_str = ts.strftime('%a %m-%d %H:%M:%S') if ts else '-'
-            table_data.append([
+            has_bps = row.get('tx_max_bps') is not None or row.get('rx_max_bps') is not None
+            cells = [
                 row['callsign'],
                 ts_str,
                 fmt_dir(row['direction']),
@@ -356,16 +438,22 @@ def build_pdf(callsign, hours, direction, details, summary, freq_stats,
                 f"{row['avg_snr_db']}" if row.get('avg_snr_db') is not None
                 else '-',
                 f"{row['tx_bytes'] or 0}/{row['rx_bytes'] or 0}",
-                f"{row['tx_max_bps'] or 0}/{row['rx_max_bps'] or 0}",
+                f"{row['tx_max_bps'] or 0}/{row['rx_max_bps'] or 0}" if has_bps else '-',
                 fmt_avg_rate(row['tx_bytes'], row['rx_bytes'],
                              row['duration_sec']),
                 fmt_freq(row['freq_khz']),
                 row['band'] or '-',
-            ])
+            ]
+            if show_modem:
+                cells.insert(1, MODEM_LABEL.get(row.get('modem'), row.get('modem') or '-'))
+            table_data.append(cells)
 
         col_widths = [0.75 * inch, 1.15 * inch, 0.55 * inch, 0.95 * inch,
                       0.7 * inch, 0.5 * inch, 0.95 * inch, 0.95 * inch,
                       0.7 * inch, 0.7 * inch, 0.5 * inch]
+        if show_modem:
+            col_widths.insert(1, 0.8 * inch)
+        rc = 4 if show_modem else 3   # Result column
         detail_table = Table(table_data, colWidths=col_widths, repeatRows=1)
         detail_table.setStyle(TableStyle([
             # Header
@@ -393,8 +481,8 @@ def build_pdf(callsign, hours, direction, details, summary, freq_stats,
             color = (colors.HexColor('#10b981') if row['status'] == 'success'
                      else colors.HexColor('#ef4444'))
             detail_table.setStyle(TableStyle([
-                ('TEXTCOLOR', (3, i), (3, i), color),
-                ('FONT', (3, i), (3, i), 'Helvetica-Bold', 8),
+                ('TEXTCOLOR', (rc, i), (rc, i), color),
+                ('FONT', (rc, i), (rc, i), 'Helvetica-Bold', 8),
             ]))
 
         elements.append(detail_table)
@@ -422,6 +510,8 @@ def main():
     parser.add_argument('--direction', default='all',
                         choices=['all', 'outgoing', 'incoming'],
                         help="Direction filter (default: all)")
+    parser.add_argument('--modem', default='all', choices=['all'] + MODEMS,
+                        help="Modem filter (default: all)")
     parser.add_argument('--output', required=True,
                         help="Output PDF path")
     args = parser.parse_args()
@@ -437,14 +527,14 @@ def main():
         sys.exit(1)
 
     try:
-        details, summary, freq_stats = fetch_data(callsign, args.hours,
-                                                   args.direction)
+        details, summary, freq_stats, modem_stats = fetch_data(
+            callsign, args.hours, args.direction, args.modem)
     except pymysql.MySQLError as e:
         print(f"ERROR: database query failed: {e}", file=sys.stderr)
         sys.exit(3)
 
     build_pdf(callsign, args.hours, args.direction, details, summary,
-              freq_stats, args.output)
+              freq_stats, args.output, args.modem, modem_stats)
 
     print(f"PDF written: {args.output} ({len(details)} sessions)")
 

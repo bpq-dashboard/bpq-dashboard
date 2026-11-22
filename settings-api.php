@@ -121,6 +121,10 @@ function actionGet() {
     $safe = $settings;
     $safe['bbs']['pass'] = strlen($settings['bbs']['pass'] ?? '') > 0 ? '••••••••' : '';
 
+    // v1.5.90: what the watchdog uses now (its last run), to fill the tab
+    $wd = @json_decode((string)@file_get_contents(__DIR__ . '/cache/watchdog-state.json'), true);
+    $safe['_watchdog_now'] = is_array($wd['settings'] ?? null) ? $wd['settings'] : null;
+
     jsonOk($safe);
 }
 
@@ -191,6 +195,20 @@ function actionSave($input) {
             $p['fixed_schedule'] = (bool)($p['fixed_schedule'] ?? false);
         }
         unset($p);
+    }
+
+    // v1.5.90: Connect Watchdog (only when the dialog sent it: config.php
+    // stays in charge until the sysop saves this tab)
+    if (isset($new['watchdog']) && is_array($new['watchdog'])) {
+        $w = $new['watchdog'];
+        $merged['watchdog'] = [
+            'fail_count'  => max(1, min(20, (int)($w['fail_count'] ?? 2))),
+            'pause_hours' => max(1, min(168, (int)($w['pause_hours'] ?? 6))),
+            'batch_mins'  => max(0, min(360, (int)($w['batch_mins'] ?? 90))),
+            'notify'      => (bool)($w['notify'] ?? true),
+            'exclude'     => array_values(array_unique(array_filter(array_map(
+                fn($c) => strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', (string)$c)), (array)($w['exclude'] ?? []))))),
+        ];
     }
 
     // Clamp prop scheduler weights 0–1

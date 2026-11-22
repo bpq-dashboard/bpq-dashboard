@@ -537,7 +537,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.84 · updated November 2026
+    v1.5.92 · updated November 2026
   </div>
 </header>
 
@@ -1314,7 +1314,7 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
 
 <div class="section" id="watchdog">
   <h2 class="section-title green">Connect Watchdog — pause a hub that doesn't answer (optional)</h2>
-  <p class="intro">v1.5.35. <span class="kw">scripts/connect-watchdog.py</span> watches the partners on RF Connections → <b>RF Forwarding Partners</b> (<span class="kw">data/stations/partners.json</span>). After <b>2 failed forwarding attempts in a row</b> it pauses that partner for <b>6 hours</b> (<span class="kw">Enabled = 0</span> in <span class="kw">linmail.cfg</span>; its mail waits in the queue), then enables it again. A good session, including the partner calling you, resets the count, and ends a pause early (v1.5.38). Only attempts that went on the air and got no answer count; one stopped by your own busy port (<i>Error - Port in use</i>) or that ended in the same second doesn't. Each change restarts LinBPQ for a few seconds (all changes in one run share one restart, and a run with forwarding in progress waits). v1.5.81: a resume waits up to 90 minutes to share a restart with another change (<i>Resuming with the next restart</i>), pauses ending soon end with it, and no restart is made while any BBS session or a Mercury/Data2G call is in progress (<span class="kw">batch_mins</span>). The tiles on RF Connections show ⏸ <i>Paused until …</i> and ⚠ failed attempts. You get a BBS message on each pause and resume (<span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span>, to <span class="kw">station.callsign</span>). Settings: config.php <span class="kw">'watchdog' =&gt; ['fail_count' =&gt; 2, 'pause_hours' =&gt; 6, 'exclude' =&gt; []]</span>. Installation Manual §10.1.</p>
+  <p class="intro">v1.5.35. <span class="kw">scripts/connect-watchdog.py</span> watches the partners on RF Connections → <b>RF Forwarding Partners</b> (<span class="kw">data/stations/partners.json</span>). After <b>2 failed forwarding attempts in a row</b> it pauses that partner for <b>6 hours</b> (or the length you set) (<span class="kw">Enabled = 0</span> in <span class="kw">linmail.cfg</span>; its mail waits in the queue), then enables it again. A good session, including the partner calling you, resets the count, and ends a pause early (v1.5.38). Only attempts that went on the air and got no answer count; one stopped by your own busy port (<i>Error - Port in use</i>) or that ended in the same second doesn't. Each change restarts LinBPQ for a few seconds (all changes in one run share one restart, and a run with forwarding in progress waits). v1.5.81: a resume waits up to 90 minutes to share a restart with another change (<i>Resuming with the next restart</i>), pauses ending soon end with it, and no restart is made while any BBS session or a Mercury/Data2G call is in progress (<span class="kw">batch_mins</span>). The tiles on RF Connections show ⏸ <i>Paused until …</i> and ⚠ failed attempts. You get a BBS message on each pause and resume (<span class="kw">bbs.user</span> / <span class="kw">bbs.pass</span>, to <span class="kw">station.callsign</span>). Settings (v1.5.90): <b>⚙ Dashboard Settings → Watchdog</b> (failed attempts, pause length, restart sharing, never-pause list, BBS messages); once saved there they override config.php <span class="kw">'watchdog'</span>. Pause length: longer than the partner's forwarding interval; 2–3 hours suits hourly forwarding. Installation Manual §10.1.</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> python3 <var data-v="root">/var/www/bpq-dashboard</var>/scripts/connect-watchdog.py <span class="flag">--status</span></code>
@@ -2314,7 +2314,7 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
   wsLoad();
 })();
 </script>
-<script src="/shared/settings-modal.js"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
+<script src="/shared/settings-modal.js?v=1.5.92"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
 <script>
 // v1.5.77: Winlink mail the dashboard has seen
 (function () {

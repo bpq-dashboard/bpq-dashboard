@@ -19,6 +19,14 @@
  *      bulletins kept) and a full "LB" is done once every <full_hours>;
  *      config.php 'messages' => ['bulletin_list_recent' => 100,
  *      'bulletin_full_list_hours' => 24];
+ *      v1.5.90: BPQ also logs every line of LP and LT, and those ran every
+ *      5 minutes too (hundreds of lines each run buried the forwarding
+ *      sessions in log_*_BBS.txt). Now a normal run sends one short
+ *      "LL <quick>" (default 25: the newest messages of every type); only
+ *      if every one of them is newer than the newest seen last run (more
+ *      may have come in) or messages are still waiting to be read does it
+ *      ask for "LL <recent>". LP, LT and LB run together in the full pass
+ *      every <full_hours>. config.php 'messages' => ['list_quick' => 25];
  *   2. archives those listings into bpq_messages (the same INSERT IGNORE +
  *      bulletin-group filing the page's Get Mail uses);
  *   3. reads (R <n>) every listed message whose saved copy has no text yet
@@ -99,6 +107,7 @@ $fullListHours = max(1, min(168, (int)getConfig('messages', 'bulletin_full_list_
 $listStateFile = $webRoot . '/cache/message-bodies-listing.json';
 $listState     = @json_decode((string)@file_get_contents($listStateFile), true) ?: [];
 $fullListDue   = $opt['backfill'] || (time() - (int)($listState['last_full_lb'] ?? 0)) >= $fullListHours * 3600;
+$quickCount    = max(10, min(200, (int)getConfig('messages', 'list_quick', 25)));   // v1.5.90
 $limit     = $opt['limit'] ?? ($opt['backfill'] ? 5000 : 400);
 $stateFile = $webRoot . '/cache/message-bodies-state.json';
 
@@ -288,29 +297,46 @@ try {
     try {
         $sock = bbsOpen();
         try {
-            $bCmd = $fullListDue ? 'LB' : 'LL ' . $recentCount;
-            foreach (['P' => 'LP', 'T' => 'LT', 'B' => $bCmd] as $kind => $cmd) {
-                $r = bbsCommand($sock, $cmd, $kind === 'B' ? 60 : 30);
-                if (!$r['prompt']) out("WARNING: $cmd listing did not finish (timeout); using what arrived");
-                $msgs = parseMessageList($r['text']);
-                if ($kind === 'B' && $cmd !== 'LB') {
-                    // "LL n" lists every type: keep the bulletins only
-                    $msgs = array_values(array_filter($msgs, fn($m) => strtoupper(substr((string)$m['status'], 0, 1)) === 'B'));
-                }
-                if ($kind === 'B' && $cmd === 'LB' && $r['prompt'] && !$opt['dry']) {
-                    $listState['last_full_lb'] = time();
-                    @file_put_contents($listStateFile, json_encode($listState));
-                }
-                $stats['bulletin_list'] = $cmd;
-                $msgs = array_slice($msgs, 0, $listCount);
+            // v1.5.90: one short "LL" most runs (BPQ logs every listed line)
+            $addRows = function (array $msgs, string $kind) use (&$listed, &$stats, $listCount) {
+                $msgs = array_slice($msgs, 0, $kind === 'L' ? 1000 : $listCount);
                 foreach ($msgs as $m) {
                     $type = strtoupper(substr((string)$m['status'], 0, 1));
-                    if (!in_array($type, ['P', 'T', 'B'], true)) $type = $kind;
+                    if (!in_array($type, ['P', 'T', 'B'], true)) $type = $kind === 'L' ? 'P' : $kind;
                     $m['type'] = $type;
-                    $listed[$m['number'] . '|' . $type . '|' . strtoupper($m['from'])] = $m;
+                    $key = $m['number'] . '|' . $type . '|' . strtoupper($m['from']);
+                    if (!isset($listed[$key])) $stats['listed'][$type]++;
+                    $listed[$key] = $m;
                 }
-                $stats['listed'][$kind] = count($msgs);
+                return $msgs;
+            };
+            if ($fullListDue) {
+                foreach (['P' => 'LP', 'T' => 'LT', 'B' => 'LB'] as $kind => $cmd) {
+                    $r = bbsCommand($sock, $cmd, $kind === 'B' ? 60 : 30);
+                    if (!$r['prompt']) out("WARNING: $cmd listing did not finish (timeout); using what arrived");
+                    $addRows(parseMessageList($r['text']), $kind);
+                    if ($kind === 'B' && $r['prompt'] && !$opt['dry']) $listState['last_full_lb'] = time();
+                }
+                $stats['bulletin_list'] = 'LP, LT, LB';
+            } else {
+                $lastMax = (int)($listState['last_max'] ?? 0);
+                $backlog = !empty($listState['backlog']);
+                $cmd = 'LL ' . ($backlog ? $recentCount : $quickCount);
+                $r = bbsCommand($sock, $cmd, 30);
+                if (!$r['prompt']) out("WARNING: $cmd listing did not finish (timeout); using what arrived");
+                $msgs = $addRows(parseMessageList($r['text']), 'L');
+                $nums = array_map(fn($m) => (int)$m['number'], $msgs);
+                if (!$backlog && $nums && $lastMax > 0 && min($nums) > $lastMax) {
+                    // every listed message is new: more may have arrived than were listed
+                    $cmd = 'LL ' . $recentCount;
+                    $r = bbsCommand($sock, $cmd, 45);
+                    $addRows(parseMessageList($r['text']), 'L');
+                }
+                $stats['bulletin_list'] = $cmd;
             }
+            $allNums = array_map(fn($m) => (int)$m['number'], $listed);
+            if ($allNums && !$opt['dry']) $listState['last_max'] = max((int)($listState['last_max'] ?? 0), max($allNums));
+            if (!$opt['dry']) @file_put_contents($listStateFile, json_encode($listState));
         } finally {
             bbsClose($sock);
         }
@@ -525,6 +551,13 @@ if ($killTable && !$opt['dry'] && isFeatureEnabled('bbs_write')) {
             out('WARNING: kill session: ' . $e->getMessage());
         }
     }
+}
+
+// v1.5.90: messages still waiting to be read: list more next run
+if (!$opt['dry'] && !$opt['backfill']) {
+    $done = $stats['saved'] + $stats['not_found'] + $stats['other_msg'];
+    $listState['backlog'] = $stats['candidates'] > $done;
+    @file_put_contents($listStateFile, json_encode($listState));
 }
 
 $s = $stats;

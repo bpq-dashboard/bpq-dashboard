@@ -911,23 +911,45 @@ function attachSuggest(input) {
         hide(); input.focus();
         input.dispatchEvent(new Event('input', { bubbles: true }));
     };
+    // v1.5.89: callsigns that START with what is typed come first; the
+    // routing part of an address (after @: .#REGION.ST.USA.NOAM) no longer
+    // matches single letters; an empty box lists the most used contacts.
+    const rankOf = (k, ql) => {
+        if (k.kind === 'list') { const n = k.display_name.toLowerCase(); return n.split(/\s+/).some(w => w.startsWith(ql)) ? 1 : (ql.length >= 2 && n.includes(ql)) ? 4 : 9; }
+        const call = String(k.callsign || '').toLowerCase();
+        const words = [nameOf(k), k.nickname].join(' ').toLowerCase().split(/[\s,.'-]+/).filter(Boolean);
+        const addr = String(k.address || '').toLowerCase(), local = addr.split('@')[0];
+        const email = String(k.email || '').toLowerCase();
+        if (call.startsWith(ql)) return 0;
+        if (words.some(w => w.startsWith(ql))) return 1;
+        if (local && local.startsWith(ql)) return 2;
+        if (email.startsWith(ql)) return 2;
+        if (ql.length >= 2 && (call.includes(ql) || [nameOf(k), k.nickname].join(' ').toLowerCase().includes(ql))) return 3;
+        if (/[@.#]/.test(ql) && (addr.includes(ql) || email.includes(ql))) return 4;
+        return 9;
+    };
+    const row = k => k.kind === 'list'
+        ? { value: k.display_name, html: `👥 <b>${esc(k.display_name)}</b> <span class="k">list · ${k.members.length}</span>` }
+        : { value: nameOf(k) ? `${nameOf(k)} <${k.address || k.callsign}>` : (k.address || k.callsign),
+            html: `<b class="mono">${esc(k.callsign)}</b>${nameOf(k) ? ' ' + esc(nameOf(k)) : ''} <span class="k">${esc(k.address || k.callsign)}</span>` };
     const show = () => {
         const { q } = token();
-        if (q.length < 1) return hide();
         const ql = q.toLowerCase();
         const score = k => (k.starred ? 2 : 0) + (k.book === 'personal' ? 1 : 0) + Math.min(5, (k.use_count || 0) / 5);
-        items = S.contacts.filter(k => k.kind === 'list'
-                ? k.display_name.toLowerCase().includes(ql)
-                : [k.callsign, nameOf(k), k.nickname, k.address, k.email].some(v => String(v || '').toLowerCase().includes(ql)))
-            .sort((a, b) => score(b) - score(a)).slice(0, 8)
-            .map(k => k.kind === 'list'
-                ? { value: k.display_name, html: `👥 <b>${esc(k.display_name)}</b> <span class="k">list · ${k.members.length}</span>` }
-                : { value: nameOf(k) ? `${nameOf(k)} <${k.address || k.callsign}>` : (k.address || k.callsign),
-                    html: `${esc(nameOf(k) || k.callsign)} <span class="k">${esc(k.address || k.callsign)}</span>` });
-        for (const a of S.addresses) {
-            if (items.length >= 10) break;
-            if (String(a).toLowerCase().includes(ql) && !items.some(i => i.value.toUpperCase().includes(String(a).toUpperCase())))
-                items.push({ value: a, html: `${esc(a)} <span class="k">Email Client</span>` });
+        if (!ql) {
+            // Empty box (or just after a comma): the most used contacts
+            items = S.contacts.filter(k => k.kind === 'contact' && (k.starred || k.use_count > 0 || k.book === 'personal'))
+                .sort((a, b) => score(b) - score(a) || String(a.callsign).localeCompare(String(b.callsign))).slice(0, 8).map(row);
+        } else {
+            items = S.contacts.map(k => ({ k, r: rankOf(k, ql) })).filter(x => x.r < 9)
+                .sort((a, b) => a.r - b.r || score(b.k) - score(a.k) || String(a.k.callsign || a.k.display_name).localeCompare(String(b.k.callsign || b.k.display_name)))
+                .slice(0, 8).map(x => row(x.k));
+            const extra = S.addresses.map(a => String(a)).filter(a => {
+                const al = a.toLowerCase(), local = al.split('@')[0];
+                return (local.startsWith(ql) || (ql.length >= 2 && local.includes(ql)) || (/[@.#]/.test(ql) && al.includes(ql)))
+                    && !items.some(i => i.value.toUpperCase().includes(a.toUpperCase()));
+            }).sort((a, b) => (b.toLowerCase().startsWith(ql)) - (a.toLowerCase().startsWith(ql)) || a.localeCompare(b));
+            for (const a of extra) { if (items.length >= 10) break; items.push({ value: a, html: `${esc(a)} <span class="k">Email Client</span>` }); }
         }
         if (!items.length) return hide();
         idx = 0;
@@ -937,6 +959,8 @@ function attachSuggest(input) {
         box.querySelectorAll('[data-i]').forEach(el => el.addEventListener('mousedown', ev => { ev.preventDefault(); pick(items[+el.dataset.i]); }));
     };
     input.addEventListener('input', show);
+    input.addEventListener('focus', show);
+    input.addEventListener('click', show);
     input.addEventListener('blur', () => setTimeout(hide, 150));
     input.addEventListener('keydown', ev => {
         if (box.style.display === 'none') return;
@@ -1339,7 +1363,7 @@ function wireToolbar() {
             { label: 'Quick Check-In…', act: () => openCheckIn() },
             { label: 'NTS Report', act: () => $('btnNts').click() },
             { label: 'PKTNET Forms', act: () => $('btnForms').click() },
-            { label: 'User Guide (§9)', act: () => window.open('/BPQ-Dashboard-v1.5.84-User-Guide.pdf', '_blank') },
+            { label: 'User Guide (§9)', act: () => window.open('/BPQ-Dashboard-v1.5.92-User-Guide.pdf', '_blank') },
         ], r.right - 220, r.bottom);
     });
 }

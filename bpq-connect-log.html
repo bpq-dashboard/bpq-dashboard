@@ -2,1045 +2,425 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Connect Log - BPQ Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connects - BPQ Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
-    <link rel="preconnect" href="https://unpkg.com" crossorigin>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script>
+        (function () { try { var s = localStorage.getItem('bpq-dark-mode'); var t = (s === 'dark' || s === 'light') ? s : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+    </script>
+    <link rel="stylesheet" href="bpq-page.css?v=1.5.86">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
     <style>
-        .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
-        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        body { background: #f3f4f6; min-height: 100vh; }
-        .glass-container { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 16px; box-shadow: 0 8px 32px rgba(31,38,135,0.37); }
-        .stat-card { transition: all 0.3s ease; }
-        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -8px rgba(0,0,0,0.2); }
-        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .modern-button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .modern-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.4); }
-        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
-        .status-success { background-color: #10b981; }
-        .status-error { background-color: #ef4444; }
-        .status-loading { background-color: #f59e0b; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); }
-        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #667eea #e5e7eb; }
-        .time-range-btn { background: #e5e7eb; color: #374151; }
-        .time-range-btn:hover { background: #d1d5db; }
-        .time-range-btn.active { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
-        .mode-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
-        .mode-VARA { background: #dbeafe; color: #1d4ed8; }
-        .mode-NETROM { background: #dcfce7; color: #166534; }
-        .mode-AX25 { background: #fef3c7; color: #92400e; }
-        .mode-TELNET { background: #f3e8ff; color: #7c3aed; }
-        .mode-OTHER { background: #f1f5f9; color: #475569; }
-        .log-row { transition: background-color 0.15s; }
-        .log-row:hover { background-color: #f8fafc; }
-        .filter-chip { cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
-        .filter-chip:hover { transform: scale(1.05); }
-        .filter-chip.active { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102,126,234,0.3); }
-        .filter-chip.dimmed { opacity: 0.4; }
-        #connectMap { border: 1px solid #e5e7eb; }
-        .connect-marker { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35); cursor: pointer; transition: transform 0.2s; }
-        .connect-marker:hover { transform: scale(1.3); }
-        .callsign-tooltip { font-weight: bold; font-size: 11px; }
-        @media (min-width: 768px) {
-            #connectMap { height: 450px; }
-        }
-        #connectMap { height: 400px; border-radius: 12px; z-index: 1; }
-        .callsign-marker { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 3px 6px; border-radius: 6px; font-weight: bold; font-size: 10px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-        .station-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); cursor: pointer; transition: transform 0.2s; }
-        .station-dot:hover { transform: scale(1.3); }
-        .dot-VARA { background: #2563eb; }
-        .dot-NETROM { background: #16a34a; }
-        .dot-AX25 { background: #d97706; }
-        .dot-TELNET { background: #7c3aed; }
-        .dot-MULTI { background: linear-gradient(135deg, #667eea, #764ba2); }
-        .dot-home { background: linear-gradient(135deg, #ef4444, #dc2626); width: 20px !important; height: 20px !important; font-size: 10px; display: flex; align-items: center; justify-content: center; border: 3px solid white; }
-        .map-legend { background: rgba(255,255,255,0.92); border-radius: 8px; padding: 8px 12px; font-size: 11px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-        .map-legend-item { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-        .map-legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-        @media (max-width: 640px) {
-            .glass-container { border-radius: 12px; }
-            .stat-card { padding: 0.75rem !important; }
-            .stat-card .text-4xl { font-size: 1.5rem !important; }
-            .hide-mobile { display: none !important; }
-        }
-    </style>
-    <style id="bpq-dark-mode">
-    /* Dark Mode — auto-detects OS preference, manual toggle in nav */
-    [data-theme="dark"] { background: #111827 !important; color-scheme: dark; }
-    [data-theme="dark"] body { background: #111827 !important; color: #e5e7eb !important; }
-    [data-theme="dark"] .glass-container { background: rgba(31,41,55,0.95) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; border: 1px solid rgba(75,85,99,0.4); }
-    /* Backgrounds */
-    [data-theme="dark"] [class~="bg-white"] { background-color: #1f2937 !important; }
-    [data-theme="dark"] [class~="bg-gray-50"] { background-color: #1a2332 !important; }
-    [data-theme="dark"] [class~="bg-gray-100"] { background-color: #1f2937 !important; }
-    [data-theme="dark"] [class~="bg-gray-200"] { background-color: #374151 !important; }
-    [data-theme="dark"] [class~="bg-gray-300"] { background-color: #4b5563 !important; }
-    [data-theme="dark"] [class~="bg-green-50"] { background-color: #064e3b !important; }
-    [data-theme="dark"] [class~="bg-green-100"] { background-color: #065f46 !important; }
-    [data-theme="dark"] [class~="bg-blue-50"] { background-color: #1e3a5f !important; }
-    [data-theme="dark"] [class~="bg-blue-100"] { background-color: #1e40af !important; }
-    [data-theme="dark"] [class~="bg-purple-50"] { background-color: #2e1065 !important; }
-    [data-theme="dark"] [class~="bg-purple-100"] { background-color: #3b0764 !important; }
-    [data-theme="dark"] [class~="bg-red-50"] { background-color: #450a0a !important; }
-    [data-theme="dark"] [class~="bg-red-100"] { background-color: #7f1d1d !important; }
-    [data-theme="dark"] [class~="bg-amber-50"] { background-color: #451a03 !important; }
-    [data-theme="dark"] [class~="bg-amber-100"] { background-color: #78350f !important; }
-    [data-theme="dark"] [class~="bg-orange-50"] { background-color: #431407 !important; }
-    [data-theme="dark"] [class~="bg-orange-100"] { background-color: #7c2d12 !important; }
-    [data-theme="dark"] [class~="bg-emerald-50"] { background-color: #022c22 !important; }
-    [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
-    [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
-    [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
-    [data-theme="dark"] [class~="bg-sky-200"] { background-color: #0369a1 !important; }
-    [data-theme="dark"] [class~="bg-cyan-50"] { background-color: #083344 !important; }
-    /* Stat card gradients */
-    [data-theme="dark"] [class*="from-green-50"] { background-image: linear-gradient(to bottom right, #064e3b, #065f46) !important; }
-    [data-theme="dark"] [class*="from-blue-50"] { background-image: linear-gradient(to bottom right, #1e3a5f, #1e40af) !important; }
-    [data-theme="dark"] [class*="from-purple-50"] { background-image: linear-gradient(to bottom right, #2e1065, #4c1d95) !important; }
-    [data-theme="dark"] [class*="from-red-50"] { background-image: linear-gradient(to bottom right, #450a0a, #7f1d1d) !important; }
-    [data-theme="dark"] [class*="from-orange-50"] { background-image: linear-gradient(to bottom right, #431407, #7c2d12) !important; }
-    [data-theme="dark"] [class*="from-amber-50"] { background-image: linear-gradient(to bottom right, #451a03, #78350f) !important; }
-    [data-theme="dark"] [class*="from-emerald-50"] { background-image: linear-gradient(to bottom right, #022c22, #064e3b) !important; }
-    [data-theme="dark"] [class*="from-sky-50"] { background-image: linear-gradient(to bottom right, #0c4a6e, #075985) !important; }
-    [data-theme="dark"] [class*="from-cyan-50"] { background-image: linear-gradient(to bottom right, #083344, #155e75) !important; }
-    /* Text colors */
-    [data-theme="dark"] [class~="text-gray-900"] { color: #f3f4f6 !important; }
-    [data-theme="dark"] [class~="text-gray-800"] { color: #e5e7eb !important; }
-    [data-theme="dark"] [class~="text-gray-700"] { color: #d1d5db !important; }
-    [data-theme="dark"] [class~="text-gray-600"] { color: #9ca3af !important; }
-    [data-theme="dark"] [class~="text-gray-500"] { color: #6b7280 !important; }
-    [data-theme="dark"] [class~="text-gray-400"] { color: #6b7280 !important; }
-    [data-theme="dark"] [class~="text-green-600"] { color: #34d399 !important; }
-    [data-theme="dark"] [class~="text-green-700"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-green-800"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-blue-600"] { color: #93c5fd !important; }
-    [data-theme="dark"] [class~="text-blue-700"] { color: #93c5fd !important; }
-    [data-theme="dark"] [class~="text-blue-800"] { color: #93c5fd !important; }
-    [data-theme="dark"] [class~="text-purple-600"] { color: #c4b5fd !important; }
-    [data-theme="dark"] [class~="text-purple-700"] { color: #c4b5fd !important; }
-    [data-theme="dark"] [class~="text-purple-800"] { color: #c4b5fd !important; }
-    [data-theme="dark"] [class~="text-red-600"] { color: #fca5a5 !important; }
-    [data-theme="dark"] [class~="text-red-700"] { color: #fca5a5 !important; }
-    [data-theme="dark"] [class~="text-red-800"] { color: #fca5a5 !important; }
-    [data-theme="dark"] [class~="text-orange-600"] { color: #fdba74 !important; }
-    [data-theme="dark"] [class~="text-orange-700"] { color: #fdba74 !important; }
-    [data-theme="dark"] [class~="text-amber-600"] { color: #fcd34d !important; }
-    [data-theme="dark"] [class~="text-amber-700"] { color: #fcd34d !important; }
-    [data-theme="dark"] [class~="text-yellow-600"] { color: #fde047 !important; }
-    [data-theme="dark"] [class~="text-sky-700"] { color: #7dd3fc !important; }
-    [data-theme="dark"] [class~="text-sky-800"] { color: #7dd3fc !important; }
-    [data-theme="dark"] [class~="text-emerald-600"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-emerald-700"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-cyan-600"] { color: #67e8f9 !important; }
-    /* Borders */
-    [data-theme="dark"] [class~="border-gray-200"] { border-color: #374151 !important; }
-    [data-theme="dark"] [class~="border-gray-300"] { border-color: #4b5563 !important; }
-    [data-theme="dark"] [class~="border-green-200"] { border-color: #065f46 !important; }
-    [data-theme="dark"] [class~="border-blue-200"] { border-color: #1e40af !important; }
-    [data-theme="dark"] [class~="border-purple-100"] { border-color: #4c1d95 !important; }
-    [data-theme="dark"] [class~="border-purple-200"] { border-color: #5b21b6 !important; }
-    [data-theme="dark"] [class~="border-red-200"] { border-color: #7f1d1d !important; }
-    [data-theme="dark"] [class~="border-amber-200"] { border-color: #78350f !important; }
-    [data-theme="dark"] [class~="border-orange-200"] { border-color: #7c2d12 !important; }
-    [data-theme="dark"] [class~="border-emerald-200"] { border-color: #065f46 !important; }
-    [data-theme="dark"] [class~="border-sky-200"] { border-color: #0369a1 !important; }
-    /* Forms */
-    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
-    [data-theme="dark"] input::placeholder { color: #6b7280 !important; }
-    /* Tables */
-    [data-theme="dark"] thead { background-color: #1f2937 !important; }
-    [data-theme="dark"] th { color: #d1d5db !important; }
-    [data-theme="dark"] tr:hover { background-color: rgba(55,65,81,0.5) !important; }
-    /* Log viewer */
-    [data-theme="dark"] .log-entry { color: #d1d5db; }
-    [data-theme="dark"] .log-connect { color: #6ee7b7 !important; }
-    [data-theme="dark"] .log-disconnect { color: #fca5a5 !important; }
-    [data-theme="dark"] .log-message { color: #93c5fd !important; }
-    [data-theme="dark"] .log-error { color: #f87171 !important; }
-    /* Nav */
-    [data-theme="dark"] #navLocalClock { background-color: #374151 !important; color: #d1d5db !important; }
-    [data-theme="dark"] .gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #93c5fd 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
-    /* Buttons */
-    [data-theme="dark"] .modern-button { background: linear-gradient(135deg, #7c3aed, #2563eb) !important; }
-    /* Leaflet */
-    [data-theme="dark"] .leaflet-control-zoom a { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
-    [data-theme="dark"] .leaflet-popup-content-wrapper, [data-theme="dark"] .leaflet-popup-tip { background-color: #1f2937 !important; color: #e5e7eb !important; }
-    /* Scrollbar */
-    [data-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
-    [data-theme="dark"] ::-webkit-scrollbar-track { background: #1f2937; }
-    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-    /* Toggle */
-    .dark-mode-toggle { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.5rem; border: none; background: transparent; font-size: 1.1rem; line-height: 1; transition: transform 0.3s ease; }
-    .dark-mode-toggle:hover { transform: scale(1.2); }
-    /* Skeleton */
-    [data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%) !important; background-size: 200% 100%; }
-    /* Modals */
-    [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
+        #connectMap { height: 480px; border-radius: 10px; }
+        .cl-marker { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--rf-card); color: var(--rf-text); }
+        .cl-mode { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; color: #fff; }
     </style>
 </head>
-<body class="min-h-screen" data-nav-page="connects">
-<!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
-     Active link is driven by the data-nav-page attribute on <body>. -->
+<!--
+  Connects (v1.5.86 redesign, laid out like RF Connections).
+  Reads LinBPQ's ConnectLog_YYMMDD.log files (written with LogAllConnects=1
+  in bpq32.cfg) from logs/ in the browser: the last 90 days are loaded once,
+  so "new this period" can tell first-time callers from regulars.
+-->
+<body data-nav-page="connects">
 <script src="bpq-nav-loader.js?v=2026-11-19-1"></script>
 
-    
-    <div class="p-2 sm:p-4 lg:p-8">
-        <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
-            <!-- Header -->
-            <div class="mb-6 sm:mb-10 flex flex-col lg:flex-row justify-between items-center gap-4">
-                <div class="text-center flex-1">
-                    <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
-                        <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">Connect Log</h1>
-                        <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.84</span>
-                    </div>
-                    <p class="text-gray-600 text-sm sm:text-lg">Connection Activity by Mode</p>
-                </div>
+<header class="rf-head">
+    <div class="rf-wrap rf-head-row">
+        <div class="rf-title">
+            <div class="rf-title-line">
+                <h1>Connects</h1>
+                <span class="rf-ver">v1.5.92</span>
             </div>
-
-            <!-- Status Bar -->
-            <div class="mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
-                <div id="statusMsg" class="text-sm text-gray-500 flex items-center gap-2">
-                    <span class="status-indicator status-loading"></span> Loading connect logs...
-                </div>
-                <!-- Time Range Buttons -->
-                <div class="flex gap-1 sm:gap-2 flex-wrap justify-center">
-                    <button class="time-range-btn active px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(1)" data-days="1">Today</button>
-                    <button class="time-range-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(3)" data-days="3">3 Days</button>
-                    <button class="time-range-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(7)" data-days="7">7 Days</button>
-                    <button class="time-range-btn px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all" onclick="setDays(30)" data-days="30">30 Days</button>
-                </div>
-            </div>
-
-            <!-- Stat Cards -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
-                <div class="stat-card bg-gradient-to-br from-purple-50 to-white rounded-xl p-3 sm:p-5 text-center border border-purple-100">
-                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Total Connects</div>
-                    <div class="text-2xl sm:text-4xl font-bold text-purple-700" id="statTotal">
-                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
-                    </div>
-                </div>
-                <div class="stat-card bg-gradient-to-br from-green-50 to-white rounded-xl p-3 sm:p-5 text-center border border-green-100">
-                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">NETROM</div>
-                    <div class="text-2xl sm:text-4xl font-bold text-green-700" id="statNetrom">
-                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
-                    </div>
-                </div>
-                <div class="stat-card bg-gradient-to-br from-blue-50 to-white rounded-xl p-3 sm:p-5 text-center border border-blue-100">
-                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">VARA</div>
-                    <div class="text-2xl sm:text-4xl font-bold text-blue-700" id="statVara">
-                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
-                    </div>
-                </div>
-                <div class="stat-card bg-gradient-to-br from-amber-50 to-white rounded-xl p-3 sm:p-5 text-center border border-amber-100">
-                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">AX.25</div>
-                    <div class="text-2xl sm:text-4xl font-bold text-amber-700" id="statAx25">
-                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
-                    </div>
-                </div>
-                <div class="stat-card bg-gradient-to-br from-violet-50 to-white rounded-xl p-3 sm:p-5 text-center border border-violet-100">
-                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">TELNET</div>
-                    <div class="text-2xl sm:text-4xl font-bold text-violet-700" id="statTelnet">
-                        <div class="skeleton h-8 sm:h-10 w-16 mx-auto rounded"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Station Map -->
-            <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm mb-6 sm:mb-8">
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-2 mb-3 sm:mb-4">
-                    <h3 class="text-sm sm:text-base font-bold text-gray-700">🗺️ Station Locations</h3>
-                    <div class="flex items-center gap-3 text-xs">
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> NETROM</span>
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> VARA</span>
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d97706;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> AX.25</span>
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#7c3aed;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> TELNET</span>
-                        <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span> Multiple</span>
-                    </div>
-                </div>
-                <div id="connectMap" style="height: 350px; border-radius: 12px; z-index: 1;"></div>
-                <div class="mt-2 text-xs text-gray-400 text-center" id="mapStatus">Looking up station locations...</div>
-            </div>
-
-            <!-- Charts Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                <!-- Mode Distribution Pie -->
-                <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm">
-                    <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">📊 Connection Mode Distribution</h3>
-                    <div class="relative" style="height: 260px;">
-                        <canvas id="modeChart"></canvas>
-                    </div>
-                </div>
-                <!-- Hourly Activity -->
-                <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm">
-                    <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">📈 Hourly Activity (UTC)</h3>
-                    <div class="relative" style="height: 260px;">
-                        <canvas id="hourlyChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Daily Trend (multi-day only) -->
-            <div id="dailyChartContainer" class="hidden bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm mb-6 sm:mb-8">
-                <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">📅 Daily Connection Trend</h3>
-                <div class="relative" style="height: 260px;">
-                    <canvas id="dailyChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Mode Filter Chips + Unique Stations -->
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
-                <div class="flex gap-2 flex-wrap justify-center" id="modeFilters">
-                    <span class="filter-chip active mode-badge mode-NETROM text-xs sm:text-sm px-3 py-1" data-mode="NETROM" onclick="toggleModeFilter(this)">NETROM</span>
-                    <span class="filter-chip active mode-badge mode-VARA text-xs sm:text-sm px-3 py-1" data-mode="VARA" onclick="toggleModeFilter(this)">VARA</span>
-                    <span class="filter-chip active mode-badge mode-AX25 text-xs sm:text-sm px-3 py-1" data-mode="AX.25" onclick="toggleModeFilter(this)">AX.25</span>
-                    <span class="filter-chip active mode-badge mode-TELNET text-xs sm:text-sm px-3 py-1" data-mode="TELNET" onclick="toggleModeFilter(this)">TELNET</span>
-                </div>
-                <div class="text-xs sm:text-sm text-gray-500">
-                    <span class="font-semibold text-purple-600" id="uniqueStationsCount">--</span> unique stations &bull;
-                    <span class="font-semibold text-gray-600" id="filteredCount">--</span> connections shown
-                </div>
-            </div>
-
-            <!-- Top Stations Table -->
-            <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm mb-6 sm:mb-8">
-                <h3 class="text-sm sm:text-base font-bold text-gray-700 mb-3 sm:mb-4">🏆 Top Stations by Connection Count</h3>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-xs sm:text-sm">
-                        <thead>
-                            <tr class="border-b-2 border-gray-200">
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">#</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">Callsign</th>
-                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600">Total</th>
-                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">NETROM</th>
-                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">VARA</th>
-                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">AX.25</th>
-                                <th class="text-center py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">TELNET</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">Modes</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">Last Seen</th>
-                            </tr>
-                        </thead>
-                        <tbody id="topStationsBody">
-                            <tr><td colspan="9" class="py-8 text-center text-gray-400">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Connection Log Table -->
-            <div class="bg-white rounded-xl p-4 sm:p-6 border border-gray-100 shadow-sm">
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mb-3 sm:mb-4">
-                    <h3 class="text-sm sm:text-base font-bold text-gray-700">📋 Connection Log</h3>
-                    <input type="text" id="searchInput" placeholder="Search callsigns..." 
-                        class="px-3 py-1.5 text-xs sm:text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 w-full sm:w-48"
-                        oninput="renderLogTable()">
-                </div>
-                <div class="overflow-x-auto custom-scrollbar" style="max-height: 500px; overflow-y: auto;">
-                    <table class="w-full text-xs sm:text-sm">
-                        <thead class="sticky top-0 bg-white z-10">
-                            <tr class="border-b-2 border-gray-200">
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('time')">Time ⇅</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('date')">Date ⇅</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('from')">From ⇅</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 hide-mobile">Node</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600">To</th>
-                                <th class="text-left py-2 px-2 sm:px-3 font-semibold text-gray-600 cursor-pointer hover:text-purple-600" onclick="sortLog('mode')">Mode ⇅</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logTableBody">
-                            <tr><td colspan="6" class="py-8 text-center text-gray-400">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="mt-3 text-xs text-gray-400 text-center" id="logFooter"></div>
-            </div>
-
-            <!-- Footer -->
-            <div class="mt-6 sm:mt-8 text-center text-xs text-gray-400">
-                <p>BPQ Connect Log Monitor &bull; Data from ConnectLog_YYMMDD.log files</p>
+            <div class="rf-sub">
+                <span id="dateRange">Loading…</span>
+                <span class="rf-live"><i id="statusDot"></i><span id="statusText">Loading…</span></span>
+                <span class="rf-clock" title="UTC"><span id="zuluTime">--:--</span>Z</span>
             </div>
         </div>
+        <div class="rf-range" role="group" aria-label="Date range">
+            <button type="button" data-range="1">Today</button>
+            <button type="button" data-range="7" class="active">7 days</button>
+            <button type="button" data-range="30">30 days</button>
+            <button type="button" data-range="90">90 days</button>
+        </div>
+        <button type="button" class="rf-btn" id="refreshBtn">Refresh</button>
+        <button type="button" class="rf-btn rf-btn-soft" id="themeBtn">Dark</button>
     </div>
+    <div class="rf-wrap rf-strip" id="statusStrip" aria-label="Node status"></div>
+</header>
+
+<main class="rf-wrap rf-main">
+    <div id="noData" class="rf-nodata hidden"></div>
+
+    <section class="rf-kpis" aria-label="Headline numbers">
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Connects</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kConn">–</span><span id="kConnTag"></span></div>
+            <div class="rf-kpi-sub" id="kConnSub">&nbsp;</div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Stations</div>
+            <div class="rf-kpi-big" id="kSta">–</div>
+            <div class="rf-kpi-sub" id="kStaSub">&nbsp;</div>
+            <div class="rf-chips" id="kStaChips"></div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">By path</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kPath">–</span><span class="rf-kpi-sub" id="kPathSub"></span></div>
+            <div class="rf-stackbar" id="kPathBar" aria-hidden="true"></div>
+            <div class="rf-chips" id="kPathChips"></div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Busiest hour (UTC)</div>
+            <div class="rf-kpi-big" id="kHour">–</div>
+            <div class="rf-kpi-sub" id="kHourSub">&nbsp;</div>
+        </div>
+    </section>
+
+    <section class="rf-cols">
+        <div class="rf-card rf-colmain">
+            <div class="rf-card-head">
+                <h2>Regulars</h2>
+                <span class="rf-card-sub">The stations that connect most in this period</span>
+            </div>
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 720px">
+                    <thead><tr><th>Station</th><th>Last seen</th><th class="num">Connects</th><th>Paths</th><th>To</th><th>Last 7 days</th></tr></thead>
+                    <tbody id="regRows"><tr><td colspan="6" class="rf-empty">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <div class="rf-legend">
+                <span><i style="background: var(--pg-blk3)"></i>connects that day (darker = more)</span>
+                <span><i style="background: var(--pg-blk0)"></i>none</span>
+                <span>Days are UTC, oldest left. Click a call for its connects.</span>
+            </div>
+        </div>
+        <div class="rf-side">
+            <div class="rf-card">
+                <div class="rf-card-head"><h2>New faces</h2><span class="rf-card-sub" id="newSub"></span></div>
+                <div class="rf-pad" id="newList"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="rf-card">
+        <div class="rf-card-head"><h2>When your node is used</h2><span class="rf-card-sub" id="heatSub">Connects per UTC hour</span></div>
+        <div class="rf-scroll" style="padding: 14px 20px">
+            <table class="pg-heat" id="heat" aria-label="Connects by day and UTC hour"></table>
+        </div>
+        <div class="rf-legend" id="heatLegend"></div>
+    </section>
+
+    <section class="rf-card">
+        <div class="rf-tabs" role="tablist" aria-label="Connect details">
+            <button type="button" role="tab" data-tab="log" aria-selected="true">Log <span class="rf-count" id="cLog">0</span></button>
+            <button type="button" role="tab" data-tab="map" aria-selected="false">Map</button>
+            <button type="button" role="tab" data-tab="trend" aria-selected="false">Trends</button>
+            <button type="button" role="tab" data-tab="stations" aria-selected="false">Stations <span class="rf-count" id="cSta">0</span></button>
+        </div>
+        <div class="rf-panel" id="tab-log">
+            <div class="rf-toolbar">
+                <input type="search" id="logSearch" placeholder="Filter: callsign or destination" aria-label="Filter the log">
+                <span class="rf-chips" id="logFilters"></span>
+            </div>
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 640px"><thead><tr><th>Time (UTC)</th><th>From</th><th>Path</th><th>To</th><th>Via node</th></tr></thead><tbody id="logRows"></tbody></table>
+            </div>
+            <div class="rf-more" id="logMore"></div>
+        </div>
+        <div class="rf-panel hidden" id="tab-map">
+            <div class="rf-pad">
+                <div id="connectMap"></div>
+                <div class="rf-small rf-muted" id="mapStatus">Locations come from callsign-lookup.php (QRZ, callook.info).</div>
+            </div>
+        </div>
+        <div class="rf-panel hidden" id="tab-trend">
+            <div style="padding: 16px 0 4px"><div class="pg-cols" id="trendCols" role="img" aria-label="Connects per day by path"></div></div>
+            <div class="pg-axis" style="padding: 0 20px" id="trendAxis"></div>
+            <div class="rf-legend" id="trendLegend"></div>
+        </div>
+        <div class="rf-panel hidden" id="tab-stations">
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 640px"><thead><tr><th>Station</th><th class="num">Connects</th><th>Paths</th><th>First seen</th><th>Last seen</th></tr></thead><tbody id="staRows"></tbody></table>
+            </div>
+            <div class="rf-more" id="staMore"></div>
+        </div>
+    </section>
+</main>
+
+<div id="drawerBg" class="rf-drawer-bg hidden"></div>
+<aside id="drawer" class="rf-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="rf-drawer-head"><h2 id="drawerTitle"></h2><button type="button" class="rf-x" id="drawerClose" aria-label="Close">×</button></div>
+    <div class="rf-drawer-body" id="drawerBody"></div>
+</aside>
 
 <script>
-// ========== CONFIGURATION ==========
-const LOG_BASE_URL = './logs/';
-let selectedDays = 1;
-let allEntries = [];        // All parsed entries across loaded files
-let filteredEntries = [];   // After mode + search filters
-let activeFilters = new Set(['NETROM', 'VARA', 'AX.25', 'TELNET']);
-let sortField = 'time';
-let sortAsc = false;        // Newest first by default
+(function () {
+    'use strict';
+    const LOG_URL = './logs/';
+    const DAYS_LOADED = 90;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const pad = (n) => String(n).padStart(2, '0');
+    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const MODE_COL = { 'NETROM': '#16A34A', 'VARA': '#2457C5', 'AX.25': '#D97706', 'TELNET': '#7C3AED' };
+    const modeCol = (m) => MODE_COL[m] || '#6B7280';
+    const base = (c) => String(c || '').toUpperCase().replace(/-\d+$/, '');
 
-// Chart instances
-let modeChart = null;
-let hourlyChart = null;
-let dailyChart = null;
+    let range = 7;
+    try { const r = parseInt(localStorage.getItem('bpq_connects_range'), 10); if ([1, 7, 30, 90].includes(r)) range = r; } catch (e) {}
+    let tab = 'log', logFilter = 'all', shown = 150;
+    let all = [], files = 0, firstSeen = {};
+    let map = null, mapLayers = [], locs = {};
 
-// Mode colors
-const MODE_COLORS = {
-    'NETROM': { bg: '#dcfce7', border: '#16a34a', fill: 'rgba(22,163,74,0.7)' },
-    'VARA':   { bg: '#dbeafe', border: '#2563eb', fill: 'rgba(37,99,235,0.7)' },
-    'AX.25':  { bg: '#fef3c7', border: '#d97706', fill: 'rgba(217,119,6,0.7)' },
-    'TELNET': { bg: '#f3e8ff', border: '#7c3aed', fill: 'rgba(124,58,237,0.7)' },
-};
+    function dayStart(back) { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d.getTime() - back * 86400000; }
+    function ymd(ms) { const d = new Date(ms); return String(d.getUTCFullYear()).slice(-2) + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()); }
+    function fmtTime(ms, withDay) {
+        const d = new Date(ms), t = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + 'Z';
+        if (!withDay && ms >= dayStart(0)) return t;
+        return DOW[d.getUTCDay()] + ' ' + pad(d.getUTCDate()) + ' ' + t;
+    }
+    function dayLabel(ms) { const d = new Date(ms); return DOW[d.getUTCDay()] + ' ' + d.getUTCDate(); }
+    function ago(ms) { const m = Math.round((Date.now() - ms) / 60000); if (m < 2) return 'just now'; if (m < 60) return m + ' min ago'; const h = Math.floor(m / 60); if (h < 24) return h + ' h ago'; const d = Math.round(h / 24); return d + (d === 1 ? ' day ago' : ' days ago'); }
 
-// ========== CLOCKS ==========
-// Update clock elements provided by the shared nav. Because the shared nav
-// is fetched async and injected after DOM parsing, these elements may not
-// exist yet when this script first runs — so we null-check before writing.
-// (Without this null-check, the script would throw on first call and halt
-// execution, leaving 'connectMap' and other later-declared 'let' variables
-// in their temporal dead zone — which manifested as a confusing
-// "can't access lexical declaration 'connectMap' before initialization"
-// error elsewhere in the page.)
-function updateClocks() {
-    const now = new Date();
-    const utcEl   = document.getElementById('navUtcClock');
-    const localEl = document.getElementById('navLocalClock');
-    if (utcEl)   utcEl.textContent   = now.toUTCString().slice(17, 25) + ' Z';
-    if (localEl) localEl.textContent = now.toLocaleTimeString('en-US', { hour12: false }) + ' L';
-}
-setInterval(updateClocks, 1000);
-updateClocks();
-
-// ========== DATA LOADING ==========
-function generateLogFilenames(days) {
-    const files = [];
-    const now = new Date();
-    for (let i = 0; i < days; i++) {
-        const d = new Date(now);
-        d.setUTCDate(d.getUTCDate() - i);
-        const yy = String(d.getUTCFullYear()).slice(2);
-        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(d.getUTCDate()).padStart(2, '0');
-        files.push({
-            filename: `ConnectLog_${yy}${mm}${dd}.log`,
-            dateStr: `${yy}${mm}${dd}`,
-            displayDate: `20${yy}-${mm}-${dd}`
+    async function load() {
+        setStatus('', 'Loading connect logs…');
+        const days = []; for (let i = 0; i < DAYS_LOADED; i++) days.push(dayStart(i));
+        const texts = await Promise.all(days.map(async ms => { try { const r = await fetch(LOG_URL + 'ConnectLog_' + ymd(ms) + '.log', { cache: 'no-store' }); return r.ok ? await r.text() : null; } catch (e) { return null; } }));
+        all = []; files = 0;
+        days.forEach((ms, i) => {
+            const t = texts[i]; if (t == null) return; files++;
+            for (const raw of t.split(/\r?\n/)) {
+                const line = raw.trim();
+                const m = line.match(/^(\d{2}):(\d{2}):(\d{2})\s+Call from\s+(\S+)/); if (!m) continue;
+                const node = (line.match(/at Node\s+(\S+)/) || [])[1] || '';
+                const to = (line.match(/\bto\s+(\S+)\s+Mode/) || [])[1] || '';
+                const mode = ((line.match(/Mode\s+(\S+)/) || [])[1] || 'UNKNOWN').toUpperCase();
+                all.push({ ts: ms + (+m[1]) * 3600000 + (+m[2]) * 60000 + (+m[3]) * 1000, from: m[4].toUpperCase(), call: base(m[4]), to: to.toUpperCase(), node, mode });
+            }
         });
-    }
-    return files;
-}
-
-function parseLine(line, dateStr, displayDate) {
-    // Format: HH:MM:SS Call from CALLSIGN at Node NODECALL to DEST Mode MODE
-    // Or:     HH:MM:SS Call from CALLSIGN to DEST Mode MODE
-    line = line.trim().replace(/\r/g, '');
-    if (!line || !line.includes('Call from')) return null;
-
-    const timeMatch = line.match(/^(\d{2}:\d{2}:\d{2})\s+Call from\s+(\S+)/);
-    if (!timeMatch) return null;
-
-    const time = timeMatch[1];
-    const from = timeMatch[2];
-
-    // Extract node (optional)
-    let node = '';
-    const nodeMatch = line.match(/at Node\s+(\S+)/);
-    if (nodeMatch) node = nodeMatch[1];
-
-    // Extract destination
-    const toMatch = line.match(/to\s+(\S+)\s+Mode/);
-    const to = toMatch ? toMatch[1] : '';
-
-    // Extract mode
-    const modeMatch = line.match(/Mode\s+(\S+)/);
-    const mode = modeMatch ? modeMatch[1] : 'UNKNOWN';
-
-    return { time, dateStr, displayDate, from, node, to, mode, sortKey: dateStr + time };
-}
-
-async function loadLogs() {
-    const files = generateLogFilenames(selectedDays);
-    allEntries = [];
-    let filesLoaded = 0;
-    let filesTotal = files.length;
-
-    setStatus('loading', `Loading ${filesTotal} log file${filesTotal > 1 ? 's' : ''}...`);
-
-    const fetches = files.map(async (f) => {
-        try {
-            const response = await fetch(LOG_BASE_URL + f.filename);
-            if (!response.ok) return;
-            const text = await response.text();
-            const lines = text.split('\n');
-            lines.forEach(line => {
-                const entry = parseLine(line, f.dateStr, f.displayDate);
-                if (entry) allEntries.push(entry);
-            });
-            filesLoaded++;
-        } catch (e) {
-            // File not found — skip silently
-        }
-    });
-
-    await Promise.all(fetches);
-
-    // Sort all entries by date+time descending
-    allEntries.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-
-    if (allEntries.length === 0) {
-        setStatus('error', filesLoaded === 0
-            ? 'No BPQ connect logs found. BPQ writes them only with LogAllConnects=1 in bpq32.cfg (main section); add it and restart LinBPQ'
-            : 'No connections in the ' + filesLoaded + ' connect log file' + (filesLoaded > 1 ? 's' : '') + ' for this range');
-    } else {
-        setStatus('success', `Loaded ${allEntries.length} connections from ${filesLoaded} file${filesLoaded > 1 ? 's' : ''}`);
+        all.sort((a, b) => a.ts - b.ts);
+        firstSeen = {}; all.forEach(e => { if (!(e.call in firstSeen)) firstSeen[e.call] = e.ts; });
+        render();
     }
 
-    applyFilters();
-    updateStats();
-    updateCharts();
-    renderTopStations();
-    renderLogTable();
-    updateMap();
-}
+    function setStatus(c, t) { $('statusDot').className = c; $('statusText').textContent = t; }
+    const cutoff = () => dayStart(range - 1);
 
-// ========== FILTERING ==========
-function toggleModeFilter(el) {
-    const mode = el.dataset.mode;
-    if (activeFilters.has(mode)) {
-        activeFilters.delete(mode);
-        el.classList.remove('active');
-        el.classList.add('dimmed');
-    } else {
-        activeFilters.add(mode);
-        el.classList.add('active');
-        el.classList.remove('dimmed');
-    }
-    applyFilters();
-    updateStats();
-    updateCharts();
-    renderTopStations();
-    renderLogTable();
-    updateMapMarkers();
-}
-
-function applyFilters() {
-    const search = (document.getElementById('searchInput').value || '').toUpperCase();
-    filteredEntries = allEntries.filter(e => {
-        if (!activeFilters.has(e.mode)) return false;
-        if (search && !e.from.toUpperCase().includes(search) && !e.to.toUpperCase().includes(search)) return false;
-        return true;
-    });
-}
-
-// ========== STATS ==========
-function updateStats() {
-    const counts = { total: 0, NETROM: 0, VARA: 0, 'AX.25': 0, TELNET: 0 };
-    // Use allEntries for stat cards (unfiltered by mode)
-    allEntries.forEach(e => {
-        counts.total++;
-        if (counts[e.mode] !== undefined) counts[e.mode]++;
-    });
-
-    document.getElementById('statTotal').textContent = counts.total.toLocaleString();
-    document.getElementById('statNetrom').textContent = counts.NETROM.toLocaleString();
-    document.getElementById('statVara').textContent = counts.VARA.toLocaleString();
-    document.getElementById('statAx25').textContent = counts['AX.25'].toLocaleString();
-    document.getElementById('statTelnet').textContent = counts.TELNET.toLocaleString();
-
-    // Unique stations (filtered)
-    const uniqueSet = new Set();
-    filteredEntries.forEach(e => {
-        uniqueSet.add(e.from);
-    });
-    document.getElementById('uniqueStationsCount').textContent = uniqueSet.size;
-    document.getElementById('filteredCount').textContent = filteredEntries.length.toLocaleString();
-}
-
-// ========== CHARTS ==========
-function updateCharts() {
-    updateModeChart();
-    updateHourlyChart();
-    updateDailyChart();
-}
-
-function updateModeChart() {
-    const counts = {};
-    filteredEntries.forEach(e => {
-        counts[e.mode] = (counts[e.mode] || 0) + 1;
-    });
-
-    const labels = Object.keys(counts);
-    const data = Object.values(counts);
-    const colors = labels.map(m => (MODE_COLORS[m] || MODE_COLORS['NETROM']).fill);
-
-    const ctx = document.getElementById('modeChart').getContext('2d');
-    if (modeChart) modeChart.destroy();
-    modeChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels,
-            datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            plugins: {
-                legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { size: 12 } } }
-            }
-        }
-    });
-}
-
-function updateHourlyChart() {
-    // Stacked bar: hour x mode
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-    const modes = ['NETROM', 'VARA', 'AX.25', 'TELNET'];
-    const modeCounts = {};
-    modes.forEach(m => modeCounts[m] = new Array(24).fill(0));
-
-    filteredEntries.forEach(e => {
-        const h = parseInt(e.time.slice(0, 2), 10);
-        if (modeCounts[e.mode]) modeCounts[e.mode][h]++;
-    });
-
-    const datasets = modes.filter(m => activeFilters.has(m)).map(m => ({
-        label: m,
-        data: modeCounts[m],
-        backgroundColor: (MODE_COLORS[m] || MODE_COLORS['NETROM']).fill,
-        borderRadius: 2,
-    }));
-
-    const ctx = document.getElementById('hourlyChart').getContext('2d');
-    if (hourlyChart) hourlyChart.destroy();
-    hourlyChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: hours.map(h => String(h).padStart(2, '0')),
-            datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            scales: {
-                x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } }
-            },
-            plugins: {
-                legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } }
-            }
-        }
-    });
-}
-
-function updateDailyChart() {
-    const container = document.getElementById('dailyChartContainer');
-    if (selectedDays <= 1) {
-        container.classList.add('hidden');
-        return;
-    }
-    container.classList.remove('hidden');
-
-    // Group by date
-    const dateMap = {};
-    const modes = ['NETROM', 'VARA', 'AX.25', 'TELNET'];
-    filteredEntries.forEach(e => {
-        if (!dateMap[e.displayDate]) {
-            dateMap[e.displayDate] = {};
-            modes.forEach(m => dateMap[e.displayDate][m] = 0);
-        }
-        if (dateMap[e.displayDate][e.mode] !== undefined) {
-            dateMap[e.displayDate][e.mode]++;
-        }
-    });
-
-    const dates = Object.keys(dateMap).sort();
-    const datasets = modes.filter(m => activeFilters.has(m)).map(m => ({
-        label: m,
-        data: dates.map(d => dateMap[d][m] || 0),
-        backgroundColor: (MODE_COLORS[m] || MODE_COLORS['NETROM']).fill,
-        borderColor: (MODE_COLORS[m] || MODE_COLORS['NETROM']).border,
-        borderWidth: 1.5,
-        borderRadius: 3,
-    }));
-
-    const ctx = document.getElementById('dailyChart').getContext('2d');
-    if (dailyChart) dailyChart.destroy();
-    dailyChart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: dates, datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            scales: {
-                x: { stacked: true, grid: { display: false } },
-                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
-            },
-            plugins: {
-                legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } }
-            }
-        }
-    });
-}
-
-// ========== TOP STATIONS ==========
-function renderTopStations() {
-    const stationMap = {};
-    filteredEntries.forEach(e => {
-        const key = e.from;
-        if (!stationMap[key]) {
-            stationMap[key] = { call: key, total: 0, modes: {}, lastSeen: e.sortKey };
-        }
-        stationMap[key].total++;
-        stationMap[key].modes[e.mode] = (stationMap[key].modes[e.mode] || 0) + 1;
-        if (e.sortKey > stationMap[key].lastSeen) stationMap[key].lastSeen = e.sortKey;
-    });
-
-    const sorted = Object.values(stationMap).sort((a, b) => b.total - a.total).slice(0, 20);
-    const tbody = document.getElementById('topStationsBody');
-
-    if (sorted.length === 0) {
-        // v1.5.19 (N3MEL): say why, instead of a bare "No data"
-        tbody.innerHTML = allEntries.length === 0
-            ? '<tr><td colspan="9" class="py-8 text-center text-gray-400">No BPQ connect logs found for this range.<br>' +
-              'BPQ writes <span class="font-mono">ConnectLog_YYMMDD.log</span> only with <b class="font-mono">LogAllConnects=1</b> in the main section of bpq32.cfg ' +
-              '(before the first PORT). Add it, restart LinBPQ, and new connections appear here.</td></tr>'
-            : '<tr><td colspan="9" class="py-8 text-center text-gray-400">No data</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = sorted.map((s, i) => {
-        const modeBadges = Object.keys(s.modes).map(m => {
-            const cls = m === 'AX.25' ? 'AX25' : m;
-            return `<span class="mode-badge mode-${cls}">${m}</span>`;
-        }).join(' ');
-
-        const lastDate = s.lastSeen.slice(0, 6);
-        const lastTime = s.lastSeen.slice(6);
-        const displayLast = `20${lastDate.slice(0,2)}-${lastDate.slice(2,4)}-${lastDate.slice(4,6)} ${lastTime}`;
-
-        return `<tr class="log-row border-b border-gray-50">
-            <td class="py-2 px-2 sm:px-3 text-gray-400 font-mono">${i + 1}</td>
-            <td class="py-2 px-2 sm:px-3 font-bold text-gray-800 font-mono">${esc(s.call)}</td>
-            <td class="py-2 px-2 sm:px-3 text-center font-bold text-purple-700">${s.total}</td>
-            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-green-700">${s.modes['NETROM'] || '-'}</td>
-            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-blue-700">${s.modes['VARA'] || '-'}</td>
-            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-amber-700">${s.modes['AX.25'] || '-'}</td>
-            <td class="py-2 px-2 sm:px-3 text-center hide-mobile text-violet-700">${s.modes['TELNET'] || '-'}</td>
-            <td class="py-2 px-2 sm:px-3">${modeBadges}</td>
-            <td class="py-2 px-2 sm:px-3 text-gray-500 font-mono text-xs hide-mobile">${displayLast}</td>
-        </tr>`;
-    }).join('');
-}
-
-// ========== LOG TABLE ==========
-function sortLog(field) {
-    if (sortField === field) {
-        sortAsc = !sortAsc;
-    } else {
-        sortField = field;
-        sortAsc = (field === 'from' || field === 'mode');
-    }
-    renderLogTable();
-}
-
-function renderLogTable() {
-    applyFilters();
-    document.getElementById('filteredCount').textContent = filteredEntries.length.toLocaleString();
-
-    // Sort
-    const sorted = [...filteredEntries];
-    sorted.sort((a, b) => {
-        let va, vb;
-        switch (sortField) {
-            case 'time': va = a.sortKey; vb = b.sortKey; break;
-            case 'date': va = a.dateStr; vb = b.dateStr; break;
-            case 'from': va = a.from; vb = b.from; break;
-            case 'mode': va = a.mode; vb = b.mode; break;
-            default: va = a.sortKey; vb = b.sortKey;
-        }
-        const cmp = va < vb ? -1 : va > vb ? 1 : 0;
-        return sortAsc ? cmp : -cmp;
-    });
-
-    // Limit display to 500 rows for performance
-    const display = sorted.slice(0, 500);
-    const tbody = document.getElementById('logTableBody');
-
-    if (display.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-gray-400">No connections match the current filters</td></tr>';
-        document.getElementById('logFooter').textContent = '';
-        return;
-    }
-
-    tbody.innerHTML = display.map(e => {
-        const modeCls = e.mode === 'AX.25' ? 'AX25' : e.mode;
-        return `<tr class="log-row border-b border-gray-50">
-            <td class="py-1.5 px-2 sm:px-3 font-mono text-gray-600">${esc(e.time)}</td>
-            <td class="py-1.5 px-2 sm:px-3 font-mono text-gray-500 text-xs">${esc(e.displayDate)}</td>
-            <td class="py-1.5 px-2 sm:px-3 font-bold text-gray-800 font-mono">${esc(e.from)}</td>
-            <td class="py-1.5 px-2 sm:px-3 text-gray-500 font-mono text-xs hide-mobile">${esc(e.node)}</td>
-            <td class="py-1.5 px-2 sm:px-3 font-mono text-gray-600">${esc(e.to)}</td>
-            <td class="py-1.5 px-2 sm:px-3"><span class="mode-badge mode-${modeCls}">${esc(e.mode)}</span></td>
-        </tr>`;
-    }).join('');
-
-    document.getElementById('logFooter').textContent = sorted.length > 500
-        ? `Showing 500 of ${sorted.length.toLocaleString()} connections. Use filters or search to narrow results.`
-        : `${sorted.length.toLocaleString()} connections`;
-}
-
-// ========== TIME RANGE ==========
-function setDays(d) {
-    selectedDays = d;
-    document.querySelectorAll('.time-range-btn').forEach(btn => {
-        btn.classList.toggle('active', parseInt(btn.dataset.days) === d);
-    });
-    loadLogs();
-}
-
-// ========== UTILS ==========
-function esc(s) {
-    if (!s) return '';
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function setStatus(type, msg) {
-    const el = document.getElementById('statusMsg');
-    const cls = type === 'success' ? 'status-success' : type === 'error' ? 'status-error' : 'status-loading';
-    el.innerHTML = `<span class="status-indicator ${cls}"></span> ${msg}`;
-}
-
-// ========== STATION MAP ==========
-let connectMap = null;
-let mapMarkers = [];
-let mapLines = [];
-let stationLocations = {};
-
-function initMap() {
-    if (connectMap) return;
-    connectMap = L.map('connectMap').setView([39.8, -98.6], 3);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 18
-    }).addTo(connectMap);
-}
-
-async function updateMap() {
-    // Wait for Leaflet to be available (loaded with defer)
-    if (typeof L === 'undefined') {
-        setTimeout(() => updateMap(), 200);
-        return;
-    }
-    
-    initMap();
-    
-    // Collect all unique callsigns from filtered entries (from + to)
-    const callsignModes = {};  // baseCall -> Set of modes
-    const callsignCounts = {}; // baseCall -> total connections
-    
-    filteredEntries.forEach(e => {
-        // From station
-        const baseFrom = e.from.replace(/-\d+$/, '').toUpperCase();
-        if (!callsignModes[baseFrom]) {
-            callsignModes[baseFrom] = new Set();
-            callsignCounts[baseFrom] = 0;
-        }
-        callsignModes[baseFrom].add(e.mode);
-        callsignCounts[baseFrom]++;
-        
-        // To station (destination hub)
-        if (e.to) {
-            const baseTo = e.to.replace(/-\d+$/, '').toUpperCase();
-            if (!callsignModes[baseTo]) {
-                callsignModes[baseTo] = new Set();
-                callsignCounts[baseTo] = 0;
-            }
-        }
-    });
-    
-    const allCalls = Object.keys(callsignModes);
-    
-    // Filter out calls we already have locations for
-    const needLookup = allCalls.filter(c => !stationLocations[c]);
-    
-    if (needLookup.length > 0) {
-        document.getElementById('mapStatus').textContent = `Looking up ${needLookup.length} station locations...`;
-        
-        // Use callsign-lookup.php (handles US + international via QRZ.com with callook.info fallback)
-        // Process in batches to avoid URL length limits
-        const BATCH_SIZE = 50;
-        for (let i = 0; i < needLookup.length; i += BATCH_SIZE) {
-            const batch = needLookup.slice(i, i + BATCH_SIZE);
-            try {
-                const response = await fetch('callsign-lookup.php?calls=' + batch.join(','));
-                const contentType = response.headers.get('content-type') || '';
-                if (response.ok && contentType.includes('application/json')) {
-                    const data = await response.json();
-                    if (data.success && data.data) {
-                        Object.assign(stationLocations, data.data);
-                    }
-                }
-            } catch (e) {
-                // callsign-lookup.php not available — stations will remain unmapped
-            }
-        }
-    }
-    
-    updateMapMarkers();
-    
-    const located = allCalls.filter(c => stationLocations[c]).length;
-    document.getElementById('mapStatus').textContent = `${located} of ${allCalls.length} stations located on map`;
-}
-
-function updateMapMarkers() {
-    if (!connectMap) return;
-    
-    // Clear existing markers and lines
-    mapMarkers.forEach(m => connectMap.removeLayer(m));
-    mapLines.forEach(l => connectMap.removeLayer(l));
-    mapMarkers = [];
-    mapLines = [];
-    
-    // Build station data from filtered entries
-    const stationData = {};  // baseCall -> { modes: Set, count, fullCall, destinations: Set }
-    filteredEntries.forEach(e => {
-        const base = e.from.replace(/-\d+$/, '').toUpperCase();
-        if (!stationData[base]) {
-            stationData[base] = { modes: new Set(), count: 0, fullCall: e.from, destinations: new Set(), destModes: {} };
-        }
-        stationData[base].modes.add(e.mode);
-        stationData[base].count++;
-        if (e.to) {
-            const destBase = e.to.replace(/-\d+$/, '').toUpperCase();
-            stationData[base].destinations.add(destBase);
-            // Track mode per destination for line color
-            if (!stationData[base].destModes[destBase]) stationData[base].destModes[destBase] = new Set();
-            stationData[base].destModes[destBase].add(e.mode);
-        }
-    });
-    
-    const bounds = [];
-    const modeMarkerColors = {
-        'NETROM': '#16a34a',
-        'VARA': '#2563eb',
-        'AX.25': '#d97706',
-        'TELNET': '#7c3aed',
-    };
-    const modeLineColors = {
-        'NETROM': 'rgba(22,163,74,0.5)',
-        'VARA': 'rgba(37,99,235,0.6)',
-        'AX.25': 'rgba(217,119,6,0.5)',
-        'TELNET': 'rgba(124,58,237,0.5)',
-    };
-    const multiLineColor = 'rgba(102,126,234,0.4)';
-    
-    // Track which connections we've drawn to avoid duplicates
-    const drawnLines = new Set();
-    
-    Object.entries(stationData).forEach(([baseCall, data]) => {
-        const loc = stationLocations[baseCall];
-        if (!loc || (!loc.lat && !loc.lon)) return;
-        
-        // Determine marker color
-        const modesArr = [...data.modes];
-        let bgColor;
-        if (modesArr.length === 1) {
-            bgColor = modeMarkerColors[modesArr[0]] || '#6b7280';
+    function render() {
+        const from = cutoff();
+        const E = all.filter(e => e.ts >= from);
+        const lbl = { 1: 'Today', 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 90 days' }[range];
+        $('dateRange').textContent = lbl + ' · ' + dayLabel(from) + ' – now (UTC)';
+        if (!files) {
+            $('noData').innerHTML = '<b>No connect logs found.</b> LinBPQ writes <code>ConnectLog_YYMMDD.log</code> only with <code>LogAllConnects=1</code> in the main section of bpq32.cfg. Add it, restart LinBPQ, and connects show here from then on.';
+            $('noData').classList.remove('hidden'); setStatus('bad', 'No connect logs');
         } else {
-            bgColor = null; // Will use gradient
+            $('noData').classList.add('hidden');
+            const last = all.length ? all[all.length - 1].ts : null;
+            const n = new Date();
+            setStatus(last && Date.now() - last < 86400000 ? 'ok' : 'warn', 'Updated ' + pad(n.getHours()) + ':' + pad(n.getMinutes()) + ' · ' + files + ' log ' + (files === 1 ? 'file' : 'files'));
         }
-        
-        // Scale marker size by connection count
-        const size = Math.max(10, Math.min(22, 8 + Math.sqrt(data.count) * 2));
-        
-        const bgStyle = bgColor 
-            ? `background:${bgColor};` 
-            : `background:linear-gradient(135deg, #667eea, #764ba2);`;
-        
-        const icon = L.divIcon({
-            className: 'connect-marker-wrapper',
-            html: `<div class="connect-marker" style="${bgStyle}width:${size}px;height:${size}px;"></div>`,
-            iconSize: [size, size],
-            iconAnchor: [size / 2, size / 2]
-        });
-        
-        // Build popup content
-        const modeBadges = modesArr.map(m => {
-            const cls = m === 'AX.25' ? 'AX25' : m;
-            return `<span class="mode-badge mode-${cls}">${m}</span>`;
-        }).join(' ');
-        
-        const locParts = [];
-        if (loc.city) locParts.push(loc.city);
-        if (loc.state) locParts.push(loc.state);
-        if (loc.country && loc.country !== 'USA' && loc.country !== 'United States') locParts.push(loc.country);
-        const locStr = locParts.join(', ');
-        
-        const popupHtml = `
-            <div style="font-family: system-ui; min-width: 160px;">
-                <div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${esc(data.fullCall)}</div>
-                ${locStr ? `<div style="color:#666; font-size:11px; margin-bottom:4px;">${esc(locStr)}</div>` : ''}
-                ${loc.grid ? `<div style="color:#888; font-size:11px; margin-bottom:4px;">Grid: ${esc(loc.grid)}</div>` : ''}
-                <div style="margin-bottom:4px;">${modeBadges}</div>
-                <div style="color:#666; font-size:11px;">${data.count} connection${data.count !== 1 ? 's' : ''}</div>
-            </div>`;
-        
-        const marker = L.marker([loc.lat, loc.lon], { icon })
-            .bindTooltip(data.fullCall, { direction: 'top', offset: [0, -size / 2], className: 'callsign-tooltip' })
-            .bindPopup(popupHtml, { maxWidth: 250 })
-            .addTo(connectMap);
-        
-        mapMarkers.push(marker);
-        bounds.push([loc.lat, loc.lon]);
-        
-        // Draw connection lines to destination hubs
-        data.destinations.forEach(destBase => {
-            const destLoc = stationLocations[destBase];
-            if (!destLoc || (!destLoc.lat && !destLoc.lon)) return;
-            
-            // Avoid duplicate lines (A->B and B->A)
-            const lineKey = [baseCall, destBase].sort().join('|');
-            if (drawnLines.has(lineKey)) return;
-            drawnLines.add(lineKey);
-            
-            // Determine line color from the modes used on this connection
-            const lineModes = data.destModes[destBase] ? [...data.destModes[destBase]] : modesArr;
-            let lineColor;
-            if (lineModes.length === 1) {
-                lineColor = modeLineColors[lineModes[0]] || multiLineColor;
-            } else {
-                lineColor = multiLineColor;
-            }
-            
-            const line = L.polyline(
-                [[loc.lat, loc.lon], [destLoc.lat, destLoc.lon]],
-                { color: lineColor, weight: 1.5, opacity: 0.7, dashArray: '6 4' }
-            ).addTo(connectMap);
-            
-            mapLines.push(line);
-        });
-    });
-    
-    if (bounds.length > 1) {
-        connectMap.fitBounds(bounds, { padding: [40, 40] });
-    } else if (bounds.length === 1) {
-        connectMap.setView(bounds[0], 6);
-    }
-}
 
-// ========== INIT ==========
-document.addEventListener('DOMContentLoaded', () => {
-    loadLogs();
-});
+        // stations in range
+        const S = {};
+        E.forEach(e => { const s = S[e.call] || (S[e.call] = { call: e.call, n: 0, last: 0, modes: {}, to: {}, days: [0, 0, 0, 0, 0, 0, 0] }); s.n++; s.last = e.ts; s.modes[e.mode] = (s.modes[e.mode] || 0) + 1; if (e.to) s.to[base(e.to)] = (s.to[base(e.to)] || 0) + 1; });
+        all.forEach(e => { const s = S[e.call]; if (!s) return; const di = Math.floor((e.ts - dayStart(6)) / 86400000); if (di >= 0 && di < 7) s.days[di]++; });
+        const SL = Object.values(S).sort((a, b) => b.n - a.n);
+        const newOnes = SL.filter(s => firstSeen[s.call] >= from && from > dayStart(DAYS_LOADED - 1)).sort((a, b) => firstSeen[b.call] - firstSeen[a.call]);
+
+        // KPI connects vs usual
+        $('kConn').textContent = E.length.toLocaleString();
+        const loadedDays = Math.max(1, Math.min(DAYS_LOADED, Math.ceil((Date.now() - (all.length ? all[0].ts : Date.now())) / 86400000)));
+        const usualPerDay = all.length / loadedDays;
+        const perDay = E.length / Math.max(1, Math.min(range, loadedDays));
+        $('kConnSub').innerHTML = 'about <b>' + (perDay < 10 ? perDay.toFixed(1) : Math.round(perDay)) + '</b> a day · usual <b>' + (usualPerDay < 10 ? usualPerDay.toFixed(1) : Math.round(usualPerDay)) + '</b> (' + loadedDays + '-day average)';
+        const ratio = usualPerDay ? perDay / usualPerDay : 1;
+        $('kConnTag').innerHTML = all.length && range < 90 ? (ratio >= 1.25 ? '<span class="rf-tag good">busier than usual</span>' : ratio <= 0.75 ? '<span class="rf-tag warn">quieter than usual</span>' : '<span class="rf-tag">about usual</span>') : '';
+
+        // KPI stations
+        $('kSta').textContent = SL.length;
+        $('kStaSub').innerHTML = SL.length ? 'top: <b>' + esc(SL[0].call) + '</b> (' + SL[0].n + ')' : 'none in this period';
+        $('kStaChips').innerHTML = newOnes.length ? '<button type="button" class="rf-chip" data-lfilter="new"><i style="background:var(--rf-accent);border-radius:50%"></i>New this period <b>' + newOnes.length + '</b></button>' : '';
+
+        // KPI path
+        const M = {}; E.forEach(e => { M[e.mode] = (M[e.mode] || 0) + 1; });
+        const ML = Object.entries(M).sort((a, b) => b[1] - a[1]);
+        $('kPath').textContent = ML.length ? ML[0][0] : '–';
+        $('kPathSub').textContent = ML.length ? Math.round(ML[0][1] / E.length * 100) + '% of connects' : '';
+        $('kPathBar').innerHTML = ML.map(([m, v]) => '<span style="width:' + (v / E.length * 100).toFixed(1) + '%;background:' + modeCol(m) + '"></span>').join('');
+        $('kPathChips').innerHTML = ML.map(([m, v]) => '<button type="button" class="rf-chip" data-lfilter="' + esc(m) + '"><i style="background:' + modeCol(m) + '"></i>' + esc(m) + ' <b>' + v + '</b></button>').join('');
+
+        // KPI busiest hour
+        const H = new Array(24).fill(0); E.forEach(e => { H[new Date(e.ts).getUTCHours()]++; });
+        if (E.length) {
+            const hi = H.indexOf(Math.max(...H)), lo = H.indexOf(Math.min(...H));
+            $('kHour').textContent = pad(hi) + 'Z';
+            $('kHourSub').innerHTML = '<b>' + H[hi] + '</b> connects between ' + pad(hi) + ':00 and ' + pad(hi) + ':59Z · quietest ' + pad(lo) + 'Z (' + H[lo] + ')';
+        } else { $('kHour').textContent = '–'; $('kHourSub').textContent = 'no connects in this period'; }
+
+        // strip
+        const lastE = all[all.length - 1];
+        const pills = [];
+        pills.push({ c: files ? 'ok' : 'bad', b: 'Connect log', s: files ? (lastE ? 'last ' + fmtTime(lastE.ts) + ' (' + ago(lastE.ts) + ')' : 'empty') : 'not found' });
+        if (lastE) pills.push({ c: 'ok', b: 'Last caller', s: lastE.from + ' via ' + lastE.mode });
+        const todayN = all.filter(e => e.ts >= dayStart(0)).length;
+        pills.push({ c: todayN ? 'ok' : 'warn', b: 'Today', s: todayN + ' connects' });
+        if (newOnes.length) pills.push({ c: 'ok', b: 'New', s: newOnes.length + (newOnes.length === 1 ? ' first-time caller' : ' first-time callers'), f: 'new' });
+        $('statusStrip').innerHTML = pills.map(p => '<button type="button" class="rf-pill"' + (p.f ? ' data-lfilter="' + p.f + '"' : '') + '><i style="background:var(--rf-dot' + (p.c === 'ok' ? 'good' : p.c) + ')"></i><b>' + esc(p.b) + '</b><span>' + esc(p.s) + '</span></button>').join('');
+
+        // regulars
+        $('regRows').innerHTML = SL.length ? SL.slice(0, 12).map(s => {
+            const st = Date.now() - s.last < 86400000 ? 'ok' : Date.now() - s.last < 7 * 86400000 ? 'idle' : 'idle';
+            const mx = Math.max(1, ...s.days);
+            const days = s.days.map((v, i) => '<span class="' + (v === 0 ? '' : v / mx < 0.34 ? 'l1' : v / mx < 0.67 ? 'l2' : 'l3') + '" title="' + esc(dayLabel(dayStart(6 - i)) + ': ' + v) + '"></span>').join('');
+            const tos = Object.entries(s.to).sort((a, b) => b[1] - a[1]).map(x => x[0]).slice(0, 2).join(', ');
+            return '<tr><td><div style="display:flex;align-items:center;gap:10px"><span class="rf-dot ' + st + '"></span><div style="display:flex;flex-direction:column;gap:2px"><button type="button" class="rf-call" data-call="' + esc(s.call) + '">' + esc(s.call) + '</button>' + (firstSeen[s.call] >= from && from > dayStart(DAYS_LOADED - 1) ? '<span class="rf-note ok">New this period</span>' : '') + '</div></div></td>'
+                + '<td style="white-space:nowrap">' + fmtTime(s.last) + '<div class="rf-small rf-muted">' + ago(s.last) + '</div></td><td class="num"><b>' + s.n + '</b></td>'
+                + '<td>' + Object.keys(s.modes).map(m => '<span class="cl-mode" style="background:' + modeCol(m) + '">' + esc(m) + '</span>').join(' ') + '</td>'
+                + '<td class="rf-mono rf-small">' + esc(tos || '–') + '</td><td><div class="rf-days">' + days + '</div></td></tr>';
+        }).join('') : '<tr><td colspan="6" class="rf-empty">No connects in this period.</td></tr>';
+
+        // new faces
+        $('newSub').textContent = from > dayStart(DAYS_LOADED - 1) ? 'first time in ' + DAYS_LOADED + ' days' : 'needs a range under 90 days';
+        $('newList').innerHTML = newOnes.length ? '<div class="pg-bars">' + newOnes.slice(0, 10).map(s => '<div class="pg-bar" style="grid-template-columns:92px minmax(0,1fr) auto"><button type="button" class="rf-call" data-call="' + esc(s.call) + '">' + esc(s.call) + '</button><span class="rf-small rf-muted">' + esc(Object.keys(s.modes).join(', ')) + '</span><span class="rf-small">' + esc(fmtTime(firstSeen[s.call], true)) + '</span></div>').join('') + '</div>' + (newOnes.length > 10 ? '<button type="button" class="rf-btn rf-btn-sm" data-lfilter="new">All ' + newOnes.length + ' in the log</button>' : '')
+            : '<div class="rf-muted rf-small">' + (from > dayStart(DAYS_LOADED - 1) ? 'Nobody new: every caller in this period was seen before.' : 'Pick Today, 7 or 30 days to see first-time callers.') + '</div>';
+
+        // heat grid: one row per day (up to 14), plus the period total
+        const rows = Math.min(range, 14);
+        const grid = []; let gmax = 1;
+        for (let r = rows - 1; r >= 0; r--) { const d0 = dayStart(r), row = new Array(24).fill(0); E.forEach(e => { if (e.ts >= d0 && e.ts < d0 + 86400000) row[new Date(e.ts).getUTCHours()]++; }); row.forEach(v => { if (v > gmax) gmax = v; }); grid.push({ label: dayLabel(d0), row }); }
+        const hmax = Math.max(1, ...H);
+        const cell = (v, mx) => '<td title="' + v + '" style="background:' + (v ? 'rgba(var(--pg-heat),' + (0.18 + 0.82 * v / mx).toFixed(2) + ')' : 'var(--rf-line)') + '"></td>';
+        let hh = '<tr><th></th>' + Array.from({ length: 24 }, (_, h) => '<th>' + (h % 3 === 0 ? pad(h) : '') + '</th>').join('') + '</tr>';
+        grid.forEach(g => { hh += '<tr><th class="day">' + esc(g.label) + '</th>' + g.row.map(v => cell(v, gmax)).join('') + '</tr>'; });
+        if (range > rows || range > 1) hh += '<tr><th class="day">' + (range > rows ? 'All ' + range + ' days' : 'Total') + '</th>' + H.map(v => cell(v, hmax)).join('') + '</tr>';
+        $('heat').innerHTML = hh;
+        $('heatSub').textContent = 'Connects per UTC hour' + (range > rows ? ' · last ' + rows + ' days, then the whole period' : '');
+        $('heatLegend').innerHTML = '<span><i style="background:var(--rf-line)"></i>none</span><span><i style="background:rgba(var(--pg-heat),.3)"></i>a few</span><span><i style="background:rgba(var(--pg-heat),1)"></i>busiest</span><span>Hover a square for the count.</span>';
+
+        // trends (per day, stacked by path)
+        const nd = Math.min(range, DAYS_LOADED), modes = ML.map(x => x[0]);
+        const cols = []; let cmax = 1;
+        for (let r = nd - 1; r >= 0; r--) { const d0 = dayStart(r), c = {}; let t = 0; E.forEach(e => { if (e.ts >= d0 && e.ts < d0 + 86400000) { c[e.mode] = (c[e.mode] || 0) + 1; t++; } }); if (t > cmax) cmax = t; cols.push({ d0, c, t }); }
+        $('trendCols').style.gridTemplateColumns = 'repeat(' + cols.length + ', minmax(0, ' + (cols.length > 20 ? '1fr' : '36px') + '))';
+        $('trendCols').style.justifyContent = 'space-around';
+        $('trendCols').innerHTML = cols.map(c => '<div title="' + esc(dayLabel(c.d0) + ': ' + c.t) + '">' + modes.map(m => c.c[m] ? '<span style="height:' + (c.c[m] / cmax * 100).toFixed(1) + '%;background:' + modeCol(m) + '"></span>' : '').join('') + '</div>').join('');
+        $('trendAxis').innerHTML = cols.length ? '<span>' + esc(dayLabel(cols[0].d0)) + '</span><span>' + esc(dayLabel(cols[cols.length - 1].d0)) + '</span>' : '';
+        $('trendLegend').innerHTML = modes.map(m => '<span><i style="background:' + modeCol(m) + '"></i>' + esc(m) + '</span>').join('') + '<span>Connects per UTC day, by path.</span>';
+
+        // stations tab
+        $('cSta').textContent = SL.length;
+        $('staRows').innerHTML = SL.length ? SL.map(s => '<tr><td><button type="button" class="rf-call" data-call="' + esc(s.call) + '">' + esc(s.call) + '</button></td><td class="num">' + s.n + '</td><td>' + Object.keys(s.modes).map(m => '<span class="cl-mode" style="background:' + modeCol(m) + '">' + esc(m) + '</span>').join(' ') + '</td><td>' + esc(fmtTime(firstSeen[s.call], true)) + '</td><td>' + esc(fmtTime(s.last, true)) + '</td></tr>').join('') : '<tr><td colspan="5" class="rf-empty">No stations in this period.</td></tr>';
+        $('staMore').textContent = 'First seen = earliest connect in the last ' + DAYS_LOADED + ' days of logs.';
+
+        renderLog();
+        showTab(tab);
+        if (tab === 'map') drawMap();
+    }
+
+    function logRows() {
+        const from = cutoff(), q = $('logSearch').value.trim().toUpperCase();
+        let E = all.filter(e => e.ts >= from);
+        if (logFilter === 'new') E = E.filter(e => firstSeen[e.call] >= from);
+        else if (logFilter !== 'all') E = E.filter(e => e.mode === logFilter);
+        if (q) E = E.filter(e => (e.from + ' ' + e.to + ' ' + e.node).includes(q));
+        return E.reverse();
+    }
+    function renderLog() {
+        const from = cutoff(), E0 = all.filter(e => e.ts >= from);
+        const M = {}; E0.forEach(e => { M[e.mode] = (M[e.mode] || 0) + 1; });
+        const nNew = E0.filter(e => firstSeen[e.call] >= from && from > dayStart(DAYS_LOADED - 1)).length;
+        const fl = [['all', 'All', E0.length]].concat(Object.entries(M).sort((a, b) => b[1] - a[1]).map(([m, v]) => [m, m, v]));
+        if (nNew) fl.push(['new', 'New callers', nNew]);
+        $('logFilters').innerHTML = fl.map(([k, l, v]) => '<button type="button" class="rf-chip" data-lfilter="' + esc(k) + '" aria-pressed="' + (logFilter === k) + '">' + (k !== 'all' && k !== 'new' ? '<i style="background:' + modeCol(k) + '"></i>' : '') + esc(l) + ' <b>' + v + '</b></button>').join('');
+        const E = logRows();
+        $('cLog').textContent = E0.length;
+        $('logRows').innerHTML = E.length ? E.slice(0, shown).map(e => '<tr><td class="rf-mono" style="white-space:nowrap">' + esc(fmtTime(e.ts, range > 1)) + '</td><td><button type="button" class="rf-call" data-call="' + esc(e.call) + '">' + esc(e.from) + '</button></td><td><span class="cl-mode" style="background:' + modeCol(e.mode) + '">' + esc(e.mode) + '</span></td><td class="rf-mono">' + esc(e.to || '–') + '</td><td class="rf-mono rf-muted">' + esc(e.node || '–') + '</td></tr>').join('') : '<tr><td colspan="5" class="rf-empty">No connects match.</td></tr>';
+        $('logMore').innerHTML = E.length > shown ? 'Showing ' + shown + ' of ' + E.length + ' <button type="button" class="rf-btn rf-btn-sm" id="showMore">Show more</button>' : E.length + (E.length === 1 ? ' connect' : ' connects');
+    }
+
+    function showTab(t) {
+        tab = t;
+        document.querySelectorAll('.rf-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+        ['log', 'map', 'trend', 'stations'].forEach(k => $('tab-' + k).classList.toggle('hidden', k !== t));
+        if (t === 'map') drawMap();
+    }
+
+    // map (Leaflet), drawn when its tab opens
+    async function drawMap() {
+        if (typeof L === 'undefined') { setTimeout(drawMap, 300); return; }
+        if (!map) { map = L.map('connectMap').setView([39.8, -98.6], 3); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 18 }).addTo(map); }
+        setTimeout(() => map.invalidateSize(), 50);
+        const from = cutoff(), E = all.filter(e => e.ts >= from);
+        const S = {}; E.forEach(e => { const s = S[e.call] || (S[e.call] = { n: 0, modes: new Set(), to: new Set(), full: e.from }); s.n++; s.modes.add(e.mode); if (e.to) s.to.add(base(e.to)); });
+        const calls = new Set(Object.keys(S)); Object.values(S).forEach(s => s.to.forEach(t => calls.add(t)));
+        const need = [...calls].filter(c => !(c in locs));
+        $('mapStatus').textContent = need.length ? 'Looking up ' + need.length + ' locations…' : '';
+        for (let i = 0; i < need.length; i += 50) {
+            const b = need.slice(i, i + 50);
+            try { const r = await fetch('callsign-lookup.php?calls=' + b.map(encodeURIComponent).join(',')); const j = await r.json(); if (j.success && j.data) Object.assign(locs, j.data); } catch (e) {}
+            b.forEach(c => { if (!(c in locs)) locs[c] = null; });
+        }
+        mapLayers.forEach(l => map.removeLayer(l)); mapLayers = [];
+        const bounds = [], drawn = new Set();
+        Object.entries(S).forEach(([c, s]) => {
+            const p = locs[c]; if (!p || (!p.lat && !p.lon)) return;
+            const ms = [...s.modes], col = ms.length === 1 ? modeCol(ms[0]) : '#5B6575', size = Math.max(10, Math.min(22, 8 + Math.sqrt(s.n) * 2));
+            const icon = L.divIcon({ className: '', html: '<div class="cl-marker" style="width:' + size + 'px;height:' + size + 'px;background:' + col + '"></div>', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+            const where = [p.city, p.state, p.country && !/^(USA|United States)$/.test(p.country) ? p.country : ''].filter(Boolean).join(', ');
+            const mk = L.marker([p.lat, p.lon], { icon }).bindTooltip(c, { direction: 'top' }).bindPopup('<b>' + esc(s.full) + '</b>' + (where ? '<br>' + esc(where) : '') + (p.grid ? '<br>Grid ' + esc(p.grid) : '') + '<br>' + s.n + ' connects · ' + esc(ms.join(', '))).addTo(map);
+            mapLayers.push(mk); bounds.push([p.lat, p.lon]);
+            s.to.forEach(t => { const q = locs[t]; if (!q || (!q.lat && !q.lon)) return; const k = [c, t].sort().join('|'); if (drawn.has(k)) return; drawn.add(k); mapLayers.push(L.polyline([[p.lat, p.lon], [q.lat, q.lon]], { color: col, weight: 1.5, opacity: 0.6, dashArray: '6 4' }).addTo(map)); });
+        });
+        if (bounds.length > 1) map.fitBounds(bounds, { padding: [40, 40] }); else if (bounds.length === 1) map.setView(bounds[0], 6);
+        const located = Object.keys(S).filter(c => locs[c]).length;
+        $('mapStatus').textContent = located + ' of ' + Object.keys(S).length + ' stations located (callsign-lookup.php: QRZ, callook.info).';
+    }
+
+    function stationDrawer(call) {
+        const from = cutoff();
+        const E = all.filter(e => e.call === call && e.ts >= from).reverse();
+        const allE = all.filter(e => e.call === call);
+        const M = {}; E.forEach(e => { M[e.mode] = (M[e.mode] || 0) + 1; });
+        const H = new Array(24).fill(0); allE.forEach(e => { H[new Date(e.ts).getUTCHours()]++; });
+        const hm = Math.max(1, ...H);
+        let h = '<div class="rf-kv"><div><span>Connects</span><b>' + E.length + '</b></div><div><span>In ' + DAYS_LOADED + ' days</span><b>' + allE.length + '</b></div><div><span>First seen</span><b style="font-size:14px">' + esc(allE.length ? fmtTime(allE[0].ts, true) : '–') + '</b></div><div><span>Last seen</span><b style="font-size:14px">' + esc(allE.length ? fmtTime(allE[allE.length - 1].ts, true) : '–') + '</b></div></div>';
+        h += '<div class="rf-chips">' + Object.entries(M).map(([m, v]) => '<span class="rf-chip" style="cursor:default"><i style="background:' + modeCol(m) + '"></i>' + esc(m) + ' <b>' + v + '</b></span>').join('') + '</div>';
+        h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">When it connects (UTC hour, last ' + DAYS_LOADED + ' days)</div><div class="pg-mbars up" style="grid-template-columns:repeat(24,minmax(0,1fr));height:56px">' + H.map((v, i) => '<span title="' + pad(i) + 'Z: ' + v + '" style="height:' + (v / hm * 100).toFixed(1) + '%' + (v ? ';min-height:2px' : '') + '"></span>').join('') + '</div><div class="pg-axis"><span>00</span><span>12</span><span>23</span></div></div>';
+        h += '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="rf-btn rf-btn-sm" style="display:inline-flex;align-items:center;text-decoration:none" href="bpq-rf-connections.html">RF Connections →</a><a class="rf-btn rf-btn-sm" style="display:inline-flex;align-items:center;text-decoration:none" href="bpq-traffic.html">Traffic →</a></div>';
+        h += E.length ? '<table class="rf-ptable" style="font-size:13px"><thead><tr><th>Time (UTC)</th><th>Path</th><th>To</th></tr></thead><tbody>' + E.slice(0, 200).map(e => '<tr><td class="rf-mono">' + esc(fmtTime(e.ts, true)) + '</td><td><span class="cl-mode" style="background:' + modeCol(e.mode) + '">' + esc(e.mode) + '</span></td><td class="rf-mono">' + esc(e.to || '–') + '</td></tr>').join('') + '</tbody></table>' : '<div class="rf-muted">No connects in this period.</div>';
+        $('drawerTitle').textContent = call + ' · connects';
+        $('drawerBody').innerHTML = h;
+        $('drawer').classList.remove('hidden'); $('drawerBg').classList.remove('hidden'); $('drawerClose').focus();
+    }
+    function closeDrawer() { $('drawer').classList.add('hidden'); $('drawerBg').classList.add('hidden'); }
+
+    document.addEventListener('click', (e) => {
+        const t = e.target.closest('button'); if (!t) return;
+        if (t.id === 'drawerClose') return closeDrawer();
+        if (t.id === 'refreshBtn') return load();
+        if (t.id === 'themeBtn') { if (window.toggleDarkMode) window.toggleDarkMode(); return; }
+        if (t.id === 'showMore') { shown += 300; return renderLog(); }
+        if (t.dataset.range) { range = +t.dataset.range; try { localStorage.setItem('bpq_connects_range', String(range)); } catch (err) {} document.querySelectorAll('.rf-range button').forEach(b => b.classList.toggle('active', b === t)); shown = 150; return render(); }
+        if (t.dataset.tab) return showTab(t.dataset.tab);
+        if (t.dataset.lfilter) { logFilter = t.dataset.lfilter; shown = 150; showTab('log'); renderLog(); if (!t.closest('#tab-log')) document.querySelector('.rf-tabs').scrollIntoView({ behavior: 'smooth' }); return; }
+        if (t.dataset.call) return stationDrawer(t.dataset.call);
+    });
+    $('drawerBg').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('drawer').classList.contains('hidden')) closeDrawer(); });
+    $('logSearch').addEventListener('input', () => { shown = 150; renderLog(); });
+    function themeLabel() { $('themeBtn').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark'; }
+    new MutationObserver(themeLabel).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    function clock() { const d = new Date(); $('zuluTime').textContent = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); }
+    document.querySelectorAll('.rf-range button').forEach(b => b.classList.toggle('active', +b.dataset.range === range));
+    themeLabel(); clock(); setInterval(clock, 10000);
+    load();
+    setInterval(load, 10 * 60 * 1000);
+})();
 </script>
-    <script>
-    (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
-    </script>
 </body>
 </html>

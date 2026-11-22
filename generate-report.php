@@ -10,6 +10,7 @@
  *   callsign  — base callsign (3-7 alphanumeric chars, SSID stripped)
  *   hours     — integer 1..8760
  *   direction — 'all' | 'outgoing' | 'incoming'
+ *   modem     — 'all' | 'vara' | 'mercury' | 'data2g' | 'vhf' (v1.5.85; default all)
  *
  * Example:
  *   GET /generate-report.php?callsign=N4SD&hours=24&direction=all
@@ -33,6 +34,7 @@ function bail(int $http_code, string $msg): void
 $callsign_raw = $_GET['callsign'] ?? '';
 $hours        = (int)($_GET['hours'] ?? 24);
 $direction    = $_GET['direction'] ?? 'all';
+$modem        = $_GET['modem'] ?? 'all';
 
 // Callsign: uppercase, strip SSID, validate format
 $callsign = strtoupper(trim((string)$callsign_raw));
@@ -51,6 +53,9 @@ if ($hours < 1 || $hours > 24 * 365) {
 // Direction: enum
 if (!in_array($direction, ['all', 'outgoing', 'incoming'], true)) {
     bail(400, 'Invalid direction');
+}
+if (!in_array($modem, ['all', 'vara', 'mercury', 'data2g', 'vhf'], true)) {
+    bail(400, 'Invalid modem');
 }
 
 // ─── Locate the Python script ──────────────────────────────────────────
@@ -98,6 +103,7 @@ $cmd = [
     '--callsign', $callsign,
     '--hours',    (string)$hours,
     '--direction', $direction,
+    '--modem',    $modem,
     '--output',   $tmp_pdf,
 ];
 
@@ -130,8 +136,9 @@ if (!is_file($tmp_pdf) || filesize($tmp_pdf) === 0) {
 }
 
 // ─── Stream the PDF back ───────────────────────────────────────────────
-$filename = sprintf('rf-activity-%s-%dh-%s.pdf',
+$filename = sprintf('rf-activity-%s%s-%dh-%s.pdf',
                     strtolower($callsign),
+                    $modem === 'all' ? '' : '-' . $modem,
                     $hours,
                     date('Ymd-His'));
 

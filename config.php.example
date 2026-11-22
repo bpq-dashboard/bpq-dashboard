@@ -80,6 +80,9 @@ return [
         'bulletin_text'            => 'all',
         'bulletin_list_recent'     => 100,
         'bulletin_full_list_hours' => 24,
+        // v1.5.90: normal runs list only the newest <list_quick> (LL 25) and
+        // use bulletin_list_recent only when they were all new.
+        'list_quick'               => 25,
     ],
 
     // ---- Database (MariaDB / MySQL) ----

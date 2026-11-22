@@ -4,6 +4,159 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.92] - 2026-11-22
+
+### Fixed (Winlink sessions on VARA and VHF, K1AJD)
+- parse-vara-log.py labelled every successful incoming VARA call with no
+  BBS line WL2K, and gave it the frequency of the nearest other call within
+  30 minutes (any band on a scanning radio). Now a call is WL2K only when
+  CMSAccess_YYYYMMDD.log has the caller connecting to CMS within 5 minutes
+  (the old rule stays for days with no gateway log), and the frequency is
+  the most common transmit frequency in rig-history.jsonl during the call
+  (the old guess only without rig history). Non-Winlink calls get their
+  band from that frequency.
+- --backfill-freq [--days 30] [--dry-run] on parse-vara-log.py corrects
+  stored VARA rows (frequency empty or WL2K); BBS-log frequencies are never
+  changed.
+- parse-vhf-connections.py: rows get the port's frequency (config.php
+  vhf.freq_mhz, else the port's WL2KREPORT frequency in bpq32.cfg) and band
+  WL2K for incoming calls the gateway log confirms; a re-read updates band
+  and frequency (--days 30 once for older rows).
+- New scripts/winlink_match.py shared by the VARA, Data2G and VHF parsers.
+  config.php vara.rig_history / data2g.rig_history = false where that
+  modem's radio isn't the one flrig reads.
+
+## [1.5.91] - 2026-11-22
+
+### Fixed (Data2G Winlink calls had no band or frequency, K1AJD)
+- A Winlink user calling the RMS gateway call (KQ4WUH > K1AJD-10) never
+  reaches the BBS, so LinBPQ writes no "Incoming Connect ... Freq" line
+  and parse-data2g-log.py stored the call with no frequency or band
+  ("Unknown"). Incoming calls the gateway log (CMSAccess_YYYYMMDD.log,
+  "Connected to CMS", within 2 minutes) confirms now get band WL2K, as
+  VARA's Winlink sessions do. Calls without a frequency take the dial
+  frequency the radio was on while transmitting during the call, from
+  rig-history.jsonl (paths.datalog; flrig, every 3 s while transmitting),
+  not a guess from other calls: the Data2G radio scans.
+- --backfill-freq fills the WL2K label and frequency on rows already
+  stored, never changing a frequency that is there.
+- config.php data2g.rig_history = false where Data2G uses a radio flrig
+  doesn't read.
+
+## [1.5.90] - 2026-11-22
+
+### Changed (message-bodies: list only new messages, K1AJD)
+- fetch-message-bodies.php listed the newest 100 messages (LL 100) every
+  5 minutes, and BPQ writes every listed line to the BBS log: about
+  29,000 lines a day that buried the forwarding sessions. Normal runs now
+  send LL 25 (config messages.list_quick, 10-200) and remember the highest
+  message number seen; LL <bulletin_list_recent> is sent only when all of
+  them were new or the last run left messages unread. The daily full
+  LP/LT/LB is unchanged. State in cache/message-bodies-listing.json.
+
+### Added (Connect Watchdog settings in Dashboard Settings, K1AJD)
+- New Watchdog tab in ⚙ Dashboard Settings: failed attempts before a
+  pause, pause length (1-168 h), restart sharing (batch_mins), never-pause
+  list and BBS messages. Saved to data/settings.json, which overrides
+  config.php 'watchdog' once saved; until then the tab shows what the
+  watchdog used on its last run and nothing is written. Advice on choosing
+  the pause length (longer than the forwarding interval; 2-3 h for hourly).
+- connect-watchdog.py reads the override and records all its settings in
+  cache/watchdog-state.json.
+
+## [1.5.89] - 2026-11-21
+
+### Fixed (BBS Mail → Write: address suggestions, K1AJD)
+- The To field's suggestions matched the typed letters anywhere in a
+  contact, including the routing part of its address
+  (`.#SEWA.WA.USA.NOAM`), and sorted by use only: typing "N" listed nearly
+  every contact and the callsign being typed could be missing from the 8
+  shown. Now ranked: callsign starts with it, then a name or nickname word,
+  then the address before the @ or the email; two or more letters also
+  match inside a callsign or name; the routing part matches only when an
+  @, . or # is typed. The callsign is shown in bold in each suggestion.
+- Clicking into an empty To box (or after a comma) lists the most used,
+  starred and personal contacts.
+
+## [1.5.88] - 2026-11-21
+
+### Changed (System Logs laid out like RF Connections)
+- bpq-system-logs.html uses bpq-page.css like Messages, Traffic and
+  Connects: header with range, Refresh, Report (PDF) and Dark; a status
+  strip (logs, last error, watched stations not heard, heard list, fresh
+  NetRom nodes); headline cards for node activity, messages, errors (share
+  of events, chips by kind) and internet links (Winlink CMS, mail server);
+  "Heard on your ports" as a table with status dots, watched stations
+  starred and listed first; activity by hour (connections above, messages
+  below) and event mix as CSS bars (Chart.js dropped); an always-open
+  Errors card; tabs for Live log, NetRom nodes, Most active and Internet;
+  a callsign panel with its log lines and where it was heard.
+- Same data code and element ids as before (database API first, the log
+  files as fallback); the layout script at the end of the page replaces
+  only the drawing functions.
+
+## [1.5.87] - 2026-11-21
+
+### Fixed (Messages page slow to load)
+- The page downloaded up to 30 days of LinBPQ's BBS and mail-server logs
+  (a busy BBS writes megabytes a day) and waited for the BBS's forwarding
+  queue before showing anything; it could take minutes, before and after
+  1.5.86. New mail-log-api.php sends only the lines the page reads (offers,
+  answers, connects; mail-server logins and refusals), cached per day in
+  cache/mail-log/: about 4% of the size on a real log. The page loads 8
+  days (30 only when 30 days is chosen), shows as soon as the logs are in,
+  and fills in the queue when the BBS answers ("asking the BBS…"). Without
+  the endpoint it falls back to reading the files as before.
+
+## [1.5.86] - 2026-11-21
+
+### Changed (Messages, Traffic and Connects laid out like RF Connections)
+- The three pages share RF Connections' layout and look (new shared
+  stylesheet bpq-page.css): header with range buttons, UTC clock, Refresh
+  and Dark; a status strip; four headline cards whose chips open the rows
+  behind them; a partner/station table with status dots, plain-words notes
+  and day or report blocks; side charts; tabs; and a detail panel from the
+  right for any call. Light and dark, phone width. No Tailwind or Chart.js
+  on these pages any more.
+- **Messages** (bpq-email-monitor.html): each offer (FA/FB/FC) in the BBS
+  log is matched with its answer (FS), so "Messages moved" counts only
+  messages that really moved; "already had" (duplicates) is counted apart,
+  and offers that got no answer flag the partner ("link dropped?"). New:
+  the forwarding queue (bpq-fwd-queue.php, FWD QUEUE) as a card, a strip
+  pill and a tab; partner status (red: mail waiting and nothing moved for a
+  day; amber: waiting over 3 h or unanswered offers); partners saved on RF
+  Connections listed even when quiet; mail by hour in/out; busiest senders;
+  security events from the mail-server log with "new since you looked";
+  Mail clients tab (replaces the SMTP/POP mode button). Windows line
+  endings in the logs are handled (they made lines unreadable before).
+- **Traffic** (bpq-traffic.html): headline cards for messages, rejects (and
+  the share of offers), data and stations; a BBS partners table with one
+  block per report and a high-reject flag; messages by report; message mix;
+  Rejections and Efficiency tabs; per-station panel by type and report.
+  Message totals now include NTS (T) traffic (they counted P and B only).
+  Ranges 1 week, 4 weeks, 12 weeks, 1 year. traffic-api.php gains
+  `action=history` (per report date and callsign), also returned by
+  `action=all`.
+- **Connects** (bpq-connect-log.html): loads 90 days of ConnectLog files once
+  and finds first-time callers ("New this period", New faces); connects
+  compared with the 90-day average; by-path card (click to filter the log);
+  busiest hour; regulars with 7-day blocks; a day x UTC-hour grid; Log, Map
+  (drawn when its tab opens), Trends and Stations tabs; per-station panel
+  with the hours it usually connects.
+
+## [1.5.85] - 2026-11-21
+
+### Added (RF Connections → Station report: every modem)
+- The Station report dialog has a **Modem** choice: All modems (default),
+  VARA HF, Mercury, Data2G or VHF packet. Until now it covered VARA only.
+  With All modems the PDF adds a **By Modem** table (connections, success,
+  average S/N, average peak speed, bytes, airtime per modem) and a Modem
+  column in the session list. Mercury and VHF sessions record no S/N or
+  speed: they show "–", and the averages use the sessions that have them
+  (a note says so). The file name carries the modem when one is chosen
+  (rf-activity-n4sd-data2g-24h-….pdf). scripts/generate-rf-report.py
+  `--modem`; generate-report.php `modem=` (checked against the list).
+
 ## [1.5.84] - 2026-11-20
 
 ### Fixed (BBS mail store on Dovecot 2.4)

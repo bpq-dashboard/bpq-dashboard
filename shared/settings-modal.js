@@ -173,7 +173,7 @@
         }, 100);
 
         // Tab bar
-        const tabs = ['Station', 'Partners', 'Prop Sched', 'Storm Mon', 'Paths'];
+        const tabs = ['Station', 'Partners', 'Prop Sched', 'Storm Mon', 'Watchdog', 'Paths'];
         const tabBar = el('div', { id: 'stnTabBar' });
         tabs.forEach((t, i) => {
             const btn = el('button', { class: 'stn-tab' + (i === 0 ? ' stn-tab-active' : ''), 'data-tab': i });
@@ -185,7 +185,7 @@
 
         // Tab panels
         const panels = el('div', { id: 'stnPanels' });
-        const panelIds = ['stnTabStation', 'stnTabPartners', 'stnTabPropSched', 'stnTabStorm', 'stnTabPaths'];
+        const panelIds = ['stnTabStation', 'stnTabPartners', 'stnTabPropSched', 'stnTabStorm', 'stnTabWatchdog', 'stnTabPaths'];
         panelIds.forEach((pid, i) => {
             const p = el('div', { id: pid, class: 'stn-panel' + (i === 0 ? ' stn-panel-active' : '') });
             p.innerHTML = '<div style="color:#9ca3af;padding:20px">Loading…</div>';
@@ -239,6 +239,7 @@
         renderPartners();
         renderPropSched();
         renderStorm();
+        renderWatchdog();
         renderPaths();
     }
 
@@ -607,7 +608,54 @@
     }
 
     // =========================================================================
-    // TAB 5 — PATHS & SYSTEM
+    // TAB 5 — CONNECT WATCHDOG (v1.5.90)
+    // =========================================================================
+    function renderWatchdog() {
+        const panel = document.getElementById('stnTabWatchdog');
+        if (!panel) return;
+        const saved = _settings.watchdog || null, now = _settings._watchdog_now || null;
+        const w = saved || now || {};
+        const v = (k, d) => (w[k] ?? d);
+        const src = saved ? 'Saved here: these override config.php.'
+                  : now ? 'Showing what the watchdog used on its last run (from config.php or its defaults). Saving makes these the settings.'
+                  : 'The watchdog hasn\'t run yet (or isn\'t scheduled): showing its defaults.';
+        panel.innerHTML = `
+        <div class="stn-section">
+            <div class="stn-section-title">⏸ Connect Watchdog</div>
+            <div class="stn-note" style="margin-bottom:14px;">Pauses forwarding to an RF partner that stops answering (Enabled = 0 in linmail.cfg), then tries it again. Every pause and resume restarts LinBPQ for a few seconds. A good session with the partner, including the partner calling you, ends a pause early.</div>
+            <div class="stn-grid2">
+                ${field('Failed attempts in a row before a pause', 'wd_fail',  v('fail_count', 2),  'number', '2')}
+                ${field('Pause length (hours, 1–168)',             'wd_hours', v('pause_hours', 6), 'number', '6')}
+                ${field('Share restarts within (minutes, 0 = off)', 'wd_batch', v('batch_mins', 90), 'number', '90')}
+                ${field('Never pause (calls, comma-separated)',    'wd_excl',  (v('exclude', []) || []).join(', '), 'text', 'e.g. K7EK, N3MEL')}
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;">
+                <input type="checkbox" id="wd_notify" ${v('notify', true) ? 'checked' : ''}>
+                <span class="stn-label" style="margin:0">BBS message to the station on every pause and resume</span>
+            </label>
+            <div class="stn-note" style="margin-top:14px;"><strong>Choosing the pause length:</strong> it should be longer than the partner's forwarding interval, or the pause saves nothing. With hourly forwarding, 2–3 hours stops the BBS calling a hub that is off the air while keeping mail from waiting long; 6 hours suits partners forwarded every few hours or long outages. RMS (Winlink) is never paused.</div>
+            <div class="stn-note" style="margin-top:8px;color:#9ca3af;font-size:.82rem;">${src} Takes effect on the watchdog's next run (every 5 minutes). Current pauses keep the end time they were given.</div>
+        </div>`;
+        _wdInitial = null; _wdInitial = JSON.stringify((collectWatchdog().watchdog) || null);
+    }
+
+    let _wdInitial = null;   // what the tab showed when it opened
+    function collectWatchdog() {
+        if (!document.getElementById('wd_hours')) return {};
+        const w = {
+            fail_count:  parseInt(val('wd_fail'))  || 2,
+            pause_hours: parseInt(val('wd_hours')) || 6,
+            batch_mins:  Math.max(0, parseInt(val('wd_batch')) || 0),
+            notify:      document.getElementById('wd_notify')?.checked ?? true,
+            exclude:     String(val('wd_excl') || '').split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean),
+        };
+        // Not saved here before and left as shown: send nothing, so config.php stays in charge
+        if (!_settings.watchdog && JSON.stringify(w) === _wdInitial) return {};
+        return { watchdog: w };
+    }
+
+    // =========================================================================
+    // TAB 6 — PATHS & SYSTEM
     // =========================================================================
     function renderPaths() {
         const paths = _settings.paths ?? {};
@@ -668,6 +716,7 @@
             collectStation(),
             collectPropSched(),
             collectStorm(),
+            collectWatchdog(),
             collectPaths(),
             { partners: _settings.partners ?? [] }
         );
@@ -695,7 +744,7 @@
     // =========================================================================
     function showLockedState() {
         // Replace all panel content with a locked message
-        const panelIds = ['stnTabStation', 'stnTabPartners', 'stnTabPropSched', 'stnTabStorm', 'stnTabPaths'];
+        const panelIds = ['stnTabStation', 'stnTabPartners', 'stnTabPropSched', 'stnTabStorm', 'stnTabWatchdog', 'stnTabPaths'];
         panelIds.forEach(pid => {
             const p = document.getElementById(pid);
             if (p) p.innerHTML = `

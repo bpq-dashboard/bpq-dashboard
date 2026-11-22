@@ -42,6 +42,9 @@ Settings (config.php, all optional):
         'exclude'     => [],     // partners never to pause, e.g. ['K7EK'] (RMS is never paused, v1.5.77)
         'batch_mins'  => 90,     // v1.5.81: how long a resume may wait / be brought forward to share a restart (0 = off)
     ],
+    v1.5.90: the same settings (not notify_to) can be set in the admin pages'
+    ⚙ Dashboard Settings → Watchdog tab (data/settings.json); once saved there
+    they override config.php.
 The BBS login for the messages is config.php 'bbs' (user / pass), as used by
 the other pages.
 
@@ -71,7 +74,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpq_db_config  # noqa: E402
 
 WEB_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_W = bpq_db_config.load_config_section('watchdog') or {}
+_W = dict(bpq_db_config.load_config_section('watchdog') or {})
+# v1.5.90: ⚙ Dashboard Settings → Watchdog (data/settings.json) overrides
+# config.php once the sysop has saved it there.
+try:
+    with open(os.path.join(WEB_ROOT, 'data', 'settings.json')) as _f:
+        _SW = (json.load(_f) or {}).get('watchdog')
+    if isinstance(_SW, dict):
+        _W.update({k: v for k, v in _SW.items() if k in ('fail_count', 'pause_hours', 'batch_mins', 'notify', 'exclude')})
+except (OSError, ValueError):
+    pass
 
 
 def _int(v, d, lo, hi):
@@ -156,7 +168,9 @@ def load_state():
 def save_state(state):
     state['version'] = 2
     state['updated_at'] = iso(now_utc())
-    state['settings'] = {'fail_count': CONFIG['fail_count'], 'pause_hours': CONFIG['pause_hours']}
+    state['settings'] = {'fail_count': CONFIG['fail_count'], 'pause_hours': CONFIG['pause_hours'],
+                         'batch_mins': CONFIG['batch_mins'], 'notify': CONFIG['notify'],
+                         'exclude': [x for x in CONFIG['exclude'] if x != 'RMS']}
     path = CONFIG['state_file']
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + '.tmp'

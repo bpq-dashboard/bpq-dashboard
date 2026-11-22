@@ -9,7 +9,6 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         /* Loading skeleton animation */
@@ -390,372 +389,235 @@
     /* Modals */
     [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
     </style>
+    <script>
+        (function () { try { var s = localStorage.getItem('bpq-dark-mode'); var t = (s === 'dark' || s === 'light') ? s : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+    </script>
+    <link rel="stylesheet" href="bpq-page.css?v=1.5.88">
+    <style>
+        /* v1.5.88: RF Connections look over the old Tailwind page */
+        body { background: var(--rf-bg) !important; color: var(--rf-text); font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+        .rf-toolbar select.rf-btn { height: 34px; padding: 0 10px; font-size: 13px; }
+        .log-container { max-height: 560px; }
+        .rf-dot.wk { background: var(--rf-accent); } .rf-note.wk { color: var(--rf-accent); }
+        #errorCount:focus-visible { outline: 2px solid var(--rf-accent); border-radius: 6px; }
+        [data-theme="dark"] .rf-card, [data-theme="dark"] .rf-head { background: var(--rf-card) !important; }
+    </style>
 </head>
-<body class="min-h-screen" data-nav-page="system">
+<body data-nav-page="system">
 <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
      Active link is driven by the data-nav-page attribute on <body>. -->
 <script src="bpq-nav-loader.js?v=2026-11-19-1"></script>
 
     <!-- Modern Navigation with gradient -->
     
-    <div class="p-2 sm:p-4 lg:p-8">
-        <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
-            <!-- Header -->
-            <div class="mb-6 sm:mb-10">
-                <div class="flex flex-col lg:flex-row justify-between items-center gap-4">
-                    <div class="text-center flex-1">
-                        <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
-                            <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">System Logs</h1>
-                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.84</span>
-                        </div>
-                        <p class="text-gray-600 text-sm sm:text-lg">Real-time event monitoring</p>
-                        <p id="dateRange" class="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Loading...</p>
-                    </div>
-                    <div class="w-full sm:w-auto">
-                        <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-100 shadow-lg">
-                            <div class="flex items-center mb-2 sm:mb-3">
-                                <span id="statusIndicator" class="status-indicator status-loading"></span>
-                                <span id="statusText" class="text-xs sm:text-sm text-gray-700 font-medium">Loading data...</span>
-                            </div>
-                            <p id="lastUpdate" class="text-xs text-gray-500 mb-2 sm:mb-3"></p>
-                            <button onclick="refreshData()" class="modern-button w-full text-white font-semibold py-2 sm:py-2.5 px-4 sm:px-6 rounded-lg text-xs sm:text-sm shadow-md">
-                                🔄 Refresh
-                            </button>
-                            <div class="mt-2 flex gap-1">
-                                <button id="range1d" onclick="setTimeRange(1)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">1D</button>
-                                <button id="range7d" onclick="setTimeRange(7)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-purple-600 text-white">7D</button>
-                                <button id="range30d" onclick="setTimeRange(30)" class="flex-1 px-2 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">30D</button>
-                            </div>
-                        </div>
-                    </div>
+    <!-- v1.5.88: laid out like RF Connections (bpq-page.css). Same element ids
+         as before, so the data code below is unchanged; the layout script at
+         the end of the page restyles what it writes. -->
+    <header class="rf-head">
+        <div class="rf-wrap rf-head-row">
+            <div class="rf-title">
+                <div class="rf-title-line">
+                    <h1>System Logs</h1>
+                    <span class="rf-ver">v1.5.92</span>
+                </div>
+                <div class="rf-sub">
+                    <span id="dateRange">Loading…</span>
+                    <span class="rf-live"><i id="statusIndicator"></i><span id="statusText">Loading…</span></span>
+                    <span id="lastUpdate"></span>
+                    <span class="rf-clock" title="UTC"><span id="slZulu">--:--</span>Z</span>
                 </div>
             </div>
-
-            <!-- No Data Warning (hidden by default, shown when no log files found) -->
-            <div id="noDataWarning" class="hidden mb-6 p-4 sm:p-6 bg-amber-50 border-2 border-amber-200 rounded-xl text-center"></div>
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-2 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-5 mb-6 sm:mb-10 animate-fade-in">
-                <div class="stat-card card-green bg-gradient-to-br from-green-50 to-green-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-green-200 shadow-lg">
-                    <div class="text-green-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Connections</div>
-                    <div id="totalConnections" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
-                    <div class="text-sm text-gray-600 space-y-1">
-                        <div class="font-medium">Successful</div>
-                    </div>
-                </div>
-                <div class="stat-card card-purple bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-purple-200 shadow-lg cursor-pointer" onclick="showAllStationsModal()">
-                    <div class="text-purple-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Active Stations</div>
-                    <div id="activeStations" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
-                    <div class="text-xs sm:text-sm text-gray-600">Unique calls</div>
-                    <div class="text-xs text-gray-500 mt-2 hidden sm:block">Click to view all →</div>
-                </div>
-                <div class="stat-card card-orange bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-orange-200 shadow-lg">
-                    <div class="text-orange-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Messages</div>
-                    <div id="totalMessages" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
-                    <div class="text-xs sm:text-sm text-gray-600 space-y-1">
-                        <div>Total Processed</div>
-                        <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-orange-200">
-                            <div class="flex flex-col">
-                                <span class="text-xs text-gray-500">Forwarded:</span>
-                                <span id="messagesForwarded" class="text-xs sm:text-sm font-semibold text-blue-600">0</span>
-                            </div>
-                            <div class="flex flex-col">
-                                <span class="text-xs text-gray-500">Received:</span>
-                                <span id="messagesReceived" class="text-xs sm:text-sm font-semibold text-green-600">0</span>
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center mt-2 pt-2 border-t border-orange-200">
-                            <span class="text-xs text-gray-500">Rejected (BID):</span>
-                            <span id="rejectedMessages" class="text-xs font-semibold text-red-600">0</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="stat-card card-red bg-gradient-to-br from-red-50 to-red-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-red-200 shadow-lg">
-                    <div class="text-red-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">Errors</div>
-                    <div id="errorCount" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
-                    <div class="text-xs sm:text-sm text-gray-600 space-y-1">
-                        <div class="grid grid-cols-2 gap-1 sm:gap-2 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-red-200">
-                            <div class="flex flex-col" title="BBS log lines reading &quot;Error - Port in use&quot; (radio port already attached to another session). This is one kind of RF failure only &mdash; the full count of failed RF sessions (timeouts, no data, channel busy, port in use, incoming failed) is on the RF Connections page.">
-                                <span class="text-xs text-gray-500">Port in Use:</span>
-                                <span id="rfFailures" class="text-xs sm:text-sm font-semibold text-orange-600">0</span>
-                            </div>
-                            <div class="flex flex-col">
-                                <span class="text-xs text-gray-500">Node Lost:</span>
-                                <span id="nodeDisappeared" class="text-xs sm:text-sm font-semibold text-yellow-600">0</span>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-1 sm:gap-2 mt-1 pt-1 border-t border-red-200">
-                            <div class="flex flex-col">
-                                <span class="text-xs text-gray-500">Protocol:</span>
-                                <span id="protocolErrors" class="text-xs sm:text-sm font-semibold text-purple-600">0</span>
-                            </div>
-                            <div class="flex flex-col">
-                                <span class="text-xs text-gray-500">Other:</span>
-                                <span id="otherErrors" class="text-xs sm:text-sm font-semibold text-gray-600">0</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="stat-card card-cyan bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-cyan-200 shadow-lg">
-                    <div class="text-cyan-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">RMS Services</div>
-                    <div id="rmsConnections" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
-                    <div class="text-xs sm:text-sm text-gray-600">CMS Connections</div>
-                    <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-cyan-200">
-                        <div class="flex justify-between"><span>Bytes Sent:</span><span id="rmsBytesSent" class="font-semibold text-green-600">0</span></div>
-                        <div class="flex justify-between"><span>Bytes Recv:</span><span id="rmsBytesRecv" class="font-semibold text-blue-600">0</span></div>
-                        <div id="rmsLoginFailed" class="flex justify-between hidden"><span>Login Fail:</span><span class="font-semibold text-red-600">0</span></div>
-                    </div>
-                    <div id="rmsStationsList" class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-cyan-200 max-h-24 overflow-y-auto custom-scrollbar pr-4"></div>
-                </div>
-                <div class="stat-card card-blue bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl sm:rounded-2xl p-3 sm:p-6 border-2 border-blue-200 shadow-lg">
-                    <div class="text-blue-700 text-xs sm:text-sm font-bold mb-1 sm:mb-2 uppercase tracking-wide">BPQ Email Server</div>
-                    <div id="tcpSessions" class="text-xl sm:text-5xl font-bold text-gray-900 mb-1">0</div>
-                    <div class="text-xs sm:text-sm text-gray-600">Total Sessions</div>
-                    <div class="text-xs text-gray-600 space-y-1 mt-1 sm:mt-2 pt-1 sm:pt-2 border-t border-blue-200">
-                        <div class="flex justify-between"><span>POP3:</span><span id="tcpPOP3" class="font-semibold text-green-600">0</span></div>
-                        <div class="flex justify-between"><span>SMTP:</span><span id="tcpSMTP" class="font-semibold text-blue-600">0</span></div>
-                        <div class="flex justify-between"><span>NNTP:</span><span id="tcpNNTP" class="font-semibold text-purple-600">0</span></div>
-                        <div class="flex justify-between border-t border-blue-100 pt-1 mt-1"><span>Auth Fail:</span><span id="tcpAuthFail" class="font-semibold text-red-600">0</span></div>
-                    </div>
-                </div>
+            <div class="rf-range" role="group" aria-label="Date range">
+                <button type="button" id="range1d" onclick="setTimeRange(1)">Today</button>
+                <button type="button" id="range7d" onclick="setTimeRange(7)" class="active">7 days</button>
+                <button type="button" id="range30d" onclick="setTimeRange(30)">30 days</button>
             </div>
-
-            <!-- Internet Connected Stations Card -->
-            <div class="mb-6 sm:mb-10 animate-fade-in">
-                <div class="stat-card bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-indigo-200 shadow-lg">
-                    <div class="text-indigo-700 text-xs sm:text-sm font-bold mb-2 sm:mb-3 uppercase tracking-wide">🌐 Internet Connected Stations</div>
-                    <div id="internetStationsList" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
-                        <div class="text-gray-400 text-center py-2">Loading...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Charts -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
-                <div class="bg-gray-50 rounded-lg p-3 sm:p-6 border border-gray-200 shadow-sm">
-                    <h2 class="text-base sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Hourly Activity (UTC)</h2>
-                    <canvas id="hourlyActivityChart"></canvas>
-                </div>
-                <div class="chart-container">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
-                        <h2 class="text-lg sm:text-2xl font-bold gradient-text">Event Distribution</h2>
-                        <span id="eventTotalDisplay" class="text-xs sm:text-sm text-gray-500 font-medium">Total: 0</span>
-                    </div>
-                    <canvas id="eventTypesChart"></canvas>
-                    <!-- Legend -->
-                    <div class="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6">
-                        <div class="text-center p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
-                            <div class="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded mx-auto mb-1 sm:mb-2"></div>
-                            <div class="text-xs text-gray-600 font-medium">Conn</div>
-                            <div id="legend-connections" class="font-bold text-xs sm:text-sm text-gray-900 mt-1">0</div>
-                        </div>
-                        <div class="text-center p-2 sm:p-3 bg-blue-50 rounded-lg border border-blue-200">
-                            <div class="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded mx-auto mb-1 sm:mb-2"></div>
-                            <div class="text-xs text-gray-600 font-medium">Msgs</div>
-                            <div id="legend-messages" class="font-bold text-xs sm:text-sm text-gray-900 mt-1">0</div>
-                        </div>
-                        <div class="text-center p-2 sm:p-3 bg-red-50 rounded-lg border border-red-200 cursor-pointer hover:bg-red-100 transition-colors" onclick="toggleErrorDetails()">
-                            <div class="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded mx-auto mb-1 sm:mb-2"></div>
-                            <div class="text-xs text-gray-600 font-medium">Errors ▼</div>
-                            <div id="legend-errors" class="font-bold text-xs sm:text-sm text-gray-900 mt-1">0</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Detailed Error Breakdown Panel -->
-                    <div id="errorDetailsPanel" class="hidden mt-4 p-4 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border-2 border-red-200">
-                        <div class="flex justify-between items-center mb-3">
-                            <h3 class="font-bold text-red-700 text-sm">📊 Error Breakdown</h3>
-                            <button onclick="toggleErrorDetails()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
-                        </div>
-                        
-                        <!-- Error Categories Table -->
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs sm:text-sm">
-                                <thead>
-                                    <tr class="bg-red-100">
-                                        <th class="text-left px-2 py-1 font-semibold text-red-800">Error Type</th>
-                                        <th class="text-right px-2 py-1 font-semibold text-red-800">Count</th>
-                                        <th class="text-right px-2 py-1 font-semibold text-red-800">%</th>
-                                        <th class="px-2 py-1 font-semibold text-red-800">Distribution</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="errorBreakdownTable">
-                                    <tr><td colspan="4" class="text-center py-2 text-gray-500">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <!-- Recent Errors List -->
-                        <div class="mt-4 pt-3 border-t border-red-200">
-                            <div class="flex justify-between items-center mb-2">
-                                <h4 class="font-semibold text-red-700 text-xs">Recent Errors (Last 10)</h4>
-                                <button onclick="filterToErrors()" class="text-xs text-purple-600 hover:text-purple-800 underline">View All in Log</button>
-                            </div>
-                            <div id="recentErrorsList" class="space-y-1 max-h-40 overflow-y-auto custom-scrollbar text-xs font-mono">
-                                <div class="text-gray-500">No errors recorded</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Log Viewer -->
-            <div class="bg-gray-50 rounded-lg p-3 sm:p-6 border border-gray-200 shadow-sm mb-4 sm:mb-6">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-4 gap-2">
-                    <h2 class="text-base sm:text-xl font-bold text-gray-900">Live Log Viewer</h2>
-                    <div class="flex flex-wrap gap-2 items-center">
-                        <input type="text" id="callsignSearch" placeholder="Search callsign..." 
-                               class="border border-gray-300 rounded px-2 sm:px-3 py-1 text-xs sm:text-sm w-28 sm:w-36 uppercase"
-                               onkeyup="if(event.key==='Enter')applyFilters()" oninput="this.value=this.value.toUpperCase()">
-                        <select id="logFilter" class="border border-gray-300 rounded px-2 sm:px-3 py-1 text-xs sm:text-sm">
-                            <option value="all">All Events</option>
-                            <option value="connect">Connections</option>
-                            <option value="disconnect">Disconnects</option>
-                            <option value="message">Messages</option>
-                            <option value="error">Errors</option>
-                        </select>
-                        <select id="dateFilter" class="border border-gray-300 rounded px-2 sm:px-3 py-1 text-xs sm:text-sm">
-                            <option value="all">All Dates</option>
-                            <option value="today">Today</option>
-                            <option value="last2">Last 2 Days</option>
-                            <option value="last3">Last 3 Days</option>
-                            <option value="last7">Last 7 Days</option>
-                            <option value="last14">Last 14 Days</option>
-                            <option value="last30">Last 30 Days</option>
-                        </select>
-                        <button onclick="applyFilters()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs sm:text-sm">
-                            Search
-                        </button>
-                        <button onclick="generatePDFReport()" id="pdfReportBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs sm:text-sm flex items-center gap-1" title="Generate PDF report for current search/filter">
-                            📄 PDF Report
-                        </button>
-                        <button onclick="refreshData()" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs sm:text-sm">
-                            ↻
-                        </button>
-                    </div>
-                </div>
-                <!-- Search Results Summary -->
-                <div id="searchSummary" class="hidden mb-3 p-2 bg-purple-50 border border-purple-200 rounded-lg text-sm">
-                    <span class="font-semibold text-purple-700">Search Results:</span>
-                    <span id="searchSummaryText" class="text-purple-600"></span>
-                    <button onclick="clearSearch()" class="ml-2 text-purple-500 hover:text-purple-700 underline text-xs">Clear Search</button>
-                </div>
-                <div class="log-container rounded p-4" id="logContainer">
-                    <div class="text-center text-gray-500 py-8">Loading logs...</div>
-                </div>
-            </div>
-
-            <!-- Top Stations -->
-            <div class="bg-gray-50 rounded-lg p-6 border border-gray-200 shadow-sm">
-                <h2 class="text-xl font-bold text-gray-900 mb-4">Most Active Stations</h2>
-                <div id="topStationsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- Populated dynamically -->
-                    <div class="col-span-3 text-center text-gray-500 py-8">Loading station data...</div>
-                </div>
-            </div>
-
-            <!-- MHeard Stations Card -->
-            <div class="mt-6 sm:mt-10">
-                <div class="bg-gradient-to-br from-emerald-50 to-teal-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-emerald-200 shadow-lg">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
-                        <div class="text-emerald-700 text-xs sm:text-sm font-bold uppercase">📻 Latest MHeard Stations</div>
-                        <div class="flex gap-2 items-center">
-                            <span id="mheardStatus" class="text-xs text-gray-500">Loading...</span>
-                            <button onclick="loadMHeardData()" class="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded transition-colors">↻ Refresh</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Port tabs, tables and counts are built from LinBPQ's own port
-                         list (bpq32.cfg ID= lines) by renderMHeardTabs() (v1.5.22; until
-                         1.5.28 five fixed tabs named for one station's ports). -->
-                    <!-- v1.5.25: watched stations (config.php system_logs.watch) -->
-                    <div id="mhWatch" class="hidden flex flex-wrap gap-2 mb-2 text-xs"></div>
-                    <div id="mhTabs" class="flex flex-wrap gap-1 mb-3 border-b border-emerald-200 pb-2"></div>
-                    <div class="overflow-x-auto custom-scrollbar" style="max-height: 300px;">
-                        <table class="w-full text-xs">
-                            <thead id="mheardHead" class="bg-emerald-100 sticky top-0"></thead>
-                            <tbody id="mheardList" class="divide-y divide-emerald-100">
-                                <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div id="mhCounts" class="mt-3 pt-3 border-t border-emerald-200 flex flex-wrap justify-around gap-2 text-xs"></div>
-                </div>
-            </div>
-
-            <!-- Known Stations Routing Card -->
-            <div class="mt-6 sm:mt-10">
-                <div class="bg-gradient-to-br from-sky-50 to-blue-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-sky-200 shadow-lg">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 sm:mb-3 gap-2">
-                        <div class="text-sky-700 text-xs sm:text-sm font-bold uppercase">🗺️ Known Stations Routing Table</div>
-                        <div class="flex gap-2 items-center">
-                            <span id="rtKnownStatus" class="text-xs text-gray-500">Loading...</span>
-                            <button onclick="loadRTKnownData()" class="px-2 py-1 bg-sky-500 hover:bg-sky-600 text-white text-xs font-semibold rounded transition-colors">↻ Refresh</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Search and Filter -->
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        <input type="text" id="rtKnownSearch" placeholder="Search callsign..." 
-                               onkeyup="filterRTKnown()" 
-                               class="flex-1 min-w-[150px] px-3 py-1 text-xs border border-sky-200 rounded focus:outline-none focus:border-sky-400">
-                        <select id="rtKnownFilter" onchange="filterRTKnown()" class="px-2 py-1 text-xs border border-sky-200 rounded focus:outline-none focus:border-sky-400">
-                            <option value="all">All Stations</option>
-                            <option value="24h">Last 24 Hours</option>
-                            <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
-                            <option value="stale">Stale (30+ days)</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Stations Table -->
-                    <div class="overflow-x-auto custom-scrollbar" style="max-height: 350px;">
-                        <table class="w-full text-xs">
-                            <thead class="bg-sky-100 sticky top-0">
-                                <tr>
-                                    <th class="px-2 py-1 text-left font-semibold text-sky-800 cursor-pointer hover:bg-sky-200" onclick="sortRTKnown('callsign')">
-                                        Callsign <span id="rtSortCall" class="text-sky-400">▼</span>
-                                    </th>
-                                    <th class="px-2 py-1 text-left font-semibold text-sky-800 cursor-pointer hover:bg-sky-200" onclick="sortRTKnown('time')">
-                                        Last Seen (UTC) <span id="rtSortTime" class="text-sky-400"></span>
-                                    </th>
-                                    <th class="px-2 py-1 text-center font-semibold text-sky-800">Age</th>
-                                    <th class="px-2 py-1 text-center font-semibold text-sky-800">Region</th>
-                                </tr>
-                            </thead>
-                            <tbody id="rtKnownList" class="divide-y divide-sky-100">
-                                <tr><td colspan="4" class="text-center py-4 text-gray-400">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Statistics -->
-                    <div class="mt-3 pt-3 border-t border-sky-200 grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-                        <div class="text-center">
-                            <span class="text-sky-600 font-bold" id="rtTotalCount">0</span>
-                            <span class="text-gray-500"> Total</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-green-600 font-bold" id="rtRecentCount">0</span>
-                            <span class="text-gray-500"> &lt;24h</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-yellow-600 font-bold" id="rtWeekCount">0</span>
-                            <span class="text-gray-500"> &lt;7d</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-orange-600 font-bold" id="rtMonthCount">0</span>
-                            <span class="text-gray-500"> &lt;30d</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-gray-500 font-bold" id="rtStaleCount">0</span>
-                            <span class="text-gray-500"> Stale</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <button type="button" class="rf-btn" onclick="refreshData()">Refresh</button>
+            <button type="button" class="rf-btn" onclick="generatePDFReport()" title="PDF of the log lines that match the Live log search and filters">Report</button>
+            <button type="button" class="rf-btn rf-btn-soft" id="slThemeBtn" onclick="if (window.toggleDarkMode) toggleDarkMode()">Dark</button>
         </div>
-    </div>
+        <div class="rf-wrap rf-strip" id="slStrip" aria-label="Node status"></div>
+    </header>
+
+    <main class="rf-wrap rf-main">
+        <div id="noDataWarning" class="hidden rf-nodata"></div>
+
+        <section class="rf-kpis" aria-label="Headline numbers">
+            <div class="rf-card rf-kpi">
+                <div class="rf-kpi-label">Node activity</div>
+                <div class="rf-kpi-big" id="totalConnections">0</div>
+                <div class="rf-kpi-sub">successful connections · <b id="activeStations">0</b> stations</div>
+                <div class="rf-chips"><button type="button" class="rf-chip" onclick="showAllStationsModal()">All stations →</button><button type="button" class="rf-chip" onclick="slTab('top')">Most active</button></div>
+            </div>
+            <div class="rf-card rf-kpi">
+                <div class="rf-kpi-label">Messages</div>
+                <div class="rf-kpi-big" id="totalMessages">0</div>
+                <div class="rf-kpi-sub"><b class="rf-out" id="messagesForwarded">0</b> forwarded · <b class="rf-in" id="messagesReceived">0</b> received</div>
+                <div class="rf-chips"><button type="button" class="rf-chip" onclick="slLogFilter('message')"><i style="background:var(--pg-b)"></i>Message lines</button><span class="rf-chip" style="cursor:default" title="Offers the BBS refused because it already had that message (BID check)">Rejected (BID) <b id="rejectedMessages">0</b></span></div>
+            </div>
+            <div class="rf-card rf-kpi">
+                <div class="rf-kpi-label">Errors</div>
+                <div class="rf-kpi-row"><button type="button" class="rf-kpi-big" id="errorCount" onclick="slShowErrors()" style="all:unset;cursor:pointer;font-size:34px;font-weight:700;letter-spacing:-0.02em;line-height:1.1">0</button><span id="slErrTag"></span></div>
+                <div class="rf-stackbar" id="slErrBar" aria-hidden="true"></div>
+                <div class="rf-chips">
+                    <button type="button" class="rf-chip" onclick="slShowErrors()" title="BBS log lines reading &quot;Error - Port in use&quot; (radio port already attached to another session). The full count of failed RF sessions is on RF Connections."><i style="background:#C2410C"></i>Port in use <b id="rfFailures">0</b></button>
+                    <button type="button" class="rf-chip" onclick="slShowErrors()"><i style="background:#C27803"></i>Node lost <b id="nodeDisappeared">0</b></button>
+                    <button type="button" class="rf-chip" onclick="slShowErrors()"><i style="background:#7C5CD6"></i>Protocol <b id="protocolErrors">0</b></button>
+                    <button type="button" class="rf-chip" onclick="slShowErrors()"><i style="background:#6B7280"></i>Other <b id="otherErrors">0</b></button>
+                </div>
+            </div>
+            <div class="rf-card rf-kpi">
+                <div class="rf-kpi-label">Internet links</div>
+                <div class="rf-kpi-row"><span class="rf-kpi-big" id="rmsConnections">0</span><span class="rf-kpi-sub">Winlink (CMS) sessions</span></div>
+                <div class="rf-kpi-sub"><b id="rmsBytesSent">0</b> sent · <b id="rmsBytesRecv">0</b> received <span id="rmsLoginFailed" class="hidden rf-tag bad"><span>login failed</span> <span>0</span></span></div>
+                <div class="rf-kpi-sub">Mail server: <b id="tcpSessions">0</b> sessions</div>
+                <div class="rf-chips">
+                    <span class="rf-chip" style="cursor:default">POP3 <b id="tcpPOP3">0</b></span><span class="rf-chip" style="cursor:default">SMTP <b id="tcpSMTP">0</b></span><span class="rf-chip" style="cursor:default">NNTP <b id="tcpNNTP">0</b></span><span class="rf-chip" style="cursor:default"><i style="background:var(--rf-dotbad);border-radius:50%"></i>Auth fail <b id="tcpAuthFail">0</b></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="rf-cols">
+            <div class="rf-card rf-colmain">
+                <div class="rf-card-head">
+                    <h2>Heard on your ports</h2>
+                    <span class="rf-card-sub" id="mheardStatus">Loading…</span>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="loadMHeardData()">Refresh</button>
+                </div>
+                <div id="mhWatch" class="hidden rf-chips" style="padding: 12px 20px 0"></div>
+                <div id="mhTabs" class="rf-chips" style="padding: 12px 20px"></div>
+                <div class="rf-scroll" style="max-height: 460px; overflow-y: auto">
+                    <table class="rf-ptable" style="min-width: 560px">
+                        <thead id="mheardHead"></thead>
+                        <tbody id="mheardList"><tr><td colspan="4" class="rf-empty">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="rf-legend"><span><span class="rf-dot ok" style="width:9px;height:9px;vertical-align:-1px"></span> connected</span><span><span class="rf-dot bad" style="width:9px;height:9px;vertical-align:-1px"></span> failed</span><span><span class="rf-dot idle" style="width:9px;height:9px;vertical-align:-1px"></span> heard</span><span>★ watched (Maintenance → Watched stations)</span><span id="mhCounts" style="display:contents"></span></div>
+            </div>
+            <div class="rf-side">
+                <div class="rf-card">
+                    <div class="rf-card-head"><h2>Activity by hour (UTC)</h2><span class="rf-card-sub"><b class="rf-in">Connections</b> above, <b style="color:var(--pg-b)">messages</b> below</span></div>
+                    <div class="pg-mirror">
+                        <div class="pg-mbars up" id="slHourUp" role="img" aria-label="Connections per UTC hour" style="grid-template-columns: repeat(24, minmax(0, 1fr))"></div>
+                        <div class="pg-mid"></div>
+                        <div class="pg-mbars down b" id="slHourDown" aria-hidden="true" style="grid-template-columns: repeat(24, minmax(0, 1fr))"></div>
+                        <div class="pg-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+                    </div>
+                </div>
+                <div class="rf-card">
+                    <div class="rf-card-head"><h2>Event mix</h2><span class="rf-card-sub" id="eventTotalDisplay"></span></div>
+                    <div class="rf-pad">
+                        <div class="rf-stackbar" id="slMixBar" style="height:12px" aria-hidden="true"></div>
+                        <div class="pg-bars">
+                            <div class="pg-bar"><b>Connects</b><span class="track"><span id="slMixC" style="background:var(--pg-in);width:0"></span></span><b id="legend-connections">0</b></div>
+                            <div class="pg-bar"><b>Messages</b><span class="track"><span id="slMixM" style="background:var(--pg-b);width:0"></span></span><b id="legend-messages">0</b></div>
+                            <div class="pg-bar"><b>Errors</b><span class="track"><span id="slMixE" style="background:var(--rf-dotbad);width:0"></span></span><b id="legend-errors">0</b></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="rf-card" id="errorDetailsPanel">
+            <div class="rf-card-head"><h2>Errors</h2><span class="rf-card-sub">Click a recent error to find it in the log</span><button type="button" class="rf-btn rf-btn-sm" onclick="filterToErrors()">All errors in the log</button></div>
+            <div class="rf-cols" style="padding: 0 0 6px; gap: 0">
+                <div style="flex: 1 1 380px; min-width: 0">
+                    <div class="rf-scroll"><table class="rf-ptable"><thead><tr><th>Kind</th><th class="num">Count</th><th class="num">Share</th><th style="width:40%"></th></tr></thead><tbody id="errorBreakdownTable"><tr><td colspan="4" class="rf-empty">Loading…</td></tr></tbody></table></div>
+                </div>
+                <div style="flex: 1 1 380px; min-width: 0; padding: 12px 20px 14px; display: flex; flex-direction: column; gap: 8px">
+                    <div class="rf-small rf-muted" style="font-weight:600">Most recent</div>
+                    <div id="recentErrorsList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="rf-card">
+            <div class="rf-tabs" role="tablist" aria-label="Log details">
+                <button type="button" role="tab" data-sltab="log" aria-selected="true">Live log</button>
+                <button type="button" role="tab" data-sltab="nodes" aria-selected="false">NetRom nodes <span class="rf-count" id="slNodesCount">0</span></button>
+                <button type="button" role="tab" data-sltab="top" aria-selected="false">Most active</button>
+                <button type="button" role="tab" data-sltab="net" aria-selected="false">Internet <span class="rf-count" id="slNetCount">0</span></button>
+            </div>
+
+            <div class="rf-panel" id="sltab-log">
+                <div class="rf-toolbar">
+                    <input type="search" id="callsignSearch" placeholder="Search callsign or text" aria-label="Search the log" onkeyup="if(event.key==='Enter')applyFilters()" oninput="this.value=this.value.toUpperCase()">
+                    <select id="logFilter" class="rf-btn rf-btn-sm" aria-label="Event kind">
+                        <option value="all">All events</option>
+                        <option value="connect">Connections</option>
+                        <option value="disconnect">Disconnects</option>
+                        <option value="message">Messages</option>
+                        <option value="error">Errors</option>
+                    </select>
+                    <select id="dateFilter" class="rf-btn rf-btn-sm" aria-label="Dates">
+                        <option value="all">All dates</option>
+                        <option value="today">Today</option>
+                        <option value="last2">Last 2 days</option>
+                        <option value="last3">Last 3 days</option>
+                        <option value="last7">Last 7 days</option>
+                        <option value="last14">Last 14 days</option>
+                        <option value="last30">Last 30 days</option>
+                    </select>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="applyFilters()">Search</button>
+                    <button type="button" class="rf-btn rf-btn-sm" id="pdfReportBtn" onclick="generatePDFReport()" title="PDF report for the current search and filters">PDF report</button>
+                </div>
+                <div id="searchSummary" class="hidden rf-more" style="border-top:0;border-bottom:1px solid var(--rf-line)">
+                    <b>Search results:</b> <span id="searchSummaryText"></span>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="clearSearch()">Clear search</button>
+                </div>
+                <div style="padding: 12px 20px 18px">
+                    <div class="log-container rounded p-4" id="logContainer"><div class="text-center text-gray-500 py-8">Loading logs…</div></div>
+                </div>
+            </div>
+
+            <div class="rf-panel hidden" id="sltab-nodes">
+                <div class="rf-toolbar">
+                    <input type="search" id="rtKnownSearch" placeholder="Search callsign" aria-label="Search nodes" onkeyup="filterRTKnown()">
+                    <select id="rtKnownFilter" class="rf-btn rf-btn-sm" onchange="filterRTKnown()" aria-label="Last seen">
+                        <option value="all">All nodes</option>
+                        <option value="24h">Last 24 hours</option>
+                        <option value="7d">Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                        <option value="stale">Stale (30+ days)</option>
+                    </select>
+                    <span class="rf-chips">
+                        <button type="button" class="rf-chip" onclick="slRt('all')">All <b id="rtTotalCount">0</b></button>
+                        <button type="button" class="rf-chip" onclick="slRt('24h')"><i style="background:var(--rf-dotgood);border-radius:50%"></i>Fresh <b id="rtRecentCount">0</b></button>
+                        <button type="button" class="rf-chip" onclick="slRt('7d')"><i style="background:var(--rf-accent);border-radius:50%"></i>This week <b id="rtWeekCount">0</b></button>
+                        <button type="button" class="rf-chip" onclick="slRt('30d')"><i style="background:var(--rf-dotwarn);border-radius:50%"></i>This month <b id="rtMonthCount">0</b></button>
+                        <button type="button" class="rf-chip" onclick="slRt('stale')"><i style="background:var(--rf-border);border-radius:50%"></i>Stale <b id="rtStaleCount">0</b></button>
+                    </span>
+                    <span class="rf-small rf-muted" id="rtKnownStatus">Loading…</span>
+                    <button type="button" class="rf-btn rf-btn-sm" onclick="loadRTKnownData()">Refresh</button>
+                </div>
+                <div class="rf-scroll" style="max-height: 520px; overflow-y: auto">
+                    <table class="rf-ptable" style="min-width: 520px">
+                        <thead><tr>
+                            <th><button type="button" onclick="sortRTKnown('callsign')">Node <span id="rtSortCall">▼</span></button></th>
+                            <th><button type="button" onclick="sortRTKnown('time')">Last seen (UTC) <span id="rtSortTime"></span></button></th>
+                            <th>Age</th><th>Region</th>
+                        </tr></thead>
+                        <tbody id="rtKnownList"><tr><td colspan="4" class="rf-empty">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="rf-more">From LinBPQ's RTKnown.txt: every NetRom node your node has heard of, and when.</div>
+            </div>
+
+            <div class="rf-panel hidden" id="sltab-top">
+                <div class="rf-scroll"><table class="rf-ptable" style="min-width: 560px"><thead><tr><th>#</th><th>Station</th><th class="num">Connections</th><th class="num">Msgs received</th><th class="num">Msgs sent</th><th>Share of activity</th></tr></thead><tbody id="topStationsContainer"><tr><td colspan="6" class="rf-empty">Loading…</td></tr></tbody></table></div>
+                <div class="rf-more"><button type="button" class="rf-btn rf-btn-sm" onclick="showAllStationsModal()">All stations</button> Click a call for its log lines.</div>
+            </div>
+
+            <div class="rf-panel hidden" id="sltab-net">
+                <div class="rf-pad">
+                    <div class="rf-small rf-muted" style="font-weight:600">Stations connected over the internet (Telnet / AXIP), most recent first</div>
+                    <div id="internetStationsList" class="pg-tiles"></div>
+                    <div class="rf-small rf-muted" style="font-weight:600;margin-top:6px">Winlink (CMS) sessions by station</div>
+                    <div id="rmsStationsList" class="pg-tiles"></div>
+                </div>
+            </div>
+        </section>
+    </main>
 
     <script>
         // ===================================
@@ -2948,7 +2810,7 @@
             doc.setTextColor(150);
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
-            doc.text(`BPQ Dashboard v1.5.84 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            doc.text(`BPQ Dashboard v1.5.92 - ${lineCount} entries exported`, pageWidth / 2, pageHeight - 10, { align: 'center' });
             
             // Generate filename
             const dateStr = new Date().toISOString().slice(0, 10);
@@ -3836,120 +3698,8 @@
         // Initialize
         window.addEventListener('DOMContentLoaded', () => {
             
-            // Initialize charts FIRST
-            const hourlyCtx = document.getElementById('hourlyActivityChart');
-            // Generate hour labels 00Z-23Z
-            const hourLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + 'Z');
-            window.hourlyActivityChart = new Chart(hourlyCtx, {
-                type: 'bar',
-                data: {
-                    labels: hourLabels,
-                    datasets: [
-                        {
-                            label: 'Connections Made',
-                            data: Array(24).fill(0),
-                            backgroundColor: 'rgba(59, 130, 246, 0.8)'
-                        },
-                        {
-                            label: 'Messages',
-                            data: Array(24).fill(0),
-                            backgroundColor: 'rgba(16, 185, 129, 0.8)'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    animation: false, // Disabled for performance
-                    scales: {
-                        x: { stacked: false },
-                        y: { beginAtZero: true }
-                    }
-                }
-            });
-            
-            const eventCtx = document.getElementById('eventTypesChart');
-            window.eventTypesChart = new Chart(eventCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Connections', 'Messages', 'Errors'],
-                    datasets: [{
-                        label: 'Event Count',
-                        data: [1, 1, 1],  // Placeholder
-                        backgroundColor: [
-                            'rgba(16, 185, 129, 0.8)',   // Green - Connections
-                            'rgba(59, 130, 246, 0.8)',   // Blue - Messages
-                            'rgba(239, 68, 68, 0.8)'     // Red - Errors
-                        ],
-                        borderColor: [
-                            'rgba(16, 185, 129, 1)',
-                            'rgba(59, 130, 246, 1)',
-                            'rgba(239, 68, 68, 1)'
-                        ],
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        barThickness: 40
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',  // Horizontal bars
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    animation: false, // Disabled for performance
-                    plugins: {
-                        legend: { 
-                            display: false 
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            padding: 12,
-                            titleFont: {
-                                size: 14,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                size: 13
-                            },
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.x;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                                    return `${value.toLocaleString()} events (${percentage}%)`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return value.toLocaleString();
-                                },
-                                font: {
-                                    size: 11
-                                }
-                            }
-                        },
-                        y: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                font: {
-                                    size: 12,
-                                    weight: '600'
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            
+            slInitCharts();   // v1.5.88: CSS bars instead of Chart.js (layout script below)
+
             updateStatus('loading', 'Loading system logs...');
             
             // Setup filter event listeners
@@ -4086,6 +3836,226 @@
         </div>
     </div>
 
+    <div id="slDrawerBg" class="rf-drawer-bg hidden" onclick="slCloseDrawer()"></div>
+    <aside id="slDrawer" class="rf-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="slDrawerTitle">
+        <div class="rf-drawer-head"><h2 id="slDrawerTitle"></h2><button type="button" class="rf-x" onclick="slCloseDrawer()" aria-label="Close">×</button></div>
+        <div class="rf-drawer-body" id="slDrawerBody"></div>
+    </aside>
+    <script>
+    // ═══ v1.5.88 layout (RF Connections look) ═══════════════════════════
+    // The data code above is unchanged; these replace the functions that
+    // drew the old layout, and stand in for the two Chart.js charts.
+    (function () {
+        const $ = (id) => document.getElementById(id);
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const pad = (n) => String(n).padStart(2, '0');
+        const n = (x) => (+x || 0).toLocaleString();
+        let slWatchList = [];
+
+        function lineTime(line) { const m = String(line).match(/^(\d{2})(\d{2})(\d{2})\s+(\d{2}):(\d{2})/); return m ? Date.UTC(2000 + +m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; }
+        function ago(ms) { if (ms == null) return ''; const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); if (m < 2) return 'just now'; if (m < 60) return m + ' min ago'; const h = Math.floor(m / 60); if (h < 48) return h + ' h ago'; return Math.round(h / 24) + ' days ago'; }
+
+        // charts → CSS bars
+        window.slInitCharts = function () {
+            window.hourlyActivityChart = { data: { labels: [], datasets: [{ data: new Array(24).fill(0) }, { data: new Array(24).fill(0) }] }, update: slDrawHours };
+            window.eventTypesChart = { data: { datasets: [{ data: [0, 0, 0] }] }, update: slDrawMix };
+        };
+        function slDrawHours() {
+            const up = window.hourlyActivityChart.data.datasets[0].data, dn = window.hourlyActivityChart.data.datasets[1].data;
+            const mx = Math.max(1, ...up, ...dn);
+            $('slHourUp').innerHTML = up.map((v, h) => '<span title="' + pad(h) + 'Z: ' + v + ' connections" style="height:' + (v / mx * 100).toFixed(1) + '%' + (v ? ';min-height:2px' : '') + '"></span>').join('');
+            $('slHourDown').innerHTML = dn.map((v, h) => '<span title="' + pad(h) + 'Z: ' + v + ' messages" style="height:' + (v / mx * 100).toFixed(1) + '%' + (v ? ';min-height:2px' : '') + '"></span>').join('');
+        }
+        function slDrawMix() {
+            const [c, m, e] = window.eventTypesChart.data.datasets[0].data.map(x => +x || 0);
+            const t = c + m + e, mx = Math.max(1, c, m, e);
+            $('slMixBar').innerHTML = t ? [[c, 'var(--pg-in)'], [m, 'var(--pg-b)'], [e, 'var(--rf-dotbad)']].map(([v, col]) => '<span style="width:' + (v / t * 100).toFixed(1) + '%;background:' + col + '"></span>').join('') : '';
+            $('slMixC').style.width = (c / mx * 100).toFixed(1) + '%'; $('slMixM').style.width = (m / mx * 100).toFixed(1) + '%'; $('slMixE').style.width = (e / mx * 100).toFixed(1) + '%';
+            // errors card and strip follow every stats update
+            updateErrorBreakdown(); updateRecentErrorsList(); slErrHeadline(); slStrip();
+        }
+        function slErrHeadline() {
+            const parts = [[stats.rfFailures, '#C2410C'], [stats.nodeDisappeared, '#C27803'], [stats.protocolErrors, '#7C5CD6'], [stats.otherErrors, '#6B7280']];
+            const t = parts.reduce((s, p) => s + (+p[0] || 0), 0);
+            $('slErrBar').innerHTML = t ? parts.map(([v, col]) => '<span style="width:' + ((+v || 0) / t * 100).toFixed(1) + '%;background:' + col + '"></span>').join('') : '';
+            const total = stats.connections + stats.messages + stats.errors;
+            const share = total ? stats.errors / total : 0;
+            $('slErrTag').innerHTML = stats.errors ? '<span class="rf-tag' + (share >= 0.15 ? ' warn' : '') + '">' + Math.round(share * 100) + '% of events</span>' : '<span class="rf-tag good">none</span>';
+            $('errorCount').style.color = share >= 0.15 ? 'var(--rf-warn)' : '';
+        }
+
+        // header: status, range, theme, clock
+        window.updateStatus = function (type, message) {
+            $('statusIndicator').className = type === 'success' ? 'ok' : type === 'error' ? 'bad' : '';
+            $('statusText').textContent = message;
+            const d = new Date(); $('lastUpdate').textContent = 'updated ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            slStrip();
+        };
+        const origRange = window.setTimeRange;
+        window.setTimeRange = function (days) {
+            ['range1d', 'range7d', 'range30d'].forEach(id => { const b = $(id); if (b) b.className = ''; });
+            const r = origRange.apply(this, arguments);
+            [['range1d', 1], ['range7d', 7], ['range30d', 30]].forEach(([id, d]) => $(id).className = d === days ? 'active' : '');
+            return r;
+        };
+        function themeLabel() { $('slThemeBtn').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark'; }
+        new MutationObserver(themeLabel).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        themeLabel();
+        function clock() { const d = new Date(); $('slZulu').textContent = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); }
+        clock(); setInterval(clock, 10000);
+
+        // status strip
+        function slStrip() {
+            const pills = [];
+            const st = $('statusIndicator').className;
+            pills.push({ c: st === 'ok' ? 'ok' : st === 'bad' ? 'bad' : 'warn', b: 'Logs', s: $('statusText').textContent || 'loading', tab: 'log' });
+            const lastErr = recentErrors.length ? recentErrors[recentErrors.length - 1] : null;
+            const le = lastErr ? lineTime(lastErr) : null;
+            pills.push({ c: !lastErr ? 'ok' : (le && Date.now() - le < 3600000 ? 'warn' : 'ok'), b: 'Last error', s: lastErr ? (le ? ago(le) : 'see the list') : 'none', go: 'errors' });
+            const quiet = slWatchList.filter(w => w.quiet);
+            if (slWatchList.length) pills.push({ c: quiet.length ? 'warn' : 'ok', b: 'Watched', s: quiet.length ? quiet.map(w => w.call).slice(0, 3).join(', ') + ' not heard lately' : 'all ' + slWatchList.length + ' heard', go: 'heard' });
+            const mh = $('mheardStatus').textContent; if (mh) pills.push({ c: /fail|error|not/i.test(mh) ? 'warn' : 'ok', b: 'Heard list', s: mh.replace(/^Loading…$/, 'loading'), go: 'heard' });
+            if (typeof rtKnownData !== 'undefined' && rtKnownData.length) {
+                const day = 86400000, fresh = rtKnownData.filter(e => Date.now() - e.date.getTime() < day).length;
+                pills.push({ c: fresh ? 'ok' : 'warn', b: 'NetRom nodes', s: fresh + ' of ' + rtKnownData.length + ' fresh', tab: 'nodes' });
+            }
+            $('slStrip').innerHTML = pills.map((p, i) => '<button type="button" class="rf-pill" data-slpill="' + i + '"><i style="background:var(--rf-dot' + (p.c === 'ok' ? 'good' : p.c) + ')"></i><b>' + esc(p.b) + '</b><span>' + esc(p.s) + '</span></button>').join('');
+            $('slStrip').querySelectorAll('[data-slpill]').forEach(b => b.onclick = () => { const p = pills[+b.dataset.slpill]; if (p.tab) slTab(p.tab, true); else if (p.go === 'errors') slShowErrors(); else if (p.go === 'heard') document.querySelector('.rf-colmain').scrollIntoView({ behavior: 'smooth' }); });
+        }
+        window.slStripRefresh = slStrip;
+
+        // tabs
+        window.slTab = function (t, scroll) {
+            document.querySelectorAll('[data-sltab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.sltab === t)));
+            ['log', 'nodes', 'top', 'net'].forEach(k => $('sltab-' + k).classList.toggle('hidden', k !== t));
+            if (scroll) document.querySelector('.rf-tabs').scrollIntoView({ behavior: 'smooth' });
+        };
+        document.querySelectorAll('[data-sltab]').forEach(b => b.addEventListener('click', () => slTab(b.dataset.sltab)));
+        window.slLogFilter = function (kind) { $('callsignSearch').value = ''; $('logFilter').value = kind; applyFilters(); slTab('log', true); };
+        window.slShowErrors = function () { $('errorDetailsPanel').scrollIntoView({ behavior: 'smooth' }); };
+        window.toggleErrorDetails = function () { updateErrorBreakdown(); updateRecentErrorsList(); slShowErrors(); };
+        const origFilterToErrors = window.filterToErrors;
+        window.filterToErrors = function () { slTab('log'); origFilterToErrors(); };
+        const origSearchForError = window.searchForError;
+        window.searchForError = function (t) { slTab('log'); origSearchForError(t); $('logContainer').scrollIntoView({ behavior: 'smooth' }); };
+        window.slRt = function (v) { $('rtKnownFilter').value = v; filterRTKnown(); };
+
+        // errors card
+        window.updateErrorBreakdown = function () {
+            const tb = $('errorBreakdownTable'), total = stats.errors || 1;
+            if (!stats.errors) { tb.innerHTML = '<tr><td colspan="4" class="rf-empty" style="color:var(--rf-good)">✓ No errors in this period</td></tr>'; return; }
+            const rows = [['Port in use (RF port busy)', stats.rfFailures, '#C2410C'], ['Node disappeared', stats.nodeDisappeared, '#C27803'], ['Protocol errors', stats.protocolErrors, '#7C5CD6'], ['Timeouts', stats.timeoutErrors, '#2457C5'], ['Connect failures', stats.connectFailures, '#A3361F'], ['Other', stats.otherErrors, '#6B7280']].filter(r => r[1]).sort((a, b) => b[1] - a[1]);
+            tb.innerHTML = rows.map(([l, v, c]) => '<tr><td><span style="display:inline-flex;align-items:center;gap:8px"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + c + '"></i>' + esc(l) + '</span></td><td class="num"><b>' + n(v) + '</b></td><td class="num rf-muted">' + (v / total * 100).toFixed(1) + '%</td><td><div class="pg-bar" style="grid-template-columns:minmax(0,1fr)"><span class="track"><span style="width:' + Math.max(1, v / total * 100).toFixed(1) + '%;background:' + c + '"></span></span></div></td></tr>').join('')
+                + '<tr><td><b>All errors</b></td><td class="num"><b>' + n(stats.errors) + '</b></td><td class="num rf-muted">100%</td><td></td></tr>';
+        };
+        window.updateRecentErrorsList = function () {
+            const box = $('recentErrorsList');
+            if (!recentErrors.length) { box.innerHTML = '<div class="rf-muted rf-small">No errors in the loaded logs.</div>'; return; }
+            box.innerHTML = recentErrors.slice(-10).reverse().map((line, i) => {
+                const t = lineTime(line), body = String(line).replace(/^\d{6}\s+\d\d:\d\d:\d\d\s+/, '');
+                return '<button type="button" class="rf-msg" data-err="' + i + '"><div class="rf-msg-top"><span class="rf-mono" style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(body.slice(0, 90)) + '</span></div><div class="rf-msg-sub">' + (t ? esc(new Date(t).toISOString().slice(5, 16).replace('T', ' ') + 'Z · ' + ago(t)) : '') + '</div></button>';
+            }).join('');
+            const list = recentErrors.slice(-10).reverse();
+            box.querySelectorAll('[data-err]').forEach(b => b.onclick = () => searchForError(list[+b.dataset.err]));
+        };
+
+        // most active (table) and internet tiles
+        window.updateTopStations = function (sorted) {
+            const tb = $('topStationsContainer');
+            if (!sorted || !sorted.length) { tb.innerHTML = '<tr><td colspan="6" class="rf-empty">No station data in this period.</td></tr>'; return; }
+            const tot = sorted.reduce((s, x) => s + (+x[1] || 0), 0) || 1, mx = +sorted[0][1] || 1;
+            tb.innerHTML = sorted.map(([call, count], i) => { const d = stats.stationDetails[call] || { connections: 0, messagesRx: 0, messagesTx: 0 }; return '<tr><td class="rf-muted">' + (i + 1) + '</td><td><button type="button" class="rf-call" data-slcall="' + esc(call) + '">' + esc(call) + '</button></td><td class="num">' + n(d.connections) + '</td><td class="num rf-in">' + n(d.messagesRx) + '</td><td class="num rf-out">' + n(d.messagesTx) + '</td><td><div class="pg-bar" style="grid-template-columns:minmax(0,1fr) 44px"><span class="track"><span style="width:' + ((+count || 0) / mx * 100).toFixed(1) + '%"></span></span><b class="rf-small">' + Math.round((+count || 0) / tot * 100) + '%</b></div></td></tr>'; }).join('');
+        };
+        window.updateInternetStationsCard = function () {
+            const list = Object.entries(internetStations).sort((a, b) => b[1].lastConnect - a[1].lastConnect);
+            $('slNetCount').textContent = list.length;
+            $('internetStationsList').innerHTML = list.length ? list.map(([call, d]) => {
+                const h = (Date.now() - d.lastConnect) / 3600000, st = h < 24 ? 'ok' : h < 168 ? 'warn' : 'idle';
+                const rtt = nodesRTT[call];
+                return '<button type="button" class="pg-tile" data-slcall="' + esc(call) + '"><span class="pg-tile-top"><b><span class="rf-dot ' + st + '" style="width:9px;height:9px;margin-right:6px"></span>' + esc(call) + '</b><b>' + d.count + '×</b></span><small>last ' + esc(d.lastConnect.toISOString().slice(5, 16).replace('T', ' ')) + 'Z' + (rtt ? ' · RTT ' + rtt.rtt.toFixed(1) + ' ms' : '') + '</small></button>';
+            }).join('') : '<div class="rf-muted rf-small">No internet connections in the loaded logs.</div>';
+        };
+        const origRms = window.updateRMSCard;
+        window.updateRMSCard = function () {
+            origRms();
+            const list = Object.entries(rmsStats.stations || {}).sort((a, b) => b[1].connections - a[1].connections);
+            $('rmsStationsList').innerHTML = list.length ? list.map(([call, d]) => '<div class="pg-tile"><span class="pg-tile-top"><b>' + esc(call) + '</b><b>' + d.connections + '</b></span><small>CMS sessions</small></div>').join('') : '<div class="rf-muted rf-small">No Winlink (CMS) sessions in this period.</div>';
+        };
+
+        // heard list
+        window.renderMHeardWatch = function (list) {
+            slWatchList = list || [];
+            const box = $('mhWatch');
+            if (!slWatchList.length) { box.classList.add('hidden'); slStrip(); return; }
+            const pname = (nn) => { const p = mheardPorts.find(x => Number(x.port) === Number(nn)); return p ? p.name : 'port ' + nn; };
+            box.innerHTML = slWatchList.map(w => '<span class="rf-chip" style="cursor:default' + (w.quiet ? ';border-color:var(--rf-dotwarn);background:var(--rf-warnbg);color:var(--rf-warnfg)' : '') + '" title="' + esc('Watched (listen only): flagged when not heard for ' + w.hours + ' h' + (w.port ? ' on ' + pname(w.port) : '')) + '">★ <b>' + esc(w.call) + '</b>' + (w.port ? ' · ' + esc(pname(w.port)) : '') + ' · ' + esc(mhAgo(w.last_heard)) + '</span>').join('');
+            box.classList.remove('hidden');
+            slStrip();
+        };
+        window.renderMHeardTabs = function () {
+            const list = mhPortList();
+            if (currentMHPort === null || !list.some(p => p.port === currentMHPort)) { const f = list.find(p => (mheardData[p.port] || []).length) || list[0]; currentMHPort = f ? f.port : null; }
+            $('mhTabs').innerHTML = list.length ? list.map(p => '<button type="button" class="rf-chip" aria-pressed="' + (p.port === currentMHPort) + '" onclick="showMHeardPort(' + p.port + ')" title="LinBPQ port ' + p.port + '"' + (p.port === currentMHPort ? ' style="background:var(--rf-accentbg);color:var(--rf-accentfg);border-color:var(--rf-accent)"' : '') + '>' + esc(p.name) + ' <b>' + (mheardData[p.port] || []).length + '</b></button>').join('') : '<span class="rf-muted rf-small">No ports found</span>';
+            $('mhCounts').innerHTML = '';
+        };
+        window.renderMHeardPort = function (port) {
+            const head = $('mheardHead'), tb = $('mheardList');
+            const p = mhPortList().find(x => x.port === port);
+            if (!p) { head.innerHTML = ''; tb.innerHTML = '<tr><td colspan="4" class="rf-empty">No stations heard</td></tr>'; return; }
+            const rf = mhIsRf(p);
+            head.innerHTML = '<tr><th>Station</th><th>Last heard (UTC)</th><th class="num">Bytes</th>' + (rf ? '<th>Grid</th><th>Frequency</th>' : '') + '</tr>';
+            const watched = new Set(slWatchList.map(w => String(w.call).toUpperCase().replace(/-\d+$/, '')));
+            const entries = (mheardData[port] || []).slice().sort((a, b) => {
+                const wa = watched.has(String(a.callsign).toUpperCase().replace(/-\d+$/, '')), wb = watched.has(String(b.callsign).toUpperCase().replace(/-\d+$/, ''));
+                return (wb - wa) || (b.timestamp - a.timestamp);
+            });
+            if (!entries.length) { tb.innerHTML = '<tr><td colspan="' + (rf ? 5 : 3) + '" class="rf-empty">No stations heard on this port</td></tr>'; return; }
+            tb.innerHTML = entries.map(e => {
+                const st = e.connected ? 'ok' : e.failed ? 'bad' : 'idle';
+                const w = watched.has(String(e.callsign).toUpperCase().replace(/-\d+$/, ''));
+                const ts = e.date instanceof Date ? e.date.getTime() : e.timestamp;
+                let rfc = '';
+                if (rf) { const band = e.freq ? getBandFromFreq(e.freq) : ''; rfc = '<td class="rf-mono rf-small">' + esc(e.grid || '–') + '</td><td>' + (band ? '<span class="rf-type" style="background:' + getBandColor(band) + ';color:#fff">' + esc(band) + '</span> ' : '') + '<span class="rf-small">' + (e.freq ? e.freq.toFixed(4) : '–') + '</span></td>'; }
+                return '<tr><td><div style="display:flex;align-items:center;gap:10px"><span class="rf-dot ' + st + '" title="' + (st === 'ok' ? 'connected' : st === 'bad' ? 'failed' : 'heard') + '"></span><button type="button" class="rf-call" data-slcall="' + esc(e.callsign) + '">' + esc(e.callsign) + '</button>' + (w ? '<span title="watched" style="color:var(--rf-dotwarn)">★</span>' : '') + '</div></td><td style="white-space:nowrap">' + esc(formatMHeardDate(e.date)) + (ts ? '<div class="rf-small rf-muted">' + ago(ts) + '</div>' : '') + '</td><td class="num">' + esc(formatBytes(e.bytes)) + '</td>' + rfc + '</tr>';
+            }).join('');
+        };
+
+        // NetRom nodes
+        window.renderRTKnown = function () {
+            const tb = $('rtKnownList');
+            $('slNodesCount').textContent = rtKnownData.length;
+            if (!rtKnownFiltered.length) { tb.innerHTML = '<tr><td colspan="4" class="rf-empty">No nodes match.</td></tr>'; slStrip(); return; }
+            const day = 86400000;
+            tb.innerHTML = rtKnownFiltered.map(e => {
+                const age = Date.now() - e.date.getTime();
+                const [st, txt] = age < day ? ['ok', 'under 24 h'] : age < 7 * day ? ['wk', 'this week'] : age < 30 * day ? ['warn', 'this month'] : ['idle', Math.floor(age / day) > 365 ? Math.floor(age / day / 365) + ' years' : Math.floor(age / day) + ' days'];
+                return '<tr' + (st === 'idle' ? ' class="dim"' : '') + '><td><div style="display:flex;align-items:center;gap:10px"><span class="rf-dot ' + st + '"></span><span class="rf-mono" style="font-weight:600">' + esc(e.callsign) + '</span></div></td><td>' + esc(formatMHeardDate(e.date)) + '</td><td><span class="rf-note ' + (st === 'idle' ? '' : st) + '">' + esc(txt) + '</span></td><td class="rf-small">' + esc(e.region) + '</td></tr>';
+            }).join('');
+            slStrip();
+        };
+
+        // callsign panel
+        document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-slcall]'); if (b) slDrawer(b.dataset.slcall); });
+        document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !$('slDrawer').classList.contains('hidden')) slCloseDrawer(); });
+        window.slCloseDrawer = function () { $('slDrawer').classList.add('hidden'); $('slDrawerBg').classList.add('hidden'); };
+        function slDrawer(call) {
+            const baseCall = String(call).toUpperCase().replace(/-\d+$/, '');
+            const re = new RegExp('(^|[^A-Z0-9])' + baseCall.replace(/[^A-Z0-9]/g, '') + '(-\\d+)?([^A-Z0-9]|$)');
+            const lines = (allLogs || []).filter(l => re.test(String(l).toUpperCase())).slice(-150).reverse();
+            const d = stats.stationDetails[baseCall] || stats.stationDetails[call] || null;
+            const heard = [];
+            mhPortList().forEach(p => (mheardData[p.port] || []).forEach(e => { if (String(e.callsign).toUpperCase().replace(/-\d+$/, '') === baseCall) heard.push({ p, e }); }));
+            let h = '<div class="rf-kv"><div><span>Connections</span><b>' + n(d ? d.connections : 0) + '</b></div><div><span>Msgs received</span><b class="rf-in">' + n(d ? d.messagesRx : 0) + '</b></div><div><span>Msgs sent</span><b class="rf-out">' + n(d ? d.messagesTx : 0) + '</b></div><div><span>Log lines</span><b>' + n(lines.length) + (lines.length === 150 ? '+' : '') + '</b></div></div>';
+            if (heard.length) h += '<div class="rf-chips">' + heard.map(x => '<span class="rf-chip" style="cursor:default"><span class="rf-dot ' + (x.e.connected ? 'ok' : x.e.failed ? 'bad' : 'idle') + '" style="width:8px;height:8px"></span>heard on <b>' + esc(x.p.name) + '</b> ' + esc(formatMHeardDate(x.e.date)) + '</span>').join('') + '</div>';
+            h += '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="rf-btn rf-btn-sm" id="slDrawerSearch">Show in the live log</button><a class="rf-btn rf-btn-sm" style="display:inline-flex;align-items:center;text-decoration:none" href="bpq-rf-connections.html">RF Connections →</a><a class="rf-btn rf-btn-sm" style="display:inline-flex;align-items:center;text-decoration:none" href="bpq-connect-log.html">Connects →</a></div>';
+            h += lines.length ? '<pre class="rf-pre" style="max-height:none">' + lines.map(esc).join('\n') + '</pre>' : '<div class="rf-muted">No lines for ' + esc(baseCall) + ' in the loaded log.</div>';
+            $('slDrawerTitle').textContent = baseCall + ' · log';
+            $('slDrawerBody').innerHTML = h;
+            $('slDrawerSearch').onclick = () => { slCloseDrawer(); $('callsignSearch').value = baseCall; $('logFilter').value = 'all'; applyFilters(); slTab('log', true); };
+            $('slDrawer').classList.remove('hidden'); $('slDrawerBg').classList.remove('hidden');
+        }
+    })();
+    </script>
     <script>
     (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
     </script>

@@ -8,7 +8,7 @@
 // load the new one (once). Covers web servers whose site file doesn't yet
 // tell browsers to re-check pages (Cache-Control: no-cache, CHANGELOG 1.5.79).
 (function () {
-    var BPQ_PAGE_VERSION = '1.5.84';
+    var BPQ_PAGE_VERSION = '1.5.92';
     fetch('/VERSION', { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
         t = (t || '').trim();
         if (!/^\d+\.\d+\.\d+$/.test(t) || t === BPQ_PAGE_VERSION) return;
@@ -198,6 +198,7 @@
   /* menus */
   .cm { position: fixed; z-index: 5000; min-width: 210px; background: var(--pane); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); padding: 4px 0; }
   .cm-i { display: flex; align-items: center; gap: 8px; padding: 5px 24px 5px 12px; cursor: default; white-space: nowrap; position: relative; }
+  .cm-i b.mono { font-family: ui-monospace, Menlo, Consolas, monospace; margin-right: 6px; }
   .cm-i .k { margin-left: auto; padding-left: 18px; color: var(--faint); font-size: 12px; }
   .cm-i:hover, .cm-i.open { background: var(--accent); color: var(--accent-text); }
   .cm-i:hover .k { color: var(--accent-text); }
@@ -362,6 +363,6 @@
 </div>
 <div id="toast"></div>
 <script src="/bpq-send-once.js?v=1.5.76"></script>
-<script src="bbs-mail.js?v=1.5.83"></script>
+<script src="bbs-mail.js?v=1.5.89"></script>
 </body>
 </html>

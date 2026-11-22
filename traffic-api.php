@@ -20,9 +20,13 @@
  *      many files/rows it's processed. Same "is the data fresh?"
  *      convenience as rf-connections-api.php's own parser_status.
  *
+ *   ?action=history[&days=N]   (v1.5.86)
+ *      One row per report date and callsign: messages and bytes in / out
+ *      (P+B+T) and connects. The Traffic page draws its by-report chart
+ *      and each BBS's report blocks from it.
  *   ?action=all[&days=N]
- *      Convenience — stations + parser_status in one round-trip. This is
- *      what the page uses.
+ *      Convenience — stations + parser_status + history in one round-trip.
+ *      This is what the page uses.
  *
  * Why a separate API file rather than adding actions to
  * rf-connections-api.php: that file is explicitly scoped to the RF
@@ -129,6 +133,33 @@ function action_stations(PDO $pdo): array {
 }
 
 /**
+ * GET ?action=history — per report date and callsign (v1.5.86)
+ */
+function action_history(PDO $pdo): array {
+    $days = intparam('days', 28, 1, 400);
+    $rows = tprfn_query($pdo,
+        "SELECT DATE_FORMAT(station_date, '%Y-%m-%d') AS d, callsign,
+                MAX(is_bbs) AS is_bbs,
+                SUM(msg_rx_p + msg_rx_b + msg_rx_t) AS msg_in,
+                SUM(msg_tx_p + msg_tx_b + msg_tx_t) AS msg_out,
+                SUM(msg_rx_p) AS in_p, SUM(msg_rx_b) AS in_b, SUM(msg_rx_t) AS in_t,
+                SUM(msg_tx_p) AS out_p, SUM(msg_tx_b) AS out_b, SUM(msg_tx_t) AS out_t,
+                SUM(bytes_rx_p + bytes_rx_b + bytes_rx_t) AS bytes_in,
+                SUM(bytes_tx_p + bytes_tx_b + bytes_tx_t) AS bytes_out,
+                SUM(conn_in + conn_out) AS conns
+         FROM traffic_stats
+         WHERE station_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+         GROUP BY station_date, callsign
+         ORDER BY station_date, callsign", [$days - 1]);
+    foreach ($rows as &$r) {
+        foreach ($r as $k => $v) if ($k !== 'd' && $k !== 'callsign') $r[$k] = (int)$v;
+        $r['is_bbs'] = $r['is_bbs'] === 1;
+    }
+    unset($r);
+    return ['rows' => $rows, 'days' => $days];
+}
+
+/**
  * GET ?action=parser_status — when did the parser last run
  */
 function action_parser_status(PDO $pdo): array {
@@ -155,13 +186,14 @@ function action_all(PDO $pdo): array {
     return [
         'stations' => action_stations($pdo),
         'parser'   => action_parser_status($pdo),
+        'history'  => action_history($pdo),
     ];
 }
 
 // ─── Dispatcher ─────────────────────────────────────────────────────────────
 
 $action = (string)($_GET['action'] ?? 'all');
-$allowed = ['stations', 'parser_status', 'all'];
+$allowed = ['stations', 'parser_status', 'history', 'all'];
 if (!in_array($action, $allowed, true)) {
     $action = 'all';
 }
@@ -176,6 +208,7 @@ try {
     $data = match ($action) {
         'stations'      => action_stations($pdo),
         'parser_status' => action_parser_status($pdo),
+        'history'       => action_history($pdo),
         'all'           => action_all($pdo),
     };
     success($data);

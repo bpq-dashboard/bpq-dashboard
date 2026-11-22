@@ -27,6 +27,12 @@ Where the calls come from (all UTC as written, like the other parsers):
   4. The scheduled test connects (link_probes, scripts/link-probe.py),
      marked "test connect".
 
+v1.5.92: frequency and Winlink. Each row gets the port's frequency: config.php
+'vhf' => ['freq_mhz' => 145.010], else the frequency in the port's WL2KREPORT
+line in bpq32.cfg (one per port; with one VHF port, calls whose port isn't
+known get it too). An incoming call that LinBPQ's gateway log
+(CMSAccess_YYYYMMDD.log) shows connecting to CMS within 2 minutes is a
+Winlink session: band 'WL2K' instead of 'VHF'.
 Runs from parse-system-logs.py every 5 minutes (no cron line of its own),
 re-reading the last --days (default 2) days; rows are keyed on start time
 and callsign, so a re-read updates rather than duplicates.
@@ -46,6 +52,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpq_db_config  # noqa: E402
+import winlink_match as wm  # noqa: E402
 
 try:
     import pymysql
@@ -269,13 +276,43 @@ def has_vhf(conn):
     return bool(r and "'vhf'" in r[0])
 
 
+def port_freqs(ports):
+    """{port: kHz} — config.php vhf.freq_mhz for every VHF port, else each port's single WL2KREPORT frequency."""
+    cfg = bpq_db_config.load_config_section('vhf') or {}
+    try:
+        f = float(cfg.get('freq_mhz') or 0)
+    except (TypeError, ValueError):
+        f = 0
+    if f > 0:
+        return {p: round(f * 1000, 2) for p in ports}
+    rep = wm.port_report_freqs(bpq_db_config.default_linbpq_path('bpq32.cfg'))
+    return {p: rep[p][0] for p in ports if len(set(rep.get(p) or [])) == 1}
+
+
+def enrich(rows, ports, logs_dir, days):
+    """v1.5.92: frequency of the port; WL2K when the gateway log confirms the caller."""
+    freqs = port_freqs(ports)
+    only = next(iter(freqs.values())) if len(ports) == 1 and freqs else None
+    if not rows:
+        return rows
+    cms = wm.Cms(logs_dir, wm.dates_between(min(r['start'] for r in rows), max(r['start'] for r in rows)))
+    for r in rows:
+        r['freq_khz'] = freqs.get(r.get('port')) if r.get('port') is not None else only
+        r['band'] = 'VHF'
+        if r['direction'] == 'incoming' and r['status'] == 'success' and cms.match(r['callsign'], r['start']):
+            r['band'] = 'WL2K'
+    return rows
+
+
 def write(conn, rows):
     sql = ("INSERT INTO rf_connections (callsign, base_call, direction, modem, session_start, session_end, "
-           "duration_sec, band, status, failure_reason, link_mode) "
-           "VALUES (%s,%s,%s,'vhf',%s,%s,%s,'VHF',%s,%s,%s) "
+           "duration_sec, freq_khz, band, status, failure_reason, link_mode) "
+           "VALUES (%s,%s,%s,'vhf',%s,%s,%s,%s,%s,%s,%s,%s) "
            "ON DUPLICATE KEY UPDATE "
            "session_end = IF(modem = 'vhf', VALUES(session_end), session_end), "
            "duration_sec = IF(modem = 'vhf', VALUES(duration_sec), duration_sec), "
+           "freq_khz = IF(modem = 'vhf', VALUES(freq_khz), freq_khz), "
+           "band = IF(modem = 'vhf', VALUES(band), band), "
            "status = IF(modem = 'vhf', VALUES(status), status), "
            "failure_reason = IF(modem = 'vhf', VALUES(failure_reason), failure_reason)")
     n = 0
@@ -283,7 +320,8 @@ def write(conn, rows):
         for r in rows:
             dur = int((r['end'] - r['start']).total_seconds()) if r.get('end') else None
             n += cur.execute(sql, (r['callsign'][:16], base_call(r['callsign']), r['direction'], r['start'],
-                                   r.get('end'), dur, r['status'], r['failure_reason'], r['link_mode']))
+                                   r.get('end'), dur, r.get('freq_khz'), r.get('band') or 'VHF',
+                                   r['status'], r['failure_reason'], r['link_mode']))
     return n
 
 
@@ -317,12 +355,13 @@ def main():
         rows = from_bbs(a.logs_dir, days, ports)
         rows += from_connectlog(a.logs_dir, days, ports, heard_on(conn, days, ports))
         rows += from_probes(conn, days, ports)
-        rows = dedupe(rows)
+        rows = enrich(dedupe(rows), ports, a.logs_dir, days)
         if a.verbose or a.dry_run:
             for r in rows:
                 dur = int((r['end'] - r['start']).total_seconds()) if r.get('end') else None
                 print(f"  {r['start']:%Y-%m-%d %H:%M:%S} {r['direction']:<8} {r['callsign']:<10} {r['status']:<7} "
-                      f"{r['failure_reason'] or '':<9} {r['link_mode']:<5} {'' if dur is None else str(dur) + ' s'}")
+                      f"{r['failure_reason'] or '':<9} {r['link_mode']:<5} {r.get('band'):<4} {r.get('freq_khz') or '-':<9} "
+                      f"{'' if dur is None else str(dur) + ' s'}")
         n = 0
         if not a.dry_run:
             n = write(conn, rows)

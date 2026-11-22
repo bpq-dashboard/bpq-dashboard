@@ -62,6 +62,11 @@ except ImportError:
 # was hard-coded to this station's file). None -> --log is required.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpq_db_config  # noqa: E402
+import winlink_match as wm  # noqa: E402
+
+# v1.5.92: set by parse_log() for upsert_session(): the gateway log and the
+# rig history (winlink_match.py)
+_WL = {'cms': None, 'rig': None}
 _vf = bpq_db_config.load_config_section('logs').get('vara_file')
 DEFAULT_LOG_PATH = os.path.join(bpq_db_config.default_logs_dir(), _vf) if _vf else None
 
@@ -238,7 +243,7 @@ def parse_timestamp(line, fallback_year=None):
 
     'Old' format ("251226 00:06:02") has YY which we expand to 2000+YY.
     """
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
     if fallback_year is None:
         fallback_year = now.year
 
@@ -1806,6 +1811,21 @@ def reset_parser_state(conn, log_filename):
     conn.commit()
 
 
+def cms_dates(log_dir, since):
+    """Dates to read gateway logs for: since..tomorrow, or every CMSAccess file there (full re-read)."""
+    if since:
+        return wm.dates_between(since, dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) + dt.timedelta(days=1))
+    out = []
+    for p in Path(log_dir).glob('CMSAccess_*.log'):
+        m = re.match(r'^CMSAccess_(\d{8})$', p.stem)
+        if m:
+            try:
+                out.append(dt.datetime.strptime(m.group(1), '%Y%m%d').date())
+            except ValueError:
+                pass
+    return out
+
+
 def upsert_session(conn, session, log_line_no, dry_run=False,
                    freq_events=None, cms_events=None, channel_busy_events=None):
     """Insert a session row, ignoring if it duplicates an existing
@@ -1848,29 +1868,28 @@ def upsert_session(conn, session, log_line_no, dry_run=False,
             if not session.get('band'):
                 session['band'] = freq_to_band(freq_khz)
         else:
-            # Step 2: no direct freq. For successful incoming connections,
-            # determine if this is a WL2K (Winlink) session.
-            #
-            # NOTE: this branch only runs when freq_events is non-empty
-            # (i.e. BBS-log enrichment is active). If enrichment is
-            # disabled we leave band as-is rather than guessing WL2K.
+            # Step 2: no direct freq. v1.5.92: the frequency is the one the
+            # radio transmitted on during the session (rig history), and a
+            # successful incoming session is Winlink only when the gateway
+            # log (CMSAccess) has the caller connecting to CMS; on a day
+            # with no gateway log, and without rig history, the old
+            # heuristic (no BBS entry = Winlink, frequency from the nearest
+            # RF activity) still applies.
             is_success = (status == 'success')
+            cms, rig = _WL['cms'], _WL['rig']
+            wl2k = False
             if direction == 'incoming' and is_success:
-                # WL2K if: confirmed in CMS log, OR no BBS freq entry at all
-                # for this callsign (a direct Winlink HF user reaching CMS
-                # through our gateway — the dashboard's heuristic).
-                wl2k = False
-                if cms_events and is_wl2k_session(cms_events, session_start,
-                                                  base):
-                    wl2k = True
+                if cms is not None and cms.covers(session_start):
+                    wl2k = cms.match(base, session_start, 300)
                 else:
-                    # Not in CMS log. The dashboard still treats an incoming
-                    # success with NO BBS freq entry as a direct WL2K HF user.
                     wl2k = True
-
-                if wl2k:
-                    session['band'] = 'WL2K'
-                    # Infer frequency from nearby RF activity (±30 min)
+            rf = rig.freq(session_start, session.get('session_end')) if rig is not None else None
+            if rf:
+                session['freq_khz'] = rf
+                session['band'] = 'WL2K' if wl2k else freq_to_band(rf)
+            elif wl2k:
+                session['band'] = 'WL2K'
+                if rig is None or not rig.days:
                     inferred = find_nearest_freq(freq_events, session_start)
                     if inferred:
                         session['freq_khz'] = inferred
@@ -1967,7 +1986,7 @@ def parse_log(log_path, conn, dry_run=False, verbose=False, bbs_log_dir=None,
         # any session that straddles midnight).
         since = None
         if last_offset > 0:
-            since = dt.datetime.utcnow() - dt.timedelta(days=2)
+            since = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=2)
         freq_events = build_freq_lookup(bbs_log_dir, since=since,
                                         verbose=verbose)
         cms_events = build_cms_lookup(bbs_log_dir, our_callsign, since=since,
@@ -1983,10 +2002,15 @@ def parse_log(log_path, conn, dry_run=False, verbose=False, bbs_log_dir=None,
         # without touching rf_connections / the VARA checkpoint).
         msg_since = since
         if messages_days:
-            msg_since = dt.datetime.utcnow() - dt.timedelta(days=messages_days)
+            msg_since = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=messages_days)
         connect_mode_events = build_connect_mode_lookup(bbs_log_dir, since=msg_since,
                                                          verbose=verbose)
         port_map = parse_bpq_port_map(bpq_cfg, verbose=verbose)
+        # v1.5.92: gateway log days and rig history for the Winlink label / frequency
+        _WL['cms'] = wm.Cms(bbs_log_dir, cms_dates(bbs_log_dir, since), skip_call=our_callsign)
+        _WL['rig'] = (wm.Rig(wm.rig_history_file(), wm.dates_between(
+            (since or dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=31)), dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) + dt.timedelta(days=1)))
+            if wm.rig_enabled('vara') else None)
         # Forwarded messages are built AFTER the session loop below (see
         # "Upsert forwarded messages") so the outbound VARA-overlap
         # fallback can see sessions committed in this same run.
@@ -2306,6 +2330,12 @@ def main():
     ap.add_argument('--no-data2g', action='store_true',
                     help='Do not run parse-data2g-log.py afterwards (v1.5.56; '
                          'it runs by itself when Data2G\'s log is there)')
+    ap.add_argument('--backfill-freq', action='store_true',
+                    help='v1.5.92: on VARA rows already stored (last --days), set the '
+                         'Winlink label from the gateway log and the frequency from the rig '
+                         'history where the BBS log had none. With --dry-run: show only.')
+    ap.add_argument('--days', type=int, default=30,
+                    help='Days back for --backfill-freq (default 30, the rig history kept)')
     ap.add_argument('--no-mercury', action='store_true',
                     help='Do not run parse-mercury-log.py afterwards (v1.5.46; '
                          'it runs by itself when Mercury\'s log is there)')
@@ -2347,6 +2377,14 @@ def main():
             if not args.dry_run:
                 reset_parser_state(conn, os.path.basename(log_path))
 
+        if args.backfill_freq:
+            our = args.my_callsign
+            if not our:
+                stem = re.split(r'[-_]', os.path.splitext(os.path.basename(log_path))[0])[0]
+                our = stem.upper() if stem else None
+            backfill_freq(conn, bbs_log_dir, our, max(1, min(args.days, 400)), args.dry_run)
+            return
+
         # v1.5.82: once, re-tag a year of forwarded messages, so those that
         # went over Mercury or Data2G (stored as VARA before) get their modem
         marker = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -2385,6 +2423,53 @@ def main():
         run_mercury_parser(bbs_log_dir)
     if not args.no_data2g and not args.dry_run:
         run_modem_parser('data2g', '/var/log/data2g/data2g.log', 'parse-data2g-log.py', 'Data2G', bbs_log_dir)
+
+
+def backfill_freq(conn, bbs_log_dir, our_callsign, days, dry_run):
+    """v1.5.92: VARA rows without a BBS frequency (frequency empty, or labelled
+    WL2K with a frequency guessed from other calls): Winlink only when the
+    gateway log confirms it, frequency from the rig history. A frequency the
+    BBS log gave is never touched."""
+    since = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) - dt.timedelta(days=days)
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, callsign, direction, status, session_start, session_end, freq_khz, band "
+                    "FROM rf_connections WHERE modem = 'vara' AND session_start >= %s "
+                    "AND (freq_khz IS NULL OR band = 'WL2K' OR band IS NULL OR band = '' OR band = 'Unknown') "
+                    "ORDER BY session_start", (since,))
+        rows = cur.fetchall()
+    if not rows:
+        print(f"VARA: no rows to check in the last {days} day(s)")
+        return 0
+    dates = wm.dates_between(rows[0][4], dt.datetime.now(dt.timezone.utc).replace(tzinfo=None) + dt.timedelta(days=1))
+    cms = wm.Cms(bbs_log_dir, dates, skip_call=our_callsign)
+    rig = wm.Rig(wm.rig_history_file(), dates) if wm.rig_enabled('vara') else None
+    changes = []
+    for rid, call, direction, status, start, end, freq, band in rows:
+        old_wl2k = (band == 'WL2K')
+        wl2k = old_wl2k
+        if direction == 'incoming' and status == 'success' and cms.covers(start):
+            wl2k = cms.match(call, start, 300)
+        rf = rig.freq(start, end) if rig is not None else None
+        if rf:
+            nf = rf
+        elif old_wl2k and rig is not None and start.date() in rig.days:
+            nf = None                          # the old frequency was a guess for a Winlink session
+        else:
+            nf = freq
+        nb = 'WL2K' if wl2k else (freq_to_band(float(nf)) if nf else (None if old_wl2k else band))
+        nf = float(nf) if nf is not None else None
+        if (nf, nb) != ((float(freq) if freq is not None else None), band):
+            changes.append((rid, call, start, band, freq, nb, nf))
+    for rid, call, start, ob, of, nb, nf in changes:
+        print(f"  {start:%Y-%m-%d %H:%M:%S} {call:<10} {ob or '-':<7} {of or '-':<9} -> {nb or '-':<7} {nf or '-'}")
+    if not dry_run and changes:
+        with conn.cursor() as cur:
+            for rid, call, start, ob, of, nb, nf in changes:
+                cur.execute("UPDATE rf_connections SET freq_khz = %s, band = %s WHERE id = %s", (nf, nb, rid))
+        conn.commit()
+    print(f"VARA: {len(rows)} row(s) checked in the last {days} day(s), {len(changes)} "
+          + ("would change  [DRY RUN]" if dry_run else "changed"))
+    return len(changes)
 
 
 def run_mercury_parser(bbs_log_dir):

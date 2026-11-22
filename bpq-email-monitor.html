@@ -3,875 +3,658 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Message Monitor - BPQ Dashboard</title>
-    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <title>Messages - BPQ Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <style>
-        body { background: #f3f4f6; min-height: 100vh; }
-        .glass-container { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
-        .stat-card { transition: all 0.3s ease; position: relative; overflow: hidden; }
-        .stat-card::before { content: ''; position: absolute; top: 0; right: 0; width: 100px; height: 100px; background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%); transform: translate(30%, -30%); }
-        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px rgba(0,0,0,0.15); }
-        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .status-indicator { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
-        .status-loading { background: #f59e0b; animation: pulse 1.5s infinite; }
-        .status-success { background: #10b981; }
-        .status-error { background: #ef4444; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 10px; }
-        .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #667eea #e5e7eb; }
-        .tab-button { transition: all 0.2s ease; }
-        .tab-button.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-        .tab-button:not(.active):hover { background: #f3f4f6; }
-        .mode-button { transition: all 0.2s ease; }
-        .mode-button.active { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
-        .mode-button:not(.active) { background: #e5e7eb; color: #6b7280; }
-        .mode-button:not(.active):hover { background: #d1d5db; }
-        .security-warning { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); }
-        .security-danger { background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); }
-        @media (max-width: 640px) { .stat-card { padding: 0.75rem !important; } .stat-card .text-4xl { font-size: 1.5rem !important; } }
-    </style>
-    <style id="bpq-dark-mode">
-    /* Dark Mode — auto-detects OS preference, manual toggle in nav */
-    [data-theme="dark"] { background: #111827 !important; color-scheme: dark; }
-    [data-theme="dark"] body { background: #111827 !important; color: #e5e7eb !important; }
-    [data-theme="dark"] .glass-container { background: rgba(31,41,55,0.95) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; border: 1px solid rgba(75,85,99,0.4); }
-    /* Backgrounds */
-    [data-theme="dark"] [class~="bg-white"] { background-color: #1f2937 !important; }
-    [data-theme="dark"] [class~="bg-gray-50"] { background-color: #1a2332 !important; }
-    [data-theme="dark"] [class~="bg-gray-100"] { background-color: #1f2937 !important; }
-    [data-theme="dark"] [class~="bg-gray-200"] { background-color: #374151 !important; }
-    [data-theme="dark"] [class~="bg-gray-300"] { background-color: #4b5563 !important; }
-    [data-theme="dark"] [class~="bg-green-50"] { background-color: #064e3b !important; }
-    [data-theme="dark"] [class~="bg-green-100"] { background-color: #065f46 !important; }
-    [data-theme="dark"] [class~="bg-blue-50"] { background-color: #1e3a5f !important; }
-    [data-theme="dark"] [class~="bg-blue-100"] { background-color: #1e40af !important; }
-    [data-theme="dark"] [class~="bg-purple-50"] { background-color: #2e1065 !important; }
-    [data-theme="dark"] [class~="bg-purple-100"] { background-color: #3b0764 !important; }
-    [data-theme="dark"] [class~="bg-red-50"] { background-color: #450a0a !important; }
-    [data-theme="dark"] [class~="bg-red-100"] { background-color: #7f1d1d !important; }
-    [data-theme="dark"] [class~="bg-amber-50"] { background-color: #451a03 !important; }
-    [data-theme="dark"] [class~="bg-amber-100"] { background-color: #78350f !important; }
-    [data-theme="dark"] [class~="bg-orange-50"] { background-color: #431407 !important; }
-    [data-theme="dark"] [class~="bg-orange-100"] { background-color: #7c2d12 !important; }
-    [data-theme="dark"] [class~="bg-emerald-50"] { background-color: #022c22 !important; }
-    [data-theme="dark"] [class~="bg-emerald-100"] { background-color: #064e3b !important; }
-    [data-theme="dark"] [class~="bg-sky-50"] { background-color: #0c4a6e !important; }
-    [data-theme="dark"] [class~="bg-sky-100"] { background-color: #075985 !important; }
-    [data-theme="dark"] [class~="bg-sky-200"] { background-color: #0369a1 !important; }
-    [data-theme="dark"] [class~="bg-cyan-50"] { background-color: #083344 !important; }
-    /* Stat card gradients */
-    [data-theme="dark"] [class*="from-green-50"] { background-image: linear-gradient(to bottom right, #064e3b, #065f46) !important; }
-    [data-theme="dark"] [class*="from-blue-50"] { background-image: linear-gradient(to bottom right, #1e3a5f, #1e40af) !important; }
-    [data-theme="dark"] [class*="from-purple-50"] { background-image: linear-gradient(to bottom right, #2e1065, #4c1d95) !important; }
-    [data-theme="dark"] [class*="from-red-50"] { background-image: linear-gradient(to bottom right, #450a0a, #7f1d1d) !important; }
-    [data-theme="dark"] [class*="from-orange-50"] { background-image: linear-gradient(to bottom right, #431407, #7c2d12) !important; }
-    [data-theme="dark"] [class*="from-amber-50"] { background-image: linear-gradient(to bottom right, #451a03, #78350f) !important; }
-    [data-theme="dark"] [class*="from-emerald-50"] { background-image: linear-gradient(to bottom right, #022c22, #064e3b) !important; }
-    [data-theme="dark"] [class*="from-sky-50"] { background-image: linear-gradient(to bottom right, #0c4a6e, #075985) !important; }
-    [data-theme="dark"] [class*="from-cyan-50"] { background-image: linear-gradient(to bottom right, #083344, #155e75) !important; }
-    /* Text colors */
-    [data-theme="dark"] [class~="text-gray-900"] { color: #f3f4f6 !important; }
-    [data-theme="dark"] [class~="text-gray-800"] { color: #e5e7eb !important; }
-    [data-theme="dark"] [class~="text-gray-700"] { color: #d1d5db !important; }
-    [data-theme="dark"] [class~="text-gray-600"] { color: #9ca3af !important; }
-    [data-theme="dark"] [class~="text-gray-500"] { color: #6b7280 !important; }
-    [data-theme="dark"] [class~="text-gray-400"] { color: #6b7280 !important; }
-    [data-theme="dark"] [class~="text-green-600"] { color: #34d399 !important; }
-    [data-theme="dark"] [class~="text-green-700"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-green-800"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-blue-600"] { color: #93c5fd !important; }
-    [data-theme="dark"] [class~="text-blue-700"] { color: #93c5fd !important; }
-    [data-theme="dark"] [class~="text-blue-800"] { color: #93c5fd !important; }
-    [data-theme="dark"] [class~="text-purple-600"] { color: #c4b5fd !important; }
-    [data-theme="dark"] [class~="text-purple-700"] { color: #c4b5fd !important; }
-    [data-theme="dark"] [class~="text-purple-800"] { color: #c4b5fd !important; }
-    [data-theme="dark"] [class~="text-red-600"] { color: #fca5a5 !important; }
-    [data-theme="dark"] [class~="text-red-700"] { color: #fca5a5 !important; }
-    [data-theme="dark"] [class~="text-red-800"] { color: #fca5a5 !important; }
-    [data-theme="dark"] [class~="text-orange-600"] { color: #fdba74 !important; }
-    [data-theme="dark"] [class~="text-orange-700"] { color: #fdba74 !important; }
-    [data-theme="dark"] [class~="text-amber-600"] { color: #fcd34d !important; }
-    [data-theme="dark"] [class~="text-amber-700"] { color: #fcd34d !important; }
-    [data-theme="dark"] [class~="text-yellow-600"] { color: #fde047 !important; }
-    [data-theme="dark"] [class~="text-sky-700"] { color: #7dd3fc !important; }
-    [data-theme="dark"] [class~="text-sky-800"] { color: #7dd3fc !important; }
-    [data-theme="dark"] [class~="text-emerald-600"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-emerald-700"] { color: #6ee7b7 !important; }
-    [data-theme="dark"] [class~="text-cyan-600"] { color: #67e8f9 !important; }
-    /* Borders */
-    [data-theme="dark"] [class~="border-gray-200"] { border-color: #374151 !important; }
-    [data-theme="dark"] [class~="border-gray-300"] { border-color: #4b5563 !important; }
-    [data-theme="dark"] [class~="border-green-200"] { border-color: #065f46 !important; }
-    [data-theme="dark"] [class~="border-blue-200"] { border-color: #1e40af !important; }
-    [data-theme="dark"] [class~="border-purple-100"] { border-color: #4c1d95 !important; }
-    [data-theme="dark"] [class~="border-purple-200"] { border-color: #5b21b6 !important; }
-    [data-theme="dark"] [class~="border-red-200"] { border-color: #7f1d1d !important; }
-    [data-theme="dark"] [class~="border-amber-200"] { border-color: #78350f !important; }
-    [data-theme="dark"] [class~="border-orange-200"] { border-color: #7c2d12 !important; }
-    [data-theme="dark"] [class~="border-emerald-200"] { border-color: #065f46 !important; }
-    [data-theme="dark"] [class~="border-sky-200"] { border-color: #0369a1 !important; }
-    /* Forms */
-    [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
-    [data-theme="dark"] input::placeholder { color: #6b7280 !important; }
-    /* Tables */
-    [data-theme="dark"] thead { background-color: #1f2937 !important; }
-    [data-theme="dark"] th { color: #d1d5db !important; }
-    [data-theme="dark"] tr:hover { background-color: rgba(55,65,81,0.5) !important; }
-    /* Log viewer */
-    [data-theme="dark"] .log-entry { color: #d1d5db; }
-    [data-theme="dark"] .log-connect { color: #6ee7b7 !important; }
-    [data-theme="dark"] .log-disconnect { color: #fca5a5 !important; }
-    [data-theme="dark"] .log-message { color: #93c5fd !important; }
-    [data-theme="dark"] .log-error { color: #f87171 !important; }
-    /* Nav */
-    [data-theme="dark"] #navLocalClock { background-color: #374151 !important; color: #d1d5db !important; }
-    [data-theme="dark"] .gradient-text { background: linear-gradient(135deg, #c4b5fd 0%, #93c5fd 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; }
-    /* Buttons */
-    [data-theme="dark"] .modern-button { background: linear-gradient(135deg, #7c3aed, #2563eb) !important; }
-    /* Leaflet */
-    [data-theme="dark"] .leaflet-control-zoom a { background-color: #374151 !important; color: #e5e7eb !important; border-color: #4b5563 !important; }
-    [data-theme="dark"] .leaflet-popup-content-wrapper, [data-theme="dark"] .leaflet-popup-tip { background-color: #1f2937 !important; color: #e5e7eb !important; }
-    /* Scrollbar */
-    [data-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
-    [data-theme="dark"] ::-webkit-scrollbar-track { background: #1f2937; }
-    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-    [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-    /* Toggle */
-    .dark-mode-toggle { cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 0.5rem; border: none; background: transparent; font-size: 1.1rem; line-height: 1; transition: transform 0.3s ease; }
-    .dark-mode-toggle:hover { transform: scale(1.2); }
-    /* Skeleton */
-    [data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1f2937 25%, #374151 50%, #1f2937 75%) !important; background-size: 200% 100%; }
-    /* Modals */
-    [data-theme="dark"] [style*="background"][style*="rgba(0"] { background-color: rgba(0,0,0,0.7) !important; }
-    </style>
+    <script>
+        // Theme before first paint (same key as every page: bpq-dark-mode)
+        (function () { try { var s = localStorage.getItem('bpq-dark-mode'); var t = (s === 'dark' || s === 'light') ? s : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+    </script>
+    <link rel="stylesheet" href="bpq-page.css?v=1.5.86">
 </head>
-<body class="min-h-screen" data-nav-page="messages">
-<!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
-     Active link is driven by the data-nav-page attribute on <body>. -->
+<!--
+  Messages (v1.5.86 redesign, laid out like RF Connections).
+  Reads LinBPQ's daily BBS logs (logs/log_YYMMDD_BBS.txt) and, when present,
+  the mail-server logs (log_YYMMDD_TCP.txt) in the browser, as before. New:
+  each offer (FA/FB/FC) is matched with the answer (FS) so only messages that
+  really moved are counted ("already had" is shown apart); the forwarding
+  queue comes from bpq-fwd-queue.php (FWD QUEUE, cached a minute); the partner
+  list adds RF Connections' saved partners (station-storage.php).
+-->
+<body data-nav-page="messages">
 <script src="bpq-nav-loader.js?v=2026-11-19-1"></script>
 
-    
-    <div class="p-2 sm:p-4 lg:p-8">
-        <div class="max-w-7xl mx-auto glass-container p-4 sm:p-6 lg:p-8">
-            <!-- Header -->
-            <div class="mb-6 sm:mb-8">
-                <div class="flex flex-col lg:flex-row justify-between items-center gap-4">
-                    <div class="text-center flex-1">
-                        <div class="flex items-center justify-center gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
-                            <h1 class="text-2xl sm:text-4xl lg:text-5xl font-bold gradient-text">📧 Message Monitor</h1>
-                            <span class="px-2 sm:px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs font-bold rounded-full">v1.5.84</span>
-                        </div>
-                        <p class="text-gray-600 text-sm sm:text-lg" id="modeDescription">BBS Message Activity & Forwarding Analytics</p>
-                        <div class="flex justify-center gap-2 mt-3">
-                            <button onclick="setMode('bbs')" id="modeBbs" class="mode-button active px-4 py-2 rounded-lg font-semibold text-sm">📬 BBS Mode</button>
-                            <button onclick="setMode('tcp')" id="modeTcp" class="mode-button px-4 py-2 rounded-lg font-semibold text-sm">📧 SMTP/POP Server</button>
-                        </div>
-                    </div>
-                    <div class="flex flex-col items-center sm:items-end gap-2">
-                        <div class="flex items-center gap-3">
-                            <span id="statusIndicator" class="status-indicator status-loading"></span>
-                            <span id="statusText" class="text-sm text-gray-600">Loading...</span>
-                        </div>
-                        <p id="dateRange" class="text-xs text-gray-500">Loading...</p>
-                        <div class="flex gap-1">
-                            <button id="range7d" onclick="setTimeRange(7)" class="px-3 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">7D</button>
-                            <button id="range28d" onclick="setTimeRange(28)" class="px-3 py-1 text-xs rounded font-semibold bg-purple-600 text-white">4W</button>
-                            <button id="range30d" onclick="setTimeRange(30)" class="px-3 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">30D</button>
-                            <button onclick="loadLogs()" class="px-3 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700">🔄</button>
-                        </div>
-                    </div>
-                </div>
+<header class="rf-head">
+    <div class="rf-wrap rf-head-row">
+        <div class="rf-title">
+            <div class="rf-title-line">
+                <h1>Messages</h1>
+                <span class="rf-ver">v1.5.92</span>
             </div>
-
-            <div id="noDataWarning" class="hidden mb-6 p-4 sm:p-6 bg-amber-50 border-2 border-amber-200 rounded-xl text-center"></div>
-
-            <div class="flex gap-2 mb-6 border-b border-gray-200 pb-2">
-                <button onclick="switchTab('monitor')" id="tabMonitor" class="tab-button active px-4 py-2 rounded-lg font-semibold text-sm">📊 Monitor</button>
-                <button onclick="switchTab('security')" id="tabSecurity" class="tab-button px-4 py-2 rounded-lg font-semibold text-sm">🔒 Security</button>
-            </div>
-
-            <div id="panelMonitor" class="tab-panel">
-                <!-- BBS Mode Stats -->
-                <div id="bbsStats" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-5 mb-6">
-                    <div class="stat-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-green-200">
-                        <div class="text-green-700 text-xs sm:text-sm font-bold mb-1 uppercase">Received</div>
-                        <div id="bbsMsgsReceived" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Messages In</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-blue-200">
-                        <div class="text-blue-700 text-xs sm:text-sm font-bold mb-1 uppercase">Forwarded</div>
-                        <div id="bbsMsgsForwarded" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Messages Out</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-200">
-                        <div class="text-purple-700 text-xs sm:text-sm font-bold mb-1 uppercase">Bulletins</div>
-                        <div id="bbsBulletins" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Total</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-cyan-200">
-                        <div class="text-cyan-700 text-xs sm:text-sm font-bold mb-1 uppercase">Partners</div>
-                        <div id="bbsPartners" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Forwarding</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-orange-200">
-                        <div class="text-orange-700 text-xs sm:text-sm font-bold mb-1 uppercase">Total Msgs</div>
-                        <div id="bbsTotalMsgs" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Processed</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-red-50 to-red-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-red-200">
-                        <div class="text-red-700 text-xs sm:text-sm font-bold mb-1 uppercase">Rejected</div>
-                        <div id="bbsRejected" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">By BID</div>
-                    </div>
-                </div>
-
-                <!-- TCP Mode Stats -->
-                <div id="tcpStats" class="hidden grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-5 mb-6">
-                    <div class="stat-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-green-200">
-                        <div class="text-green-700 text-xs sm:text-sm font-bold mb-1 uppercase">POP3</div>
-                        <div id="pop3Sessions" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Sessions</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-blue-200">
-                        <div class="text-blue-700 text-xs sm:text-sm font-bold mb-1 uppercase">SMTP</div>
-                        <div id="smtpSessions" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Sessions</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-purple-200">
-                        <div class="text-purple-700 text-xs sm:text-sm font-bold mb-1 uppercase">NNTP</div>
-                        <div id="nntpSessions" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Sessions</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-cyan-200">
-                        <div class="text-cyan-700 text-xs sm:text-sm font-bold mb-1 uppercase">Users</div>
-                        <div id="activeUsers" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Active</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-orange-200">
-                        <div class="text-orange-700 text-xs sm:text-sm font-bold mb-1 uppercase">Messages</div>
-                        <div id="totalMessages" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Tracked</div>
-                    </div>
-                    <div class="stat-card bg-gradient-to-br from-red-50 to-red-100 rounded-xl sm:rounded-2xl p-3 sm:p-5 border-2 border-red-200">
-                        <div class="text-red-700 text-xs sm:text-sm font-bold mb-1 uppercase">Auth Fail</div>
-                        <div id="authFails" class="text-2xl sm:text-4xl font-bold text-gray-900">0</div>
-                        <div class="text-xs text-gray-500">Blocked</div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
-                    <div class="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">📈 Hourly Activity</h3>
-                        <div style="height: 250px;"><canvas id="hourlyChart"></canvas></div>
-                    </div>
-                    <div class="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4" id="activityTitle">🔄 Forwarding Partners</h3>
-                        <div id="activityList" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                            <div class="text-gray-400 text-center py-4">Loading...</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="msgBulletinGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                    <div class="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">📬 Recent Message IDs</h3>
-                        <div id="recentMessages" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                            <div class="text-gray-400 text-center py-4">Loading...</div>
-                        </div>
-                    </div>
-                    <div class="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">📰 Bulletin Groups</h3>
-                        <div id="bulletinGroups" class="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                            <div class="text-gray-400 text-center py-4">Loading...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="panelSecurity" class="tab-panel hidden">
-                <div id="securityContent">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                        <div class="stat-card bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-5 border-2 border-red-200">
-                            <div class="text-red-700 text-sm font-bold mb-2 uppercase">Auth Failures</div>
-                            <div id="secAuthFails" class="text-4xl font-bold text-gray-900">0</div>
-                        </div>
-                        <div class="stat-card bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-5 border-2 border-orange-200">
-                            <div class="text-orange-700 text-sm font-bold mb-2 uppercase">Suspicious</div>
-                            <div id="secSuspicious" class="text-4xl font-bold text-gray-900">0</div>
-                        </div>
-                        <div class="stat-card bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-5 border-2 border-yellow-200">
-                            <div class="text-yellow-700 text-sm font-bold mb-2 uppercase">Relay Attempts</div>
-                            <div id="secRelayAttempts" class="text-4xl font-bold text-gray-900">0</div>
-                        </div>
-                    </div>
-                    <div class="bg-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">🔒 Security Event Log</h3>
-                        <div id="securityLog" class="space-y-2 max-h-96 overflow-y-auto custom-scrollbar pr-2">
-                            <div class="text-gray-400 text-center py-4">Loading...</div>
-                        </div>
-                    </div>
-                </div>
-                <div id="bbsSecurityNote" class="hidden text-center py-12">
-                    <div class="text-gray-400 text-4xl mb-4">🔒</div>
-                    <div class="text-gray-600 font-semibold mb-2">Security Tab - TCP Mode Only</div>
-                    <div class="text-gray-400 text-sm">Switch to TCP Mode to view security analytics.</div>
-                </div>
-            </div>
-
-            <div class="mt-6 pt-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-gray-500">
-                <span id="lastUpdate">Last updated: --</span>
-                <span>Auto-refresh: 15 minutes</span>
-                <button onclick="loadLogs()" class="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg font-semibold hover:bg-purple-200">🔄 Refresh</button>
+            <div class="rf-sub">
+                <span id="dateRange">Loading…</span>
+                <span class="rf-live"><i id="statusDot"></i><span id="statusText">Loading…</span></span>
+                <span class="rf-clock" title="UTC"><span id="zuluTime">--:--</span>Z</span>
             </div>
         </div>
+        <div class="rf-range" role="group" aria-label="Date range">
+            <button type="button" data-range="1">Today</button>
+            <button type="button" data-range="7" class="active">7 days</button>
+            <button type="button" data-range="30">30 days</button>
+        </div>
+        <button type="button" class="rf-btn" id="refreshBtn">Refresh</button>
+        <button type="button" class="rf-btn rf-btn-soft" id="themeBtn">Dark</button>
     </div>
+    <div class="rf-wrap rf-strip" id="statusStrip" aria-label="Mail status"></div>
+</header>
 
-    <div id="bulletinModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div class="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-500 to-purple-500 rounded-t-2xl">
-                <h3 class="text-lg font-bold text-white" id="bulletinModalTitle">📰 Bulletins</h3>
-                <button onclick="closeBulletinModal()" class="text-white hover:text-gray-200 text-2xl">&times;</button>
+<main class="rf-wrap rf-main">
+    <div id="noData" class="rf-nodata hidden"></div>
+
+    <section class="rf-kpis" aria-label="Headline numbers">
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Messages moved</div>
+            <div class="rf-kpi-big" id="kMoved">–</div>
+            <div class="rf-kpi-sub" id="kMovedSub">&nbsp;</div>
+            <div class="rf-chips" id="kTypeChips"></div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Waiting to forward</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kQueue">–</span><span class="rf-kpi-sub" id="kQueueSub"></span></div>
+            <div class="rf-stackbar" id="kQueueBar" aria-hidden="true"></div>
+            <div class="rf-chips" id="kQueueChips"></div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Bulletins</div>
+            <div class="rf-kpi-big" id="kBull">–</div>
+            <div class="rf-kpi-sub" id="kBullSub">&nbsp;</div>
+            <div class="rf-chips" id="kBullChips"></div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Security events</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kSec">–</span><span id="kSecTag"></span></div>
+            <div class="rf-kpi-sub" id="kSecSub">&nbsp;</div>
+            <div class="rf-chips" id="kSecChips"></div>
+        </div>
+    </section>
+
+    <section class="rf-cols">
+        <div class="rf-card rf-colmain">
+            <div class="rf-card-head">
+                <h2>Forwarding partners · mail</h2>
+                <span class="rf-card-sub">Link health is on <a class="rf-a" href="bpq-rf-connections.html">RF Connections</a></span>
             </div>
-            <div class="p-4 flex-1 overflow-y-auto custom-scrollbar" id="bulletinModalContent"></div>
-            <div class="p-4 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
-                <span id="bulletinCount" class="text-sm text-gray-500">0 bulletins</span>
-                <button onclick="closeBulletinModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">Close</button>
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 760px">
+                    <thead><tr>
+                        <th>Partner</th><th>Last mail moved</th><th class="num">Sent</th><th class="num">Received</th>
+                        <th class="num" title="Offered, but the other side already had it">Already had</th><th class="num">Waiting</th><th>Last 7 days</th>
+                    </tr></thead>
+                    <tbody id="partnerRows"><tr><td colspan="7" class="rf-empty">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <div class="rf-legend">
+                <span><i style="background: var(--pg-blk3)"></i>mail moved that day (darker = more)</span>
+                <span><i style="background: var(--pg-blk0)"></i>none</span>
+                <span>Days are UTC, oldest left. Click a call for its messages.</span>
             </div>
         </div>
-    </div>
+        <div class="rf-side">
+            <div class="rf-card">
+                <div class="rf-card-head"><h2>Mail by hour (UTC)</h2><span class="rf-card-sub"><b class="rf-in">In</b> above the line, <b class="rf-out">out</b> below</span></div>
+                <div class="pg-mirror">
+                    <div class="pg-mbars up" id="hourIn" role="img" aria-label="Messages received for each UTC hour" style="grid-template-columns: repeat(24, minmax(0, 1fr))"></div>
+                    <div class="pg-mid"></div>
+                    <div class="pg-mbars down" id="hourOut" aria-hidden="true" style="grid-template-columns: repeat(24, minmax(0, 1fr))"></div>
+                    <div class="pg-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+                </div>
+            </div>
+            <div class="rf-card">
+                <div class="rf-card-head"><h2>Busiest senders</h2><span class="rf-card-sub">messages that came in</span></div>
+                <div class="rf-pad"><div class="pg-bars" id="senders"></div></div>
+            </div>
+        </div>
+    </section>
 
-    <script>
+    <section class="rf-card">
+        <div class="rf-tabs" role="tablist" aria-label="Message details">
+            <button type="button" role="tab" data-tab="recent" aria-selected="true">Recent messages <span class="rf-count" id="cRecent">0</span></button>
+            <button type="button" role="tab" data-tab="bull" aria-selected="false">Bulletins by group <span class="rf-count" id="cBull">0</span></button>
+            <button type="button" role="tab" data-tab="queue" aria-selected="false">Forwarding queue <span class="rf-count" id="cQueue">0</span></button>
+            <button type="button" role="tab" data-tab="clients" aria-selected="false">Mail clients <span class="rf-count" id="cClients">0</span></button>
+            <button type="button" role="tab" data-tab="sec" aria-selected="false">Security log <span class="rf-count" id="cSec">0</span></button>
+        </div>
 
-        const LOG_FILE_BASE_URL = './logs/';
-        const DAYS_TO_LOAD = 30;
+        <div class="rf-panel" id="tab-recent">
+            <div class="rf-toolbar">
+                <input type="search" id="msgSearch" placeholder="Filter: call, group, BID" aria-label="Filter messages">
+                <span class="rf-chips" id="msgFilters"></span>
+            </div>
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 900px">
+                    <thead><tr><th>Time (UTC)</th><th>Dir</th><th>Type</th><th>From</th><th>To</th><th>BID</th><th class="num">Size</th><th>Via</th><th>Result</th></tr></thead>
+                    <tbody id="msgRows"></tbody>
+                </table>
+            </div>
+            <div class="rf-more" id="msgMore"></div>
+        </div>
 
-        let currentMode = 'bbs';
-        let loadedMode = null;  // Track which mode the data belongs to
-        let allLogs = [];
-        let filteredLogs = [];
-        let isLoading = false;
-        let selectedRange = 28;
-        let loadedDates = [];
-        
-        let bbsStats = { msgsReceived: 0, msgsForwarded: 0, bulletins: 0, rejected: 0, totalMsgs: 0, partners: {}, bulletinGroups: {}, messages: [], hourlyActivity: { received: {}, forwarded: {}, bulletins: {} } };
-        let tcpStats = { pop3: 0, smtp: 0, nntp: 0, authFails: 0, suspicious: 0, relayAttempts: 0, users: {}, messages: [], nntpGroups: {}, hourlyActivity: { pop3: {}, smtp: {}, nntp: {} }, securityEvents: [] };
+        <div class="rf-panel hidden" id="tab-bull">
+            <div class="rf-pad"><div class="pg-tiles" id="bullTiles"></div><div class="rf-small rf-muted">Click a group to read its latest bulletins from the BBS.</div></div>
+        </div>
 
-        async function setMode(mode) {
-            currentMode = mode;
-            document.getElementById('modeBbs').className = mode === 'bbs' ? 'mode-button active px-4 py-2 rounded-lg font-semibold text-sm' : 'mode-button px-4 py-2 rounded-lg font-semibold text-sm';
-            document.getElementById('modeTcp').className = mode === 'tcp' ? 'mode-button active px-4 py-2 rounded-lg font-semibold text-sm' : 'mode-button px-4 py-2 rounded-lg font-semibold text-sm';
-            document.getElementById('modeDescription').textContent = mode === 'bbs' ? 'BBS Message Activity & Forwarding Analytics' : 'POP3/SMTP/NNTP Server Analytics';
-            document.getElementById('bbsStats').classList.toggle('hidden', mode !== 'bbs');
-            document.getElementById('tcpStats').classList.toggle('hidden', mode !== 'tcp');
-            document.getElementById('activityTitle').textContent = mode === 'bbs' ? '🔄 Forwarding Partners' : '👥 Top 5 Users';
-            document.getElementById('securityContent').classList.toggle('hidden', mode === 'bbs');
-            document.getElementById('bbsSecurityNote').classList.toggle('hidden', mode !== 'bbs');
-            document.getElementById('msgBulletinGrid').classList.toggle('hidden', mode !== 'bbs');
-            localStorage.setItem('messageMonitorMode', mode);
-            
-            // Clear previous data before loading new mode's logs
-            allLogs = [];
-            loadedDates = [];
-            
-            await loadLogs();
-        }
+        <div class="rf-panel hidden" id="tab-queue">
+            <div class="rf-scroll">
+                <table class="rf-ptable"><thead><tr><th>Waiting for</th><th class="num">Messages</th><th>Last mail moved</th><th>Note</th></tr></thead><tbody id="queueRows"></tbody></table>
+            </div>
+            <div class="rf-more" id="queueMore"></div>
+        </div>
 
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-            document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.remove('hidden');
-            document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
-        }
+        <div class="rf-panel hidden" id="tab-clients">
+            <div class="rf-pad">
+                <div class="rf-kv" id="clientKv"></div>
+            </div>
+            <div class="rf-scroll">
+                <table class="rf-ptable"><thead><tr><th>User</th><th class="num">Sessions</th><th class="num">Read</th><th class="num">Sent</th><th>Last seen (UTC)</th></tr></thead><tbody id="clientRows"></tbody></table>
+            </div>
+            <div class="rf-more">From LinBPQ's mail-server log (POP3 / SMTP / NNTP), <code>log_YYMMDD_TCP.txt</code>.</div>
+        </div>
 
-        function openBulletinModal(group) {
-            currentBulletinGroup = group;
-            document.getElementById('bulletinModalTitle').textContent = '📰 ' + group;
-            document.getElementById('bulletinModalContent').innerHTML = '<div class="text-gray-400 text-center py-8">Loading bulletins...</div>';
-            document.getElementById('bulletinModal').classList.remove('hidden');
-            fetchBulletins(group);
-        }
-        
-        function closeBulletinModal() { document.getElementById('bulletinModal').classList.add('hidden'); }
-        
-        async function fetchBulletins(group) {
-            try {
-                // Group is in format "NEWS@WW" or just "WW"
-                // PHP expects address like "NEWS@WW"
-                const address = group.includes('@') ? group : group;
-                const response = await fetch('bbs-messages.php?action=bulletins&address=' + encodeURIComponent(address) + '&count=30');
-                const data = await response.json();
-                if (data.success && data.messages && data.messages.length > 0) {
-                    document.getElementById('bulletinCount').textContent = data.messages.length + ' bulletins' + (data.total > data.messages.length ? ' (of ' + data.total + ' total)' : '');
-                    document.getElementById('bulletinModalContent').innerHTML = data.messages.map((msg, idx) => 
-                        '<div class="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-blue-50 cursor-pointer" onclick="viewBulletinMessage(' + msg.number + ')">' +
-                        '<div class="flex justify-between items-start">' +
-                        '<div class="font-semibold text-gray-900 flex-1">' + escapeHtml(msg.subject || 'No Subject') + '</div>' +
-                        '<span class="text-xs text-gray-400 ml-2">#' + msg.number + '</span>' +
-                        '</div>' +
-                        '<div class="text-sm text-gray-500 mt-1">' +
-                        '<span class="text-purple-600 font-medium">' + escapeHtml(msg.from || 'Unknown') + '</span>' +
-                        ' • <span class="text-gray-400">' + escapeHtml(msg.date || '') + '</span>' +
-                        ' • <span class="text-blue-600">' + escapeHtml(msg.to || '') + '</span>' +
-                        '</div>' +
-                        '</div>'
-                    ).join('');
-                } else if (data.error) {
-                    document.getElementById('bulletinModalContent').innerHTML = '<div class="text-red-500 text-center py-8">Error: ' + escapeHtml(data.error) + '</div>';
-                    document.getElementById('bulletinCount').textContent = 'Error';
-                } else {
-                    document.getElementById('bulletinModalContent').innerHTML = '<div class="text-gray-400 text-center py-8">No bulletins found for ' + escapeHtml(group) + '</div>';
-                    document.getElementById('bulletinCount').textContent = '0 bulletins';
-                }
-            } catch (err) {
-                document.getElementById('bulletinModalContent').innerHTML = '<div class="text-red-500 text-center py-8">Error loading bulletins: ' + escapeHtml(err.message) + '</div>';
-                document.getElementById('bulletinCount').textContent = 'Error';
-            }
-        }
-        
-        async function viewBulletinMessage(msgNum) {
-            document.getElementById('bulletinModalContent').innerHTML = '<div class="text-gray-400 text-center py-8">Loading message #' + msgNum + '...</div>';
-            try {
-                const response = await fetch('bbs-messages.php?action=read&msg=' + msgNum);
-                const data = await response.json();
-                if (data.success && data.body) {
-                    document.getElementById('bulletinModalContent').innerHTML = 
-                        '<div class="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">' +
-                        '<div class="font-bold text-gray-900">' + escapeHtml(data.subject || 'No Subject') + '</div>' +
-                        '<div class="text-sm text-gray-600 mt-1">' +
-                        'From: <span class="text-purple-600 font-medium">' + escapeHtml(data.from || 'Unknown') + '</span>' +
-                        ' • To: <span class="text-blue-600">' + escapeHtml(data.to || '') + '</span>' +
-                        ' • Date: ' + escapeHtml(data.date || '') +
-                        '</div>' +
-                        '</div>' +
-                        '<pre class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 p-4 rounded-lg border overflow-x-auto">' + escapeHtml(data.body) + '</pre>' +
-                        '<button onclick="fetchBulletins(currentBulletinGroup)" class="mt-4 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg font-semibold hover:bg-purple-200">← Back to List</button>';
-                } else {
-                    document.getElementById('bulletinModalContent').innerHTML = '<div class="text-red-500 text-center py-8">Error: ' + escapeHtml(data.error || 'Could not load message') + '</div>';
-                }
-            } catch (err) {
-                document.getElementById('bulletinModalContent').innerHTML = '<div class="text-red-500 text-center py-8">Error: ' + escapeHtml(err.message) + '</div>';
-            }
-        }
-        
-        let currentBulletinGroup = '';
+        <div class="rf-panel hidden" id="tab-sec">
+            <div class="rf-scroll">
+                <table class="rf-ptable"><thead><tr><th>Time (UTC)</th><th>Event</th><th>Detail</th></tr></thead><tbody id="secRows"></tbody></table>
+            </div>
+            <div class="rf-more">From the mail-server log. Opening this tab marks the events as seen.</div>
+        </div>
+    </section>
+</main>
 
-        function escapeHtml(str) { return str ? str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''; }
+<div id="drawerBg" class="rf-drawer-bg hidden"></div>
+<aside id="drawer" class="rf-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="rf-drawer-head"><h2 id="drawerTitle"></h2><button type="button" class="rf-x" id="drawerClose" aria-label="Close">×</button></div>
+    <div class="rf-drawer-body" id="drawerBody"></div>
+</aside>
 
-        async function loadLogs() {
-            if (isLoading) return;
-            isLoading = true;
-            
-            const modeToLoad = currentMode;
-            updateStatus('loading', 'Loading ' + (modeToLoad === 'bbs' ? 'BBS' : 'TCP') + ' logs...');
-            const warningDiv = document.getElementById('noDataWarning');
-            warningDiv.classList.add('hidden');
-            warningDiv.style.display = 'none';
-            allLogs = [];
-            loadedDates = [];
-            loadedMode = modeToLoad;
-            const logType = modeToLoad === 'bbs' ? 'BBS' : 'TCP';
-            const now = new Date();
-            
-            for (let i = 0; i < DAYS_TO_LOAD; i++) {
-                const d = new Date(now);
-                d.setDate(d.getDate() - i);
-                const yy = String(d.getFullYear()).slice(-2);
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const dd = String(d.getDate()).padStart(2, '0');
-                const dateStr = yy + mm + dd;
-                const filename = 'log_' + dateStr + '_' + logType + '.txt';
-                
-                try {
-                    const cacheBust = '?t=' + Date.now();
-                    const resp = await fetch(LOG_FILE_BASE_URL + filename + cacheBust);
-                    if (resp.ok) {
-                        const text = await resp.text();
-                        text.split('\n').filter(l => l.trim()).forEach(line => allLogs.push({ date: dateStr, line: line }));
-                        loadedDates.push(dateStr);
+<script>
+(function () {
+    'use strict';
+    const LOG_URL = './logs/';
+    const DAYS_LOADED = 31;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const pad = (n) => String(n).padStart(2, '0');
+    const TYPE = { P: 'Personal', B: 'Bulletin', T: 'NTS', W: 'B2' };
+    const TYPECLS = { P: 'p', B: '', T: 't', W: 'w' };
+    const TYPECOL = { P: 'var(--pg-p)', B: 'var(--pg-b)', T: 'var(--pg-t)', W: '#0D9488' };
+
+    let range = 7;
+    try { const r = parseInt(localStorage.getItem('bpq_msg_range'), 10); if ([1, 7, 30].includes(r)) range = r; } catch (e) {}
+    let tab = 'recent';
+    let msgFilter = 'all';
+    let shown = 100;
+    let data = null;        // parsed logs
+    let queue = null;       // {list:[{call,msgs}], at, error}
+    let savedPartners = [];
+
+    // ── helpers ─────────────────────────────────────────────────────────
+    const base = (c) => String(c || '').toUpperCase().replace(/-\d+$/, '');
+    function ago(ms) {
+        if (ms == null) return '';
+        const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+        if (s < 90) return 'just now';
+        const m = Math.round(s / 60); if (m < 60) return m + ' min ago';
+        const h = Math.floor(m / 60), mm = m % 60; if (h < 24) return h + ' h' + (mm ? ' ' + pad(mm) + ' m' : '') + ' ago';
+        const d = Math.round(h / 24); return d + (d === 1 ? ' day ago' : ' days ago');
+    }
+    function fmtTime(ms, withDay) {
+        if (ms == null) return '–';
+        const d = new Date(ms);
+        const t = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
+        const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+        if (!withDay && ms >= today.getTime()) return t + 'Z';
+        return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()] + ' ' + pad(d.getUTCDate()) + ' ' + t + 'Z';
+    }
+    function fmtSize(n) { n = +n || 0; return n < 1024 ? n + ' B' : (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' K'; }
+    function dayStart(daysBack) { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d.getTime() - daysBack * 86400000; }
+    function ymd(ms) { const d = new Date(ms); return String(d.getUTCFullYear()).slice(-2) + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()); }
+    function lineTs(date, hh, mi, ss) { return Date.UTC(2000 + +date.slice(0, 2), +date.slice(2, 4) - 1, +date.slice(4, 6), +hh, +mi, +ss); }
+
+    // ── loading ─────────────────────────────────────────────────────────
+    async function fetchText(url) {
+        try { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) return null; return await r.text(); } catch (e) { return null; }
+    }
+    // v1.5.86: mail-log-api.php sends only the lines this page reads (a busy
+    // BBS log is megabytes a day); the files themselves are the fallback.
+    async function loadFromApi(days) {
+        try {
+            const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 60000);
+            const r = await fetch('mail-log-api.php?days=' + days, { cache: 'no-store', signal: ctl.signal });
+            clearTimeout(tm);
+            if (!r.ok) return null;
+            const j = await r.json();
+            return j && j.ok ? j : null;
+        } catch (e) { return null; }
+    }
+    async function loadLogs(kind, days) {
+        const dates = [];
+        for (let i = -1; i < days; i++) dates.push(ymd(dayStart(i)));
+        const texts = await Promise.all(dates.map(d => fetchText(LOG_URL + 'log_' + d + '_' + kind + '.txt')));
+        const out = [];
+        dates.forEach((d, i) => { if (texts[i]) out.push({ date: d, text: texts[i] }); });
+        return out;
+    }
+
+    // BBS log: each offer (FA/FB/FC) is matched with the answer (FS) so we
+    // know what really moved. "<CALL" = the partner sent the line, ">CALL" = we did.
+    function parseBbs(files) {
+        const msgs = [], sessions = {}, lastLine = { ts: null };
+        const pend = {};
+        const LINE = /^(\d{6})\s+(\d{2}):(\d{2}):(\d{2})\s+([<>|?])(\S*)\s*(.*)$/;
+        const FAB = /^F[AB]\s+([BPT])\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)/;
+        const FC = /^FC\s+(\S+)\s+(\S+)\s+(\d+)/;
+        const ACC = { '+': 'moved', 'Y': 'moved', '!': 'moved', 'A': 'moved', '-': 'had', 'N': 'had', 'R': 'had', 'E': 'error', '=': 'later', 'L': 'later', 'H': 'later' };
+        files.sort((a, b) => a.date.localeCompare(b.date));
+        for (const f of files) {
+            for (const raw of f.text.split(/\r?\n/)) {
+                const m = raw.replace(/\r/g, '').match(LINE); if (!m) continue;
+                const ts = lineTs(m[1], m[2], m[3], m[4]);
+                lastLine.ts = ts;
+                const dirc = m[5], call = base(m[6]), text = m[7].trim();
+                if (!call || !/^[A-Z0-9]{3,}$/.test(call)) continue;
+                if (dirc === '|') {
+                    const out = /Connecting to BBS/i.test(text), inn = /Incoming Connect/i.test(text);
+                    if (out || inn) {
+                        const s = sessions[call] || (sessions[call] = { list: [] });
+                        s.list.push({ ts, dir: inn ? 'in' : 'out' });
+                        const mode = text.match(/Mode\s+(\S+)/); if (mode) s.mode = mode[1];
                     }
-                } catch (e) {}
+                    if (/Disconnected/i.test(text) && pend[call]) { pend[call] = []; }
+                    continue;
+                }
+                if (dirc !== '<' && dirc !== '>') continue;
+                const dir = dirc === '<' ? 'in' : 'out';
+                let p = text.match(FAB), msg = null;
+                if (p) msg = { ts, dir, partner: call, type: p[1], from: p[2], at: p[3], to: p[4], bid: p[5], size: +p[6], result: 'offered' };
+                else if ((p = text.match(FC))) msg = { ts, dir, partner: call, type: 'W', from: '', at: '', to: '(compressed, not listed)', bid: p[2], size: +p[3], result: 'offered' };
+                if (msg) { msgs.push(msg); (pend[call] || (pend[call] = [])).push(msg); continue; }
+                const fs = text.match(/^FS\s+(\S+)/);
+                if (fs) {
+                    // The answer is for the offers the OTHER side made.
+                    const want = dir === 'in' ? 'out' : 'in';
+                    const list = (pend[call] || []).filter(x => x.dir === want);
+                    const codes = fs[1].match(/[!A]\d*|[+\-=YNRLHE]/g) || [];
+                    list.forEach((x, i) => { const c = codes[i]; if (c) x.result = ACC[c[0]] || 'offered'; });
+                    pend[call] = (pend[call] || []).filter(x => x.dir !== want);
+                }
             }
-            
-            if (loadedDates.length > 0) {
-                filterAndProcess();
+        }
+        return { msgs, sessions, lastLine: lastLine.ts };
+    }
+
+    // Mail-server log (POP3 / SMTP / NNTP), as the old SMTP/POP mode read it.
+    function parseTcp(files) {
+        const out = { pop3: 0, smtp: 0, nntp: 0, users: {}, events: [], files: files.length };
+        let user = null;
+        files.sort((a, b) => a.date.localeCompare(b.date));
+        for (const f of files) {
+            for (const line of f.text.split(/\r?\n/)) {
+                const t = line.match(/(\d{2}):(\d{2}):(\d{2})/);
+                const ts = t ? lineTs(f.date, t[1], t[2], t[3]) : lineTs(f.date, 0, 0, 0);
+                if (line.includes('Incoming POP3 Connect')) out.pop3++;
+                if (line.includes('Incoming SMTP Connect')) out.smtp++;
+                if (line.includes('Incoming NNTP Connect')) out.nntp++;
+                const um = line.match(/<\s+USER\s+(\w+)/i);
+                if (um) { user = um[1].toUpperCase(); const u = out.users[user] || (out.users[user] = { sessions: 0, read: 0, sent: 0, last: 0 }); u.sessions++; u.last = ts; }
+                if (/<\s+RETR\s+\d+/i.test(line) && user && out.users[user]) out.users[user].read++;
+                const sm = line.match(/MAIL\s+From:\s*<?\s*([A-Z0-9]+)[@>]/i);
+                if (sm) { const s = sm[1].toUpperCase(); const u = out.users[s] || (out.users[s] = { sessions: 0, read: 0, sent: 0, last: ts }); u.sent++; }
+                if (line.includes('530 Authentication required')) out.events.push({ ts, kind: 'relay', label: 'Relay refused', detail: 'SMTP without login (530)' });
+                if (line.includes('Authentication failed')) out.events.push({ ts, kind: 'auth', label: 'Wrong password', detail: 'Login failed' + (user ? ' (last user ' + user + ')' : '') });
+                if (line.includes('\\x')) out.events.push({ ts, kind: 'odd', label: 'Unexpected data', detail: 'Binary data on a mail connection' });
+            }
+        }
+        out.events.sort((a, b) => b.ts - a.ts);
+        return out;
+    }
+
+    async function loadQueue() {
+        try {
+            const ctl = new AbortController(); setTimeout(() => ctl.abort(), 45000);
+            const r = await fetch('bpq-fwd-queue.php?action=queue', { cache: 'no-store', signal: ctl.signal });
+            const j = await r.json();
+            if (j && j.success) return { list: (j.queue || []).map(q => ({ call: base(q.call), msgs: +q.msgs || 0 })), at: j.generated_at ? Date.parse(j.generated_at) : Date.now() };
+            return { list: [], error: (j && j.error) || 'the BBS did not answer' };
+        } catch (e) { return { list: [], error: 'the BBS did not answer' }; }
+    }
+    async function loadSavedPartners() {
+        try { const r = await fetch('station-storage.php?action=partners', { cache: 'no-store' }); const j = await r.json(); return Array.isArray(j) ? j.map(base).filter(Boolean) : []; } catch (e) { return []; }
+    }
+
+    let loadedDays = 0, loading = false;
+    async function loadAll() {
+        if (loading) return; loading = true;
+        const days = range > 7 ? DAYS_LOADED : 8;      // 7 days covers Today, 7 days and the day blocks
+        setStatus('', 'Loading logs…');
+        // The queue asks the BBS (can take a while): it fills in when it comes.
+        loadQueue().then(q => { queue = q; if (data) render(); });
+        loadSavedPartners().then(sp => { savedPartners = sp; if (data) render(); });
+        let bbsFiles, tcpFiles;
+        const api = await loadFromApi(days);
+        if (api) { bbsFiles = api.bbs || []; tcpFiles = api.tcp || []; }
+        else { setStatus('', 'Loading log files…'); [bbsFiles, tcpFiles] = await Promise.all([loadLogs('BBS', days), loadLogs('TCP', days)]); }
+        loadedDays = days;
+        data = { bbs: parseBbs(bbsFiles), tcp: parseTcp(tcpFiles), bbsFiles: bbsFiles.length, oldest: bbsFiles.length ? bbsFiles.map(f => f.date).sort()[0] : null, via: api ? 'server' : 'files' };
+        loading = false;
+        render();
+    }
+
+    // ── rendering ───────────────────────────────────────────────────────
+    function setStatus(cls, text) { $('statusDot').className = cls; $('statusText').textContent = text; }
+    function cutoff() { return dayStart(range - 1); }
+
+    function partnerStats() {
+        const now = Date.now(), from = cutoff();
+        const oldest = data.oldest ? fmtTime(lineTs(data.oldest, 0, 0, 0), true).replace(/ 00:00Z$/, '') : 'the first log';
+        const P = {};
+        const get = (c) => P[c] || (P[c] = { call: c, sent: 0, recv: 0, had: 0, unans: 0, unans24: 0, lastMoved: null, lastSession: null, days: [0, 0, 0, 0, 0, 0, 0], queue: 0 });
+        savedPartners.forEach(get);
+        for (const m of data.bbs.msgs) {
+            const p = get(m.partner);
+            if (m.result === 'moved') {
+                if (p.lastMoved == null || m.ts > p.lastMoved) p.lastMoved = m.ts;
+                const di = Math.floor((m.ts - dayStart(6)) / 86400000); if (di >= 0 && di < 7) p.days[di]++;
+                if (m.ts >= from) { if (m.dir === 'out') p.sent++; else p.recv++; }
+            } else if (m.result === 'had' && m.ts >= from) p.had++;
+            else if (m.result === 'offered') { if (m.ts >= from) p.unans++; if (now - m.ts < 86400000) p.unans24++; }
+        }
+        for (const [c, s] of Object.entries(data.bbs.sessions)) {
+            if (!P[c]) continue;            // a connect alone doesn't make a forwarding partner
+            const last = s.list[s.list.length - 1]; if (last) P[c].lastSession = last.ts;
+        }
+        if (queue) queue.list.forEach(q => { get(q.call).queue = q.msgs; });
+        for (const p of Object.values(P)) {
+            const since = p.lastMoved == null ? Infinity : now - p.lastMoved;
+            if (p.queue > 0 && since > 86400000) { p.st = 'bad'; p.note = p.lastMoved == null ? p.queue + ' waiting, nothing moved since ' + oldest : p.queue + ' waiting, nothing moved for ' + ago(p.lastMoved).replace(' ago', ''); }
+            else if (p.queue > 0 && since > 3 * 3600000) { p.st = 'warn'; p.note = p.queue + ' waiting, last mail ' + ago(p.lastMoved); }
+            else if (p.unans24 > 0 && since > 86400000) { p.st = 'warn'; p.note = p.unans24 + (p.unans24 === 1 ? ' offer' : ' offers') + ' in the last day got no answer (link dropped?)'; }
+            else if (since <= 86400000) { p.st = 'ok'; p.note = p.queue > 0 ? p.queue + ' waiting, moving' : 'Mail moving'; }
+            else { p.st = 'idle'; p.note = p.lastMoved == null ? 'No mail since ' + oldest : 'Quiet since ' + fmtTime(p.lastMoved, true); }
+        }
+        const order = { bad: 0, warn: 1, ok: 2, idle: 3 };
+        return Object.values(P).sort((a, b) => (order[a.st] - order[b.st]) || ((b.sent + b.recv) - (a.sent + a.recv)) || a.call.localeCompare(b.call));
+    }
+
+    function render() {
+        const from = cutoff();
+        const inRange = data.bbs.msgs.filter(m => m.ts >= from);
+        const moved = inRange.filter(m => m.result === 'moved');
+        const had = inRange.filter(m => m.result === 'had');
+        const now = new Date();
+        const labels = { 1: 'Today', 7: 'Last 7 days', 30: 'Last 30 days' };
+        $('dateRange').textContent = labels[range] + ' · ' + fmtTime(from, true).replace(/ 00:00Z$/, '') + ' – now (UTC)';
+
+        // No logs at all
+        const nd = $('noData');
+        if (!data.bbsFiles) {
+            nd.innerHTML = '<b>No BBS logs found.</b> This page reads LinBPQ\'s daily BBS logs, <code>logs/log_' + ymd(Date.now()) + '_BBS.txt</code>, through the web server. Check LinBPQ writes them (BBS → Logging) and that <code>logs/</code> points at LinBPQ\'s logs folder (Install Check shows both).';
+            nd.classList.remove('hidden');
+            setStatus('bad', 'No BBS logs');
+        } else {
+            nd.classList.add('hidden');
+            const fresh = data.bbs.lastLine && Date.now() - data.bbs.lastLine < 6 * 3600000;
+            setStatus(fresh ? 'ok' : 'warn', 'Updated ' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + (queue ? '' : ' · asking the BBS for its queue…') + (fresh ? '' : ' · BBS log quiet since ' + fmtTime(data.bbs.lastLine, true)));
+        }
+
+        // KPI 1: moved
+        const nIn = moved.filter(m => m.dir === 'in').length, nOut = moved.length - nIn;
+        $('kMoved').textContent = moved.length.toLocaleString();
+        $('kMovedSub').innerHTML = '<b class="rf-in">' + nIn + ' in</b> · <b class="rf-out">' + nOut + ' out</b>' + (had.length ? ' · ' + had.length + ' offered but already held' : '');
+        const byType = {}; moved.forEach(m => { byType[m.type] = (byType[m.type] || 0) + 1; });
+        $('kTypeChips').innerHTML = ['P', 'B', 'T', 'W'].filter(t => byType[t]).map(t =>
+            '<button type="button" class="rf-chip" data-filter="' + t + '"><i style="background:' + TYPECOL[t] + '"></i>' + TYPE[t] + ' <b>' + byType[t] + '</b></button>').join('');
+
+        // partners (also used for the queue card)
+        const partners = partnerStats();
+
+        // KPI 2: queue
+        const qPending = !queue;
+        const qList = (queue && queue.list || []).filter(q => q.msgs > 0).sort((a, b) => b.msgs - a.msgs);
+        const qTotal = qList.reduce((s, q) => s + q.msgs, 0);
+        const pmap = {}; partners.forEach(p => { pmap[p.call] = p; });
+        if (qPending) {
+            $('kQueue').textContent = '…'; $('kQueue').className = 'rf-kpi-big';
+            $('kQueueSub').textContent = 'asking the BBS (FWD QUEUE)…';
+            $('kQueueBar').innerHTML = ''; $('kQueueChips').innerHTML = '';
+        } else if (queue.error) {
+            $('kQueue').textContent = '–'; $('kQueue').className = 'rf-kpi-big';
+            $('kQueueSub').textContent = 'couldn\'t ask the BBS';
+            $('kQueueBar').innerHTML = ''; $('kQueueChips').innerHTML = '<span class="rf-small rf-muted">FWD QUEUE needs the BBS login in config.php (Maintenance → Forwarding queue check).</span>';
+        } else {
+            const worst = qList.map(q => pmap[q.call]).filter(Boolean).map(p => p.st);
+            $('kQueue').textContent = qTotal; $('kQueue').className = 'rf-kpi-big' + (worst.includes('bad') ? ' bad' : worst.includes('warn') ? ' warn' : '');
+            $('kQueueSub').textContent = qTotal ? 'for ' + qList.length + (qList.length === 1 ? ' partner' : ' partners') + ' · checked ' + fmtTime(queue.at) : 'nothing waiting · checked ' + fmtTime(queue.at);
+            const cols = ['var(--rf-dotwarn)', 'var(--rf-accent)', 'var(--pg-b)', 'var(--rf-muted)'];
+            $('kQueueBar').innerHTML = qTotal ? qList.map((q, i) => '<span style="width:' + (q.msgs / qTotal * 100).toFixed(1) + '%;background:' + cols[Math.min(i, 3)] + '"></span>').join('') : '';
+            $('kQueueChips').innerHTML = qList.slice(0, 4).map((q, i) => '<button type="button" class="rf-chip" data-partner="' + esc(q.call) + '"><i style="background:' + cols[Math.min(i, 3)] + '"></i><span class="rf-mono">' + esc(q.call) + '</span> <b>' + q.msgs + '</b></button>').join('')
+                + (qList.length > 4 ? '<button type="button" class="rf-chip" data-tabgo="queue">+' + (qList.length - 4) + ' more</button>' : '');
+        }
+
+        // KPI 3: bulletins
+        const groups = {};
+        moved.filter(m => m.type === 'B').forEach(m => { const g = m.to + '@' + m.at; const x = groups[g] || (groups[g] = { name: g, n: 0, last: 0, from: '' }); x.n++; if (m.ts > x.last) { x.last = m.ts; x.from = m.from; } });
+        const gl = Object.values(groups).sort((a, b) => b.n - a.n);
+        const nb = byType.B || 0;
+        $('kBull').textContent = nb.toLocaleString();
+        $('kBullSub').textContent = gl.length ? 'in ' + gl.length + (gl.length === 1 ? ' group' : ' groups') : 'none in this period';
+        $('kBullChips').innerHTML = gl.slice(0, 4).map(g => '<button type="button" class="rf-chip" data-group="' + esc(g.name) + '">' + esc(g.name) + ' <b>' + g.n + '</b></button>').join('')
+            + (gl.length > 4 ? '<button type="button" class="rf-chip" data-tabgo="bull">+' + (gl.length - 4) + ' more</button>' : '');
+
+        // KPI 4: security
+        const tcp = data.tcp;
+        const ev = tcp.events.filter(e => e.ts >= from);
+        let seen = 0; try { seen = +localStorage.getItem('bpq_msg_sec_seen') || 0; } catch (e) {}
+        const fresh = tcp.events.filter(e => e.ts > seen).length;
+        if (!tcp.files) {
+            $('kSec').textContent = '–'; $('kSecTag').innerHTML = '';
+            $('kSecSub').textContent = 'no mail-server log (needed only if mail apps use LinBPQ\'s POP3/SMTP)';
+            $('kSecChips').innerHTML = '';
+        } else {
+            $('kSec').textContent = ev.length;
+            $('kSecTag').innerHTML = fresh ? '<span class="rf-tag warn">' + fresh + ' new since you looked</span>' : '';
+            $('kSecSub').textContent = ev.length ? 'last ' + fmtTime(ev[0].ts, true) : 'none in this period';
+            const k = {}; ev.forEach(e => { k[e.label] = (k[e.label] || 0) + 1; });
+            $('kSecChips').innerHTML = Object.entries(k).map(([l, n]) => '<button type="button" class="rf-chip" data-tabgo="sec"><i style="background:' + (l === 'Wrong password' ? 'var(--rf-dotbad)' : 'var(--rf-dotwarn)') + ';border-radius:50%"></i>' + esc(l) + ' <b>' + n + '</b></button>').join('');
+        }
+
+        // status strip
+        const lastIn = data.bbs.msgs.filter(m => m.result === 'moved' && m.dir === 'in').pop();
+        const lastOut = data.bbs.msgs.filter(m => m.result === 'moved' && m.dir === 'out').pop();
+        const act = partners.filter(p => p.st !== 'idle');
+        const okN = act.filter(p => p.st === 'ok').length;
+        const pills = [];
+        pills.push({ c: data.bbsFiles ? (data.bbs.lastLine && Date.now() - data.bbs.lastLine < 6 * 3600000 ? 'ok' : 'warn') : 'bad', b: 'BBS log', s: data.bbs.lastLine ? 'last line ' + fmtTime(data.bbs.lastLine) : 'not found' });
+        if (act.length) pills.push({ c: okN === act.length ? 'ok' : (act.some(p => p.st === 'bad') ? 'bad' : 'warn'), b: 'Forwarding', s: okN + ' of ' + act.length + ' partners moving mail', go: 'partners' });
+        pills.push({ c: !queue || queue.error ? '' : (qTotal ? 'warn' : 'ok'), b: 'Queue', s: !queue ? 'asking the BBS…' : queue.error ? 'not available' : (qTotal ? qTotal + ' waiting' : 'empty'), go: 'queue' });
+        if (lastIn) pills.push({ c: 'ok', b: 'Last in', s: fmtTime(lastIn.ts) + ' from ' + lastIn.partner });
+        if (lastOut) pills.push({ c: 'ok', b: 'Last out', s: fmtTime(lastOut.ts) + ' to ' + lastOut.partner });
+        $('statusStrip').innerHTML = pills.map(p => '<button type="button" class="rf-pill"' + (p.go ? ' data-tabgo="' + p.go + '"' : '') + '><i style="background:' + (p.c ? 'var(--rf-dot' + (p.c === 'ok' ? 'good' : p.c) + ')' : 'var(--rf-muted)') + '"></i><b>' + esc(p.b) + '</b><span>' + esc(p.s) + '</span></button>').join('');
+
+        // partner table
+        $('partnerRows').innerHTML = partners.length ? partners.map(p => {
+            const days = p.days.map((n, i) => { const lv = n === 0 ? '' : n < 3 ? 'l1' : n < 10 ? 'l2' : 'l3'; return '<span class="' + lv + '" title="' + esc(fmtTime(dayStart(6 - i), true).replace(/ 00:00Z$/, '') + ': ' + n + ' moved') + '"></span>'; }).join('');
+            const qc = p.queue ? (p.st === 'bad' ? 'bad' : p.st === 'warn' ? 'warn' : 'on') : '';
+            return '<tr><td><div style="display:flex;align-items:center;gap:10px"><span class="rf-dot ' + p.st + '"></span><div style="display:flex;flex-direction:column;gap:2px"><button type="button" class="rf-call" data-partner="' + esc(p.call) + '">' + esc(p.call) + '</button><span class="rf-note ' + (p.st === 'idle' ? '' : p.st) + '">' + esc(p.note) + '</span></div></div></td>'
+                + '<td style="white-space:nowrap">' + (p.lastMoved ? fmtTime(p.lastMoved) + '<div class="rf-small rf-muted">' + ago(p.lastMoved) + '</div>' : '<span class="rf-muted">–</span>') + '</td>'
+                + '<td class="num rf-out">' + p.sent + '</td><td class="num rf-in">' + p.recv + '</td><td class="num rf-muted">' + (p.had || '–') + '</td>'
+                + '<td class="num"><span class="rf-q ' + qc + '">' + (queue && !queue.error ? p.queue : '–') + '</span></td>'
+                + '<td><div class="rf-days">' + days + '</div></td></tr>';
+        }).join('') : '<tr><td colspan="7" class="rf-empty">No forwarding partners seen in the BBS logs yet. Partners saved on RF Connections show here too.</td></tr>';
+
+        // hourly mirror
+        const hi = new Array(24).fill(0), ho = new Array(24).fill(0);
+        moved.forEach(m => { const h = new Date(m.ts).getUTCHours(); (m.dir === 'in' ? hi : ho)[h]++; });
+        const hmax = Math.max(1, ...hi, ...ho);
+        $('hourIn').innerHTML = hi.map((v, h) => '<span title="' + pad(h) + 'Z: ' + v + ' in" style="height:' + (v / hmax * 100).toFixed(1) + '%' + (v ? ';min-height:2px' : '') + '"></span>').join('');
+        $('hourOut').innerHTML = ho.map((v, h) => '<span title="' + pad(h) + 'Z: ' + v + ' out" style="height:' + (v / hmax * 100).toFixed(1) + '%' + (v ? ';min-height:2px' : '') + '"></span>').join('');
+
+        // senders
+        const snd = {}; moved.filter(m => m.dir === 'in' && m.from).forEach(m => { snd[m.from] = (snd[m.from] || 0) + 1; });
+        const sl = Object.entries(snd).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        const smax = sl.length ? sl[0][1] : 1;
+        $('senders').innerHTML = sl.length ? sl.map(([c, n]) => '<div class="pg-bar"><b class="rf-mono">' + esc(c) + '</b><span class="track"><span style="width:' + (n / smax * 100).toFixed(1) + '%"></span></span><b>' + n + '</b></div>').join('') : '<div class="rf-muted rf-small">Nothing came in during this period.</div>';
+
+        // tabs
+        $('cRecent').textContent = inRange.filter(m => m.result !== 'offered').length;
+        $('cBull').textContent = gl.length;
+        $('cQueue').textContent = queue && !queue.error ? qTotal : '–';
+        $('cClients').textContent = tcp.files ? Object.keys(tcp.users).length : '–';
+        $('cSec').textContent = tcp.files ? ev.length : '–';
+        renderRecent(inRange);
+        $('bullTiles').innerHTML = gl.length ? gl.map(g => '<button type="button" class="pg-tile" data-group="' + esc(g.name) + '"><span class="pg-tile-top"><b>' + esc(g.name) + '</b><b>' + g.n + '</b></span><small>latest ' + esc(fmtTime(g.last)) + (g.from ? ' · ' + esc(g.from) : '') + '</small></button>').join('') : '<div class="rf-muted">No bulletins in this period.</div>';
+        renderQueue(qList, pmap);
+        renderClients(tcp);
+        $('secRows').innerHTML = !tcp.files ? '<tr><td colspan="3" class="rf-empty">No mail-server log (log_YYMMDD_TCP.txt). It exists only when mail apps use LinBPQ\'s own POP3/SMTP.</td></tr>'
+            : (ev.length ? ev.slice(0, 300).map(e => '<tr' + (e.ts > seen ? '' : ' class="dim"') + '><td class="rf-mono" style="white-space:nowrap">' + esc(fmtTime(e.ts, true)) + '</td><td><span style="display:inline-flex;align-items:center;gap:6px"><span class="rf-dot ' + (e.kind === 'auth' ? 'bad' : 'warn') + '"></span>' + esc(e.label) + '</span></td><td>' + esc(e.detail) + '</td></tr>').join('') : '<tr><td colspan="3" class="rf-empty">No security events in this period.</td></tr>');
+        showTab(tab, true);
+    }
+
+    function renderRecent(inRange) {
+        const q = $('msgSearch').value.trim().toUpperCase();
+        const counts = { all: 0, in: 0, out: 0, had: 0 };
+        let rows = inRange.filter(m => m.result !== 'offered').slice().reverse();
+        rows.forEach(m => { counts.all++; if (m.result === 'had') counts.had++; else if (m.dir === 'in') counts.in++; else counts.out++; });
+        const f = msgFilter;
+        rows = rows.filter(m => f === 'all' || (f === 'in' && m.dir === 'in' && m.result !== 'had') || (f === 'out' && m.dir === 'out' && m.result !== 'had') || (f === 'had' && m.result === 'had') || (f === m.type && m.result === 'moved'));
+        if (q) rows = rows.filter(m => (m.from + ' ' + m.to + '@' + m.at + ' ' + m.bid + ' ' + m.partner).toUpperCase().includes(q));
+        const flt = [['all', 'All', counts.all], ['in', 'In', counts.in], ['out', 'Out', counts.out], ['had', 'Already had', counts.had]];
+        if (['P', 'B', 'T', 'W'].includes(f)) flt.push([f, TYPE[f], rows.length]);
+        $('msgFilters').innerHTML = flt.map(([k, l, n]) => '<button type="button" class="rf-chip" data-mfilter="' + k + '" aria-pressed="' + (f === k) + '">' + l + ' <b>' + n + '</b></button>').join('');
+        const RES = { moved: '<span class="rf-note ok">✓ moved</span>', had: '<span class="rf-note">already had</span>', later: '<span class="rf-note warn">deferred</span>', error: '<span class="rf-note bad">error</span>' };
+        $('msgRows').innerHTML = rows.length ? rows.slice(0, shown).map(m =>
+            '<tr' + (m.result === 'had' ? ' class="dim"' : '') + '><td class="rf-mono" style="white-space:nowrap">' + esc(fmtTime(m.ts, range > 1)) + '</td>'
+            + '<td class="' + (m.dir === 'in' ? 'rf-in' : 'rf-out') + '" style="white-space:nowrap">' + (m.dir === 'in' ? '← IN' : 'OUT →') + '</td>'
+            + '<td><span class="rf-type ' + TYPECLS[m.type] + '">' + TYPE[m.type] + '</span></td>'
+            + '<td class="rf-mono">' + esc(m.from || '–') + '</td><td class="rf-mono">' + esc(m.type === 'W' ? m.to : m.to + (m.at ? '@' + m.at : '')) + '</td>'
+            + '<td class="rf-mono rf-small">' + esc(m.bid) + '</td><td class="num">' + fmtSize(m.size) + '</td>'
+            + '<td><button type="button" class="rf-call" data-partner="' + esc(m.partner) + '">' + esc(m.partner) + '</button></td><td>' + (RES[m.result] || '') + '</td></tr>').join('')
+            : '<tr><td colspan="9" class="rf-empty">No messages match.</td></tr>';
+        $('msgMore').innerHTML = rows.length > shown ? 'Showing ' + shown + ' of ' + rows.length + ' <button type="button" class="rf-btn rf-btn-sm" id="showMore">Show more</button>' : rows.length + (rows.length === 1 ? ' message' : ' messages') + ' · from the BBS logs (offers matched with their answers)';
+    }
+
+    function renderQueue(qList, pmap) {
+        if (!queue) { $('queueRows').innerHTML = '<tr><td colspan="4" class="rf-empty">Asking the BBS for its forwarding queue…</td></tr>'; $('queueMore').textContent = ''; return; }
+        if (queue.error) {
+            $('queueRows').innerHTML = '<tr><td colspan="4" class="rf-empty">Couldn\'t ask the BBS for its forwarding queue (' + esc(queue && queue.error || 'no answer') + '). It uses the BBS login in config.php.</td></tr>';
+            $('queueMore').textContent = '';
+            return;
+        }
+        $('queueRows').innerHTML = qList.length ? qList.map(q => { const p = pmap[q.call] || {}; return '<tr><td><button type="button" class="rf-call" data-partner="' + esc(q.call) + '">' + esc(q.call) + '</button></td><td class="num"><span class="rf-q ' + (p.st === 'bad' ? 'bad' : p.st === 'warn' ? 'warn' : 'on') + '">' + q.msgs + '</span></td><td>' + (p.lastMoved ? esc(fmtTime(p.lastMoved, true)) + ' <span class="rf-muted rf-small">' + ago(p.lastMoved) + '</span>' : '<span class="rf-muted">none in the logs</span>') + '</td><td><span class="rf-note ' + (p.st || '') + '">' + esc(p.note || '') + '</span></td></tr>'; }).join('')
+            : '<tr><td colspan="4" class="rf-empty">Nothing waiting: every partner is up to date.</td></tr>';
+        $('queueMore').textContent = 'From the BBS\'s FWD QUEUE command, checked ' + fmtTime(queue.at, true) + ' (asked at most once a minute).';
+    }
+
+    function renderClients(tcp) {
+        if (!tcp.files) {
+            $('clientKv').innerHTML = '';
+            $('clientRows').innerHTML = '<tr><td colspan="5" class="rf-empty">No mail-server log. It exists only when mail apps use LinBPQ\'s own POP3/SMTP (the BBS mail store uses Dovecot instead).</td></tr>';
+            return;
+        }
+        $('clientKv').innerHTML = [['POP3 sessions', tcp.pop3], ['SMTP sessions', tcp.smtp], ['NNTP sessions', tcp.nntp], ['Users', Object.keys(tcp.users).length]].map(([l, n]) => '<div><span>' + l + '</span><b>' + n + '</b></div>').join('');
+        const ul = Object.entries(tcp.users).sort((a, b) => (b[1].sessions + b[1].read + b[1].sent) - (a[1].sessions + a[1].read + a[1].sent));
+        $('clientRows').innerHTML = ul.length ? ul.slice(0, 100).map(([u, d]) => '<tr><td class="rf-mono">' + esc(u) + '</td><td class="num">' + d.sessions + '</td><td class="num">' + d.read + '</td><td class="num">' + d.sent + '</td><td class="rf-mono">' + esc(d.last ? fmtTime(d.last, true) : '–') + '</td></tr>').join('') : '<tr><td colspan="5" class="rf-empty">No mail-app sessions in the log.</td></tr>';
+    }
+
+    function showTab(t, keep) {
+        tab = t;
+        document.querySelectorAll('.rf-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+        ['recent', 'bull', 'queue', 'clients', 'sec'].forEach(k => $('tab-' + k).classList.toggle('hidden', k !== t));
+        if (t === 'sec' && !keep && data && data.tcp.events.length) {
+            try { localStorage.setItem('bpq_msg_sec_seen', String(data.tcp.events[0].ts)); } catch (e) {}
+            $('kSecTag').innerHTML = '';
+        }
+    }
+
+    // ── drawers ─────────────────────────────────────────────────────────
+    function openDrawer(title, html) {
+        $('drawerTitle').textContent = title; $('drawerBody').innerHTML = html;
+        $('drawer').classList.remove('hidden'); $('drawerBg').classList.remove('hidden');
+        $('drawerClose').focus();
+    }
+    function closeDrawer() { $('drawer').classList.add('hidden'); $('drawerBg').classList.add('hidden'); }
+
+    function partnerDrawer(call) {
+        const p = partnerStats().find(x => x.call === call) || { call, sent: 0, recv: 0, had: 0, queue: 0, note: '' };
+        const from = cutoff();
+        const ms = data.bbs.msgs.filter(m => m.partner === call && m.ts >= from && m.result !== 'offered').reverse();
+        const ses = (data.bbs.sessions[call] || { list: [] }).list.filter(s => s.ts >= from);
+        let h = '<div class="rf-kv"><div><span>Sent</span><b class="rf-out">' + p.sent + '</b></div><div><span>Received</span><b class="rf-in">' + p.recv + '</b></div><div><span>Already had</span><b>' + p.had + '</b></div><div><span>Waiting</span><b>' + (queue && !queue.error ? p.queue : '–') + '</b></div><div><span>Sessions</span><b>' + ses.length + '</b></div></div>';
+        h += '<div class="rf-note ' + (p.st || '') + '">' + esc(p.note || '') + (p.lastMoved && !/last mail/.test(p.note || '') ? ' · last mail ' + esc(fmtTime(p.lastMoved, true)) : '') + '</div>';
+        h += '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="rf-btn rf-btn-sm" style="display:inline-flex;align-items:center;text-decoration:none" href="bpq-rf-connections.html">RF link health →</a></div>';
+        h += ms.length ? ms.slice(0, 200).map(m => '<div class="rf-msg"><div class="rf-msg-top"><span class="' + (m.dir === 'in' ? 'rf-in' : 'rf-out') + '">' + (m.dir === 'in' ? '← ' : '→ ') + esc(m.type === 'W' ? m.to : (m.to + (m.at ? '@' + m.at : ''))) + '</span><span class="rf-type ' + TYPECLS[m.type] + '">' + TYPE[m.type] + '</span></div><div class="rf-msg-sub">' + esc(fmtTime(m.ts, true)) + ' · from ' + esc(m.from || '–') + ' · ' + esc(m.bid) + ' · ' + fmtSize(m.size) + (m.result === 'moved' ? '' : ' · ' + (m.result === 'had' ? 'already had' : m.result)) + '</div></div>').join('')
+            : '<div class="rf-muted">No messages with ' + esc(call) + ' in this period.</div>';
+        openDrawer(call + ' · mail', h);
+    }
+
+    let curGroup = '';
+    async function groupDrawer(group) {
+        curGroup = group;
+        openDrawer(group, '<div class="rf-muted">Asking the BBS for the latest ' + esc(group) + ' bulletins…</div>');
+        try {
+            const r = await fetch('bbs-messages.php?action=bulletins&address=' + encodeURIComponent(group) + '&count=30');
+            const j = await r.json();
+            if (curGroup !== group) return;
+            if (j.success && j.messages && j.messages.length) {
+                $('drawerBody').innerHTML = '<div class="rf-small rf-muted">' + j.messages.length + (j.total > j.messages.length ? ' of ' + j.total : '') + ' bulletins on the BBS</div>' + j.messages.map(m => '<button type="button" class="rf-msg" data-read="' + (+m.number) + '"><div class="rf-msg-top"><span>' + esc(m.subject || '(no subject)') + '</span><span class="rf-muted rf-small">#' + (+m.number) + '</span></div><div class="rf-msg-sub">' + esc(m.from || '') + ' · ' + esc(m.date || '') + ' · ' + esc(m.to || '') + '</div></button>').join('');
             } else {
-                showNoDataWarning();
+                $('drawerBody').innerHTML = '<div class="rf-muted">' + esc(j.error ? 'The BBS answered: ' + j.error : 'No bulletins found for ' + group + ' on the BBS.') + '</div>';
             }
-            isLoading = false;
-        }
-        
-        function showNoDataWarning() {
-            const now = new Date();
-            const yy = String(now.getUTCFullYear()).slice(-2);
-            const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
-            const dd = String(now.getUTCDate()).padStart(2, '0');
-            const logType = currentMode === 'bbs' ? 'BBS' : 'TCP';
-            const warningDiv = document.getElementById('noDataWarning');
-            
-            if (currentMode === 'bbs') {
-                warningDiv.innerHTML = '<div class="text-amber-600 text-3xl mb-3">⚠️</div><div class="text-gray-700 font-bold text-lg mb-2">No BBS Log Files Found</div><div class="text-gray-500 text-sm leading-relaxed">This dashboard requires BPQ32 daily BBS log files.<br><br><span class="font-semibold">Required file:</span> <span class="font-mono font-bold text-purple-600">log_YYMMDD_BBS.txt</span><br><span class="font-semibold">Location:</span> <span class="font-mono font-bold text-purple-600">logs/</span> directory<br><span class="font-semibold">Example:</span> <span class="font-mono text-gray-600">logs/log_' + yy + mm + dd + '_BBS.txt</span></div>';
-            } else {
-                warningDiv.innerHTML = '<div class="text-amber-600 text-3xl mb-3">⚠️</div><div class="text-gray-700 font-bold text-lg mb-2">No TCP Log Files Found</div><div class="text-gray-500 text-sm leading-relaxed">TCP Mode requires BPQ32 TCP log files (POP3/SMTP/NNTP sessions).<br><br><span class="font-semibold">Required file:</span> <span class="font-mono font-bold text-purple-600">log_YYMMDD_TCP.txt</span><br><span class="font-semibold">Location:</span> <span class="font-mono font-bold text-purple-600">logs/</span> directory<br><span class="font-semibold">Example:</span> <span class="font-mono text-gray-600">logs/log_' + yy + mm + dd + '_TCP.txt</span><br><br><span class="font-semibold text-green-700">💡 Tip:</span> If you don\'t have email clients connecting via POP3/SMTP,<br>switch to <strong class="text-purple-600">BBS Mode</strong> to view message forwarding activity instead.</div>';
-            }
-            warningDiv.classList.remove('hidden');
-            warningDiv.style.display = 'block'; // Force display
-            
-            if (currentMode === 'bbs') { resetBbsStats(); updateBbsUI(); } else { resetTcpStats(); updateTcpUI(); }
-            updateStatus('error', 'No ' + logType + ' log files found');
-            document.getElementById('dateRange').textContent = '⚠️ No ' + logType + ' logs found';
-        }
+        } catch (e) { $('drawerBody').innerHTML = '<div class="rf-muted">Couldn\'t reach the BBS: ' + esc(e.message) + '</div>'; }
+    }
+    async function readMsg(n) {
+        $('drawerBody').innerHTML = '<div class="rf-muted">Loading message #' + n + '…</div>';
+        try {
+            const r = await fetch('bbs-messages.php?action=read&msg=' + n);
+            const j = await r.json();
+            if (j.success && j.body != null) {
+                $('drawerBody').innerHTML = '<div><button type="button" class="rf-btn rf-btn-sm" id="backToGroup">← ' + esc(curGroup) + '</button></div><div class="rf-msg"><div class="rf-msg-top"><span>' + esc(j.subject || '(no subject)') + '</span><span class="rf-muted rf-small">#' + n + '</span></div><div class="rf-msg-sub">From ' + esc(j.from || '') + ' · to ' + esc(j.to || '') + ' · ' + esc(j.date || '') + '</div></div><pre class="rf-pre">' + esc(j.body) + '</pre>';
+            } else $('drawerBody').innerHTML = '<div class="rf-muted">' + esc(j.error || 'Could not load the message.') + '</div>';
+        } catch (e) { $('drawerBody').innerHTML = '<div class="rf-muted">' + esc(e.message) + '</div>'; }
+    }
 
-        function filterAndProcess() {
-            const warningDiv = document.getElementById('noDataWarning');
-            warningDiv.classList.add('hidden');
-            warningDiv.style.display = 'none';
-            
-            const now = new Date();
-            const cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - selectedRange));
-            const cutoffStr = String(cutoffDate.getUTCFullYear()).slice(-2) + String(cutoffDate.getUTCMonth() + 1).padStart(2, '0') + String(cutoffDate.getUTCDate()).padStart(2, '0');
-            
-            filteredLogs = allLogs.filter(entry => entry.date >= cutoffStr);
-            const datesInRange = loadedDates.filter(d => d >= cutoffStr);
-            const rangeLabel = selectedRange === 7 ? '7 Days' : selectedRange === 28 ? '4 Weeks' : '30 Days';
-            
-            if (datesInRange.length > 0) {
-                if (currentMode === 'bbs') { 
-                    parseBbsLogs(); 
-                    // Check if BBS parsing found any actual activity
-                    if (bbsStats.totalMsgs === 0 && Object.keys(bbsStats.partners).length === 0) {
-                        showNoBbsActivityWarning(rangeLabel);
-                        return;
-                    }
-                    updateBbsUI(); 
-                } else { 
-                    parseTcpLogs(); 
-                    updateTcpUI();
-                    // Check if TCP parsing found any actual activity
-                    if (tcpStats.pop3 === 0 && tcpStats.smtp === 0 && tcpStats.nntp === 0 && tcpStats.messages.length === 0) {
-                        showNoActivityWarning(rangeLabel);
-                        return;
-                    }
-                }
-                const formatDate = (d) => { const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return months[parseInt(d.substring(2,4))-1] + ' ' + parseInt(d.substring(4,6)); };
-                datesInRange.sort();
-                updateStatus('success', filteredLogs.length.toLocaleString() + ' lines');
-                document.getElementById('dateRange').textContent = rangeLabel + ': ' + formatDate(datesInRange[0]) + ' – ' + formatDate(datesInRange[datesInRange.length - 1]);
-            } else {
-                showNoDataWarning();
-            }
+    // ── events ──────────────────────────────────────────────────────────
+    document.addEventListener('click', (e) => {
+        const t = e.target.closest('button, [data-partner], [data-group]');
+        if (!t) return;
+        if (t.id === 'drawerClose') return closeDrawer();
+        if (t.id === 'refreshBtn') return loadAll();
+        if (t.id === 'themeBtn') { if (window.toggleDarkMode) window.toggleDarkMode(); themeLabel(); return; }
+        if (t.id === 'showMore') { shown += 200; renderRecent(data.bbs.msgs.filter(m => m.ts >= cutoff())); return; }
+        if (t.id === 'backToGroup') return groupDrawer(curGroup);
+        if (t.dataset.range) {
+            range = +t.dataset.range; try { localStorage.setItem('bpq_msg_range', String(range)); } catch (err) {}
+            document.querySelectorAll('.rf-range button').forEach(b => b.classList.toggle('active', b === t));
+            shown = 100; if (range > loadedDays - 1) loadAll(); else if (data) render(); return;
         }
-        
-        function showNoActivityWarning(rangeLabel) {
-            const warningDiv = document.getElementById('noDataWarning');
-            warningDiv.innerHTML = '<div class="text-amber-600 text-3xl mb-3">📭</div><div class="text-gray-700 font-bold text-lg mb-2">No POP3/SMTP/NNTP Activity</div><div class="text-gray-500 text-sm leading-relaxed">TCP log files exist but contain no email server activity for the selected period.<br><br><span class="font-semibold">Selected range:</span> ' + rangeLabel + '<br><br><span class="font-semibold text-green-700">💡 Tip:</span> Try selecting a longer time range (4W or 30D),<br>or switch to <strong class="text-purple-600">BBS Mode</strong> to view message forwarding activity.</div>';
-            warningDiv.classList.remove('hidden');
-            warningDiv.style.display = 'block';
-            updateStatus('error', 'No TCP activity in selected range');
-            document.getElementById('dateRange').textContent = '⚠️ No activity in ' + rangeLabel;
-        }
-        
-        function showNoBbsActivityWarning(rangeLabel) {
-            const warningDiv = document.getElementById('noDataWarning');
-            warningDiv.innerHTML = '<div class="text-amber-600 text-3xl mb-3">📭</div><div class="text-gray-700 font-bold text-lg mb-2">No BBS Forwarding Activity</div><div class="text-gray-500 text-sm leading-relaxed">BBS log files exist but contain no message forwarding activity for the selected period.<br><br><span class="font-semibold">Selected range:</span> ' + rangeLabel + '<br><br><span class="font-semibold text-green-700">💡 Tip:</span> Try selecting a longer time range (4W or 30D).<br>If your BBS is not actively forwarding, the logs may only contain connection events.</div>';
-            warningDiv.classList.remove('hidden');
-            warningDiv.style.display = 'block';
-            resetBbsStats();
-            updateBbsUI();
-            updateStatus('error', 'No BBS activity in selected range');
-            document.getElementById('dateRange').textContent = '⚠️ No activity in ' + rangeLabel;
-        }
-        
-        function setTimeRange(days) {
-            selectedRange = days;
-            ['range7d', 'range28d', 'range30d'].forEach(id => {
-                const btn = document.getElementById(id);
-                const isActive = (id === 'range7d' && days === 7) || (id === 'range28d' && days === 28) || (id === 'range30d' && days === 30);
-                btn.className = isActive ? 'px-3 py-1 text-xs rounded font-semibold bg-purple-600 text-white' : 'px-3 py-1 text-xs rounded font-semibold bg-gray-200 hover:bg-purple-100 text-gray-700';
-            });
-            
-            // Only use cached data if it's for the current mode
-            if (loadedMode === currentMode && (allLogs.length > 0 || loadedDates.length > 0)) {
-                filterAndProcess();
-            } else {
-                showNoDataWarning();
-            }
-        }
+        if (t.dataset.tab) return showTab(t.dataset.tab);
+        if (t.dataset.tabgo) { if (t.dataset.tabgo === 'partners') { document.querySelector('.rf-colmain').scrollIntoView({ behavior: 'smooth' }); return; } showTab(t.dataset.tabgo); document.querySelector('.rf-tabs').scrollIntoView({ behavior: 'smooth' }); return; }
+        if (t.dataset.filter) { msgFilter = t.dataset.filter; shown = 100; showTab('recent'); renderRecent(data.bbs.msgs.filter(m => m.ts >= cutoff())); document.querySelector('.rf-tabs').scrollIntoView({ behavior: 'smooth' }); return; }
+        if (t.dataset.mfilter) { msgFilter = t.dataset.mfilter; shown = 100; renderRecent(data.bbs.msgs.filter(m => m.ts >= cutoff())); return; }
+        if (t.dataset.partner) return partnerDrawer(t.dataset.partner);
+        if (t.dataset.group) return groupDrawer(t.dataset.group);
+        if (t.dataset.read) return readMsg(+t.dataset.read);
+    });
+    $('drawerBg').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('drawer').classList.contains('hidden')) closeDrawer(); });
+    $('msgSearch').addEventListener('input', () => { shown = 100; if (data) renderRecent(data.bbs.msgs.filter(m => m.ts >= cutoff())); });
 
-        function resetBbsStats() { bbsStats = { msgsReceived: 0, msgsForwarded: 0, bulletins: 0, rejected: 0, totalMsgs: 0, partners: {}, bulletinGroups: {}, messages: [], hourlyActivity: { received: {}, forwarded: {}, bulletins: {} } }; }
-        
-        function parseBbsLogs() {
-            resetBbsStats();
-            const seenMsgs = new Set(); // Track unique message BIDs
-            
-            for (const entry of filteredLogs) {
-                const line = entry.line;
-                const date = entry.date;
-                const timeMatch = line.match(/(\d{2}):(\d{2}):(\d{2})/);
-                const hour = timeMatch ? timeMatch[1] : null;
-                const time = timeMatch ? timeMatch[1] + ':' + timeMatch[2] + ':' + timeMatch[3] : '';
-                
-                // Direction is determined by prefix after timestamp: >CALL = outgoing, <CALL = incoming
-                // Format: "260204 00:02:11 >F1UBL    FA B LU9DCE WW NEWS 6938_LU9DCE 7569"
-                const dirMatch = line.match(/^\d{6}\s+\d{2}:\d{2}:\d{2}\s+([><|?])([A-Z0-9-]*)/);
-                const direction = dirMatch ? dirMatch[1] : null;
-                const partner = dirMatch ? dirMatch[2] : '';
-                
-                // FBB protocol message proposals: FB (propose) or FA (accept)
-                // Format: "FB B LU9DCE WW NEWS 6938_LU9DCE 7166" or "FA B LU9DCE WW NEWS 6938_LU9DCE 7569"
-                const fbMatch = line.match(/F[AB]\s+([BPT])\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Z0-9]+)\s+([A-Z0-9_-]+)\s+(\d+)/);
-                if (fbMatch) {
-                    const msgType = fbMatch[1]; // B=Bulletin, P=Personal, T=Traffic
-                    const fromCall = fbMatch[2];
-                    const toArea = fbMatch[3]; // WW, USA, LUNET, etc
-                    const category = fbMatch[4]; // NEWS, TECH, etc
-                    const bid = fbMatch[5];
-                    const size = fbMatch[6];
-                    
-                    const isBulletin = (msgType === 'B');
-                    
-                    // Only count each BID once per direction
-                    const msgKey = bid + '_' + direction;
-                    if (!seenMsgs.has(msgKey)) {
-                        seenMsgs.add(msgKey);
-                        bbsStats.totalMsgs++;
-                        
-                        if (direction === '>') {
-                            // Outgoing (forwarding)
-                            bbsStats.msgsForwarded++;
-                            if (hour) bbsStats.hourlyActivity.forwarded[hour] = (bbsStats.hourlyActivity.forwarded[hour] || 0) + 1;
-                        } else if (direction === '<') {
-                            // Incoming (received)
-                            bbsStats.msgsReceived++;
-                            if (hour) bbsStats.hourlyActivity.received[hour] = (bbsStats.hourlyActivity.received[hour] || 0) + 1;
-                        }
-                        
-                        if (isBulletin) {
-                            bbsStats.bulletins++;
-                            if (hour) bbsStats.hourlyActivity.bulletins[hour] = (bbsStats.hourlyActivity.bulletins[hour] || 0) + 1;
-                            // Track bulletin groups by category@area (e.g., NEWS@WW)
-                            const groupKey = category + '@' + toArea;
-                            if (!bbsStats.bulletinGroups[groupKey]) bbsStats.bulletinGroups[groupKey] = { count: 0, lastSeen: '', category: category, area: toArea };
-                            bbsStats.bulletinGroups[groupKey].count++;
-                            bbsStats.bulletinGroups[groupKey].lastSeen = date;
-                        }
-                        
-                        // Store message info
-                        if (bbsStats.messages.length < 100) {
-                            bbsStats.messages.push({ 
-                                id: bid, 
-                                from: fromCall, 
-                                to: toArea + ' ' + category, 
-                                date: date, 
-                                time: time, 
-                                isBulletin: isBulletin,
-                                direction: direction === '>' ? 'out' : 'in',
-                                partner: partner,
-                                size: parseInt(size)
-                            });
-                        }
-                    }
-                }
-                
-                // Track forwarding partners from connection events
-                // "|EXAMPLE   Incoming Connect from EXAMPLE" or "|F1UBL     Connecting to BBS F1UBL"
-                if (direction === '|' && partner) {
-                    const cleanPartner = partner.replace(/-\d+$/, ''); // Remove SSID
-                    if (cleanPartner.length >= 3 && /^[A-Z0-9]+$/.test(cleanPartner)) {
-                        if (!bbsStats.partners[cleanPartner]) bbsStats.partners[cleanPartner] = { connections: 0, incoming: 0, outgoing: 0, rejected: 0, lastSeen: '' };
-                        bbsStats.partners[cleanPartner].connections++;
-                        if (line.includes('Incoming Connect')) {
-                            bbsStats.partners[cleanPartner].incoming++;
-                        } else if (line.includes('Connecting to')) {
-                            bbsStats.partners[cleanPartner].outgoing++;
-                        }
-                        bbsStats.partners[cleanPartner].lastSeen = date + ' ' + time;
-                    }
-                }
-                
-                // Track rejections by partner (format: "?LU9DCE   Message Rejected by BID Check")
-                if (direction === '?' && partner) {
-                    const cleanPartner = partner.replace(/-\d+$/, ''); // Remove SSID
-                    if (cleanPartner.length >= 3 && /^[A-Z0-9]+$/.test(cleanPartner)) {
-                        if (!bbsStats.partners[cleanPartner]) bbsStats.partners[cleanPartner] = { connections: 0, incoming: 0, outgoing: 0, rejected: 0, lastSeen: '' };
-                        bbsStats.partners[cleanPartner].rejected++;
-                    }
-                }
-                
-                // Count total rejections
-                if (line.includes('Rejected by BID')) bbsStats.rejected++;
-            }
-            
-            bbsStats.messages.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-            bbsStats.messages = bbsStats.messages.slice(0, 50);
-        }
-        
-        function updateBbsUI() {
-            document.getElementById('bbsMsgsReceived').textContent = bbsStats.msgsReceived.toLocaleString();
-            document.getElementById('bbsMsgsForwarded').textContent = bbsStats.msgsForwarded.toLocaleString();
-            document.getElementById('bbsBulletins').textContent = bbsStats.bulletins.toLocaleString();
-            document.getElementById('bbsPartners').textContent = Object.keys(bbsStats.partners).length;
-            document.getElementById('bbsTotalMsgs').textContent = bbsStats.totalMsgs.toLocaleString();
-            document.getElementById('bbsRejected').textContent = bbsStats.rejected.toLocaleString();
-            
-            const partnersSorted = Object.entries(bbsStats.partners).sort((a, b) => b[1].connections - a[1].connections).slice(0, 10);
-            document.getElementById('activityList').innerHTML = partnersSorted.length > 0
-                ? partnersSorted.map(([partner, data], idx) => '<div class="flex justify-between items-center p-2 bg-white rounded-lg border border-gray-100"><div class="flex items-center gap-2"><span class="text-xs font-bold text-gray-400">#' + (idx+1) + '</span><span class="font-bold text-purple-700">' + partner + '</span></div><div class="text-right"><div class="flex gap-1 text-xs"><span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded" title="Incoming">↓' + (data.incoming || 0) + '</span><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded" title="Outgoing">↑' + (data.outgoing || 0) + '</span>' + (data.rejected > 0 ? '<span class="px-1.5 py-0.5 bg-red-100 text-red-700 rounded" title="Rejected">✗' + data.rejected + '</span>' : '') + '</div><div class="text-xs text-gray-400 mt-1">' + data.lastSeen + '</div></div></div>').join('')
-                : '<div class="text-gray-400 text-center py-4">No forwarding partners found</div>';
-            
-            document.getElementById('recentMessages').innerHTML = bbsStats.messages.length > 0
-                ? bbsStats.messages.map(msg => '<div class="flex justify-between items-center p-2 bg-white rounded-lg border border-gray-100"><div class="flex-1 min-w-0"><span class="font-mono text-xs ' + (msg.direction === 'out' ? 'text-blue-600' : 'text-green-600') + '">' + (msg.direction === 'out' ? '↑' : '↓') + '</span> <span class="font-mono text-sm text-gray-700">' + msg.id + '</span><span class="text-xs text-gray-400 ml-2">' + msg.date + '</span>' + (msg.from ? '<span class="text-xs text-purple-600 ml-2">' + msg.from + '</span>' : '') + '<span class="text-xs text-gray-400 ml-1">→</span><span class="text-xs text-blue-600 ml-1">' + (msg.to || '') + '</span>' + (msg.partner ? '<span class="text-xs text-gray-400 ml-2">via ' + msg.partner + '</span>' : '') + '</div>' + (msg.isBulletin ? '<span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-semibold shrink-0">Bull</span>' : '<span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-semibold shrink-0">Pers</span>') + '</div>').join('')
-                : '<div class="text-gray-400 text-center py-4">No messages found</div>';
-            
-            const groupsSorted = Object.entries(bbsStats.bulletinGroups).sort((a, b) => b[1].count - a[1].count);
-            document.getElementById('bulletinGroups').innerHTML = groupsSorted.length > 0
-                ? groupsSorted.map(([group, data]) => '<div class="flex justify-between items-center p-2 bg-white rounded-lg border border-gray-100 hover:bg-blue-50 cursor-pointer" onclick="openBulletinModal(\'' + group + '\')"><span class="font-semibold text-blue-700">' + group + '</span><div class="text-right"><span class="text-sm font-bold text-gray-700">' + data.count + ' msgs</span><div class="text-xs text-gray-400">' + data.lastSeen + '</div></div></div>').join('')
-                : '<div class="text-gray-400 text-center py-4">No bulletin groups found</div>';
-            
-            updateHourlyChart();
-            document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-        }
+    function themeLabel() { $('themeBtn').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark'; }
+    function clock() { const n = new Date(); $('zuluTime').textContent = pad(n.getUTCHours()) + ':' + pad(n.getUTCMinutes()); }
 
-        function resetTcpStats() { tcpStats = { pop3: 0, smtp: 0, nntp: 0, authFails: 0, suspicious: 0, relayAttempts: 0, users: {}, messages: [], nntpGroups: {}, hourlyActivity: { pop3: {}, smtp: {}, nntp: {} }, securityEvents: [] }; }
-        
-        function parseTcpLogs() {
-            resetTcpStats();
-            let currentUser = null;
-            for (const entry of filteredLogs) {
-                const line = entry.line;
-                const date = entry.date;
-                const timeMatch = line.match(/(\d{2}):(\d{2}):(\d{2})/);
-                const hour = timeMatch ? timeMatch[1] : null;
-                const time = timeMatch ? timeMatch[1] + ':' + timeMatch[2] + ':' + timeMatch[3] : '';
-                
-                if (line.includes('Incoming POP3 Connect')) { tcpStats.pop3++; if (hour) tcpStats.hourlyActivity.pop3[hour] = (tcpStats.hourlyActivity.pop3[hour] || 0) + 1; }
-                if (line.includes('Incoming SMTP Connect')) { tcpStats.smtp++; if (hour) tcpStats.hourlyActivity.smtp[hour] = (tcpStats.hourlyActivity.smtp[hour] || 0) + 1; }
-                if (line.includes('Incoming NNTP Connect')) { tcpStats.nntp++; if (hour) tcpStats.hourlyActivity.nntp[hour] = (tcpStats.hourlyActivity.nntp[hour] || 0) + 1; }
-                
-                const userMatch = line.match(/<\s+USER\s+(\w+)/i);
-                if (userMatch) {
-                    const user = userMatch[1].toUpperCase();
-                    if (!tcpStats.users[user]) tcpStats.users[user] = { sessions: 0, lastSeen: '', msgsRecv: 0, msgsSent: 0 };
-                    tcpStats.users[user].sessions++;
-                    tcpStats.users[user].lastSeen = date + ' ' + time;
-                    currentUser = user;
-                }
-                
-                if (line.match(/<\s+RETR\s+\d+/i) && currentUser && tcpStats.users[currentUser]) tcpStats.users[currentUser].msgsRecv++;
-                
-                const smtpFromMatch = line.match(/MAIL\s+From:\s*<?\s*([A-Z0-9]+)[@>]/i);
-                if (smtpFromMatch) {
-                    const sender = smtpFromMatch[1].toUpperCase();
-                    if (!tcpStats.users[sender]) tcpStats.users[sender] = { sessions: 0, lastSeen: '', msgsRecv: 0, msgsSent: 0 };
-                    tcpStats.users[sender].msgsSent++;
-                    if (!tcpStats.users[sender].lastSeen) tcpStats.users[sender].lastSeen = date + ' ' + time;
-                }
-                
-                const uidlMatch = line.match(/>\s+(\d+)\s+(\d+_[A-Z0-9]+)/i);
-                if (uidlMatch && !tcpStats.messages.find(m => m.id === uidlMatch[2])) {
-                    const callMatch = uidlMatch[2].match(/_([A-Z0-9]+)$/);
-                    tcpStats.messages.push({ id: uidlMatch[2], callsign: callMatch ? callMatch[1] : 'Unknown', date: date });
-                }
-                
-                const groupMatch = line.match(/>\s+211\s+(\d+)\s+\d+\s+\d+\s+([A-Z0-9._-]+)/i);
-                if (groupMatch) {
-                    const group = groupMatch[2];
-                    if (!tcpStats.nntpGroups[group]) tcpStats.nntpGroups[group] = { count: 0, accesses: 0, lastSeen: '' };
-                    tcpStats.nntpGroups[group].count = Math.max(tcpStats.nntpGroups[group].count, parseInt(groupMatch[1]));
-                    tcpStats.nntpGroups[group].accesses++;
-                    tcpStats.nntpGroups[group].lastSeen = date;
-                }
-                
-                if (line.includes('530 Authentication required')) { tcpStats.authFails++; tcpStats.relayAttempts++; tcpStats.securityEvents.push({ type: 'auth_fail', time: date + ' ' + time, detail: 'SMTP auth required', severity: 'warning' }); }
-                if (line.includes('Authentication failed')) { tcpStats.authFails++; tcpStats.securityEvents.push({ type: 'auth_fail', time: date + ' ' + time, detail: 'Auth failed', severity: 'warning' }); }
-                if (line.includes('\\x')) { tcpStats.suspicious++; tcpStats.securityEvents.push({ type: 'suspicious', time: date + ' ' + time, detail: 'Binary data detected', severity: 'danger' }); }
-            }
-            
-            tcpStats.securityEvents.sort((a, b) => b.time.localeCompare(a.time));
-            tcpStats.securityEvents = tcpStats.securityEvents.slice(0, 100);
-            tcpStats.messages.sort((a, b) => b.date.localeCompare(a.date));
-            tcpStats.messages = tcpStats.messages.slice(0, 50);
-        }
-        
-        function updateTcpUI() {
-            document.getElementById('pop3Sessions').textContent = tcpStats.pop3;
-            document.getElementById('smtpSessions').textContent = tcpStats.smtp;
-            document.getElementById('nntpSessions').textContent = tcpStats.nntp;
-            document.getElementById('activeUsers').textContent = Object.keys(tcpStats.users).length;
-            document.getElementById('totalMessages').textContent = tcpStats.messages.length;
-            document.getElementById('authFails').textContent = tcpStats.authFails;
-            document.getElementById('secAuthFails').textContent = tcpStats.authFails;
-            document.getElementById('secSuspicious').textContent = tcpStats.suspicious;
-            document.getElementById('secRelayAttempts').textContent = tcpStats.relayAttempts;
-            
-            const usersSorted = Object.entries(tcpStats.users).map(([user, data]) => ({ user, sessions: data.sessions, msgsRecv: data.msgsRecv || 0, msgsSent: data.msgsSent || 0, lastSeen: data.lastSeen, total: data.sessions + (data.msgsRecv || 0) + (data.msgsSent || 0) })).sort((a, b) => b.total - a.total).slice(0, 5);
-            document.getElementById('activityList').innerHTML = usersSorted.length > 0
-                ? usersSorted.map((data, idx) => '<div class="flex justify-between items-center p-2 bg-white rounded-lg border border-gray-100"><div class="flex items-center gap-2"><span class="text-xs font-bold text-gray-400">#' + (idx+1) + '</span><span class="font-bold text-purple-700">' + data.user + '</span></div><div class="text-right"><div class="flex gap-2 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">' + data.sessions + ' sess</span><span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded">↓' + data.msgsRecv + '</span><span class="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded">↑' + data.msgsSent + '</span></div><div class="text-xs text-gray-400 mt-1">' + data.lastSeen + '</div></div></div>').join('')
-                : '<div class="text-gray-400 text-center py-4">No user activity found</div>';
-            
-            document.getElementById('recentMessages').innerHTML = tcpStats.messages.length > 0
-                ? tcpStats.messages.map(msg => '<div class="flex justify-between items-center p-2 bg-white rounded-lg border border-gray-100"><div><span class="font-mono text-sm text-gray-700">' + msg.id + '</span><span class="text-xs text-gray-400 ml-2">' + msg.date + '</span></div><span class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-semibold">' + msg.callsign + '</span></div>').join('')
-                : '<div class="text-gray-400 text-center py-4">No messages found</div>';
-            
-            const groupsSorted = Object.entries(tcpStats.nntpGroups).sort((a, b) => b[1].count - a[1].count);
-            document.getElementById('bulletinGroups').innerHTML = groupsSorted.length > 0
-                ? groupsSorted.map(([group, data]) => '<div class="flex justify-between items-center p-2 bg-white rounded-lg border border-gray-100 hover:bg-blue-50 cursor-pointer" onclick="openBulletinModal(\'' + group + '\')"><div><span class="font-semibold text-blue-700">' + group + '</span><span class="text-xs text-gray-400 ml-2">' + data.accesses + 'x</span></div><div class="text-right"><span class="text-sm font-bold text-gray-700">' + data.count + ' msgs</span><div class="text-xs text-gray-400">' + data.lastSeen + '</div></div></div>').join('')
-                : '<div class="text-gray-400 text-center py-4">No bulletin groups found</div>';
-            
-            document.getElementById('securityLog').innerHTML = tcpStats.securityEvents.length > 0
-                ? tcpStats.securityEvents.map(evt => '<div class="p-2 rounded-lg ' + (evt.severity === 'danger' ? 'security-danger' : 'security-warning') + '"><div class="flex justify-between"><span class="text-xs font-mono text-gray-600">' + evt.time + '</span><span class="text-xs font-bold ' + (evt.severity === 'danger' ? 'text-red-700' : 'text-orange-700') + '">' + evt.type.toUpperCase() + '</span></div><div class="text-sm text-gray-800 mt-1">' + evt.detail + '</div></div>').join('')
-                : '<div class="text-gray-400 text-center py-4">No security events</div>';
-            
-            updateHourlyChart();
-            document.getElementById('lastUpdate').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-        }
-
-        let hourlyChartInstance = null;
-        function updateHourlyChart() {
-            const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-            let datasets;
-            if (currentMode === 'bbs') {
-                datasets = [
-                    { label: 'Received', data: hours.map(h => bbsStats.hourlyActivity.received[h] || 0), backgroundColor: 'rgba(16, 185, 129, 0.7)', borderRadius: 4 },
-                    { label: 'Forwarded', data: hours.map(h => bbsStats.hourlyActivity.forwarded[h] || 0), backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 4 },
-                    { label: 'Bulletins', data: hours.map(h => bbsStats.hourlyActivity.bulletins[h] || 0), backgroundColor: 'rgba(139, 92, 246, 0.7)', borderRadius: 4 }
-                ];
-            } else {
-                datasets = [
-                    { label: 'POP3', data: hours.map(h => tcpStats.hourlyActivity.pop3[h] || 0), backgroundColor: 'rgba(16, 185, 129, 0.7)', borderRadius: 4 },
-                    { label: 'SMTP', data: hours.map(h => tcpStats.hourlyActivity.smtp[h] || 0), backgroundColor: 'rgba(59, 130, 246, 0.7)', borderRadius: 4 },
-                    { label: 'NNTP', data: hours.map(h => tcpStats.hourlyActivity.nntp[h] || 0), backgroundColor: 'rgba(139, 92, 246, 0.7)', borderRadius: 4 }
-                ];
-            }
-            
-            const ctx = document.getElementById('hourlyChart').getContext('2d');
-            if (hourlyChartInstance) hourlyChartInstance.destroy();
-            hourlyChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: { labels: hours, datasets: datasets },
-                options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true } } }
-            });
-        }
-
-        function updateStatus(type, msg) {
-            document.getElementById('statusIndicator').className = 'status-indicator status-' + type;
-            document.getElementById('statusText').textContent = msg;
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedMode = localStorage.getItem('messageMonitorMode');
-            if (savedMode === 'tcp') { setMode('tcp'); } else { loadLogs(); }
-            setInterval(() => loadLogs(), 900000);
-            (function updateNavClocks(){var n=new Date(),u=String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0'),l=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'),a=document.getElementById('navUtcClock'),b=document.getElementById('navLocalClock');if(a)a.textContent=u+' Z';if(b)b.textContent=l+' L';setTimeout(updateNavClocks,1000-n.getMilliseconds())})();
-        });
-    </script>
-    <script>
-    (function(){var K="bpq-dark-mode";function g(){var s=localStorage.getItem(K);if(s==="dark"||s==="light")return s;return window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"}function a(t){document.documentElement.setAttribute("data-theme",t);if(window.Chart){var tc=t==="dark"?"#9ca3af":"#666",gc=t==="dark"?"rgba(75,85,99,0.4)":"rgba(0,0,0,0.1)";Chart.defaults.color=tc;Chart.defaults.borderColor=gc;if(Chart.defaults.scale)Chart.defaults.scale.grid={color:gc};Object.values(Chart.instances||{}).forEach(function(c){try{c.update("none")}catch(e){}})}var b=document.getElementById("darkModeToggle");if(b)b.textContent=t==="dark"?"☀️":"🌙"}function toggle(){var c=document.documentElement.getAttribute("data-theme")||"light";var n=c==="dark"?"light":"dark";localStorage.setItem(K,n);a(n)}a(g());window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",function(e){if(!localStorage.getItem(K))a(e.matches?"dark":"light")});window.toggleDarkMode=toggle;document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("darkModeToggle");if(b)b.textContent=g()==="dark"?"☀️":"🌙"})})();
-    </script>
+    document.querySelectorAll('.rf-range button').forEach(b => b.classList.toggle('active', +b.dataset.range === range));
+    themeLabel(); clock(); setInterval(clock, 10000);
+    new MutationObserver(themeLabel).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    loadAll();
+    setInterval(loadAll, 5 * 60 * 1000);
+})();
+</script>
 </body>
 </html>

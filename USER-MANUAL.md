@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.84**
+**Version 1.5.92**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -68,7 +68,7 @@ You access it by opening a web browser and going to your node's IP address. No s
 | VARA HF Terminal | Keyboard-to-keyboard HF sessions over your BPQ VARA port, from the browser |
 | Telnet Client | Terminal on your node with a NetROM nodes list, command reference and **YAPP file transfer** |
 | Email Client | Webmail-style client for BBS mail: Personal, NTS, bulletins, folders, rules, 📌 keep, address book; everything saved in the database |
-| Message Monitor | BBS and BPQ mail-server activity from the daily logs, with a security view |
+| Messages | Is mail moving: messages moved, forwarding queue, partners, bulletins and mail-server security, from the daily logs |
 | System Logs | Statistics and a searchable viewer for BPQ's daily logs, plus MHeard and the routing table |
 | Traffic Report | Per-station traffic from BPQ's traffic reports (7 days, 4 or 12 weeks) |
 | Connect Log | Incoming connects by mode (NET/ROM, VARA, AX.25, Telnet), with a map |
@@ -87,6 +87,39 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.92
+
+- **Winlink calls reported accurately on VARA and VHF too.** As for Data2G in v1.5.91: a call is labelled **WL2K** only when LinBPQ's gateway log confirms it, and its frequency is the one the radio transmitted on (rig history), not one taken from another call. VHF rows show the port's frequency from its WL2KREPORT line. One-time fixes for stored rows: User Guide §24.
+
+### In v1.5.91
+
+- **Data2G Winlink calls:** Winlink users who call your gateway call on Data2G show as **WL2K** in Recent connections, with the frequency, instead of an unknown band. The frequency comes from the radio's dial frequency while transmitting (rig history). One command fixes the rows already stored (§10.18).
+
+### In v1.5.90
+
+- **Connect Watchdog settings** in **⚙ Dashboard Settings → Watchdog**: pause length, failed attempts before a pause, never-pause list and BBS messages, without editing `config.php` (§10.1). With hourly forwarding a 2–3 hour pause is enough.
+- **Smaller BBS log:** the message-text job lists only the newest 25 messages each run, and more only when needed, instead of 100 every 5 minutes (§9, *Keeping the BBS log small*).
+
+### In v1.5.89
+
+- **BBS Mail → Write:** To suggestions put callsigns that start with what you type first, no longer match single letters in the routing part of addresses, and show your most used contacts when the box is empty.
+
+### In v1.5.88
+
+- **System Logs redesigned** to match RF Connections and the other pages: status strip, headline cards, the heard list as a table with watched stations first, an Errors card, tabs for the live log, NetRom nodes, most active and internet stations, and a panel for any callsign (*User Guide* §14).
+
+### In v1.5.87
+
+- **Messages loads quickly:** the server now sends only the log lines the page needs (new `mail-log-api.php`), and the forwarding queue fills in after the page appears.
+
+### In v1.5.86
+
+- **Messages, Traffic and Connects redesigned** to match RF Connections: status strip, four headline cards with clickable chips, a partner or station table with status dots and day blocks, tabs, and a detail panel for any call. Messages now counts only messages that really moved (duplicates apart), shows the forwarding queue and flags partners whose mail is stuck; Traffic counts NTS too; Connects finds first-time callers (*User Guide* §11, §13, §15).
+
+### In v1.5.85
+
+- **Station report for every modem:** RF Connections → Station report has a Modem choice (All modems, VARA HF, Mercury, Data2G, VHF packet). With All modems the PDF adds a By Modem table and a Modem column. It covered VARA only before (*User Guide*, RF Connections).
 
 ### In v1.5.84
 
@@ -607,14 +640,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.84.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.92.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.84
+cd bpq-dashboard-1.5.92
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -1040,6 +1073,8 @@ printf '/var/log/bpq-dashboard/*.log {\n    weekly\n    rotate 8\n    compress\n
 
 **Keeping the BBS log small (v1.5.40).** BPQ writes every line it sends to the BBS log, and BPQ's `LB` command sends the whole bulletin list. On a busy hub that's well over a thousand lines a run, which made the log 40–50 MB a day. So most runs list only the newest messages with `LL 100` (keeping the bulletins), and a full `LB` happens once a day to catch anything older. To change the numbers: `'messages' => ['bulletin_list_recent' => 100, 'bulletin_full_list_hours' => 24]`. If more than about 100 messages of all types arrive between two runs (5 minutes), raise `bulletin_list_recent`. Each run's summary line shows which listing it used (`B:… (LL 100)` or `(LB)`).
 
+**v1.5.90: only new messages.** Even `LL 100` put 100 lines in the BBS log every 5 minutes (about 29,000 a day), which buried the forwarding sessions. Now a normal run sends `LL 25` (`list_quick`), remembers the highest message number it has seen, and sends `LL <bulletin_list_recent>` only when all 25 are new (more may have arrived) or when the last run left messages unread. The daily full `LP` / `LT` / `LB` still catches anything missed. State: `cache/message-bodies-listing.json`. To change: `'messages' => ['list_quick' => 25]` (10–200).
+
 `--days 8` matters: some BPQ versions write the traffic report weekly rather than daily.
 
 **9. Helper services** (only for the pages you use; set the others to `false` in `config.php 'pages'`)
@@ -1086,7 +1121,7 @@ The **User Guide** describes every page in detail. In short, with what each need
 | Traffic Report | `/bpq-traffic.html` | none | `Traffic_*.txt`, `parse-traffic-report.py` |
 | System Logs | `/bpq-system-logs.html` | none | BBS/TCP/CMS logs, `parse-system-logs.py`; optional `nodes-rtt.sh` (§10.12) |
 | Connect Log | `/bpq-connect-log.html` | none | `ConnectLog_*.log` (`LogAllConnects=1` in `bpq32.cfg`) |
-| Message Monitor | `/bpq-email-monitor.html` | none (reading bulletins: admin) | BBS and TCP logs |
+| Messages | `/bpq-email-monitor.html` | none (reading bulletins: admin) | BBS and TCP logs |
 | Email Client | `/bbs-messages.html` | admin | database, `bbs` login in `config.php`, `message-bodies.timer`, `bulletin-retention.timer` |
 | NWS Weather | `/nws-dashboard.html` | none (posting: admin) | api.weather.gov; `bbs` login for posting |
 | Chat Client | `/bpq-chat.html` | admin | `bpq-chat` |
@@ -1221,13 +1256,17 @@ Built-in profiles (each sets the right data mode for VARA): **Yaesu** FTdx3000, 
 - **Not counted (v1.5.38):** `Connecting to BBS N4SFL` followed by `N4SFL Disconnected` in the same second. The ConnectScript had nothing to do at that time (for example, outside its `TIMES` window) or LinBPQ had just started, so nothing went on the air.
 - **Not counted (v1.5.37):** an attempt that only failed because your own port was busy (`Error - Port in use`, typically while another partner's session is ending) or the channel was busy. That isn't the partner's fault, so it counts neither for nor against it.
 - **The partner calling you counts as good:** BPQ logs those sessions under the partner's full call (`KK4DIV-1`, `N4SD-11`). The watchdog matches them on the base call, so a hub that keeps calling you in isn't paused just because your calls to it missed.
-- **What it does:** after **2 failed attempts in a row** it sets `Enabled = 0` for that partner (BPQ stops calling it; its mail waits in the queue) for **6 hours**, then `Enabled = 1` again, and counting starts over. A good session, whether you called the partner or it called you, resets the count. You get a BBS message on each pause and resume.
+- **What it does:** after **2 failed attempts in a row** it sets `Enabled = 0` for that partner (BPQ stops calling it; its mail waits in the queue) for **6 hours** (the default; set in ⚙ Dashboard Settings → Watchdog since v1.5.90), then `Enabled = 1` again, and counting starts over. A good session, whether you called the partner or it called you, resets the count. You get a BBS message on each pause and resume.
 - **Back early (v1.5.38):** if a paused partner has a good session with you during the pause (usually it calls you), the pause ends at the next run, within 5 minutes, with a *"forwarding resumed early"* message.
 - **LinBPQ restarts:** LinBPQ reads `linmail.cfg` only when it starts, and writes its own copy when it stops. So each change is: stop LinBPQ, edit, start LinBPQ (a few seconds; sessions in progress are dropped). All changes due in one run share one restart, and a run is put off while a forwarding session is in progress. The previous file is kept as `linmail.cfg.watchdog.bak`. `cache/linmail.lock` makes the watchdog, the propagation scheduler and the storm monitor take turns.
 - **Left alone:** a partner you switched off yourself (`Enabled = 0` that the watchdog didn't set). If you turn a paused partner back on by hand, the watchdog notices and clears its pause.
 - **Shown on:** RF Connections' forwarding partner rows (⏸ *Paused until HH:MMZ*, ⚠ *N failed attempts*), Maintenance → *Connect Watchdog*, System Audit (running, paused partners, unmatched partners) and the Log Viewer (*Forwarding tools*). Troubleshooting: §12 *Forwarding to one partner stopped*.
 
-**Settings** (optional, `config.php`):
+**Settings** (v1.5.90): easiest in **⚙ Dashboard Settings → Watchdog** on any admin page (BBS password needed to save). Saved there (`data/settings.json`), they override `config.php`; until then `config.php` and the defaults apply, and the tab shows what the watchdog last used. Changes apply on the next run; a pause already running keeps its end time.
+
+**Choosing the pause length:** longer than the partner's forwarding interval, or the pause saves no calls. With hourly forwarding (`FwdInterval = 3600`), 2–3 hours stops calls to a station that is off the air while mail waits no longer than that; keep 6 or more for partners forwarded every few hours or that go off the air for days. A partner calling you ends a pause early anyway.
+
+Or in `config.php` (`notify_to` only here):
 
 ```php
 'watchdog' => [
@@ -2162,7 +2201,7 @@ ENDPORT
 
 Restart LinBPQ. Data2G's log then shows `command: MYCALL …` (your node and BBS calls), `BW2300` and `LISTEN ON`. Calls out go through the port like Mercury's: `ATTACH 6` in a forward script, or `C 6 <call>` from the node. The first transmission is where to check the ALC and that LinBPQ keys the radio.
 
-**5. On the dashboard.** Nothing to configure: RF Connections finds Data2G (its log, service file or TNC port) and shows the **Data2G HF** card; its calls become rows from the next 5-minute parser run (User Guide §12, *Data2G calls on this page*). Check with `sudo -u www-data python3 /var/www/<dashboard>/scripts/parse-data2g-log.py --dry-run`. Settings, all optional: `'data2g' => ['enabled' => 'auto' | true | false, 'log' => '/var/log/data2g/data2g.log', 'unit' => '/etc/systemd/system/data2g.service', 'tnc_port' => 8500, 'in_headlines' => false]`.
+**5. On the dashboard.** Nothing to configure: RF Connections finds Data2G (its log, service file or TNC port) and shows the **Data2G HF** card; its calls become rows from the next 5-minute parser run (User Guide §12, *Data2G calls on this page*). Check with `sudo -u www-data python3 /var/www/<dashboard>/scripts/parse-data2g-log.py --dry-run`. Settings, all optional: `'data2g' => ['enabled' => 'auto' | true | false, 'log' => '/var/log/data2g/data2g.log', 'unit' => '/etc/systemd/system/data2g.service', 'tnc_port' => 8500, 'in_headlines' => false, 'rig_history' => true]`. v1.5.91: Winlink users calling your gateway call never reach the BBS, so LinBPQ logs no frequency for them; the parser labels them **WL2K** (matched in `CMSAccess_YYYYMMDD.log`) and takes the frequency from the rig history (`rig-history.jsonl`, the radio's dial frequency while transmitting, read through flrig). If Data2G uses a radio that flrig doesn't read, set `'rig_history' => false`. For rows stored before 1.5.91: `sudo -u www-data python3 /var/www/<dashboard>/scripts/parse-data2g-log.py --backfill-freq` (add `--dry-run` to see them first).
 
 **6. Its monitor page on the desktop (optional).** Data2G also comes as `data2g-web`: the same modem with a web page (Monitor tab: waterfall, constellation, link, every burst with its S/N, decoded packets; Settings tab). `sudo bash /var/www/<dashboard>/tools/data2g-monitor.sh`:
 
@@ -2710,7 +2749,7 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | System Logs | `http://YOUR_SERVER_IP/bpq-system-logs.html` |
 | Traffic Report | `http://YOUR_SERVER_IP/bpq-traffic.html` |
 | Email Client | `http://YOUR_SERVER_IP/bbs-messages.html` |
-| Message Monitor | `http://YOUR_SERVER_IP/bpq-email-monitor.html` |
+| Messages | `http://YOUR_SERVER_IP/bpq-email-monitor.html` |
 | Connect Log | `http://YOUR_SERVER_IP/bpq-connect-log.html` |
 | RF Power Monitor | `http://YOUR_SERVER_IP/rf-power-monitor.html` |
 | Rig Status | `http://YOUR_SERVER_IP/rig-status.html` |
@@ -2723,10 +2762,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.84-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.92-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.84 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.92 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

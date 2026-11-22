@@ -38,6 +38,13 @@ tx_max_bps / rx_max_bps are the best rate of the stats/session lines.
 Frequency and bandwidth come from LinBPQ's BBS log, as for Mercury
 ("Incoming Connect from W1ABC on Port 6 Freq 7102400 Mode VARA",
 ">W1ABC RADIO 7.100900 ..." for outgoing calls).
+v1.5.91: a Winlink user calling the RMS gateway call never reaches the BBS,
+so there is no BBS line. Such an incoming call that the gateway log
+(CMSAccess_YYYYMMDD.log: "HH:MM:SS n W1ABC Connected to CMS") shows within
+2 minutes gets band 'WL2K', as VARA's Winlink sessions do. A call left
+without a frequency takes the dial frequency the radio was on while it
+transmitted during the call (rig-history.jsonl in paths.datalog, written
+every 3 s while transmitting by rig-history-poller), the most common one.
 
 Times: Data2G writes the server's local time without a zone; they are
 stored as written, like the other parsers (keep the server on UTC; the
@@ -53,6 +60,7 @@ Usage:
   parse-data2g-log.py --dry-run -v    # show the rows, write nothing
   parse-data2g-log.py --reset         # delete Data2G rows + checkpoint, re-read
   parse-data2g-log.py --backfill-link # fill link_sec (time connected) on stored rows (v1.5.64)
+  parse-data2g-log.py --backfill-freq # Winlink label + frequency on stored rows (v1.5.91)
   parse-data2g-log.py --log FILE --bbs-log-dir DIR
 
 Exit codes: 0 ok, 1 no log, 2 database, 3 database not upgraded.
@@ -73,6 +81,7 @@ except ImportError:
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 import bpq_db_config  # noqa: E402
+import winlink_match as wm  # noqa: E402
 
 # The BBS-log matching, band table and checkpoint helpers are Mercury's.
 _spec = importlib.util.spec_from_file_location('parse_mercury_log', os.path.join(_HERE, 'parse-mercury-log.py'))
@@ -299,6 +308,45 @@ class Parser:
         self._flush_refused()
 
 
+# ------------------------------------------------- Winlink and rig history (v1.5.91)
+# v1.5.92: the matching lives in winlink_match.py, shared with VARA and VHF.
+def winlink_sources(bbs_dir, rows):
+    if not rows:
+        return None, None
+    dates = wm.dates_between(min(r['start'] for r in rows),
+                             max((r.get('end') or r['start']) for r in rows))
+    rig = wm.Rig(wm.rig_history_file(), dates) if wm.rig_enabled('data2g') else None
+    return wm.Cms(bbs_dir, dates), rig
+
+
+def enrich_winlink(rows, cms, rig):
+    """WL2K label from the gateway log; frequency from the rig history when the BBS log had none."""
+    for r in rows:
+        if not r.get('freq_khz') and rig is not None:
+            f = rig.freq(r['start'], r.get('end'))
+            if f:
+                r['freq_khz'] = f
+                r['band'] = merc.freq_to_band(f)
+        if (cms is not None and r['direction'] == 'incoming' and r.get('status') == 'success'
+                and not r.get('bbs_port') and cms.match(r['callsign'], r.get('connected_at') or r['start'])):
+            r['band'] = 'WL2K'
+
+
+def backfill_freq(conn, rows):
+    """Fill frequency / WL2K on stored rows that have none; never overwrites a frequency."""
+    n = 0
+    with conn.cursor() as cur:
+        for r in rows:
+            if not r.get('freq_khz') and r.get('band') != 'WL2K':
+                continue
+            n += cur.execute("UPDATE rf_connections SET freq_khz = COALESCE(freq_khz, %s), "
+                             "band = CASE WHEN %s = 'WL2K' THEN 'WL2K' ELSE COALESCE(band, %s) END "
+                             "WHERE modem = %s AND session_start = %s AND callsign = %s "
+                             "AND (freq_khz IS NULL OR band IS NULL OR band = '' OR band = 'Unknown')",
+                             (r.get('freq_khz'), r.get('band'), r.get('band'), MODEM, r['start'], r['callsign']))
+    return n
+
+
 # ---------------------------------------------------------------- database
 def insert_rows(conn, rows):
     n = 0
@@ -383,6 +431,8 @@ def main():
     ap.add_argument('--reset', action='store_true', help='Delete Data2G rows and the checkpoint, re-read')
     ap.add_argument('--backfill-link', action='store_true',
                     help='Re-read the log (and <log>.1) and fill link_sec on rows already stored; nothing else changes (v1.5.64)')
+    ap.add_argument('--backfill-freq', action='store_true',
+                    help='Re-read the log (and <log>.1) and fill the Winlink label and frequency on rows already stored (v1.5.91)')
     ap.add_argument('--dry-run', action='store_true', help="Show what would be written, write nothing")
     ap.add_argument('--verbose', '-v', action='store_true')
     ap.add_argument('--quiet', '-q', action='store_true', help='No output when nothing is new or there is no log')
@@ -431,10 +481,29 @@ def main():
             conn.commit()
             print(f"Data2G: {len(rows)} call(s) read, link_sec filled on {n} stored row(s)")
             return
+        if args.backfill_freq:
+            rows, _, _ = parse_files(log, None)
+            inc, radio = merc.load_bbs(bbs_dir, rows)
+            merc.enrich(rows, inc, radio)
+            enrich_winlink(rows, *winlink_sources(bbs_dir, rows))
+            w = sum(1 for r in rows if r.get('band') == 'WL2K')
+            f = sum(1 for r in rows if r.get('freq_khz'))
+            if args.dry_run:
+                for r in rows:
+                    if r.get('band') == 'WL2K' or r.get('freq_khz'):
+                        print(f"  {r['start']:%Y-%m-%d %H:%M:%S} {r['direction']:<8} {r['callsign']:<10} "
+                              f"{r['status']:<7} {r.get('band') or '-':<6} {r.get('freq_khz') or '-'}")
+                print(f"Data2G: {len(rows)} call(s) read, {w} Winlink, {f} with a frequency  [DRY RUN]")
+                return
+            n = backfill_freq(conn, rows)
+            conn.commit()
+            print(f"Data2G: {len(rows)} call(s) read, {w} Winlink, {f} with a frequency; {n} stored row(s) updated")
+            return
         state = None if (args.reset or conn is None) else merc.get_state(conn, key)
         rows, off, ln = parse_files(log, state)
         inc, radio = merc.load_bbs(bbs_dir, rows)
         merc.enrich(rows, inc, radio)
+        enrich_winlink(rows, *winlink_sources(bbs_dir, rows))
         if args.verbose or args.dry_run:
             for r in rows:
                 print(f"  {r['start']:%Y-%m-%d %H:%M:%S} {r['direction']:<8} {r['callsign']:<10} "
