@@ -457,7 +457,7 @@
             <div class="rf-title">
                 <div class="rf-title-line">
                     <h1>RF Connections</h1>
-                    <span class="rf-ver">v1.5.92</span>
+                    <span class="rf-ver">v1.5.93</span>
                 </div>
                 <div class="rf-sub">
                     <span id="dateRange">Loading...</span>
@@ -7638,7 +7638,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.92 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.93 | HF Efficiency Report
                 </p>
             `;
             
@@ -8452,6 +8452,7 @@
             const S = {
                 session: ['success', 'In session',          `Connected with ${d.session ? d.session.peer : ''}`],
                 up:      ['success', 'On air',               'Data2G running, LinBPQ attached to its TNC'],
+                noport:  ['error',   'Command port closed',  `Data2G is running but its command port ${d.tnc_port} isn't open, so LinBPQ can't use it (and a scanning radio stops): sudo systemctl restart data2g; LinBPQ reconnects by itself`],
                 nolink:  ['warn',    'LinBPQ not attached',  `Data2G is running but LinBPQ is not connected to its TNC port ${d.tnc_port}: check the port's ADDR line in bpq32.cfg, then restart LinBPQ`],
                 audio:   ['error',   'No audio',             'Data2G reports its sound card input ended: check the radio\'s USB sound card, then sudo systemctl restart data2g'],
                 down:    ['error',   'Modem not running',    `Nothing is listening on Data2G's TNC port ${d.tnc_port}: check the service (systemctl status data2g)`],
@@ -8788,7 +8789,7 @@
             }
             const g = window._rfData2g;                     // v1.5.56
             if (g && g.enabled) {
-                const L = { up: 'on air', session: 'in session', nolink: 'LinBPQ not attached', audio: 'no audio', down: 'not running' }[g.status] || 'status unknown';
+                const L = { up: 'on air', session: 'in session', noport: 'command port closed', nolink: 'LinBPQ not attached', audio: 'no audio', down: 'not running' }[g.status] || 'status unknown';
                 const cs = g.calls_24h;
                 const extra = cs && cs.in ? ` · calls in ${cs.in_connected}/${cs.in}` : '';
                 const ok = g.status === 'up' || g.status === 'session';

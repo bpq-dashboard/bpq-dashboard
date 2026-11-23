@@ -364,6 +364,22 @@ if (!$opt['dry'] && $listed) {
     } catch (Throwable $e) {
         out('WARNING: archiving listings failed: ' . $e->getMessage());
     }
+    // v1.5.93: BPQ's status letters (TF, PY...) for the NTS forwarding report
+    try {
+        $st = $pdo->prepare("UPDATE bpq_messages SET bbs_status = ?, bbs_status_at = NOW()
+                             WHERE bbs_number = ? AND msg_type = ? AND from_call = ?
+                               AND NOT (bbs_status <=> ?)");
+        $n = 0;
+        foreach ($listed as $m) {
+            $code = strtoupper(substr(preg_replace('/[^A-Za-z$]/', '', (string)$m['status']), 0, 4));
+            if ($code === '') continue;
+            $st->execute([$code, (string)$m['number'], $m['type'], $m['from'], $code]);
+            $n += $st->rowCount();
+        }
+        $stats['status_updated'] = $n;
+    } catch (Throwable $e) {
+        // before the 2026-11-23 migration: no bbs_status column yet
+    }
 }
 
 // 3. Which saved rows need text.

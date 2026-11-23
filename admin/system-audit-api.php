@@ -58,6 +58,98 @@ function finding(string $id, string $category, string $status, string $title,
                  string $detail, string $recommendation = ''): array {
     return compact('id','category','status','title','detail','recommendation');
 }
+/**
+ * v1.5.93: a USB serial port that came back after flrig started.
+ * Returns null when nothing is wrong (or flrig isn't running), else
+ * ['sure' => bool, 'port', 'dev', 'dev_at', 'started']. sure = the port is the
+ * one flrig's settings name (~/.flrig/*.prefs xcvr_serial_port of the rig in
+ * use); otherwise any /dev/serial/by-id device newer than flrig.
+ */
+function flrig_stale_port(): ?array {
+    $pid = (int)trim(sh_quiet('pgrep -xo flrig'));
+    if ($pid <= 0) return null;
+    $age = (int)trim(sh_quiet('ps -o etimes= -p ' . $pid));
+    if ($age <= 0) return null;
+    $start = time() - $age;
+    $fmt = fn($t) => gmdate('Y-m-d H:i', $t) . 'Z';
+    $newer = function (string $port) use ($start) {
+        $dev = @realpath($port);
+        if (!$dev || strpos($dev, '/dev/') !== 0) return null;
+        clearstatcache(true, $dev);
+        $ct = @filectime($dev);
+        return ($ct && $ct > $start + 60) ? [$dev, $ct] : null;
+    };
+    // flrig's settings: the rig in use (flrig.prefs) and its serial port
+    $uid = null;
+    foreach (@file("/proc/$pid/status") ?: [] as $l) if (preg_match('/^Uid:\s+(\d+)/', $l, $m)) { $uid = (int)$m[1]; break; }
+    $home = ($uid !== null && function_exists('posix_getpwuid')) ? (posix_getpwuid($uid)['dir'] ?? null) : null;
+    $ports = [];
+    if ($home && @is_readable("$home/.flrig")) {
+        $active = '';
+        if (preg_match('/^xcvr_name:(.+)$/m', (string)@file_get_contents("$home/.flrig/flrig.prefs"), $m)) $active = strtoupper(trim($m[1]));
+        foreach (glob("$home/.flrig/*.prefs") ?: [] as $f) {
+            $t = (string)@file_get_contents($f);
+            if (!preg_match('/^xcvr_serial_port:(.+)$/m', $t, $m) || strtoupper(trim($m[1])) === 'NONE') continue;
+            $name = preg_match('/^xcvr_name:(.+)$/m', $t, $n) ? strtoupper(trim($n[1])) : '';
+            $ports[trim($m[1])] = ($active === '' || $name === '' || $name === $active);
+        }
+        $use = array_keys(array_filter($ports)) ?: array_keys($ports);
+        foreach ($use as $p) {
+            if ($r = $newer($p)) return ['sure' => true, 'port' => $p, 'dev' => $r[0], 'dev_at' => $fmt($r[1]), 'started' => $fmt($start)];
+        }
+        if ($use) return null;                          // its port is older than flrig: fine
+    }
+    foreach (glob('/dev/serial/by-id/*') ?: [] as $p) {
+        if ($r = $newer($p)) return ['sure' => false, 'port' => basename($p), 'dev' => $r[0], 'dev_at' => $fmt($r[1]), 'started' => $fmt($start)];
+    }
+    return null;
+}
+
+/**
+ * v1.5.93: radio modems started before a USB sound card or USB serial port
+ * last (re)appeared. Each entry: id, name, started, dev, dev_at, fix.
+ */
+function stale_modems(): array {
+    // USB devices and when their nodes appeared
+    $devs = [];
+    foreach (glob('/proc/asound/card[0-9]*') ?: [] as $c) {
+        if (!file_exists("$c/usbid")) continue;                 // USB sound cards only
+        $n = substr(basename($c), 4);
+        $name = trim((string)@file_get_contents("$c/id")) ?: "card $n";
+        foreach (glob("/dev/snd/pcmC{$n}D*") ?: [] as $p) {
+            clearstatcache(true, $p);
+            if ($t = @filectime($p)) $devs[] = ["sound card $name", $t];
+        }
+    }
+    foreach (glob('/dev/serial/by-id/*') ?: [] as $l) {
+        $r = @realpath($l);
+        if ($r) { clearstatcache(true, $r); if ($t = @filectime($r)) $devs[] = [basename($r) . ' (' . preg_replace('/^usb-|-if\d+.*$/', '', basename($l)) . ')', $t]; }
+    }
+    if (!$devs) return [];
+    usort($devs, fn($a, $b) => $b[1] <=> $a[1]);
+    $fmt = fn($t) => gmdate('Y-m-d H:i', $t) . 'Z';
+    $mods = [
+        ['data2g', 'Data2G',       "pgrep -o -f '[d]ata2g-web'",       'sudo systemctl restart data2g, then ss -ltnp | grep 8500 should show it listening'],
+        ['mercury', 'Mercury',     'pgrep -o -x mercury',              'sudo systemctl restart mercury'],
+        ['qtsm', 'QtSoundModem',   "pgrep -o -f '[Q]tSoundModem'",     'sudo systemctl restart qtsoundmodem'],
+        ['vara', 'VARA HF',        "pgrep -o -f '[V]ARA.exe'",         'Close and reopen VARA HF on the desktop'],
+    ];
+    $out = [];
+    foreach ($mods as [$id, $name, $cmd, $fix]) {
+        $pid = (int)trim(sh_quiet($cmd));
+        if ($pid <= 0) continue;
+        $age = (int)trim(sh_quiet("ps -o etimes= -p $pid"));
+        if ($age <= 0) continue;
+        $start = time() - $age;
+        foreach ($devs as [$dname, $t]) {
+            if ($t <= $start + 60) break;                       // newest first: nothing newer than this modem
+            $out[] = ['id' => $id, 'name' => $name, 'started' => $fmt($start), 'dev' => $dname, 'dev_at' => $fmt($t), 'fix' => $fix];
+            break;
+        }
+    }
+    return $out;
+}
+
 function unit_state(string $unit): array {
     // [installed(bool), active-state, enabled-state]  — no sudo needed
     $load = sh_quiet('systemctl show ' . escapeshellarg($unit) . ' -p LoadState --value');
@@ -841,11 +933,37 @@ if ($radioOn) {
     $s = @fsockopen($fh, $fp, $en_, $es_, 2);
     if ($s) { fclose($s);
         $findings[] = finding('flrig','application','ok',"flrig answers at $fh:$fp", 'Rig Status and RF Power Monitor can read the radio.');
+        // v1.5.93: flrig answering is not flrig reaching the radio. If the
+        // radio's USB serial port drops off and comes back (a new ttyUSB
+        // node), flrig keeps the old, dead one: it still answers, but
+        // can't tune the radio, so LinBPQ's scanning stops.
+        $fs = flrig_stale_port();
+        if ($fs) {
+            $findings[] = finding('flrig-port','application', $fs['sure'] ? 'crit' : 'warn',
+                $fs['sure'] ? "flrig is still on the radio's old serial port" : 'A USB serial port came back after flrig started',
+                ($fs['sure']
+                    ? "flrig started " . $fs['started'] . " and uses {$fs['port']}, which became {$fs['dev']} at " . $fs['dev_at'] . ' when the radio\'s USB dropped off and came back.'
+                    : "{$fs['dev']} ({$fs['port']}) appeared at " . $fs['dev_at'] . ', after flrig started (' . $fs['started'] . "). flrig's settings couldn't be read to tell whether it is the radio's port.")
+                . ' flrig keeps answering but can\'t reach the radio, so frequency changes (and LinBPQ scanning) stop. Data2G or another modem may also have lost the radio\'s sound card at the same time.',
+                "In flrig on the desktop: Config → Setup → Transceiver → Init (or close and reopen flrig). Then check Data2G: ss -ltnp | grep 8500, and if nothing: sudo systemctl restart data2g. Recurring? Check the USB hub, its power and the cables, and ferrites against RF.");
+        }
     } else {
         $findings[] = finding('flrig','application','warn',"flrig not reachable at $fh:$fp",
             'Rig Status and RF Power Monitor show no readings. Either flrig isn\'t running or config.php radio.flrig_host / flrig_port is wrong.',
             "pgrep -af flrig; sudo systemctl status flrig. No radio on this station? Set 'radio' => ['enabled' => false] in config.php.");
     }
+}
+
+// v1.5.93: modems still holding USB devices that dropped off and came back.
+// When the radio's USB (sound card or serial port) disconnects and returns,
+// the device gets a new node; a modem that was already running keeps the
+// old one and goes deaf (and may not key) while still looking healthy.
+foreach (stale_modems() as $sm) {
+    $findings[] = finding('modem-stale-' . $sm['id'], 'application', 'warn',
+        "{$sm['name']} started before the radio's USB devices last came back",
+        "{$sm['name']} has been running since {$sm['started']}; {$sm['dev']} came back at {$sm['dev_at']} (USB disconnect and reconnect). "
+        . "It is probably still on the old device: it can't hear the radio (or key it), though it still answers LinBPQ.",
+        $sm['fix'] . '. LinBPQ reconnects by itself. Recurring? Check the USB hub, its power and cables, and ferrites against RF.');
 }
 
 // Callsign lookups (QRZ / callook) — failures recorded by callsign-lookup.php
@@ -1057,10 +1175,11 @@ $dst = bpq_data2g_status($WEB_ROOT . '/cache');
 if (!empty($dst['enabled'])) {
     $dp = $dst['tnc_port'];
     $where = 'TNC port ' . $dp . ($dst['bpq_port'] ? ', LinBPQ port ' . $dst['bpq_port']['num'] : ', no LinBPQ port with ADDR 127.0.0.1 ' . $dp);
-    $lvl = ['up' => 'ok', 'session' => 'ok', 'nolink' => 'warn', 'audio' => 'warn', 'down' => 'warn'][$dst['status']] ?? 'info';
-    $title = ['up' => 'Data2G HF running', 'session' => 'Data2G HF running (in a session)', 'nolink' => 'Data2G HF: LinBPQ not attached',
+    $lvl = ['up' => 'ok', 'session' => 'ok', 'noport' => 'crit', 'nolink' => 'warn', 'audio' => 'warn', 'down' => 'warn'][$dst['status']] ?? 'info';
+    $title = ['up' => 'Data2G HF running', 'session' => 'Data2G HF running (in a session)', 'noport' => "Data2G HF running but its command port $dp isn't open", 'nolink' => 'Data2G HF: LinBPQ not attached',
               'audio' => 'Data2G HF: sound card input ended', 'down' => 'Data2G HF not running'][$dst['status']] ?? 'Data2G HF: status unknown';
-    $rec = ['nolink' => 'Check the Data2G port\'s "ADDR 127.0.0.1 ' . $dp . '" line in bpq32.cfg, then restart LinBPQ.',
+    $rec = ['noport' => 'Data2G hung while starting (often after the radio\'s USB sound card dropped off and came back), so LinBPQ can\'t use it and a scanning radio stops. sudo systemctl restart data2g; then ss -ltnp | grep ' . $dp . ' should show it listening. LinBPQ reconnects by itself.',
+            'nolink' => 'Check the Data2G port\'s "ADDR 127.0.0.1 ' . $dp . '" line in bpq32.cfg, then restart LinBPQ.',
             'audio'  => 'sudo tail -20 /var/log/data2g/data2g.log; sudo systemctl restart data2g',
             'down'   => 'sudo systemctl status data2g'][$dst['status']] ?? '';
     $tzNote = '';

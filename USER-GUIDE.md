@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.92**
+**Version 1.5.93**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -1534,6 +1534,9 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | System Audit: **Test connects to CALL not running** (v1.5.50) | No test connect recorded for more than twice its interval | Look at Log Viewer → *Link Probe*; run `sudo -u www-data python3 <web root>/scripts/link-probe.py --list`. *login refused*: check `bbs.user` / `bbs.pass`. The probe starts from `parse-system-logs.py`'s 5-minute run, so that must be scheduled too |
 | Data2G card: **LinBPQ not attached** (v1.5.56) | Data2G runs but LinBPQ isn't connected to its TNC port | Check the Data2G port's `ADDR 127.0.0.1 8500` in `bpq32.cfg`, then restart LinBPQ |
 | Data2G log: *"refusing CONNECT from W1ABC: NOT_LISTENING"* | A station called while LinBPQ had Data2G's listening off (scanning another frequency, or VARA / Mercury using the radio) | Nothing, or agree a schedule with that station (*Installation Manual* §10.18). Shown as *turned away* |
+| The radio has **stopped scanning**; System Audit says *flrig is still on the radio's old serial port* (v1.5.93) | The radio's USB dropped off and came back under a new device name (`ttyUSB0` → `ttyUSB3`). flrig still answers but holds the dead port, so LinBPQ's frequency changes never reach the radio | In flrig: **Config → Setup → Transceiver → Init** (or close and reopen flrig). Then check Data2G (next row). If it keeps happening: USB hub, its power, cables, ferrites against RF |
+| System Audit: *Mercury / QtSoundModem / VARA HF / Data2G started before the radio's USB devices last came back* (v1.5.93) | The radio's USB sound card or serial port dropped off and came back; that modem was already running and still has the old device, so it hears nothing (and may not key) while LinBPQ still sees it | Restart that modem: `sudo systemctl restart mercury` / `qtsoundmodem` / `data2g`; VARA HF: close and reopen it on the desktop. LinBPQ reconnects by itself |
+| Data2G card: **Command port closed**; System Audit *Data2G HF running but its command port isn't open* (v1.5.93) | Data2G hung while starting, often after the radio's USB sound card dropped off and came back. LinBPQ can't use it, and a scanning radio stops | `sudo systemctl restart data2g`, then `ss -ltnp \| grep 8500` should show it listening; LinBPQ reconnects by itself |
 | No **Data2G** rows in Recent connections (v1.5.56), though the card shows calls | The database upgrade hasn't run, or the parser can't read Data2G's log | System Audit → *Data2G calls read into RF Connections*; run update.sh again, or `parse-data2g-log.py --dry-run` |
 | No **Mercury** rows in Recent connections (v1.5.46), though the Mercury card shows calls | The database upgrade hasn't run, or the parser can't read Mercury's log | System Audit → *Mercury calls read into RF Connections* says which; run update.sh again, or Maintenance → *Log parsers* → `parse-mercury-log.py --dry-run` |
 | *"Change due … but forwarding is in progress … next run"* (Connect Watchdog log) | A pause or resume was due, but a forwarding session was running, so LinBPQ wasn't restarted | Nothing: the next run (5 minutes) does it |
@@ -1544,7 +1547,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.92
+## 27. Known limitations in v1.5.93
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1619,7 +1622,7 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.92-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.93-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1646,7 +1649,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.92 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.93 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1661,6 +1664,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.92 — User Guide**
+**73 — BPQ Dashboard v1.5.93 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

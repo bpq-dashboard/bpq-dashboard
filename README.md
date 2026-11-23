@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.92** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
+**Version 1.5.93** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Platform: Debian / Ubuntu / Raspberry Pi](https://img.shields.io/badge/platform-Linux-orange.svg)]()
@@ -19,13 +19,17 @@ BPQ Dashboard turns your packet radio node into a friendly, browser-accessible o
 - **APRS map** with messaging, weather popups, your BBS's station info, and an optional beacon that puts the BBS on aprs.fi
 - **RF Connections analytics** — band activity heatmaps, propagation scoring, station map
 - **Full BBS message client** with NTS folder, address book, custom folders
-- **BBS Mail** (v1.5.71–1.5.79) — an email page laid out like Thunderbird: folders and subfolders, sortable columns, quick filter and search, tabs, keyboard shortcuts, an address book with vCard/CSV, message filters, drafts, Quick Check-In, NTS and bulletin sending, bulletin retention, and Tools (forwarding activity, BBSes seen, statistics). It reads an optional **mail store** (Dovecot, `tools/bbs-mail-setup.sh`, offered by the installer and update.sh) that also puts your BBS mail in Thunderbird or a phone's mail app on your home network; deleting from Trash kills the message on the BBS. Works on iPad and phones
+- **BBS Mail** (v1.5.71–1.5.79) — an email page laid out like Thunderbird: folders and subfolders, sortable columns, quick filter and search, tabs, keyboard shortcuts, an address book with vCard/CSV, message filters, drafts, Quick Check-In, NTS and bulletin sending, bulletin retention, and Tools (forwarding activity, BBSes seen, statistics). It reads an optional **mail store** (Dovecot, `tools/bbs-mail-setup.sh`, offered by the installer and update.sh) that also puts your BBS mail in Thunderbird or a phone's mail app on your home network; deleting from Trash kills the message on the BBS. Works on iPad and phones. Address suggestions as you type, callsigns first (v1.5.89); the mail store works with Dovecot 2.4 (v1.5.84)
 - **Winlink mail** (v1.5.77) — mail LinBPQ's BBS collects from Winlink (*Poll RMS*) is marked Winlink, shows the sender's address and can be answered through Winlink (`rms:user@domain`); other accounts (a club or tactical call) get their own folder
 - **Safe sending** (v1.5.76) — a send interrupted by a dropped connection (an iPad locking its screen) is checked with the server instead of failing, and can't post twice
 - **System Audit** — automated health checks for daemons, certs, security, resources
-- **Connect Watchdog** — pauses a forwarding partner that stops answering; shares LinBPQ restarts and never restarts during a radio session (v1.5.81). System Audit also flags forwarding scripts whose `TIMES` bands leave hours with no forwarding (v1.5.82)
+- **Connect Watchdog** — pauses a forwarding partner that stops answering; shares LinBPQ restarts and never restarts during a radio session (v1.5.81). System Audit also flags forwarding scripts whose `TIMES` bands leave hours with no forwarding (v1.5.82). Pause length, attempts before a pause and the never-pause list are set in ⚙ Dashboard Settings → Watchdog (v1.5.90)
 - **Nightly station backups (optional, recommended)** — `scripts/bpq-backup-setup.sh` backs up LinBPQ, the databases, the dashboard and the system settings to a separate drive every night (encrypted, with restic) and shows the result on the Maintenance page
 - **RF Connections, redesigned (v1.5.44)** — status strip, headline numbers, partner rows with a 7-day strip, modems and conditions side by side, details in tabs, light and dark
+- **Messages, Traffic, Connects and System Logs, redesigned (v1.5.86–1.5.88)** — the same layout as RF Connections: a status strip, headline cards, partner or station tables with day blocks, tabs and a detail panel for any callsign. Messages counts only messages that really moved, shows the forwarding queue and flags stuck partners, and loads in seconds
+- **Station report for every modem (v1.5.85)** — the RF Connections PDF report covers VARA HF, Mercury, Data2G and VHF packet, together or one at a time
+- **Winlink sessions reported accurately (v1.5.91–1.5.92)** — on VARA, Data2G and VHF, a call is labelled WL2K only when LinBPQ's gateway log confirms it, with the frequency the radio actually transmitted on (from flrig's history); VHF rows show the port's frequency
+- **Quieter BBS log (v1.5.90)** — saving message text lists only new messages, so forwarding sessions stay easy to find in LinBPQ's log
 - **Mercury HF modem** — for stations running the open-source Mercury modem beside VARA as a LinBPQ port: a status card on RF Connections, its calls beside the VARA sessions (v1.5.46), checks in System Audit, and a setup guide (Manual §10.17)
 - **Data2G HF modem** (v1.5.56) — the same for the open-source Data2G modem: a status card, its calls (with S/N) beside the VARA sessions and on the Station Map, System Audit checks, a desktop monitor-page script (`tools/data2g-monitor.sh`), and a setup guide (Manual §10.18)
 - **Forwarded messages by modem** (v1.5.82) — messages sent or received over Mercury or Data2G are labelled as such, not as VARA
@@ -36,14 +40,14 @@ BPQ Dashboard turns your packet radio node into a friendly, browser-accessible o
 - **Audio Map** (v1.5.57) — Admin page that draws, from the running system, how each LinBPQ radio port reaches its radio: modem program, shared ALSA device (dmix/dsnoop), sound card with mixer levels, and what keys the transmitter
 - **Radio settings for the Yaesu FTdx-3000** (v1.5.60) — on Rig Status, through flrig: live ALC / power / SWR / compression meters, and width, roofing filter, IPO, attenuator, AGC, noise blanker, noise reduction and notch, each with a hint for data use; changes need the sysop password and wait while a modem is transmitting. The card appears only when flrig reports an FTdx-3000
 
-See the [User Guide](BPQ-Dashboard-v1.5.92-User-Guide.pdf) for detailed feature walkthroughs.
+See the [User Guide](BPQ-Dashboard-v1.5.93-User-Guide.pdf) for detailed feature walkthroughs.
 
 ## Quick links
 
 | Document | What it covers |
 |---|---|
-| 📖 **[User Guide](BPQ-Dashboard-v1.5.92-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
-| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.5.92-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
+| 📖 **[User Guide](BPQ-Dashboard-v1.5.93-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
+| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.5.93-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
 | 🧭 **[Installation guide](USER-MANUAL.md#4-installation--step-by-step)** | Step-by-step install for newcomers, plus manual install and updating |
 | ⚡ **[Phase 1 Deployment Guide](docs/PHASE-1-DEPLOYMENT.md)** | Background on the DB-backed RF Connections (done automatically by `install.sh`) |
 | ⚡ **[Traffic Report Deployment Guide](docs/TRAFFIC-STATS-DEPLOYMENT.md)** | Background on the DB-backed Traffic Report (done automatically by `install.sh`) |
@@ -58,8 +62,8 @@ On the computer that already runs LinBPQ:
 ```bash
 sudo apt update && sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.92.zip
-unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.92
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.93.zip
+unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.93
 sudo bash install.sh
 ```
 

@@ -52,7 +52,16 @@ reported, clearly and patiently, everything that didn't work:
   Check's PHP-version gap. His feedback shaped the same page-choice work.
 - **Lee, K5DAT** — asked, before installing, whether the dashboard could run
   under Apache next to the nginx he already uses as a reverse proxy, without
-  touching it. That became v1.5.19's web-server and port choice.
+  touching it. That became v1.5.19's web-server and port choice. His working
+  Data2G station was the model for reporting Data2G channels to Winlink
+  (2026-11).
+- **Ray, W6RAY** — running the dashboard since v1.5.13. His report that the
+  BBS mail store setup failed on Dovecot 2.4 (Debian 13) led to the fix in
+  v1.5.84.
+- **Glenn Allison, N3MEL**, again — after the first install he kept using
+  and updating it, and his requests became BBS Mail's full-screen reading and
+  mail-app copy, more than one Winlink account and safe sending (v1.5.76–
+  1.5.83).
 
 ## Also built on
 

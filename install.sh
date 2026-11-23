@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.92 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.93 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.92 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.93 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝

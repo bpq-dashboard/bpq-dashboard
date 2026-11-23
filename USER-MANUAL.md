@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.92**
+**Version 1.5.93**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -87,6 +87,11 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.93
+
+- **NTS report no longer calls old forwarded messages unsent.** It used to know a message was forwarded only from the BBS log, so anything forwarded before the oldest log kept showed "Not Yet Forwarded". The dashboard now records BPQ's own status letters (TF, TD, TY…) and the report uses them; a message older than the logs with no status shows "Older than logs".
+- **System Audit spots a radio USB drop.** If the radio's USB sound card or serial port drops off and comes back, programs already running keep the dead device. New warnings: flrig still on the old serial port (scanning stops), Data2G running with its command port closed, and Data2G, Mercury, QtSoundModem or VARA HF started before the USB came back, each with its restart.
 
 ### In v1.5.92
 
@@ -640,14 +645,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.92.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.93.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.92
+cd bpq-dashboard-1.5.93
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -2762,10 +2767,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.92-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.93-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.92 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.93 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

@@ -310,6 +310,9 @@ function bpq_data2g_status(string $cacheDir): array {
     $running = ($proc !== null && $proc !== '') || $listening === true;
     if ($socks === null && $proc === null)  $status = 'unknown';
     elseif (!$running)                      $status = 'down';
+    // v1.5.93: process there but its command port never opened (hung on
+    // start, e.g. after the radio's USB sound card dropped off and came back)
+    elseif ($proc && $listening === false)  $status = 'noport';
     elseif ($attached === false)            $status = 'nolink';
     elseif (!$s['audio_ok'])                $status = 'audio';
     elseif ($s['session'])                  $status = 'session';

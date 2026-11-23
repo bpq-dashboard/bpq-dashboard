@@ -4,6 +4,44 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.93] - 2026-11-23
+
+### Fixed (NTS report: old forwarded messages shown as "Not Yet Forwarded", N3MEL)
+- nts-forwarding-report.php only knew a message was forwarded from its
+  offer in the BBS log, so messages forwarded before the oldest log still
+  kept (N3MEL: 22 of 204, back to June, with 9 days of logs) showed "Not Yet
+  Forwarded" although BPQ lists them TF.
+- New columns bpq_messages.bbs_status / bbs_status_at (sql/2026-11-23-
+  messages-bbs-status.sql): fetch-message-bodies.php records BPQ's status
+  letters from every listing (LL every run, LP/LT/LB daily).
+- The report uses them when the log has no record: Forwarded (F), Delivered
+  (D), Read here (Y), Held (H), Killed (K), with "BPQ status TF — handled
+  before the oldest BBS log kept (date)"; a message older than the logs
+  with no status recorded yet shows "Older than logs" instead of "Not Yet
+  Forwarded". New totals: Delivered / Read here, Older Than Logs.
+
+### Added (System Audit: radio stopped scanning, K1AJD 2026-11-22)
+- On ARSSYSTEM the radio's USB devices dropped off and came back on another
+  hub port (ttyUSB0 → ttyUSB3); flrig kept the dead port, answered as usual
+  but couldn't tune the radio, so LinBPQ's scanning stopped, and Data2G
+  lost its sound card, was killed and hung on restart without opening its
+  command port.
+- System Audit "flrig is still on the radio's old serial port" (crit): the
+  serial port in flrig's settings (~/.flrig/*.prefs, the rig in use) is a
+  device newer than the flrig process. If the settings can't be read, any
+  /dev/serial/by-id device newer than flrig gives a warning. Fix shown:
+  flrig Config → Setup → Transceiver → Init.
+- Data2G status "noport" (System Audit crit, RF Connections "Command port
+  closed"): the process runs but its command port isn't listening. Fix
+  shown: sudo systemctl restart data2g; LinBPQ reconnects by itself.
+- System Audit "<modem> started before the radio's USB devices last came
+  back" (warn) for Data2G, Mercury, QtSoundModem and VARA HF: the process
+  is older than the newest USB sound card (/proc/asound/cardN/usbid,
+  /dev/snd/pcmCN*) or USB serial port (/dev/serial/by-id). On ARSSYSTEM all
+  four (and flrig) kept the dead devices after the 2026-11-22 drop and each
+  needed a restart. The finding names the device, when it came back, and
+  the restart for that modem.
+
 ## [1.5.92] - 2026-11-22
 
 ### Fixed (Winlink sessions on VARA and VHF, K1AJD)

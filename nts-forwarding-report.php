@@ -118,22 +118,52 @@ function scanLogsForBids(array $files, int $sinceTs): array {
 $pdo = tprfn_db();
 $sinceTs = time() - $days * 86400;
 $sinceSql = date('Y-m-d H:i:s', $sinceTs);
-$rows = tprfn_query($pdo,
-    "SELECT bbs_number, from_call, to_call, subject, msg_date, body, first_seen_at
-     FROM bpq_messages
-     WHERE msg_type = 'T' AND first_seen_at >= ?
-     ORDER BY first_seen_at DESC",
-    [$sinceSql]
-);
+// v1.5.93: bbs_status (BPQ's own letters, e.g. TF) when the column exists
+try {
+    $rows = tprfn_query($pdo,
+        "SELECT bbs_number, from_call, to_call, subject, msg_date, body, first_seen_at, bbs_status
+         FROM bpq_messages
+         WHERE msg_type = 'T' AND first_seen_at >= ?
+         ORDER BY first_seen_at DESC",
+        [$sinceSql]
+    );
+} catch (Throwable $e) {
+    $rows = tprfn_query($pdo,
+        "SELECT bbs_number, from_call, to_call, subject, msg_date, body, first_seen_at, NULL AS bbs_status
+         FROM bpq_messages
+         WHERE msg_type = 'T' AND first_seen_at >= ?
+         ORDER BY first_seen_at DESC",
+        [$sinceSql]
+    );
+}
 
 $files = logFilesForDays($LOG_DIR, $days, $MAX_LOG_BYTES);
 $eventsByBid = scanLogsForBids($files, $sinceTs);
+// v1.5.93: the oldest BBS log read. A message seen before it may have been
+// forwarded on a day whose log is no longer kept.
+$oldestLogTs = null;
+if ($files && preg_match('/log_(\d{6})_BBS\.txt$/', $files[0], $mm)) {
+    $oldestLogTs = mktime(0, 0, 0, (int)substr($mm[1], 2, 2), (int)substr($mm[1], 4, 2), 2000 + (int)substr($mm[1], 0, 2));
+}
+// BPQ status letter (2nd) -> what it means for traffic
+const NTS_STATUS = ['F' => 'forwarded', 'D' => 'delivered', 'Y' => 'read', 'K' => 'killed', 'H' => 'held', 'N' => 'waiting', '$' => 'waiting'];
 
 $report = [];
 foreach ($rows as $r) {
     $bid = extractBid($r['body']);
     $events = ($bid && isset($eventsByBid[$bid])) ? $eventsByBid[$bid] : [];
+    $code = strtoupper((string)($r['bbs_status'] ?? ''));
+    $bpq = NTS_STATUS[substr($code, 1, 1)] ?? null;
+    $seen = strtotime((string)$r['first_seen_at']) ?: 0;
+    if ($events)                                          $state = 'forwarded';
+    elseif (in_array($bpq, ['forwarded', 'delivered', 'read'], true)) $state = 'bpq-' . $bpq;
+    elseif ($bpq === 'held')                              $state = 'held';
+    elseif ($bpq === 'killed')                            $state = 'killed';
+    elseif ($bpq === null && $oldestLogTs && $seen < $oldestLogTs) $state = 'unknown';
+    else                                                  $state = 'pending';
     $report[] = [
+        'state'    => $state,
+        'code'     => $code,
         'number'   => $r['bbs_number'],
         'date'     => $r['msg_date'],
         'from'     => $r['from_call'],
@@ -144,7 +174,10 @@ foreach ($rows as $r) {
     ];
 }
 
-$forwardedCount = count(array_filter($report, fn($r) => count($r['events']) > 0));
+$forwardedCount = count(array_filter($report, fn($r) => $r['state'] === 'forwarded' || $r['state'] === 'bpq-forwarded'));
+$doneCount = count(array_filter($report, fn($r) => in_array($r['state'], ['bpq-delivered', 'bpq-read', 'killed'], true)));
+$pendingCount = count(array_filter($report, fn($r) => $r['state'] === 'pending' || $r['state'] === 'held'));
+$unknownCount = count(array_filter($report, fn($r) => $r['state'] === 'unknown'));
 $totalCount = count($report);
 
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
@@ -205,6 +238,7 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
     }
     .status-forwarded { background: #dcfce7; color: #166534; }
     .status-pending { background: #fef3c7; color: #92400e; }
+    .status-unknown { background: #e5e7eb; color: #374151; }
     .no-bid { color: #999; font-style: italic; font-size: 12px; }
     footer { margin-top: 24px; color: #999; font-size: 11px; }
 
@@ -240,7 +274,9 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
     <div class="summary">
         <div class="stat"><div class="n"><?= h($totalCount) ?></div><div class="l">NTS Messages</div></div>
         <div class="stat"><div class="n"><?= h($forwardedCount) ?></div><div class="l">Forwarded</div></div>
-        <div class="stat"><div class="n"><?= h($totalCount - $forwardedCount) ?></div><div class="l">Not Yet Forwarded</div></div>
+        <?php if ($doneCount): ?><div class="stat"><div class="n"><?= h($doneCount) ?></div><div class="l">Delivered / Read here</div></div><?php endif; ?>
+        <div class="stat"><div class="n"><?= h($pendingCount) ?></div><div class="l">Not Yet Forwarded</div></div>
+        <?php if ($unknownCount): ?><div class="stat"><div class="n"><?= h($unknownCount) ?></div><div class="l">Older Than Logs</div></div><?php endif; ?>
     </div>
 
     <table>
@@ -267,8 +303,18 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
                     <td><?= h($r['to']) ?></td>
                     <td class="subj"><?= h($r['subject']) ?></td>
                     <td>
-                        <?php if (count($r['events']) > 0): ?>
+                        <?php if ($r['state'] === 'forwarded' || $r['state'] === 'bpq-forwarded'): ?>
                             <span class="status-badge status-forwarded">Forwarded</span>
+                        <?php elseif ($r['state'] === 'bpq-delivered'): ?>
+                            <span class="status-badge status-forwarded">Delivered</span>
+                        <?php elseif ($r['state'] === 'bpq-read'): ?>
+                            <span class="status-badge status-forwarded">Read here</span>
+                        <?php elseif ($r['state'] === 'killed'): ?>
+                            <span class="status-badge status-unknown">Killed</span>
+                        <?php elseif ($r['state'] === 'held'): ?>
+                            <span class="status-badge status-pending">Held</span>
+                        <?php elseif ($r['state'] === 'unknown'): ?>
+                            <span class="status-badge status-unknown">Older than logs</span>
                         <?php else: ?>
                             <span class="status-badge status-pending">Not Yet Forwarded</span>
                         <?php endif; ?>
@@ -280,6 +326,10 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
                                     <div class="dest"><span class="call"><?= h($e['dest_bbs']) ?></span> <span class="time"><?= h($e['time_iso']) ?></span></div>
                                 <?php endforeach; ?>
                             </div>
+                        <?php elseif (str_starts_with($r['state'], 'bpq-') || $r['state'] === 'killed' || $r['state'] === 'held'): ?>
+                            <span class="bid">BPQ status <?= h($r['code']) ?><?= $oldestLogTs && $r['state'] !== 'held' ? ' — handled before the oldest BBS log kept (' . h(date('Y-m-d', $oldestLogTs)) . ')' : '' ?></span>
+                        <?php elseif ($r['state'] === 'unknown'): ?>
+                            <span class="bid">Arrived before the oldest BBS log kept (<?= h(date('Y-m-d', $oldestLogTs)) ?>); BPQ's status not recorded yet</span>
                         <?php elseif (!$r['bid']): ?>
                             <span class="no-bid">no BID found in body</span>
                         <?php else: ?>
@@ -295,6 +345,7 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
         NTS traffic sourced from the message archive (bpq_messages). Forwarding events parsed from
         BPQ's BBS log<?= !empty($files) ? ' (' . h(count($files)) . ' day' . (count($files) === 1 ? '' : 's') . ' of logs read)' : ' — no log files found for this range' ?>.
         A message with no BID in its body can't be matched to forward events even if it was in fact forwarded.
+        When the log has no record, BPQ's own status is used (F forwarded, D delivered, Y read, H held, K killed), as last listed by the message-text job<?= $oldestLogTs ? '; the oldest BBS log read is ' . h(date('Y-m-d', $oldestLogTs)) : '' ?>.
     </footer>
 
 </body>

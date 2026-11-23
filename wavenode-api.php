@@ -1,7 +1,7 @@
 <?php
 /**
  * wavenode-api.php — WaveNode RF Power Monitor API
- * BPQ Dashboard v1.5.92
+ * BPQ Dashboard v1.5.93
  *
  * Reads JSON files written by wavenode-reader.py on Windows
  * and synced to the server by wavenode-sync.sh
