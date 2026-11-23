@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.94**
+**Version 1.5.95**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -125,7 +125,7 @@ Every page loads the same bar at the top.
 - **📡 BPQ Dashboard** — returns to the home page, RF Connections.
 - **Page links** — RF, Traffic, System, Connects, Messages, Email, Weather, Chat, APRS, VARA, Telnet, Rig, RF Power. The page you're on is highlighted. **Email** opens BBS Mail, the Thunderbird-style page, where the BBS mail store is set up (v1.5.71), otherwise the Email Client (Section 9).
 - **📖 Guide** — opens this guide as a PDF in a new tab.
-- **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit, Audio Map (v1.5.57), LinBPQ Status (v1.5.94). These ask for the admin login.
+- **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit, Audio Map (v1.5.57), LinBPQ Status (v1.5.94), Node Debug (v1.5.95). These ask for the admin login.
 - **Clocks** — UTC (purple, "Z") and your browser's local time ("L"), updated every second.
 - **Theme button** — 🌙 / ☀️ (Section 3).
 - **⚙** — on the admin pages only: *Dashboard Settings* for the forwarding tools (Section 19).
@@ -1286,7 +1286,7 @@ Reads the server's logs from the browser, no SSH needed.
   - **Log parsers** — RF Connections, Traffic and System Logs parsers (every 5 minutes).
   - **Forwarding tools** — prop-scheduler, storm monitor, connect watchdog and its state, White Pages auto-clean (only if you run them).
   - **VARA** — the VARA session log (config.php `logs.vara_file`), **VARA download** (v1.5.19, when the log comes from the TPRFN server) and the callsign validator, and **Mercury HF** (v1.5.43) and **Data2G HF** (v1.5.56), only where they are installed.
-  - **BPQ Node** — today's BBS, TCP, Connect and CMS logs, and earlier BBS logs by date.
+  - **BPQ Node** — today's BBS, TCP, Connect and CMS logs, and earlier BBS logs by date. LinBPQ's node debug log has its own page: **Admin → Node Debug** (v1.5.95).
   - **System** — the web-server error log (PHP errors land here too) and the auth log.
   Each entry shows its size and last change; hover for what it is and where it lives. Logs for features you don't use say **not used here**.
 - **Viewer** — the last 100, 200 (default), 500 or 1000 lines, colour-coded (errors red, warnings amber), with ⟳ Refresh. Characters the browser can't show (raw bytes from BBS sessions, for example) appear as **�**; the rest of the line is unchanged.
@@ -1344,6 +1344,20 @@ Runs dozens of checks on this install and reports each one with what it found an
 - The firewall, fail2ban, listening-port and `nginx -t` rows need the read-only sudo rules (`www-data-tools.sudoers`).
 - **Multi-domain SSL** — list your certificates in config.php `ssl_domains`; otherwise the address you opened the page on is checked.
 - Run it after an upgrade and once a month.
+
+### Node Debug (Admin → Node Debug, v1.5.95)
+
+LinBPQ's node debug log (`NodeDebuglog_YYMMDD.log` in the LinBPQ log folder) read for you, laid out like RF Connections. Choose **Today**, **3 days** or **7 days** (UTC).
+
+- **Status strip and headline cards:** LinBPQ starts (often = the Connect Watchdog or hand restarts), neighbour links dropped, internet / Winlink server (CMS) outages with when and how long, and the share of Winlink channel reports (WL2KREPORT) Winlink accepted.
+- **Neighbours:** each node link: sessions, data sent and received, links dropped while LinBPQ was running, links dropped during its own restarts (counted apart), last drop, and a block per day. Click one for details.
+- **Needs attention / Problems:** known lines explained, with what to do: a modem's **MISSING SOUNDCARD** (the radio's USB sound card dropped off), **Check CMS Failed** (Winlink servers unreachable), DNS failures, a chat link that keeps failing, AXIP packets from addresses LinBPQ has no MAP for, BPQ's web forms folder missing, RTS keying set without a serial port, and more. Anything else with "error" or "failed" is listed too.
+- **Why LinBPQ restarted (Starts tab):** each start says why: **Connect Watchdog** (and which partner it paused or resumed), **By *user*** (someone ran `sudo systemctl restart`), **Dashboard**, **Cron job**, **Computer restarted** (by whom, or after a power cut or hang), **Root / script** (stopped by root with no sudo record), **Crashed** (segfault, out of memory or an error exit), or **Unknown**. Click a start for the evidence, how long LinBPQ was down, whether it shut down normally, and the last lines it wrote. For an **Unknown** one it also lists what was checked, the likely causes and ready-to-copy commands for the system logs around that minute. Crashes and unknown restarts also appear under *Needs attention*. The reasons come from the Connect Watchdog's log and the system records read by the LinBPQ Status helper (the admin pages' sudo rules); without the helper, starts on the watchdog's 5-minute schedule show as *Probably Watchdog*.
+- **When things happened:** one square per UTC hour, coloured by the worst thing in it.
+- **Live log:** today's file, new lines every 5 seconds. VARA's routine busy / OK / alive lines and heartbeats are hidden (Everything shows them); *Problems only*; a filter box; Pause. Colours: red urgent, amber look at, brown LinBPQ shutting down, blue starting, green OK. **Search all days** (or Enter in the filter box) and the *Show … in the log* buttons on problems and neighbours search every day in the range you chose; a start's *Show the log around this start* opens the minutes before and after it. **Back to live log** returns to the live view.
+- Lines LinBPQ writes in the 30 seconds before it starts again (links dropped, "called without semaphore") are its own shutdown and are not counted as problems.
+
+LinBPQ writes the file when node debug logging is on. Behind the admin login (the log holds addresses and callsigns).
 
 ### LinBPQ Status (Admin → LinBPQ Status, v1.5.94)
 
@@ -1558,7 +1572,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.94
+## 27. Known limitations in v1.5.95
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1630,11 +1644,12 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | System Audit | `http://YOUR_SERVER/admin/system-audit.html` | Admin |
 | Audio Map (v1.5.57) | `http://YOUR_SERVER/admin/audio-map.html` | Admin |
 | LinBPQ Status (v1.5.94) | `http://YOUR_SERVER/admin/linbpq-status.html` | Admin |
+| Node Debug (v1.5.95) | `http://YOUR_SERVER/admin/node-debug.html` | Admin |
 | Install Check | `http://YOUR_SERVER/install-check.php` | Admin |
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.94-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.95-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1661,7 +1676,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.94 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.95 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1676,6 +1691,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.94 — User Guide**
+**73 — BPQ Dashboard v1.5.95 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

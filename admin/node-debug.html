@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node Debug - BPQ Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <script>
+        (function () { try { var s = localStorage.getItem('bpq-dark-mode'); var t = (s === 'dark' || s === 'light') ? s : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+    </script>
+    <link rel="stylesheet" href="/bpq-page.css?v=1.5.95">
+    <style>
+        .nd-console { position: relative; background: #0B0F14; color: #C9D3DE; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; padding: 12px 16px; height: 520px; overflow: auto; white-space: pre-wrap; word-break: break-word; border-top: 1px solid var(--rf-line); }
+        .nd-console .crit { color: #FF7B72; font-weight: 700; }
+        .nd-console .err { color: #FF9E8F; }
+        .nd-console .warn { color: #E3B341; }
+        .nd-console .stop { color: #B08A3E; }
+        .nd-console .start { color: #79C0FF; font-weight: 600; }
+        .nd-console .ok { color: #7EE787; }
+        .nd-console .chatter, .nd-console .cont { color: #6B7785; }
+        .nd-console .empty { color: #7D8590; font-style: italic; }
+        .nd-console .mark { background: rgba(121,192,255,.22); display: inline-block; width: 100%; }
+        #viewBanner.hidden { display: none !important; }
+        .nd-hit { background: rgba(227,179,65,.25); border-radius: 2px; }
+        .nd-prob { display: grid; grid-template-columns: 12px minmax(0,1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--rf-line); text-align: left; width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; color: inherit; cursor: pointer; font: inherit; }
+        .nd-prob:last-child { border-bottom: 0; }
+        .nd-prob .rf-dot { margin-top: 5px; }
+        .nd-prob b { display: block; }
+        .nd-heat td { height: 18px; border-radius: 3px; }
+        .nd-lvl { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+        .nd-lvl.crit { background: var(--rf-badbg); color: var(--rf-bad); } .nd-lvl.warn { background: var(--rf-warnbg); color: var(--rf-warnfg); } .nd-lvl.info { background: var(--rf-soft); color: var(--rf-muted); }
+        .nd-why { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--rf-soft); color: var(--rf-ink); }
+        .nd-why.bad { background: var(--rf-badbg); color: var(--rf-bad); } .nd-why.warn { background: var(--rf-warnbg); color: var(--rf-warnfg); } .nd-why.good { background: var(--rf-goodbg, var(--rf-soft)); color: var(--rf-good, var(--rf-ink)); }
+        .nd-cmd { display: flex; gap: 8px; align-items: flex-start; margin-top: 4px; }
+        .nd-cmd code { flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: #0B0F14; color: #C9D3DE; border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; user-select: all; }
+        .nd-list { margin: 4px 0 0; padding-left: 18px; } .nd-list li { margin: 3px 0; }
+        tr.nd-row { cursor: pointer; } tr.nd-row:hover td { background: var(--rf-soft); }
+        .nd-sample { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: var(--rf-soft); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; word-break: break-word; }
+    </style>
+</head>
+<!--
+  Admin > Node Debug (v1.5.95). LinBPQ's NodeDebuglog_YYMMDD.log read and
+  explained (node-debug-api.php, behind the admin login), with a live view of
+  today's log. Laid out like RF Connections.
+-->
+<body data-nav-page="nodedebug">
+<script src="/bpq-nav-loader.js?v=2026-11-19-1"></script>
+
+<header class="rf-head">
+    <div class="rf-wrap rf-head-row">
+        <div class="rf-title">
+            <div class="rf-title-line">
+                <h1>Node Debug</h1>
+                <span class="rf-ver">v1.5.95</span>
+            </div>
+            <div class="rf-sub">
+                <span id="dateRange">Loading…</span>
+                <span class="rf-live"><i id="statusDot"></i><span id="statusText">Loading…</span></span>
+                <span class="rf-clock" title="UTC"><span id="zuluTime">--:--</span>Z</span>
+            </div>
+        </div>
+        <div class="rf-range" role="group" aria-label="Date range">
+            <button type="button" data-range="1">Today</button>
+            <button type="button" data-range="3" class="active">3 days</button>
+            <button type="button" data-range="7">7 days</button>
+        </div>
+        <button type="button" class="rf-btn" id="refreshBtn">Refresh</button>
+        <button type="button" class="rf-btn rf-btn-soft" id="themeBtn">Dark</button>
+    </div>
+    <div class="rf-wrap rf-strip" id="statusStrip" aria-label="Node status"></div>
+</header>
+
+<main class="rf-wrap rf-main">
+    <div id="noData" class="rf-nodata hidden"></div>
+
+    <section class="rf-kpis" aria-label="Headline numbers">
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">LinBPQ starts</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kStarts">–</span><span id="kStartsTag"></span></div>
+            <div class="rf-kpi-sub" id="kStartsSub">&nbsp;</div>
+            <div class="rf-chips" id="kStartsChips"></div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Neighbour links dropped</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kLost">–</span><span class="rf-kpi-sub" id="kLostSub2"></span></div>
+            <div class="rf-kpi-sub" id="kLostSub">&nbsp;</div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Internet &amp; Winlink servers</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kNet">–</span><span id="kNetTag"></span></div>
+            <div class="rf-kpi-sub" id="kNetSub">&nbsp;</div>
+        </div>
+        <div class="rf-card rf-kpi">
+            <div class="rf-kpi-label">Winlink channel reports</div>
+            <div class="rf-kpi-row"><span class="rf-kpi-big" id="kWl">–</span><span class="rf-kpi-sub" id="kWlSub2"></span></div>
+            <div class="rf-kpi-sub" id="kWlSub">&nbsp;</div>
+        </div>
+    </section>
+
+    <section class="rf-cols">
+        <div class="rf-card rf-colmain">
+            <div class="rf-card-head">
+                <h2>Neighbours</h2>
+                <span class="rf-card-sub">Links to other nodes: sessions, data and drops (drops during a LinBPQ restart counted apart)</span>
+            </div>
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 760px">
+                    <thead><tr><th>Neighbour</th><th class="num">Sessions</th><th class="num">Sent</th><th class="num">Received</th><th class="num">Dropped</th><th class="num">At restarts</th><th>Last drop</th><th id="nbDaysHead">Days</th></tr></thead>
+                    <tbody id="nbRows"><tr><td colspan="8" class="rf-empty">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <div class="rf-legend">
+                <span><i style="background: var(--pg-blk3)"></i>drops that day (darker = more)</span>
+                <span><i style="background: var(--pg-blk0)"></i>none</span>
+                <span>Days are UTC, oldest left. Click a neighbour for details.</span>
+            </div>
+        </div>
+        <div class="rf-side">
+            <div class="rf-card">
+                <div class="rf-card-head"><h2>Needs attention</h2><span class="rf-card-sub" id="attnSub"></span></div>
+                <div class="rf-pad" id="attnList"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="rf-card">
+        <div class="rf-card-head"><h2>When things happened</h2><span class="rf-card-sub">Per UTC hour: the worst thing that hour</span></div>
+        <div class="rf-scroll" style="padding: 14px 20px">
+            <table class="pg-heat nd-heat" id="heat" aria-label="Events by day and UTC hour"></table>
+        </div>
+        <div class="rf-legend">
+            <span><i style="background: var(--rf-dotbad)"></i>internet / Winlink servers unreachable, or a sound card lost</span>
+            <span><i style="background: var(--rf-dotwarn)"></i>3 or more neighbour links dropped</span>
+            <span><i style="background: rgba(194,120,3,.28)"></i>1–2 dropped</span>
+            <span><i style="background: #3B82F6"></i>LinBPQ started</span>
+            <span><i style="background: var(--rf-line)"></i>quiet</span>
+        </div>
+    </section>
+
+    <section class="rf-card">
+        <div class="rf-tabs" role="tablist" aria-label="Node debug details">
+            <button type="button" role="tab" data-tab="live" aria-selected="true">Live log <span class="rf-count" id="cLive">0</span></button>
+            <button type="button" role="tab" data-tab="problems" aria-selected="false">Problems <span class="rf-count" id="cProb">0</span></button>
+            <button type="button" role="tab" data-tab="winlink" aria-selected="false">Winlink reports <span class="rf-count" id="cWl">0</span></button>
+            <button type="button" role="tab" data-tab="connects" aria-selected="false">Radio connects <span class="rf-count" id="cConn">0</span></button>
+            <button type="button" role="tab" data-tab="starts" aria-selected="false">Starts <span class="rf-count" id="cStarts">0</span></button>
+        </div>
+        <div class="rf-panel" id="tab-live">
+            <div class="rf-toolbar">
+                <input type="search" id="liveSearch" placeholder="Filter: any text, e.g. a callsign" aria-label="Filter the live log">
+                <span class="rf-chips" id="liveFilters">
+                    <button type="button" class="rf-chip" data-lf="all" aria-pressed="false">Everything</button>
+                    <button type="button" class="rf-chip" data-lf="quiet" aria-pressed="true">Hide VARA chatter</button>
+                    <button type="button" class="rf-chip" data-lf="problems" aria-pressed="false"><i style="background:var(--rf-dotbad)"></i>Problems only</button>
+                </span>
+                <button type="button" class="rf-btn rf-btn-sm" id="findBtn" title="Search every day in the range above, not just the live view">Search all days</button>
+                <button type="button" class="rf-btn rf-btn-sm" id="pauseBtn">Pause</button>
+            </div>
+            <div class="rf-note hidden" id="viewBanner" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin:0 16px 10px;padding:8px 12px;border-radius:8px;background:var(--rf-soft)"><span id="viewText"></span><button type="button" class="rf-btn rf-btn-sm" id="backLive">Back to live log</button></div>
+            <div class="nd-console" id="console"><span class="empty">Loading today's log…</span></div>
+            <div class="rf-more" id="liveMore"></div>
+        </div>
+        <div class="rf-panel hidden" id="tab-problems">
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 720px"><thead><tr><th>What</th><th>Level</th><th class="num">Times</th><th>First</th><th>Last</th><th>Who</th></tr></thead><tbody id="probRows"></tbody></table>
+            </div>
+            <div class="rf-more">Click a row for what it means and what to do.</div>
+        </div>
+        <div class="rf-panel hidden" id="tab-winlink">
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 560px"><thead><tr><th>Service</th><th>Frequency (centre)</th><th class="num">Reports sent</th><th class="num">Accepted</th><th>Last accepted</th></tr></thead><tbody id="wlRows"></tbody></table>
+            </div>
+            <div class="rf-more">LinBPQ's WL2KREPORT lines: each channel is reported to Winlink about every 30 minutes; "Accepted" = Winlink answered "Database update ok".</div>
+        </div>
+        <div class="rf-panel hidden" id="tab-connects">
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 480px"><thead><tr><th>Time (UTC)</th><th>From</th><th>To</th></tr></thead><tbody id="connRows"></tbody></table>
+            </div>
+            <div class="rf-more">Connects reported by the VARA-type modems (VARA, Mercury, Data2G). RF Connections has the full picture.</div>
+        </div>
+        <div class="rf-panel hidden" id="tab-starts">
+            <div class="rf-scroll">
+                <table class="rf-ptable" style="min-width: 760px"><thead><tr><th>LinBPQ started (UTC)</th><th>Why</th><th>Details</th><th class="num">Down for</th><th>Then ran for</th></tr></thead><tbody id="startRows"></tbody></table>
+            </div>
+            <div class="rf-more" id="startsMore"></div>
+        </div>
+    </section>
+</main>
+
+<div id="drawerBg" class="rf-drawer-bg hidden"></div>
+<aside id="drawer" class="rf-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <div class="rf-drawer-head"><h2 id="drawerTitle"></h2><button type="button" class="rf-x" id="drawerClose" aria-label="Close">×</button></div>
+    <div class="rf-drawer-body" id="drawerBody"></div>
+</aside>
+
+<script>
+(function () {
+    'use strict';
+    const API = 'node-debug-api.php';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const pad = (n) => String(n).padStart(2, '0');
+    const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // restart reasons: [tag class, short name for counts]
+    const WHY = { watchdog: ['', 'watchdog'], 'watchdog?': ['', 'probably watchdog'], manual: ['good', 'by hand'], cron: ['', 'cron job'], reboot: ['', 'computer restart'],
+                  root: ['warn', 'root / script'], self: ['warn', 'LinBPQ closed itself'], crash: ['bad', 'crash'], unknown: ['warn', 'unknown'] };
+    let range = 3;
+    try { const r = parseInt(localStorage.getItem('bpq_nodedebug_range'), 10); if ([1, 3, 7].includes(r)) range = r; } catch (e) {}
+    let tab = 'live', D = null, lines = [], offset = 0, paused = false, lf = 'quiet', liveFile = '';
+    let view = null;   // search results / lines around a start, shown instead of the live tail
+
+    const fmt = (s, withDay) => { if (!s) return '–'; const d = new Date(s * 1000), t = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + 'Z'; return withDay ? DOW[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + t : t; };
+    const ago = (s) => { const m = Math.round((Date.now() / 1000 - s) / 60); if (m < 2) return 'just now'; if (m < 60) return m + ' min ago'; const h = Math.floor(m / 60); if (h < 24) return h + ' h ago'; const dd = Math.round(h / 24); return dd + (dd === 1 ? ' day ago' : ' days ago'); };
+    const dur = (s) => { s = Math.round(s); if (s < 3600) return Math.round(s / 60) + ' min'; if (s < 86400) return Math.floor(s / 3600) + ' h ' + Math.round(s % 3600 / 60) + ' min'; return Math.floor(s / 86400) + ' d ' + Math.floor(s % 86400 / 3600) + ' h'; };
+    const kb = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' kB' : b + ' B';
+    const dayLbl = (s) => { const d = new Date(s * 1000); return DOW[d.getUTCDay()] + ' ' + d.getUTCDate(); };
+    function setStatus(c, t) { $('statusDot').className = c; $('statusText').textContent = t; }
+
+    async function getJSON(url) {
+        const r = await fetch(url, { cache: 'no-store' });
+        const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
+        if (r.status === 401 || r.status === 403) throw new Error('Admin login needed: reload the page and log in.');
+        if (!j) throw new Error('No answer from ' + API + ' (HTTP ' + r.status + ')');
+        if (!j.success) throw new Error(j.error || 'failed');
+        return j;
+    }
+
+    async function load() {
+        setStatus('', 'Reading the node debug log…');
+        try { D = await getJSON(API + '?action=summary&days=' + range); }
+        catch (e) { setStatus('bad', e.message); $('noData').classList.remove('hidden'); $('noData').textContent = e.message; return; }
+        const any = D.files.some(f => f.present);
+        $('noData').classList.toggle('hidden', any);
+        if (!any) $('noData').innerHTML = 'No <code>NodeDebuglog_YYMMDD.log</code> in the LinBPQ log folder for this period. LinBPQ writes it when node debug logging is on.';
+        render();
+        setStatus(D.last_line && Date.now() / 1000 - D.last_line < 900 ? 'ok' : 'warn', D.last_line ? 'last line ' + fmt(D.last_line) + ' (' + ago(D.last_line) + ')' : 'no lines');
+    }
+
+    function render() {
+        const per = D.per_day, sum = (k) => per.reduce((a, d) => a + d[k], 0);
+        $('dateRange').textContent = range === 1 ? 'Today' : dayLbl(D.from) + ' – today (' + range + ' days)';
+        // KPI starts
+        const st = D.starts.length, todayStarts = per[per.length - 1].starts;
+        $('kStarts').textContent = st;
+        const perDay = st / range;
+        $('kStartsTag').innerHTML = perDay >= 8 ? '<span class="rf-tag bad">very often</span>' : perDay >= 3 ? '<span class="rf-tag warn">often</span>' : '<span class="rf-tag good">settled</span>';
+        const RC = D.restart_reasons || {}, rcTxt = Object.keys(WHY).filter(k => RC[k]).map(k => '<b>' + RC[k] + '</b> ' + esc(WHY[k][1])).join(' · ');
+        $('kStartsSub').innerHTML = '<b>' + todayStarts + '</b> today' + (rcTxt ? ' · ' + rcTxt : '') + '<div class="rf-small rf-muted">' + D.restart_lines.toLocaleString() + ' shutdown lines set aside (dropped links, “without semaphore”)</div>';
+        $('kStartsChips').innerHTML = per.map((d, i) => '<span class="rf-chip" style="cursor:default">' + esc(dayLbl(D.from + i * 86400)) + ' <b>' + d.starts + '</b></span>').join('');
+        // KPI links
+        const lost = sum('lost'), nb = D.neighbours;
+        $('kLost').textContent = lost;
+        $('kLostSub2').textContent = nb.length + ' neighbours';
+        const worst = nb.filter(n => n.lost).slice(0, 2);
+        $('kLostSub').innerHTML = worst.length ? 'most: ' + worst.map(n => '<b>' + esc(n.call) + '</b> (' + n.lost + ')').join(', ') + ' · not counting restarts' : 'none outside restarts';
+        // KPI internet
+        const out = D.internet.outages, cms = D.internet.cms_fail, dns = D.internet.dns_fail;
+        $('kNet').textContent = out.length ? out.length + (out.length === 1 ? ' outage' : ' outages') : 'OK';
+        $('kNet').className = 'rf-kpi-big' + (out.length ? ' bad' : '');
+        $('kNetTag').innerHTML = out.length ? '<span class="rf-tag bad">' + esc(dur(out.reduce((a, o) => a + Math.max(60, o.to - o.from), 0))) + '</span>' : '<span class="rf-tag good">reachable</span>';
+        $('kNetSub').innerHTML = out.length ? 'last: <b>' + esc(fmt(out[out.length - 1].from, true)) + '</b> for ' + esc(dur(Math.max(60, out[out.length - 1].to - out[out.length - 1].from))) + ' · ' + cms + ' CMS checks failed, ' + dns + ' name lookups' : (cms + dns ? cms + ' CMS checks failed, ' + dns + ' name lookups (short)' : 'every Winlink server check passed');
+        // KPI winlink reports
+        const wsent = D.winlink.reduce((a, w) => a + w.sent, 0), wok = D.winlink.reduce((a, w) => a + w.ok, 0);
+        $('kWl').textContent = wsent ? Math.round(wok / wsent * 100) + '%' : '–';
+        $('kWl').className = 'rf-kpi-big' + (wsent && wok / wsent < 0.8 ? ' warn' : '');
+        $('kWlSub2').textContent = wok + ' of ' + wsent + ' accepted';
+        const svc = {}; D.winlink.forEach(w => { svc[w.service] = (svc[w.service] || 0) + 1; });
+        $('kWlSub').innerHTML = D.winlink.length ? Object.entries(svc).map(([s, n]) => '<b>' + esc(s) + '</b> ' + n + ' channels').join(' · ') : 'no WL2KREPORT lines in the log';
+        // strip
+        const pills = [];
+        const lastF = D.files.filter(f => f.present).pop();
+        pills.push({ c: lastF ? 'ok' : 'bad', b: 'Debug log', s: lastF ? 'NodeDebuglog_' + lastF.date + ' · ' + kb(lastF.size) : 'not found' });
+        pills.push({ c: todayStarts > 6 ? 'bad' : todayStarts > 2 ? 'warn' : 'ok', b: 'Starts today', s: String(todayStarts) });
+        pills.push({ c: out.length ? 'bad' : 'ok', b: 'Internet', s: out.length ? 'outage ' + fmt(out[out.length - 1].from, true) : 'OK' });
+        pills.push({ c: D.soundcard.count ? 'bad' : 'ok', b: 'Sound cards', s: D.soundcard.count ? 'lost ' + fmt(D.soundcard.stretches[D.soundcard.stretches.length - 1].from, true) : 'OK' });
+        pills.push({ c: wsent && wok / wsent < 0.8 ? 'warn' : 'ok', b: 'Winlink reports', s: wok + '/' + wsent });
+        const attn = D.problems.filter(p => p.level !== 'info');
+        pills.push({ c: attn.some(p => p.level === 'crit') ? 'bad' : attn.length ? 'warn' : 'ok', b: 'Needs attention', s: String(attn.length), f: 'problems' });
+        $('statusStrip').innerHTML = pills.map(p => '<button type="button" class="rf-pill"' + (p.f ? ' data-tab="' + p.f + '"' : '') + '><i style="background:var(--rf-dot' + (p.c === 'ok' ? 'good' : p.c) + ')"></i><b>' + esc(p.b) + '</b><span>' + esc(p.s) + '</span></button>').join('');
+        // neighbours
+        $('nbDaysHead').textContent = range === 1 ? 'Today' : 'Last ' + range + ' days';
+        $('nbRows').innerHTML = nb.length ? nb.slice(0, 25).map(n => {
+            const st = n.lost >= 20 ? 'bad' : n.lost >= 5 ? 'warn' : n.sessions ? 'ok' : 'idle';
+            const mx = Math.max(1, ...n.days);
+            const days = n.days.map((v, i) => '<span class="' + (v === 0 ? '' : v / mx < 0.34 ? 'l1' : v / mx < 0.67 ? 'l2' : 'l3') + '" title="' + esc(dayLbl(D.from + i * 86400) + ': ' + v + ' dropped') + '"></span>').join('');
+            return '<tr><td><div style="display:flex;align-items:center;gap:10px"><span class="rf-dot ' + st + '"></span><button type="button" class="rf-call" data-nb="' + esc(n.call) + '">' + esc(n.call) + '</button></div></td>'
+                + '<td class="num">' + n.sessions + '</td><td class="num">' + kb(n.sent) + '</td><td class="num">' + kb(n.recv) + '</td>'
+                + '<td class="num"><b>' + n.lost + '</b></td><td class="num rf-muted">' + n.lost_restart + '</td>'
+                + '<td style="white-space:nowrap">' + (n.last_lost ? esc(fmt(n.last_lost, range > 1)) + '<div class="rf-small rf-muted">' + ago(n.last_lost) + '</div>' : '–') + '</td><td><div class="rf-days">' + days + '</div></td></tr>';
+        }).join('') : '<tr><td colspan="8" class="rf-empty">No neighbour links in this period.</td></tr>';
+        // needs attention
+        $('attnSub').textContent = attn.length ? attn.length + ' to look at' : 'nothing urgent';
+        $('attnList').innerHTML = attn.length ? attn.map(p => probItem(p)).join('') + (D.problems.length > attn.length ? '<div class="rf-small rf-muted" style="padding-top:8px">' + (D.problems.length - attn.length) + ' more for information on the Problems tab.</div>' : '')
+            : '<div class="rf-muted rf-small">No crashes, outages or failing links in this period. ' + (D.problems.length ? D.problems.length + ' minor notes on the Problems tab.' : '') + '</div>';
+        // heat
+        const H = D.hours, startH = {}; D.starts.forEach(s => { const h = Math.floor((s - D.from) / 3600); startH[h] = (startH[h] || 0) + 1; });
+        const scH = {}; (D.soundcard.stretches || []).forEach(s => { for (let t = s.from; t <= s.to; t += 600) scH[Math.floor((t - D.from) / 3600)] = 1; });
+        let hh = '<tr><th></th>' + Array.from({ length: 24 }, (_, h) => '<th>' + (h % 3 === 0 ? pad(h) : '') + '</th>').join('') + '</tr>';
+        for (let d = 0; d < range; d++) {
+            hh += '<tr><th class="day">' + esc(dayLbl(D.from + d * 86400)) + '</th>';
+            for (let h = 0; h < 24; h++) {
+                const i = d * 24 + h, x = H[i] || { cms_fail: 0, dns_fail: 0, lost: 0 };
+                const bad = x.cms_fail + x.dns_fail + (scH[i] ? 1 : 0), s = startH[i] || 0;
+                // one or two drops in an hour is everyday internet: pale; three or more: solid
+                const col = bad ? 'var(--rf-dotbad)' : s ? '#3B82F6' : x.lost >= 3 ? 'var(--rf-dotwarn)' : x.lost ? 'rgba(194,120,3,.28)' : 'var(--rf-line)';
+                const tip = pad(h) + 'Z: ' + [bad ? (x.cms_fail + x.dns_fail) + ' internet/CMS failures' + (scH[i] ? ', sound card lost' : '') : '', x.lost ? x.lost + ' link drops' : '', s ? s + ' LinBPQ start' + (s > 1 ? 's' : '') : ''].filter(Boolean).join(' · ');
+                hh += '<td title="' + esc(tip || pad(h) + 'Z: quiet') + '" style="background:' + col + (bad || x.lost || s ? '' : '') + '"></td>';
+            }
+            hh += '</tr>';
+        }
+        $('heat').innerHTML = hh;
+        // tabs
+        $('cProb').textContent = D.problems.length;
+        $('probRows').innerHTML = D.problems.length ? D.problems.map((p, i) => '<tr><td><button type="button" class="rf-call" data-prob="' + i + '" style="font-weight:600">' + esc(p.title) + '</button></td><td><span class="nd-lvl ' + esc(p.level) + '">' + ({ crit: 'urgent', warn: 'look at', info: 'note' }[p.level] || p.level) + '</span></td><td class="num">' + p.count + '</td><td style="white-space:nowrap">' + esc(fmt(p.first, true)) + '</td><td style="white-space:nowrap">' + esc(fmt(p.last, true)) + '</td><td class="rf-mono rf-small">' + esc(Object.keys(p.who || {}).slice(0, 3).join(', ') || '–') + '</td></tr>').join('') : '<tr><td colspan="6" class="rf-empty">Nothing found.</td></tr>';
+        $('cWl').textContent = D.winlink.length;
+        $('wlRows').innerHTML = D.winlink.length ? D.winlink.map(w => '<tr><td><span class="rf-tag">' + esc(w.service) + '</span></td><td class="rf-mono">' + (w.freq / 1000).toLocaleString(undefined, { minimumFractionDigits: 1 }) + ' kHz</td><td class="num">' + w.sent + '</td><td class="num"><b>' + w.ok + '</b>' + (w.sent && w.ok < w.sent * 0.8 ? ' <span class="rf-note warn">low</span>' : '') + '</td><td>' + esc(fmt(w.last_ok, true)) + (w.last_ok ? ' <span class="rf-small rf-muted">' + ago(w.last_ok) + '</span>' : '') + '</td></tr>').join('') : '<tr><td colspan="5" class="rf-empty">No Winlink channel reports in this period.</td></tr>';
+        $('cConn').textContent = D.connects.length;
+        $('connRows').innerHTML = D.connects.length ? D.connects.map(c => '<tr><td class="rf-mono">' + esc(fmt(c.at, true)) + '</td><td class="rf-mono"><b>' + esc(c.from) + '</b></td><td class="rf-mono">' + esc(c.to) + '</td></tr>').join('') : '<tr><td colspan="3" class="rf-empty">No modem connects in this period.</td></tr>';
+        $('cStarts').textContent = st;
+        const SI = (D.start_info || []).map((s, i) => Object.assign({ i: i }, s));
+        const ranFor = (i) => i + 1 < SI.length ? dur((SI[i + 1].stopped_at || SI[i + 1].at) - SI[i].at) : 'still running (' + dur(Date.now() / 1000 - SI[i].at) + ')';
+        $('startRows').innerHTML = SI.length ? SI.slice().reverse().map(s => '<tr class="nd-row" data-start="' + s.i + '" tabindex="0"><td class="rf-mono" style="white-space:nowrap">' + esc(fmt(s.at, true)) + '</td>'
+            + '<td><span class="nd-why ' + ((WHY[s.why] || [''])[0]) + '">' + esc(s.label || '–') + '</span></td>'
+            + '<td class="rf-small">' + esc(s.detail || '') + (s.clean ? '' : ' <span class="rf-note warn">no shutdown lines</span>') + '</td>'
+            + '<td class="num rf-small">' + (s.down_s != null ? esc(dur(Math.max(60, s.down_s)).replace(/^1 min$/, s.down_s < 60 ? s.down_s + ' s' : '1 min')) : '–') + '</td>'
+            + '<td class="rf-small" style="white-space:nowrap">' + esc(ranFor(s.i)) + '</td></tr>').join('') : '<tr><td colspan="5" class="rf-empty">No starts in this period.</td></tr>';
+        const src = D.restart_sources || {};
+        $('startsMore').innerHTML = '<span>Click a start for the evidence and the lines LinBPQ wrote before it went down. Reasons come from '
+            + (src.system === 'ok' ? 'the system records (systemd, sudo, cron, kernel)' : '<b>this log only</b> (system records: ' + (src.system === 'missing' ? 'the LinBPQ Status helper isn\'t installed' : 'the web server may not run the LinBPQ Status helper') + '; run the update and answer yes to the admin pages\' sudo rules)')
+            + (src.watchdog ? ' and the Connect Watchdog\'s log.' : '; the Connect Watchdog\'s log (' + esc(src.watchdog_file || '') + ') could not be read by the web server.') + ' <a class="rf-a" href="/admin/linbpq-status.html">LinBPQ Status</a> has the crash history.</span>';
+        showTab(tab);
+    }
+    function probItem(p) {
+        const i = D.problems.indexOf(p);
+        const dot = p.level === 'crit' ? 'bad' : p.level === 'warn' ? 'warn' : 'idle';
+        return '<button type="button" class="nd-prob" data-prob="' + i + '"><span class="rf-dot ' + dot + '"></span><span><b>' + esc(p.title) + '</b><span class="rf-small rf-muted">' + p.count + '× · last ' + esc(fmt(p.last, true)) + '</span></span><span class="rf-small">›</span></button>';
+    }
+    function probDrawer(i) {
+        const p = D.problems[i]; if (!p) return;
+        let h = '<div class="rf-kv"><div><span>Times</span><b>' + p.count + '</b></div><div><span>First</span><b style="font-size:14px">' + esc(fmt(p.first, true)) + '</b></div><div><span>Last</span><b style="font-size:14px">' + esc(fmt(p.last, true)) + '</b></div><div><span>Level</span><b style="font-size:14px">' + ({ crit: 'Urgent', warn: 'Look at', info: 'Note' }[p.level] || p.level) + '</b></div></div>';
+        if (p.what) h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">What it means</div><div>' + esc(p.what) + '</div></div>';
+        if (p.fix) h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">What to do</div><div>' + esc(p.fix) + '</div></div>';
+        const who = Object.entries(p.who || {});
+        if (who.length) h += '<div class="rf-chips">' + who.map(([c, n]) => '<span class="rf-chip" style="cursor:default">' + esc(c) + ' <b>' + n + '</b></span>').join('') + '</div>';
+        h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">' + (p.tab ? 'For example' : 'Example line') + '</div><div class="nd-sample">' + esc(p.sample) + '</div></div>';
+        h += p.tab ? '<button type="button" class="rf-btn rf-btn-sm" data-tab="' + esc(p.tab) + '" data-closedrawer="1">Open the Starts tab</button>'
+                   : '<button type="button" class="rf-btn rf-btn-sm" data-findlive="' + esc(/^other:/.test(p.key) ? findText(p) : p.title) + '"' + (/^other:/.test(p.key) ? '' : ' data-key="' + esc(p.key) + '"') + '>Show these lines in the log</button>';
+        if (p.key === 'cms' || p.key === 'dns') h += '<div class="rf-small rf-muted">Outages: ' + D.internet.outages.map(o => esc(fmt(o.from, true)) + ' for ' + esc(dur(Math.max(60, o.to - o.from)))).join('; ') + '</div>';
+        $('drawerTitle').textContent = p.title;
+        $('drawerBody').innerHTML = h; openDrawer();
+    }
+    function startDrawer(i) {
+        const s = (D.start_info || [])[i]; if (!s) return;
+        const nx = D.start_info[i + 1];
+        let h = '<div class="rf-kv"><div><span>Why</span><b style="font-size:14px">' + esc(s.label) + '</b></div><div><span>Went down</span><b style="font-size:14px">' + esc(s.stopped_at ? fmt(s.stopped_at, true) : '–') + '</b></div>'
+            + '<div><span>Down for</span><b style="font-size:14px">' + (s.down_s != null ? (s.down_s < 120 ? s.down_s + ' s' : esc(dur(s.down_s))) : '–') + '</b></div><div><span>Shutdown</span><b style="font-size:14px">' + (s.clean ? 'Normal' : 'Abrupt') + '</b></div></div>';
+        h += '<div>' + esc(s.detail) + '</div>';
+        if (nx) h += '<div class="rf-small rf-muted">It then ran ' + esc(dur((nx.stopped_at || nx.at) - s.at)) + ', until ' + esc(fmt(nx.stopped_at || nx.at, true)) + '.</div>';
+        if (s.evidence && s.evidence.length) h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">On record</div><div class="nd-sample">' + s.evidence.map(esc).join('\n') + '</div></div>';
+        const T = s.troubleshoot;
+        if (T) {
+            h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">Checked, nothing found</div><ul class="nd-list">' + T.checked.map(c => '<li>' + esc(c) + '</li>').join('') + '</ul></div>';
+            h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">' + (s.clean ? 'LinBPQ shut down normally, so something asked it to stop. Likely:' : 'LinBPQ ended abruptly. Likely:') + '</div><ul class="nd-list">' + T.ideas.map(c => '<li>' + esc(c) + '</li>').join('') + '</ul></div>';
+            h += '<div><div class="rf-small rf-muted">To look further, run these on the station (times are UTC, around this restart):</div>' + T.commands.map(([what, cmd], k) =>
+                '<div style="margin-top:8px"><div class="rf-small"><b>' + esc(what) + '</b></div><div class="nd-cmd"><code id="cmd' + k + '">' + esc(cmd) + '</code><button type="button" class="rf-btn rf-btn-sm" data-copy="cmd' + k + '">Copy</button></div></div>').join('') + '</div>';
+        }
+        if (s.before && s.before.length) h += '<div><div class="rf-small rf-muted" style="margin-bottom:4px">The last lines LinBPQ wrote before this start (UTC)</div><div class="nd-sample">' + s.before.map(esc).join('\n') + '</div></div>';
+        h += '<button type="button" class="rf-btn rf-btn-sm" data-around="' + s.at + '">Show the log around this start</button>';
+        $('drawerTitle').textContent = 'LinBPQ start · ' + fmt(s.at, true);
+        $('drawerBody').innerHTML = h; openDrawer();
+    }
+    const gmd = (t) => new Date(t * 1000).toISOString().slice(0, 10);
+    function copyText(id, btn) {
+        const t = $(id).textContent;
+        const done = () => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); };
+        if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(t).then(done, () => fallback()); } else fallback();
+        function fallback() { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
+    }
+    // what to search the log for, for a problem: its sample line without numbers that change
+    function findText(p) {
+        const s = (p.sample || '').replace(/\s+/g, ' ').trim();
+        const m = s.match(/^[^0-9]{6,40}/);           // the wording before the first number (address, port, count)
+        return (m ? m[0] : s.slice(0, 30)).trim();
+    }
+    function nbDrawer(call) {
+        const n = D.neighbours.find(x => x.call === call); if (!n) return;
+        let h = '<div class="rf-kv"><div><span>Sessions</span><b>' + n.sessions + '</b></div><div><span>Time linked</span><b style="font-size:14px">' + esc(dur(n.secs)) + '</b></div><div><span>Sent</span><b style="font-size:14px">' + kb(n.sent) + '</b></div><div><span>Received</span><b style="font-size:14px">' + kb(n.recv) + '</b></div></div>';
+        h += '<div class="rf-kv"><div><span>Dropped</span><b>' + n.lost + '</b></div><div><span>At restarts</span><b>' + n.lost_restart + '</b></div><div><span>Last drop</span><b style="font-size:14px">' + esc(fmt(n.last_lost, true)) + '</b></div><div><span>Last session</span><b style="font-size:14px">' + esc(fmt(n.last_session, true)) + '</b></div></div>';
+        h += '<div class="rf-small rf-muted">“Dropped” is the link to this neighbour being lost while LinBPQ kept running (the path, their node, or the internet). Drops in the seconds before a LinBPQ start are its own shutdown and are counted under “At restarts”.</div>';
+        h += '<button type="button" class="rf-btn rf-btn-sm" data-findlive="' + esc(call) + '">Show ' + esc(call) + ' in the log</button>';
+        $('drawerTitle').textContent = call + ' · neighbour';
+        $('drawerBody').innerHTML = h; openDrawer();
+    }
+    function openDrawer() { $('drawer').classList.remove('hidden'); $('drawerBg').classList.remove('hidden'); $('drawerClose').focus(); }
+    function closeDrawer() { $('drawer').classList.add('hidden'); $('drawerBg').classList.add('hidden'); }
+
+    // ── live log ──
+    async function poll() {
+        if (paused || document.hidden) return;
+        try {
+            const j = await getJSON(API + '?action=tail&offset=' + offset);
+            if (j.file !== liveFile) { lines = []; liveFile = j.file; }
+            if (!j.present) { lines = []; renderLive('No ' + j.file + ' yet today.'); offset = 0; return; }
+            if (j.offset < offset) lines = [];
+            lines = lines.concat(j.lines).slice(-8000);
+            offset = j.offset;
+            renderLive();
+        } catch (e) { renderLive(e.message); }
+    }
+    function renderLive(msg) {
+        const box = $('console');
+        const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+        const q = (view && view.q ? view.q : $('liveSearch').value.trim()).toLowerCase();
+        let L = view ? view.lines : lines;
+        if (lf === 'quiet') L = L.filter(l => l.k !== 'chatter');
+        if (lf === 'problems') L = L.filter(l => l.k === 'crit' || l.k === 'err' || l.k === 'warn' || /mark/.test(l.k));
+        if (q && !(view && view.q)) L = L.filter(l => l.t.toLowerCase().includes(q));
+        const show = L.slice(-2000);
+        box.innerHTML = msg ? '<span class="empty">' + esc(msg) + '</span>' : show.length ? show.map(l => {
+            let t = esc(l.t);
+            if (q) t = t.replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/&/g, '&amp;').replace(/</g, '&lt;'), 'gi'), m => '<span class="nd-hit">' + m + '</span>');
+            return '<span class="' + esc(l.k) + '">' + t + '</span>';
+        }).join('\n') : '<span class="empty">' + (view ? 'Nothing found.' : 'No lines match in the live view (it holds the end of today\'s log). Search all days looks through every day in the range.') + '</span>';
+        if (view) {
+            if (!view.scrolled && view.lines.length) { const mk = box.querySelector('.mark'); box.scrollTop = mk ? Math.max(0, mk.offsetTop - box.clientHeight / 2) : box.scrollHeight; view.scrolled = true; }
+            const hid = view.lines.length - L.length;
+            $('viewText').innerHTML = view.title + (hid ? ' · ' + hid.toLocaleString() + ' hidden by the filter chips (choose Everything to see them)' : '');
+            $('liveMore').innerHTML = 'Not live: new lines are still collected and show when you go back to the live log.';
+            return;
+        }
+        if (atEnd || !box.dataset.seen) { box.scrollTop = box.scrollHeight; box.dataset.seen = '1'; }
+        $('cLive').textContent = lines.length.toLocaleString();
+        const hidden = lines.length - L.length;
+        $('liveMore').innerHTML = (paused ? '<b>Paused</b> · ' : 'Live: new lines every 5 s · ') + esc(liveFile) + ' · showing ' + show.length.toLocaleString() + (hidden ? ' (' + hidden.toLocaleString() + ' hidden: ' + (lf === 'quiet' ? 'VARA busy/OK/alive and heartbeat lines' : 'not problems') + ')' : '')
+            + ' · <span style="color:#FF7B72">urgent</span> · <span style="color:#E3B341">look at</span> · <span style="color:#B08A3E">LinBPQ shutting down</span> · <span style="color:#79C0FF">starting</span> · <span style="color:#3FB950">OK</span>';
+    }
+
+    async function findAll(q, label, key) {
+        q = (q || '').trim(); if (q.length < 2) return;
+        view = { q: key ? '' : q, key: key || '', lines: [], title: 'Searching ' + (range === 1 ? 'today' : 'the last ' + range + ' days') + ' for “' + esc(q) + '”…' };
+        lf = 'all'; setChips(); $('liveSearch').value = key ? '' : q; $('viewBanner').classList.remove('hidden'); showTab('live'); renderLive();
+        try {
+            const j = await getJSON(API + '?action=find&days=' + range + '&q=' + encodeURIComponent(q) + (key ? '&key=' + encodeURIComponent(key) : ''));
+            if (!view || (key ? view.key !== key : view.q !== q)) return;
+            view.lines = j.lines;
+            view.title = '<b>' + j.total.toLocaleString() + '</b> line' + (j.total === 1 ? '' : 's') + (key ? ': ' + esc(q) + ' ' : ' with “' + esc(q) + '” ') + (range === 1 ? 'today' : 'in the last ' + range + ' days') + (j.total > j.shown ? ' (the newest ' + j.shown.toLocaleString() + ' shown)' : '') + (label ? ' · ' + esc(label) : '');
+        } catch (e) { view.title = esc(e.message); }
+        renderLive();
+    }
+    async function showAround(at) {
+        view = { q: '', lines: [], title: 'Loading…' }; lf = 'quiet'; setChips(); $('liveSearch').value = ''; $('viewBanner').classList.remove('hidden'); showTab('live'); renderLive();
+        try {
+            const j = await getJSON(API + '?action=around&at=' + at);
+            view.lines = j.lines;
+            view.title = 'The 5 minutes before LinBPQ started at <b>' + esc(fmt(at, true)) + '</b> and the 90 seconds after (the start is highlighted)';
+        } catch (e) { view.title = esc(e.message); }
+        renderLive();
+    }
+    function backToLive() { view = null; $('viewBanner').classList.add('hidden'); $('liveSearch').value = ''; lf = 'quiet'; setChips(); const b = $('console'); delete b.dataset.seen; renderLive(); }
+    function setChips() { document.querySelectorAll('#liveFilters button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lf === lf))); }
+    function showTab(t) {
+        tab = t;
+        document.querySelectorAll('.rf-tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+        ['live', 'problems', 'winlink', 'connects', 'starts'].forEach(k => $('tab-' + k).classList.toggle('hidden', k !== t));
+        if (t === 'live') { const box = $('console'); box.scrollTop = box.scrollHeight; }
+    }
+    document.addEventListener('click', (e) => {
+        const t = e.target.closest('button'); if (!t) return;
+        if (t.id === 'drawerClose') return closeDrawer();
+        if (t.id === 'refreshBtn') { load(); offset = 0; lines = []; return poll(); }
+        if (t.id === 'themeBtn') { if (window.toggleDarkMode) window.toggleDarkMode(); else { const c = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', c); try { localStorage.setItem('bpq-dark-mode', c); } catch (err) {} } return; }
+        if (t.id === 'pauseBtn') { paused = !paused; t.textContent = paused ? 'Resume' : 'Pause'; renderLive(); if (!paused) poll(); return; }
+        if (t.dataset.range) { range = +t.dataset.range; try { localStorage.setItem('bpq_nodedebug_range', String(range)); } catch (err) {} document.querySelectorAll('.rf-range button').forEach(b => b.classList.toggle('active', b === t)); return load(); }
+        if (t.dataset.copy) return copyText(t.dataset.copy, t);
+        if (t.dataset.closedrawer) closeDrawer();
+        if (t.dataset.tab) { showTab(t.dataset.tab); if (!t.closest('.rf-tabs')) document.querySelector('.rf-tabs').scrollIntoView({ behavior: 'smooth' }); return; }
+        if (t.dataset.lf) { lf = t.dataset.lf; document.querySelectorAll('#liveFilters button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); return renderLive(); }
+        if (t.dataset.prob) return probDrawer(+t.dataset.prob);
+        if (t.dataset.nb) return nbDrawer(t.dataset.nb);
+        if (t.dataset.findlive != null) { closeDrawer(); findAll(t.dataset.findlive, t.dataset.label || '', t.dataset.key || ''); document.querySelector('.rf-tabs').scrollIntoView({ behavior: 'smooth' }); return; }
+        if (t.dataset.around) { closeDrawer(); showAround(+t.dataset.around); document.querySelector('.rf-tabs').scrollIntoView({ behavior: 'smooth' }); return; }
+        if (t.id === 'findBtn') return findAll($('liveSearch').value);
+        if (t.id === 'backLive') return backToLive();
+    });
+    $('drawerBg').addEventListener('click', closeDrawer);
+    $('startRows').addEventListener('click', (e) => { const r = e.target.closest('tr[data-start]'); if (r) startDrawer(+r.dataset.start); });
+    $('startRows').addEventListener('keydown', (e) => { const r = e.target.closest('tr[data-start]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); startDrawer(+r.dataset.start); } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('drawer').classList.contains('hidden')) closeDrawer(); });
+    $('liveSearch').addEventListener('input', () => { if (view && view.q) { view = null; $('viewBanner').classList.add('hidden'); } renderLive(); });
+    $('liveSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') findAll($('liveSearch').value); });
+    function themeLabel() { $('themeBtn').textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Light' : 'Dark'; }
+    new MutationObserver(themeLabel).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    function clock() { const d = new Date(); $('zuluTime').textContent = pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); }
+    document.querySelectorAll('.rf-range button').forEach(b => b.classList.toggle('active', +b.dataset.range === range));
+    themeLabel(); clock(); setInterval(clock, 10000);
+    load(); poll();
+    setInterval(poll, 5000);
+    setInterval(() => { if (!document.hidden) load(); }, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>

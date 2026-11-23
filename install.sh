@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.94 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.95 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.94 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.95 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -1650,6 +1650,16 @@ if [[ -d "$INPUT_LINBPQ_DIR" ]]; then
             say "Skipped. Later: Maintenance page > 'LinBPQ in a home folder', or the Installation Manual."
         fi
     fi
+fi
+
+# v1.5.95: Admin → Node Debug reads LinBPQ's NodeDebuglog_YYMMDD.log from its logs folder
+NDL_NEW=$(ls -1t "$BPQ_LOGS_DIR"/NodeDebuglog_[0-9][0-9][0-9][0-9][0-9][0-9].log 2>/dev/null | head -1)
+if [[ -z "$NDL_NEW" ]]; then
+    say "No NodeDebuglog_YYMMDD.log in $BPQ_LOGS_DIR yet: Admin → Node Debug stays empty until LinBPQ writes one (nothing else depends on it)."
+elif sudo -u "$WEB_USER" test -r "$NDL_NEW" 2>/dev/null; then
+    ok "Node debug log found ($(basename "$NDL_NEW")): see Admin → Node Debug"
+else
+    warn "Node debug log found ($(basename "$NDL_NEW")) but $WEB_USER can't read it yet: Install Check shows the folder fix."
 fi
 
 # ============================================================================

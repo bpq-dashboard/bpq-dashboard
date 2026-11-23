@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.94** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
+**Version 1.5.95** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Platform: Debian / Ubuntu / Raspberry Pi](https://img.shields.io/badge/platform-Linux-orange.svg)]()
@@ -40,14 +40,14 @@ BPQ Dashboard turns your packet radio node into a friendly, browser-accessible o
 - **Audio Map** (v1.5.57) — Admin page that draws, from the running system, how each LinBPQ radio port reaches its radio: modem program, shared ALSA device (dmix/dsnoop), sound card with mixer levels, and what keys the transmitter
 - **Radio settings for the Yaesu FTdx-3000** (v1.5.60) — on Rig Status, through flrig: live ALC / power / SWR / compression meters, and width, roofing filter, IPO, attenuator, AGC, noise blanker, noise reduction and notch, each with a hint for data use; changes need the sysop password and wait while a modem is transmitting. The card appears only when flrig reports an FTdx-3000
 
-See the [User Guide](BPQ-Dashboard-v1.5.94-User-Guide.pdf) for detailed feature walkthroughs.
+See the [User Guide](BPQ-Dashboard-v1.5.95-User-Guide.pdf) for detailed feature walkthroughs.
 
 ## Quick links
 
 | Document | What it covers |
 |---|---|
-| 📖 **[User Guide](BPQ-Dashboard-v1.5.94-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
-| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.5.94-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
+| 📖 **[User Guide](BPQ-Dashboard-v1.5.95-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
+| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.5.95-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
 | 🧭 **[Installation guide](USER-MANUAL.md#4-installation--step-by-step)** | Step-by-step install for newcomers, plus manual install and updating |
 | ⚡ **[Phase 1 Deployment Guide](docs/PHASE-1-DEPLOYMENT.md)** | Background on the DB-backed RF Connections (done automatically by `install.sh`) |
 | ⚡ **[Traffic Report Deployment Guide](docs/TRAFFIC-STATS-DEPLOYMENT.md)** | Background on the DB-backed Traffic Report (done automatically by `install.sh`) |
@@ -62,8 +62,8 @@ On the computer that already runs LinBPQ:
 ```bash
 sudo apt update && sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.94.zip
-unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.94
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.95.zip
+unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.95
 sudo bash install.sh
 ```
 

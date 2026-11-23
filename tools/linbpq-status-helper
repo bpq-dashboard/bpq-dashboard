@@ -50,6 +50,16 @@ if MODE not in ('all', 'console') or len(sys.argv) > 2:
 NAMES = ('linbpq', 'linbpq64', 'pilinbpq')
 SECRET = re.compile(r'(?i)(pass(word|wd)?\s*[=:]?\s*|\buser\s*=\s*|\bsysop\s*password\s*)\S.*$')
 CRASH = re.compile(r'(?i)\b(linbpq\w*|pilinbpq)\[\d+\]:\s*(segfault|general protection|trap|traps:)|traps:\s*(linbpq\w*|pilinbpq)\[\d+\]')
+# v1.5.95: the out-of-memory killer ending LinBPQ
+OOM = re.compile(r'(?i)(Out of memory: Killed process \d+ \((linbpq\w*|pilinbpq)\)|oom-kill:.*task=(linbpq\w*|pilinbpq))')
+# v1.5.95 (Node Debug: why LinBPQ restarted): who stopped it. Only lines about
+# LinBPQ, a reboot, or a root shell being opened; nothing else is passed on.
+ADMIN = re.compile(r'(?i)(sudo\[\d+\]:.*COMMAND=.*(systemctl\b.*\b(re)?start|systemctl\b.*\b(stop|kill|try-restart|reload-or-restart)|\b(kill|pkill|killall)\b).*\b(linbpq\w*|pilinbpq|bpq)\b'
+                   r'|sudo\[\d+\]:.*COMMAND=\S*/(reboot|shutdown|poweroff|halt)\b'
+                   r'|sudo\[\d+\]:.*COMMAND=\S*/(bash|sh|zsh|su)$|sudo\[\d+\]:.*COMMAND=\S*/(bash|zsh|su) (-l|-i|-)$'
+                   r'|\bsu\[\d+\]:.*session opened for user root'
+                   r'|CRON\[\d+\]:.*CMD \(.*(\b(linbpq\w*|pilinbpq)\b|systemctl\b.*\bbpq\b|\breboot\b|\bshutdown\b)'
+                   r'|systemd-logind\[\d+\]:.*(System is (rebooting|powering down|halting)|Power key pressed|The system will))')
 UNIT_END = re.compile(r'(?i)(Main process exited|Failed with result|Scheduled restart|Started |Stopped |Stopping |Deactivated successfully)')
 
 
@@ -270,12 +280,16 @@ if MODE == 'all':
                 starts.append(mask(line))
     result['unit_events'] = starts[-300:]
     # crashes in the kernel log
-    kern = [mask(l) for l in journal(['-k', '--since', '-30d']) if CRASH.search(l)]
+    kern = [mask(l) for l in journal(['-k', '--since', '-30d']) if CRASH.search(l) or OOM.search(l)]
     if not kern:                                  # no persistent journal: this boot's ring buffer
-        kern = [mask(l) for l in run(['dmesg', '-T'], timeout=10).splitlines() if CRASH.search(l)]
+        kern = [mask(l) for l in run(['dmesg', '-T'], timeout=10).splitlines() if CRASH.search(l) or OOM.search(l)]
     result['kernel_crashes'] = kern[-100:]
     result['coredumps'] = coredumps()
     result['boots'] = [mask(l) for l in run(['journalctl', '--list-boots', '--no-pager'], timeout=10).splitlines()[1:]][-15:]
     result['journal_persistent'] = os.path.isdir('/var/log/journal')
+    # v1.5.95: sudo / su / cron / logind lines about LinBPQ or a reboot (Node Debug's "why it restarted")
+    adm = journal(['--since', '-30d', '_COMM=sudo', '+', '_COMM=su', '+', '_COMM=cron', '+', 'SYSLOG_IDENTIFIER=systemd-logind'])
+    adm = [re.sub(r'\s*PWD=[^;]*;', '', mask(l)) for l in adm if ADMIN.search(l) and 'connect-watchdog' not in l]
+    result['admin_events'] = adm[-400:]
 
 print(json.dumps(result))

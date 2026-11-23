@@ -546,6 +546,25 @@ if [[ ! -f /etc/bpq-dashboard/bbs-mail.php && -f "$MAIL_SETUP" ]]; then
     fi
 fi
 
+# v1.5.95: Admin → Node Debug reads LinBPQ's NodeDebuglog_YYMMDD.log from its logs folder
+hdr "Node debug log"
+NDL_DIR=$(php_cfg paths logs); NDL_DIR="${NDL_DIR:-$WEB_ROOT/logs}"; NDL_DIR="${NDL_DIR%/}"
+NDL_NEW=$(ls -1t "$NDL_DIR"/NodeDebuglog_[0-9][0-9][0-9][0-9][0-9][0-9].log 2>/dev/null | head -1)
+if [[ -z "$NDL_NEW" ]]; then
+    say "No NodeDebuglog_YYMMDD.log in $NDL_DIR: this LinBPQ doesn't write one (or not there)."
+    say "Admin → Node Debug will say so; nothing else depends on it."
+elif ! sudo -u "$WEB_USER" test -r "$NDL_NEW" 2>/dev/null; then
+    warn "Node debug log found ($(basename "$NDL_NEW")) but $WEB_USER can't read it: Node Debug will be empty. Install Check shows the folder fix."
+else
+    NDL_N=$(ls -1 "$NDL_DIR"/NodeDebuglog_[0-9][0-9][0-9][0-9][0-9][0-9].log 2>/dev/null | wc -l)
+    NDL_AGE=$(( ( $(date +%s) - $(stat -c %Y "$NDL_NEW") ) / 3600 ))
+    if (( NDL_AGE > 48 )); then
+        warn "Node debug log found but the newest ($(basename "$NDL_NEW")) was last written ${NDL_AGE} h ago: is LinBPQ running, and still writing it?"
+    else
+        ok "Node debug log found: $(basename "$NDL_NEW") ($NDL_N day(s) kept). See Admin → Node Debug."
+    fi
+fi
+
 # ── Done ───────────────────────────────────────────────────────────────────
 hdr "Done"
 if (( ${#FAILS[@]} )); then

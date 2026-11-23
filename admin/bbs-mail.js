@@ -1363,7 +1363,7 @@ function wireToolbar() {
             { label: 'Quick Check-In…', act: () => openCheckIn() },
             { label: 'NTS Report', act: () => $('btnNts').click() },
             { label: 'PKTNET Forms', act: () => $('btnForms').click() },
-            { label: 'User Guide (§9)', act: () => window.open('/BPQ-Dashboard-v1.5.94-User-Guide.pdf', '_blank') },
+            { label: 'User Guide (§9)', act: () => window.open('/BPQ-Dashboard-v1.5.95-User-Guide.pdf', '_blank') },
         ], r.right - 220, r.bottom);
     });
 }

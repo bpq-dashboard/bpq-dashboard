@@ -96,7 +96,7 @@ foreach ((array)($d['unit_events'] ?? []) as $l) {
 $segs = 0;
 foreach ((array)($d['kernel_crashes'] ?? []) as $l) {
     $l = (string)$l; $segs++;
-    $what = preg_match('/general protection/i', $l) ? 'Crashed: general protection fault' : (preg_match('/segfault/i', $l) ? 'Crashed: segfault' : 'Crashed: trap');
+    $what = preg_match('/Out of memory|oom-kill/i', $l) ? 'Killed: the computer ran out of memory' : (preg_match('/general protection/i', $l) ? 'Crashed: general protection fault' : (preg_match('/segfault/i', $l) ? 'Crashed: segfault' : 'Crashed: trap'));
     $events[] = ['at' => $ts($l), 'kind' => 'crash', 'what' => $what . ' (kernel log)', 'line' => preg_replace('/^.*?kernel:\s*/', '', $l)];
 }
 $p = $d['process'] ?? null;

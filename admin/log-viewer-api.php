@@ -99,6 +99,7 @@ $LOGS = [
     'tcp-today'        => ['path' => null, 'dir' => $LOG_DIR, 'fmt' => 'log_%y%m%d_TCP.txt',      'label' => 'TCP Log (Today)',     'group' => 'BPQ Node', 'color' => 'cyan', 'desc' => "Today's telnet / TCP connections (UTC)", 'dynamic' => 'today', 'opt' => 'BPQ writes it when telnet logging is on'],
     'connect-today'    => ['path' => null, 'dir' => $LOG_DIR, 'fmt' => 'ConnectLog_%y%m%d.log',   'label' => 'Connect Log (Today)', 'group' => 'BPQ Node', 'color' => 'cyan', 'desc' => "Today's incoming connects (UTC), as on the Connect Log page", 'dynamic' => 'today', 'opt' => 'BPQ writes it when connect logging is on'],
     'cms-today'        => ['path' => null, 'dir' => $LOG_DIR, 'fmt' => 'CMSAccess_%Y%m%d.log',    'label' => 'CMS Access (Today)',  'group' => 'BPQ Node', 'color' => 'cyan', 'desc' => "Today's Winlink CMS gateway sessions (UTC)", 'dynamic' => 'today', 'opt' => 'Only on a Winlink RMS gateway'],
+    // v1.5.95: LinBPQ's node debug log has its own page, Admin → Node Debug (admin/node-debug.html)
     // System
     'webserver-error'  => ['path' => $webserverLog,                              'label' => 'Web Server Errors',   'group' => 'System',             'color' => 'red',    'desc' => 'nginx or Apache error log (PHP errors land here too)'],
     'auth'             => ['path' => '/var/log/auth.log',                        'label' => 'Auth Log',            'group' => 'System',             'color' => 'amber',  'desc' => 'SSH and sudo logins. Usually readable by root only: sudo tail /var/log/auth.log (systems without it log to the journal: sudo journalctl -t sshd)'],
@@ -110,12 +111,14 @@ function get_today_path(array $meta): string {
     return rtrim($meta['dir'], '/') . '/' . $name;
 }
 
-function list_bbs_dates(string $dir): array {
+// v1.5.95: any dated log with a %y%m%d name (BBS log, node debug log)
+function list_bbs_dates(string $dir, string $fmt = 'log_%y%m%d_BBS.txt'): array {
     $dates = [];
-    $files = glob($dir . '/log_??????_BBS.txt') ?: [];
+    $files = glob($dir . '/' . str_replace('%y%m%d', '??????', $fmt)) ?: [];
+    $re = '/' . str_replace('%y%m%d', '(\d{6})', preg_quote($fmt, '/')) . '$/';
     rsort($files);
     foreach (array_slice($files, 0, 30) as $f) {
-        if (preg_match('/log_(\d{6})_BBS\.txt$/', $f, $m)) {
+        if (preg_match($re, $f, $m)) {
             $dates[] = [
                 'date'  => $m[1],
                 'label' => '20' . substr($m[1],0,2) . '-' . substr($m[1],2,2) . '-' . substr($m[1],4,2),
@@ -170,7 +173,10 @@ function search_log(string $path, string $q): array {
 function resolve_path(array $meta, string $date = ''): ?string {
     global $LOG_DIR;
     if (($meta['dynamic'] ?? '') === 'today')   return get_today_path($meta);
-    if (($meta['dynamic'] ?? '') === 'archive') return $date ? "{$LOG_DIR}/log_{$date}_BBS.txt" : null;
+    if (($meta['dynamic'] ?? '') === 'archive') {
+        if (!preg_match('/^\d{6}$/', $date)) return null;
+        return $LOG_DIR . '/' . str_replace('%y%m%d', $date, $meta['fmt'] ?? 'log_%y%m%d_BBS.txt');
+    }
     return $meta['path'] ?? null;
 }
 
@@ -197,7 +203,7 @@ if ($action === 'list') {
         $e = ['key'=>$key,'label'=>$meta['label'],'group'=>$meta['group'],'color'=>$meta['color'],'desc'=>$meta['desc'],'opt'=>$meta['opt'] ?? ''];
         if (($meta['dynamic'] ?? '') === 'archive') {
             $e['exists'] = true; $e['dynamic'] = 'archive';
-            $e['dates']  = list_bbs_dates($meta['dir']);
+            $e['dates']  = list_bbs_dates($meta['dir'], $meta['fmt'] ?? 'log_%y%m%d_BBS.txt');
         } elseif ($path && file_exists($path)) {
             $e['exists'] = true; $e['readable'] = is_readable($path); $e['size'] = filesize($path);
             $e['modified'] = filemtime($path); $e['path'] = $path;
@@ -239,7 +245,8 @@ if ($action === 'search') {
 
 if ($action === 'dates') {
     global $LOG_DIR;
-    out(['dates' => list_bbs_dates($LOG_DIR)]);
+    $dm = $LOGS[(string)($_GET['log'] ?? '')] ?? null;
+    out(['dates' => list_bbs_dates($LOG_DIR, ($dm['fmt'] ?? null) ?: 'log_%y%m%d_BBS.txt')]);
     exit;
 }
 

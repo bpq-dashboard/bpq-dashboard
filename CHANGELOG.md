@@ -4,6 +4,63 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.95] - 2026-11-23
+
+### Added (Admin → Node Debug, K1AJD)
+- admin/node-debug.html + admin/node-debug-api.php (admin login), laid out
+  like RF Connections, reading LinBPQ's NodeDebuglog_YYMMDD.log (Today / 3 /
+  7 days, UTC):
+  - status strip (debug log, starts today, internet, sound cards, Winlink
+    reports, needs attention); headline cards: LinBPQ starts, neighbour
+    links dropped, internet & Winlink CMS outages, Winlink channel reports
+    accepted.
+  - Neighbours: sessions, data sent/received (KISS session stats), links
+    dropped while running vs during LinBPQ restarts, last drop, day blocks.
+  - Needs attention / Problems: known lines explained with what to do
+    (MISSING SOUNDCARD, Check CMS Failed, DNS failures, chat link failing,
+    AXIP from unknown address, forms dir missing, RTS PTT with no port, TCP
+    send retried, deferred offers, L4 retries) and any other error lines.
+  - Hourly grid of the worst event per UTC hour; Winlink reports per service
+    and channel; modem connects; LinBPQ starts with how long each ran.
+  - Live log of today's file, polled every 5 s by byte offset, coloured
+    (urgent, look at, LinBPQ shutting down, starting, OK), VARA busy/OK/
+    alive and heartbeat lines hidden by default, problems-only filter,
+    search, pause.
+  - Why LinBPQ restarted: each start on the Starts tab says Connect Watchdog
+    (with the partner paused or resumed), By <user> (sudo), Dashboard, Cron
+    job, Computer restarted (by whom, or after power loss / a hang), Root /
+    script, Crashed (segfault, out of memory, error exit, with systemd's
+    automatic restart), LinBPQ closed itself, or Unknown. Sources: the
+    Connect Watchdog's log (/var/log/bpq-dashboard/connect-watchdog.log,
+    local time converted to UTC) and, through the LinBPQ Status helper,
+    systemd's record of the service, kernel crash / OOM lines, sudo, su,
+    cron and logind lines. Without the helper: "Probably Watchdog" from
+    the 5-minute schedule, else Unknown.
+  - Each start opens to the evidence, how long LinBPQ was down, whether it
+    shut down normally or abruptly, and the last lines it wrote. Unknown
+    ones also list what was checked, likely causes, and copyable commands
+    for the system logs around that minute. Crashes and unknown restarts
+    are listed under Needs attention; the LinBPQ starts card counts them
+    by reason.
+  - Finding lines: the Show … in the log buttons (problems, neighbours) and
+    Search all days look through every day in the chosen range, not just
+    the live view (which holds the end of today's file); a known problem
+    is searched with the same pattern that counted it, so the numbers
+    match. A start opens the log 5 minutes before it to 90 s after, on any
+    day, centred on the start. Back to live log returns to the live tail.
+  - Lines in the 30 s before a LinBPQ start (links dropped, "called
+    without semaphore") are shutdown noise and counted apart.
+- install.sh / update.sh check for NodeDebuglog_YYMMDD.log in LinBPQ's logs
+  folder: found (and how many days), not written by this LinBPQ (a note, not a
+  warning), found but unreadable by the web user, or not written for 48 h.
+- tools/linbpq-status-helper also returns admin_events: sudo / su / cron /
+  systemd-logind lines about LinBPQ, a reboot or a root shell (PWD dropped,
+  passwords masked; the Connect Watchdog's own cron line left out), and the
+  kernel's out-of-memory kills of LinBPQ. LinBPQ Status shows an OOM kill as
+  "Killed: the computer ran out of memory". Same sudo rule as before.
+- Admin menu entry and Maintenance tile. The Log Viewer's archive code now
+  takes any dated log name (%y%m%d) and refuses a date that isn't six digits.
+
 ## [1.5.94] - 2026-11-23
 
 ### Added (Admin → LinBPQ Status, requested by N3MEL)
