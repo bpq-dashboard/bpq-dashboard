@@ -1,0 +1,281 @@
+#!/usr/bin/python3 -I
+"""
+bpq-dashboard-linbpq-status — read-only facts for Admin > LinBPQ Status (v1.5.94)
+
+Installed as a root-owned copy in /usr/local/sbin (install.sh / update.sh
+copy it from tools/linbpq-status-helper where the admin pages' sudo rules
+are installed); the web server runs it with
+    sudo -n /usr/local/sbin/bpq-dashboard-linbpq-status            (everything)
+    sudo -n /usr/local/sbin/bpq-dashboard-linbpq-status console    (console only)
+and no other arguments (www-data-tools.sudoers allows exactly these two).
+It needs root to read the system journal and kernel log, and to copy the
+window of a screen session that belongs to another user.
+
+It prints one JSON object and changes nothing in LinBPQ:
+  process   the running LinBPQ: pid, user, started (UTC), uptime, program
+            path, working folder; null when it isn't running.
+  how       how it is run: 'systemd' (unit name), 'screen' (session name and
+            owner), 'tmux', or 'other' (the parent program's name).
+  unit      systemd only: state, start time, restarts counted by systemd
+            (NRestarts), how the last run ended (Result, ExecMainCode/Status).
+  starts    LinBPQ starts and ends in the last 30 days, newest first: from
+            the unit's journal (systemd), plus each start the kernel or
+            journal shows a crash for; and the machine's boots.
+  crashes   segfaults and other traps of LinBPQ in the kernel log (30 days),
+            systemd 'core-dump' / 'signal' ends, and core dumps
+            (coredumpctl), newest first.
+  console   the last lines LinBPQ printed: its journal (systemd) or a copy
+            of the screen window with its scrollback (screen, via
+            `screen -X hardcopy -h`, run as the session's owner into a
+            private temporary folder that is removed again).
+Lines with a password or a USER= login are masked before printing. Nothing
+is written to LinBPQ or its screen window (no keystrokes are sent).
+"""
+import datetime as dt
+import json
+import os
+import pwd
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+MODE = sys.argv[1] if len(sys.argv) > 1 else 'all'
+if MODE not in ('all', 'console') or len(sys.argv) > 2:
+    print(json.dumps({'error': 'usage'}))
+    sys.exit(2)
+
+NAMES = ('linbpq', 'linbpq64', 'pilinbpq')
+SECRET = re.compile(r'(?i)(pass(word|wd)?\s*[=:]?\s*|\buser\s*=\s*|\bsysop\s*password\s*)\S.*$')
+CRASH = re.compile(r'(?i)\b(linbpq\w*|pilinbpq)\[\d+\]:\s*(segfault|general protection|trap|traps:)|traps:\s*(linbpq\w*|pilinbpq)\[\d+\]')
+UNIT_END = re.compile(r'(?i)(Main process exited|Failed with result|Scheduled restart|Started |Stopped |Stopping |Deactivated successfully)')
+
+
+def run(cmd, timeout=15, user=None):
+    try:
+        if user is not None:
+            cmd = ['runuser', '-u', user, '--'] + cmd
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                           env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8'})
+        return r.stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+
+
+def mask(line):
+    return SECRET.sub(lambda m: m.group(1) + '********', line.rstrip('\r\n'))
+
+
+def read(p, default=''):
+    try:
+        with open(p, 'r', encoding='utf-8', errors='replace') as f:
+            return f.read()
+    except OSError:
+        return default
+
+
+def iso(t):
+    return dt.datetime.fromtimestamp(t, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ') if t else None
+
+
+BOOT = 0
+for line in read('/proc/stat').splitlines():
+    if line.startswith('btime '):
+        BOOT = int(line.split()[1])
+HZ = os.sysconf('SC_CLK_TCK') or 100
+
+
+def proc_info(pid):
+    st = read(f'/proc/{pid}/stat')
+    if not st:
+        return None
+    rest = st[st.rfind(')') + 2:].split()
+    ppid, start = int(rest[1]), BOOT + int(rest[19]) / HZ
+    uid = None
+    for line in read(f'/proc/{pid}/status').splitlines():
+        if line.startswith('Uid:'):
+            uid = int(line.split()[1])
+    try:
+        user = pwd.getpwuid(uid).pw_name if uid is not None else None
+    except KeyError:
+        user = str(uid)
+    return {'pid': pid, 'ppid': ppid, 'comm': read(f'/proc/{pid}/comm').strip(), 'start': start, 'user': user}
+
+
+def find_linbpq():
+    found = []
+    for d in os.listdir('/proc'):
+        if d.isdigit() and read(f'/proc/{d}/comm').strip().lower() in NAMES:
+            i = proc_info(int(d))
+            if i:
+                found.append(i)
+    found.sort(key=lambda x: x['start'])
+    return found
+
+
+def unit_of(pid):
+    for line in read(f'/proc/{pid}/cgroup').splitlines():
+        m = re.search(r'/([^/]+\.service)$', line.strip())
+        if m and not m.group(1).startswith('user@'):
+            return m.group(1)
+    return None
+
+
+def screen_session(p):
+    """(session name, owner, screen pid) when LinBPQ runs inside screen."""
+    pid = p['ppid']
+    for _ in range(6):
+        i = proc_info(pid)
+        if not i:
+            return None
+        if i['comm'].lower() == 'screen':
+            for base in ('/run/screen', '/var/run/screen', '/tmp/screens'):
+                try:
+                    for d in os.listdir(base):
+                        sdir = os.path.join(base, d)
+                        for s in os.listdir(sdir):
+                            if s.split('.', 1)[0] == str(pid):
+                                owner = d[2:] if d.startswith('S-') else i['user']
+                                return {'session': s, 'name': s.split('.', 1)[1] if '.' in s else s,
+                                        'owner': owner, 'pid': pid}
+                except OSError:
+                    continue
+            return {'session': str(pid), 'name': None, 'owner': i['user'], 'pid': pid}
+        if i['comm'].startswith('tmux'):
+            return {'tmux': True, 'owner': i['user']}
+        if pid <= 1:
+            return None
+        pid = i['ppid']
+    return None
+
+
+def screen_copy(sess):
+    """Window and scrollback of the screen session, as its owner sees it."""
+    owner = sess.get('owner') or 'root'
+    try:
+        pw = pwd.getpwnam(owner)
+    except KeyError:
+        return None, 'unknown owner'
+    tmp = tempfile.mkdtemp(prefix='bpqstat-')
+    try:
+        os.chown(tmp, pw.pw_uid, pw.pw_gid)
+        os.chmod(tmp, 0o700)
+        out = os.path.join(tmp, 'hardcopy.txt')
+        cmd = ['screen', '-S', sess['session'], '-X', 'hardcopy', '-h', out]
+        run(cmd, timeout=10, user=None if owner == 'root' else owner)
+        for _ in range(20):
+            if os.path.exists(out) and os.path.getsize(out) > 0:
+                break
+            time.sleep(0.1)
+        if not os.path.exists(out):
+            return None, 'screen did not write a copy (session name or owner may differ)'
+        with open(out, 'r', encoding='utf-8', errors='replace') as f:
+            lines = f.read().splitlines()
+        while lines and not lines[-1].strip():
+            lines.pop()
+        return lines[-500:], None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def unit_props(unit):
+    props = {}
+    out = run(['systemctl', 'show', unit, '-p', 'ActiveState,SubState,ActiveEnterTimestamp,NRestarts,Result,'
+               'ExecMainCode,ExecMainStatus,ExecMainStartTimestamp,ExecMainExitTimestamp,MainPID,Restart'])
+    for line in out.splitlines():
+        if '=' in line:
+            k, v = line.split('=', 1)
+            props[k] = v
+    return props
+
+
+def journal(args, limit=None):
+    cmd = ['journalctl', '--no-pager', '-o', 'short-iso'] + args
+    if limit:
+        cmd += ['-n', str(limit)]
+    return run(cmd, timeout=25).splitlines()
+
+
+def coredumps():
+    out = run(['coredumpctl', 'list', '--no-pager', '--since', '-30d'], timeout=15)
+    rows = []
+    for line in out.splitlines()[1:]:
+        if re.search(r'(?i)linbpq', line):
+            rows.append(mask(line))
+    return rows[-50:]
+
+
+result = {'mode': MODE, 'checked': iso(time.time()), 'boot': iso(BOOT)}
+procs = find_linbpq()
+main = procs[-1] if procs else None
+how, unit, sess = None, None, None
+if main:
+    unit = unit_of(main['pid'])
+    sess = screen_session(main)
+    if sess and sess.get('tmux'):
+        how = {'kind': 'tmux', 'owner': sess['owner']}
+        sess = None
+    elif sess:
+        how = {'kind': 'screen', 'session': sess['name'], 'owner': sess['owner']}
+    elif unit:
+        how = {'kind': 'systemd', 'unit': unit}
+    else:
+        par = proc_info(main['ppid'])
+        how = {'kind': 'other', 'parent': par['comm'] if par else None}
+    try:
+        exe = os.readlink(f"/proc/{main['pid']}/exe")
+    except OSError:
+        exe = None
+    try:
+        cwd = os.readlink(f"/proc/{main['pid']}/cwd")
+    except OSError:
+        cwd = None
+    result['process'] = {'pid': main['pid'], 'user': main['user'], 'started': iso(main['start']),
+                         'uptime_s': int(time.time() - main['start']), 'exe': exe, 'cwd': cwd,
+                         'count': len(procs)}
+else:
+    result['process'] = None
+    # not running: still find its systemd unit for the history
+    for u in ('linbpq.service', 'bpq.service', 'linbpq64.service'):
+        if 'LoadState=loaded' in run(['systemctl', 'show', u, '-p', 'LoadState']):
+            unit = u
+            how = {'kind': 'systemd', 'unit': u}
+            break
+result['how'] = how
+
+# console
+cons, cerr = [], None
+if sess:
+    lines, cerr = screen_copy(sess)
+    cons = lines or []
+elif unit:
+    cons = [l for l in journal(['-u', unit], limit=400)]
+elif how and how['kind'] == 'tmux':
+    cerr = 'LinBPQ runs in tmux; the console copy is only made for screen and systemd.'
+else:
+    cerr = 'LinBPQ is not running under systemd or screen, so there is no console to copy.' if main else 'LinBPQ is not running.'
+result['console'] = [mask(l) for l in cons][-500:]
+result['console_error'] = cerr
+
+if MODE == 'all':
+    if unit:
+        result['unit'] = unit_props(unit)
+    # starts / ends from the unit's journal
+    starts = []
+    if unit:
+        for line in journal(['-u', unit, '--since', '-30d']):
+            if UNIT_END.search(line) and 'systemd[' in line:
+                starts.append(mask(line))
+    result['unit_events'] = starts[-300:]
+    # crashes in the kernel log
+    kern = [mask(l) for l in journal(['-k', '--since', '-30d']) if CRASH.search(l)]
+    if not kern:                                  # no persistent journal: this boot's ring buffer
+        kern = [mask(l) for l in run(['dmesg', '-T'], timeout=10).splitlines() if CRASH.search(l)]
+    result['kernel_crashes'] = kern[-100:]
+    result['coredumps'] = coredumps()
+    result['boots'] = [mask(l) for l in run(['journalctl', '--list-boots', '--no-pager'], timeout=10).splitlines()[1:]][-15:]
+    result['journal_persistent'] = os.path.isdir('/var/log/journal')
+
+print(json.dumps(result))

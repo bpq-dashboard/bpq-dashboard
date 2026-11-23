@@ -537,7 +537,7 @@
   <h1>📡 BPQ Dashboard <span>//</span> Maintenance</h1>
   <div class="meta">
     <span id="stationLine">Admin reference for sysops</span><br>
-    v1.5.93 · updated November 2026
+    v1.5.94 · updated November 2026
   </div>
 </header>
 
@@ -551,6 +551,7 @@
   <a href="/admin/system-audit.html"><span class="tl-icon">🔍</span><span><strong style="color:var(--blue)">System Audit</strong><small>services · security · database</small></span></a>
   <a href="/admin/log-viewer.html"><span class="tl-icon">📋</span><span><strong style="color:var(--cyan)">Log Viewer</strong><small>daemon and BBS logs</small></span></a>
   <a href="/admin/audio-map.html"><span class="tl-icon">🎛️</span><span><strong style="color:var(--purple)">Audio Map</strong><small>ports · modems · sound cards · radios</small></span></a>
+  <a href="/admin/linbpq-status.html"><span class="tl-icon">🩺</span><span><strong style="color:var(--red)">LinBPQ Status</strong><small>crashes · restarts · live console</small></span></a>
   <a href="/install-check.php"><span class="tl-icon">✅</span><span><strong style="color:var(--amber)">Install Check</strong><small>full self-test</small></span></a>
   <a href="#partners-editor"><span class="tl-icon">📡</span><span><strong style="color:var(--purple)">Partners Editor</strong><small>partners.json</small></span></a>
 </div>
@@ -770,7 +771,7 @@ curl <span class="flag">-s</span> <var data-v="site">https://bpq.example.com</va
 
 <div class="section" id="sudo">
   <h2 class="section-title purple">Firewall &amp; System Audit — read-only sudo rules</h2>
-  <p class="intro">The <a href="/admin/firewall-status.html">Firewall</a> and <a href="/admin/system-audit.html">System Audit</a> pages read the firewall (IPv4 and IPv6), fail2ban, the listening ports and <span class="kw">nginx -t</span> through read-only sudo rules (plus the admin-password helper, v1.5.19, and the <a href="/admin/audio-map.html">Audio Map</a>'s read-only helper <span class="kw">/usr/local/sbin/bpq-dashboard-audio-map</span>, v1.5.57) in <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers</span>. <span class="kw">install.sh</span> offers to install them. Without them those rows say "not checked" (they never guess), and everything else on both pages still works.</p>
+  <p class="intro">The <a href="/admin/firewall-status.html">Firewall</a> and <a href="/admin/system-audit.html">System Audit</a> pages read the firewall (IPv4 and IPv6), fail2ban, the listening ports and <span class="kw">nginx -t</span> through read-only sudo rules (plus the admin-password helper, v1.5.19, the <a href="/admin/audio-map.html">Audio Map</a>'s read-only helper <span class="kw">/usr/local/sbin/bpq-dashboard-audio-map</span>, v1.5.57, and <a href="/admin/linbpq-status.html">LinBPQ Status</a>'s <span class="kw">/usr/local/sbin/bpq-dashboard-linbpq-status</span>, v1.5.94) in <span class="kw"><var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers</span>. <span class="kw">install.sh</span> offers to install them. Without them those rows say "not checked" (they never guess), and everything else on both pages still works.</p>
   <div class="cmd-group">
     <div class="cmd"><div class="cmd-inner">
       <code><span class="sudo">sudo</span> cp <var data-v="root">/var/www/bpq-dashboard</var>/www-data-tools.sudoers /etc/sudoers.d/www-data-tools &amp;&amp; <span class="sudo">sudo</span> chmod 440 /etc/sudoers.d/www-data-tools &amp;&amp; <span class="sudo">sudo</span> visudo <span class="flag">-c</span></code>
@@ -2314,7 +2315,7 @@ document.querySelectorAll('.cmd').forEach(function (cmd) {
   wsLoad();
 })();
 </script>
-<script src="/shared/settings-modal.js?v=1.5.93"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
+<script src="/shared/settings-modal.js?v=1.5.94"></script>   <!-- 2026-10-25: Dashboard Settings (⚙) on the admin pages only -->
 <script>
 // v1.5.77: Winlink mail the dashboard has seen
 (function () {

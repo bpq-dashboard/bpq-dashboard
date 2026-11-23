@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.93 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.5.94 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.93 — Guided Installer                  ║
+║             BPQ Dashboard v1.5.94 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -1865,7 +1865,8 @@ if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
     explain "(listed in www-data-tools.sudoers). They can't change anything."
     explain "One more rule (v1.5.19) lets the Maintenance page change the admin"
     explain "login's password, through a small root-owned helper in /usr/local/sbin,"
-    explain "and one (v1.5.57) lets Admin > Audio Map see which programs use the sound cards."
+    explain "and one (v1.5.57) lets Admin > Audio Map see which programs use the sound cards,"
+    explain "and one (v1.5.94) lets Admin > LinBPQ Status read LinBPQ's crashes, restarts and console."
     if yesno "Install those sudo rules (/etc/sudoers.d/www-data-tools)?" Y; then
         # The helper must be root-owned and outside the web folder (the web
         # user can write there, so a sudo rule pointing into it = root).
@@ -1876,6 +1877,10 @@ if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
         if [[ -f "$WEB_ROOT/tools/audio-map-helper" ]]; then      # v1.5.57: Admin > Audio Map (read-only)
             install -o root -g root -m 755 "$WEB_ROOT/tools/audio-map-helper" /usr/local/sbin/bpq-dashboard-audio-map \
                 && ok "Audio Map helper: /usr/local/sbin/bpq-dashboard-audio-map"
+        fi
+        if [[ -f "$WEB_ROOT/tools/linbpq-status-helper" ]]; then  # v1.5.94: Admin > LinBPQ Status (read-only)
+            install -o root -g root -m 755 "$WEB_ROOT/tools/linbpq-status-helper" /usr/local/sbin/bpq-dashboard-linbpq-status \
+                && ok "LinBPQ Status helper: /usr/local/sbin/bpq-dashboard-linbpq-status"
         fi
         TMP_SUDO=$(mktemp)
         sed "s/^www-data /$WEB_USER /" "$WEB_ROOT/www-data-tools.sudoers" > "$TMP_SUDO"

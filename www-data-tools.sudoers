@@ -39,3 +39,12 @@ www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-set-admin-password *
 # (install.sh / update.sh put it there from tools/audio-map-helper); "" = no
 # arguments allowed. It reads only and prints no command lines or secrets.
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-audio-map ""
+
+# v1.5.94: Admin > LinBPQ Status. LinBPQ's starts, stops and crashes (system
+# journal, kernel log, coredumpctl) and a copy of its console (its journal, or
+# its screen window via `screen -X hardcopy`, as the session's owner). Root-
+# owned copy in /usr/local/sbin (from tools/linbpq-status-helper); only "" (no
+# arguments) and "console" are allowed. Read-only: it sends nothing to LinBPQ
+# and masks password / USER= lines.
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-linbpq-status ""
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-linbpq-status console

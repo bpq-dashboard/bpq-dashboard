@@ -4,6 +4,26 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.94] - 2026-11-23
+
+### Added (Admin → LinBPQ Status, requested by N3MEL)
+- admin/linbpq-status.html + admin/linbpq-status-api.php (admin login):
+  LinBPQ running or not, pid, uptime, how it is run (systemd unit, screen
+  session, tmux, other; detected from the process's cgroup and parents),
+  starts / stops / crashes / automatic restarts over 30 days, core dumps,
+  and a live console refreshed every 5 s: the unit's journal, or the screen
+  window with scrollback (screen -X hardcopy -h as the session owner, into a
+  private temporary folder). Error lines highlighted; errors-only filter;
+  pause ("VARA Thread Terminated", printed at every stop, in amber, not
+  as an error). Crash records of one event (systemd exit, "failed", kernel
+  segfault) merged. Notes for screen (no clean-stop history), a journal not
+  kept across boots, and Restart=no.
+- tools/linbpq-status-helper → /usr/local/sbin/bpq-dashboard-linbpq-status
+  (root, read-only, arguments "" or "console" only; masks password and
+  USER= lines). www-data-tools.sudoers: two lines. install.sh and update.sh
+  install it where the admin pages' sudo rules are installed. Admin menu,
+  Maintenance tile.
+
 ## [1.5.93] - 2026-11-23
 
 ### Fixed (NTS report: old forwarded messages shown as "Not Yet Forwarded", N3MEL)

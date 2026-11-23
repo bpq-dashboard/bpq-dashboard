@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinBPQ Status - BPQ Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#21262d;--border2:#30363d;
+    --text:#e6edf3;--muted:#7d8590;--green:#3fb950;--green-dim:#1a4428;
+    --amber:#d29922;--amber-dim:#3d2b05;--blue:#58a6ff;--blue-dim:#0d2340;
+    --red:#f85149;--red-dim:#3d0c0a;--purple:#bc8cff;--purple-dim:#1e1040;
+    --cyan:#39d0d8;--cyan-dim:#0c2d30;--orange:#f0883e;--orange-dim:#3a1d06;
+    --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  [data-theme="light"] {
+    --bg:#f6f8fa;--surface:#ffffff;--surface2:#f6f8fa;--border:#d0d7de;--border2:#afb8c1;
+    --text:#1f2328;--muted:#656d76;
+    --green:#1a7f37;--green-dim:#dcfce7;--amber:#9a6700;--amber-dim:#fff8c5;
+    --blue:#0969da;--blue-dim:#ddf4ff;--red:#cf222e;--red-dim:#ffebe9;
+    --purple:#8250df;--purple-dim:#fbefff;--cyan:#0d7d8a;--cyan-dim:#e0f7f9;
+    --orange:#bc4c00;--orange-dim:#fff1e5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;padding:32px 24px 64px;max-width:1280px;margin:0 auto;}
+  header{border-bottom:1px solid var(--border2);padding-bottom:20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+  header h1{font-family:var(--mono);font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;}
+  header h1 span{color:var(--green);}
+  header .meta{font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-align:right;line-height:1.8;}
+  .nav-back{font-family:var(--mono);font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;opacity:0.8;}
+  .nav-back:hover{opacity:1;}
+  .auth-gate{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:32px;max-width:440px;margin:80px auto;text-align:center;}
+  .auth-gate h2{font-family:var(--mono);font-size:1rem;margin-bottom:8px;color:var(--amber);}
+  .auth-gate p{color:var(--muted);font-size:0.85rem;}
+  .loading{font-family:var(--mono);color:var(--muted);text-align:center;padding:60px 0;}
+  .intro{color:var(--muted);font-size:0.85rem;margin-bottom:18px;max-width:900px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:0.72rem;color:var(--muted);margin-bottom:10px;}
+  .btn{font-family:var(--mono);font-size:0.72rem;font-weight:600;padding:5px 12px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;}
+  .btn:hover{border-color:var(--blue);color:var(--blue);}
+  .diagram{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px;overflow-x:auto;margin-bottom:26px;}
+  .diagram svg{display:block;min-width:1100px;width:100%;height:auto;}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:0.75rem;color:var(--muted);margin:2px 4px 10px;}
+  .legend i{display:inline-block;width:26px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px;}
+  h2.sec{font-family:var(--mono);font-size:0.85rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:26px 0 10px;}
+  .notes{display:flex;flex-direction:column;gap:6px;}
+  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:6px;padding:8px 12px;font-size:0.85rem;}
+  .note.warn{border-left-color:var(--amber);} .note.ok{border-left-color:var(--green);}
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:0.8rem;}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{font-family:var(--mono);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);background:var(--surface2);}
+  td code,.mono{font-family:var(--mono);font-size:0.76rem;}
+  .tbl-wrap{overflow-x:auto;}
+  .pill{display:inline-block;font-family:var(--mono);font-size:0.66rem;padding:1px 7px;border-radius:9px;border:1px solid var(--border2);margin:1px 2px 1px 0;white-space:nowrap;}
+  .pill.ok{color:var(--green);border-color:var(--green);} .pill.warn{color:var(--amber);border-color:var(--amber);}
+  .muted{color:var(--muted);}
+    /* LinBPQ Status (v1.5.94) */
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px;}
+  .card{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;}
+  .card .k{font-family:var(--mono);font-size:0.66rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
+  .card .v{font-family:var(--mono);font-size:1.15rem;font-weight:700;margin-top:2px;}
+  .card .s{font-size:0.75rem;color:var(--muted);}
+  .v.ok{color:var(--green);} .v.bad{color:var(--red);} .v.warn{color:var(--amber);}
+  .console{background:#0a0d12;color:#cfd8e3;border:1px solid var(--border2);border-radius:8px;font-family:var(--mono);font-size:0.74rem;line-height:1.45;padding:10px 12px;height:460px;overflow:auto;white-space:pre-wrap;word-break:break-word;}
+  [data-theme="light"] .console{background:#0d1117;color:#d8e0ea;}
+  .console .err{color:#ff7b72;font-weight:600;} .console .ok{color:#7ee787;} .console .stop{color:#e3b341;}
+  .console .empty{color:#7d8590;font-style:italic;}
+  .k-crash td:first-child{border-left:3px solid var(--red);} .k-restart td:first-child{border-left:3px solid var(--amber);}
+  .k-start td:first-child{border-left:3px solid var(--green);} .k-stop td:first-child,.k-exit td:first-child{border-left:3px solid var(--border2);}
+  .k-boot td:first-child{border-left:3px solid var(--blue);}
+  .live{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;}
+  .dot.paused{background:var(--muted);}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  .filters .btn[aria-pressed="true"]{border-color:var(--blue);color:var(--blue);}
+  @media(max-width:700px){body{padding:20px 16px 48px;} header .meta{text-align:left;} .console{height:360px;}}
+</style>
+</head>
+<body data-nav-page="linbpq">
+<script src="/bpq-nav-loader.js?v=2026-11-19-1"></script>
+
+<a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
+
+<header>
+  <h1>🩺 BPQ Dashboard <span>//</span> LinBPQ Status <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.5.94</span></h1>
+  <div class="meta">Starts, restarts, crashes and the live console<br>Read-only: nothing is sent to LinBPQ</div>
+</header>
+
+<div id="auth-gate" class="auth-gate" style="display:none;"><h2>🔒 Admin login needed</h2><p id="auth-msg"></p></div>
+<div id="loading" class="loading">Reading LinBPQ's status…</div>
+
+<div id="main" style="display:none;">
+  <p class="intro">Is LinBPQ running, how was it started, has it crashed or restarted in the last 30 days, and what is it printing now, the same as <span class="mono">screen -r bpq</span> or <span class="mono">journalctl -u</span> would show. Crashes come from the system's own records (kernel log, systemd, core dumps), so they are listed even when LinBPQ was restarted afterwards.</p>
+  <div class="strip" id="strip"></div>
+  <div id="notes" class="notes" style="margin-bottom:18px;"></div>
+
+  <h2 class="sec">Live console</h2>
+  <div class="toolbar">
+    <span class="live"><span class="dot" id="live-dot"></span><span id="console-src"></span></span>
+    <span><label style="margin-right:10px;"><input type="checkbox" id="errs-only"> errors only</label><button class="btn" id="pause">⏸ Pause</button></span>
+  </div>
+  <div class="console" id="console"></div>
+
+  <h2 class="sec">Starts, stops and crashes · last 30 days</h2>
+  <div class="filters" id="ev-filters">
+    <button class="btn" data-k="all" aria-pressed="true">All</button>
+    <button class="btn" data-k="crash" aria-pressed="false">Crashes</button>
+    <button class="btn" data-k="restart" aria-pressed="false">Automatic restarts</button>
+    <button class="btn" data-k="start" aria-pressed="false">Starts</button>
+    <button class="btn" data-k="boot" aria-pressed="false">Computer starts</button>
+  </div>
+  <div class="tbl-wrap"><table id="t-events"></table></div>
+
+  <div id="dumps-wrap" style="display:none;">
+    <h2 class="sec">Core dumps (coredumpctl)</h2>
+    <div class="console" id="dumps" style="height:auto;max-height:240px;"></div>
+  </div>
+  <div class="toolbar" style="margin-top:14px;"><span id="stamp"></span><button class="btn" onclick="loadAll()">⟳ Refresh</button></div>
+</div>
+
+<script>
+const API = 'linbpq-status-api.php';
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let paused = false, timer = null, events = [], evKind = 'all', lastConsole = [], lastHow = null, lastErr = null;
+
+function get(view) {
+  return fetch(API + (view ? '?view=' + view + '&' : '?') + 't=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.text().then(t => {
+      let d = null; try { d = JSON.parse(t); } catch (e) {}
+      if (r.status === 401 || r.status === 403) { const e = new Error('auth'); e.detail = d && d.error; throw e; }
+      if (!d) throw new Error('HTTP ' + r.status);
+      if (!d.success) { const e = new Error(d.error || 'failed'); e.helper = d.helper; throw e; }
+      return d;
+    }));
+}
+function fail(err) {
+  document.getElementById('loading').style.display = 'block';
+  if (err.message === 'auth') {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('auth-gate').style.display = 'block';
+    document.getElementById('auth-msg').textContent = err.detail || 'Reload the page and log in.';
+  } else {
+    document.getElementById('loading').innerHTML = '⚠️ ' + esc(err.message);
+  }
+}
+function ago(s) {
+  if (s == null) return '';
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+}
+function when(iso) {
+  if (!iso) return '—';
+  const t = new Date(iso.replace(' ', 'T'));
+  return isNaN(t) ? iso : t.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+}
+function howText(h) {
+  if (!h) return ['—', ''];
+  if (h.kind === 'systemd') return ['systemd', 'service ' + h.unit];
+  if (h.kind === 'screen') return ['screen', 'session ' + (h.session || '?') + ', user ' + h.owner];
+  if (h.kind === 'tmux') return ['tmux', 'user ' + h.owner];
+  return ['other', 'started by ' + (h.parent || '?')];
+}
+
+function renderStrip(d) {
+  const p = d.process, s = d.summary || {}, [hk, hs] = howText(d.how);
+  const cards = [
+    ['LinBPQ', p ? 'Running' : 'Not running', p ? 'ok' : 'bad', p ? 'pid ' + p.pid + ' · user ' + esc(p.user) : ''],
+    ['Up for', p ? ago(p.uptime_s) : '—', '', p ? 'since ' + when(p.started) : ''],
+    ['Run by', hk, '', esc(hs)],
+    ['Crashes · 30 days', String(s.crashes ?? 0), s.crashes ? 'bad' : 'ok', s.segfaults_kernel ? s.segfaults_kernel + ' in the kernel log' : 'none recorded'],
+    ['Restarts · 30 days', String((s.auto_restarts ?? 0)), s.auto_restarts ? 'warn' : '', (s.starts ?? 0) + ' starts' + (s.unit_restarts != null ? ' · systemd count ' + s.unit_restarts : '')],
+    ['Core dumps', String(s.coredumps ?? 0), s.coredumps ? 'warn' : '', s.coredumps ? 'see below' : ''],
+  ];
+  document.getElementById('strip').innerHTML = cards.map(([k, v, c, sub]) =>
+    `<div class="card"><div class="k">${k}</div><div class="v ${c}">${esc(v)}</div><div class="s">${sub}</div></div>`).join('');
+  document.getElementById('notes').innerHTML = (d.notes || []).map(n => `<div class="note ${n.lvl === 'warn' ? 'warn' : ''}">${esc(n.text)}</div>`).join('');
+}
+
+function renderEvents() {
+  const rows = events.filter(e => evKind === 'all' || e.kind === evKind);
+  const t = document.getElementById('t-events');
+  if (!rows.length) { t.innerHTML = '<tr><td class="muted">Nothing recorded in the last 30 days' + (evKind === 'crash' ? ': no crashes. 👍' : '.') + '</td></tr>'; return; }
+  const icon = { crash: '💥', restart: '🔁', start: '▶️', stop: '⏹', exit: '⚠️', boot: '🖥️' };
+  t.innerHTML = '<tr><th>When (UTC)</th><th>What happened</th><th>Record</th></tr>' + rows.map(e =>
+    `<tr class="k-${esc(e.kind)}"><td class="mono" style="white-space:nowrap">${esc(when(e.at))}</td><td>${icon[e.kind] || ''} ${esc(e.what)}</td><td class="mono muted" style="white-space:pre-line">${esc(e.line)}</td></tr>`).join('');
+}
+
+function renderConsole(d) {
+  const box = document.getElementById('console');
+  const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  lastConsole = d.console || []; if (d.how !== undefined) lastHow = d.how; if (d.console_error !== undefined) lastErr = d.console_error;
+  const only = document.getElementById('errs-only').checked;
+  const lines = only ? lastConsole.filter(l => l.k === 'err') : lastConsole;
+  box.innerHTML = lines.length
+    ? lines.map(l => `<span class="${l.k}">${esc(l.t)}</span>`).join('\n')
+    : `<span class="empty">${esc(lastErr || (only ? 'No error lines in the console.' : 'Nothing printed yet.'))}</span>`;
+  if (atEnd || !box.dataset.seen) { box.scrollTop = box.scrollHeight; box.dataset.seen = '1'; }
+  const [hk, hs] = howText(lastHow);
+  document.getElementById('console-src').textContent = (paused ? 'Paused · ' : 'Live, every 5 s · ') +
+    (hk === 'systemd' ? 'journal of ' + lastHow.unit : hk === 'screen' ? 'screen window "' + (lastHow.session || '') + '"' : 'no console') + ' · ' + new Date().toLocaleTimeString();
+}
+
+function loadAll() {
+  get('').then(d => {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    renderStrip(d); events = d.events || []; renderEvents(); renderConsole(d);
+    const dw = document.getElementById('dumps-wrap');
+    if ((d.coredumps || []).length) { dw.style.display = 'block'; document.getElementById('dumps').textContent = d.coredumps.join('\n'); } else dw.style.display = 'none';
+    document.getElementById('stamp').textContent = 'Checked ' + new Date().toLocaleString() + ' · history refreshes every minute';
+  }).catch(fail);
+}
+function tick() {
+  if (paused || document.hidden) return;
+  get('console').then(renderConsole).catch(() => {});
+}
+document.getElementById('pause').onclick = () => {
+  paused = !paused;
+  document.getElementById('pause').textContent = paused ? '▶ Resume' : '⏸ Pause';
+  document.getElementById('live-dot').classList.toggle('paused', paused);
+  if (!paused) tick();
+};
+document.getElementById('errs-only').onchange = () => renderConsole({ console: lastConsole });
+document.getElementById('ev-filters').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  evKind = b.dataset.k;
+  document.querySelectorAll('#ev-filters button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  renderEvents();
+};
+loadAll();
+timer = setInterval(tick, 5000);
+setInterval(() => { if (!document.hidden) loadAll(); }, 60000);
+</script>
+</body>
+</html>

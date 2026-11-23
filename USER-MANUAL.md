@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.93**
+**Version 1.5.94**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -87,6 +87,10 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 ---
 
 ## 2. What's New
+
+### In v1.5.94
+
+- **Admin → LinBPQ Status** (requested by Glenn, N3MEL): whether LinBPQ is running and how (systemd service or screen session), its starts, stops, crashes (segfaults from the kernel log, systemd and core dumps) and automatic restarts over 30 days, and a live console view refreshed every 5 seconds: the service's journal, or the screen window as `screen -r bpq` shows it. Read-only, behind the admin login; a new read-only helper with two sudo lines, installed by the update (§11).
 
 ### In v1.5.93
 
@@ -645,14 +649,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.93.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.94.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.93
+cd bpq-dashboard-1.5.94
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -683,7 +687,7 @@ Some questions are **yes/no**. The capital letter is the default:
 | Set up flrig now (for Rig Status / RF Power Monitor)? | **Y** if you use flrig, then answer whether it runs on this server. **n** hides the Rig Status and RF Power Monitor pages (both need flrig); everything else, including BPQ's own CAT control of the radio, works without it |
 | Apply that fix now (setfacl)? *(only if the web server can't reach your LinBPQ folder)* | **Y** — gives the web server read access to the LinBPQ folder and its logs only (§12, *LinBPQ in a home folder*) |
 | Start the page helpers now (and at every boot)? | **Y** |
-| Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need, plus the Maintenance page's *Change admin password* helper and the Audio Map's read-only helper (v1.5.57) |
+| Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need, plus the Maintenance page's *Change admin password* helper and the read-only helpers for Audio Map (v1.5.57) and LinBPQ Status (v1.5.94) |
 | Set up a basic firewall (ufw) now? *(default No)* | **N** to do it later; **y** runs `tools/setup-firewall.sh` (§11) |
 | Set up BBS Mail now? *(optional, default No; v1.5.76)* | **y** to install the mail store now (§10.19): it installs Dovecot, opens port 993 to your home network only and asks you to type a mail password. Then Email opens BBS Mail, the Thunderbird-style page, and Thunderbird or a phone can read the BBS mail. **N** keeps the older Email Client; run `tools/bbs-mail-setup.sh` any time later. A No is remembered, so updates don't ask again |
 | Set up nightly backups now? *(optional, recommended; default No)* | **y** only if a backup drive is already formatted and mounted; it runs `scripts/bpq-backup-setup.sh`. Otherwise **N**, prepare the drive, and run it later (§10.16) |
@@ -1135,7 +1139,7 @@ The **User Guide** describes every page in detail. In short, with what each need
 | Telnet Client | `/bpq-telnet.html` | admin + your BPQ login | `bpq-telnet`; `bpq-nodes-api.php` for the nodes list (`bbs` login, `station.node`) |
 | Rig Status | `/rig-status.html` | none (controls: BBS password) | flrig; optional `smartplug` |
 | RF Power Monitor | `/rf-power-monitor.html` | none | flrig, `rig-history-poller` |
-| Maintenance, Firewall Status, Log Viewer, System Audit, Audio Map | `/admin/…` | admin | sudo rules (§11) for Firewall/Audit, *Change admin password* and the Audio Map's program list |
+| Maintenance, Firewall Status, Log Viewer, System Audit, Audio Map, LinBPQ Status | `/admin/…` | admin | sudo rules (§11) for Firewall/Audit, *Change admin password*, the Audio Map's program list and LinBPQ Status |
 | Install Check, Health Check | `/install-check.php`, `/health-check.php` | admin | — |
 
 Chat, APRS Map, VARA HF Terminal, Telnet Client, Rig Status and RF Power Monitor are **optional pages** (v1.5.19): switched off in `config.php 'pages'` (or `'radio' => 'enabled'`) they are hidden from the menu and their helper isn't needed.
@@ -2767,10 +2771,10 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.93-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.94-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.93 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.5.94 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

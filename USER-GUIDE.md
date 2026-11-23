@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.93**
+**Version 1.5.94**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -125,7 +125,7 @@ Every page loads the same bar at the top.
 - **📡 BPQ Dashboard** — returns to the home page, RF Connections.
 - **Page links** — RF, Traffic, System, Connects, Messages, Email, Weather, Chat, APRS, VARA, Telnet, Rig, RF Power. The page you're on is highlighted. **Email** opens BBS Mail, the Thunderbird-style page, where the BBS mail store is set up (v1.5.71), otherwise the Email Client (Section 9).
 - **📖 Guide** — opens this guide as a PDF in a new tab.
-- **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit, Audio Map (v1.5.57). These ask for the admin login.
+- **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit, Audio Map (v1.5.57), LinBPQ Status (v1.5.94). These ask for the admin login.
 - **Clocks** — UTC (purple, "Z") and your browser's local time ("L"), updated every second.
 - **Theme button** — 🌙 / ☀️ (Section 3).
 - **⚙** — on the admin pages only: *Dashboard Settings* for the forwarding tools (Section 19).
@@ -1345,6 +1345,17 @@ Runs dozens of checks on this install and reports each one with what it found an
 - **Multi-domain SSL** — list your certificates in config.php `ssl_domains`; otherwise the address you opened the page on is checked.
 - Run it after an upgrade and once a month.
 
+### LinBPQ Status (Admin → LinBPQ Status, v1.5.94)
+
+Is LinBPQ running, has it crashed or restarted, and what is it printing now. Asked for by Glenn, N3MEL, chasing a suspected segfault. Read-only: nothing is sent to LinBPQ, and lines with a password or a `USER=` login are masked.
+
+- **Status cards:** running or not (process number, user), how long it has been up, how it is run (a **systemd** service such as `bpq.service`, a **screen** session such as `screen -S bpq`, or something else, found by itself), crashes and automatic restarts in the last 30 days, core dumps.
+- **Live console**, refreshed every 5 seconds: for a systemd service, LinBPQ's journal (`journalctl -u bpq`); for screen, a copy of the screen window with its scrollback, the same as `screen -r bpq` shows. Error lines are red, connects green; *errors only* hides the rest; *Pause* stops the refresh.
+- **Starts, stops and crashes, last 30 days:** every start and stop systemd recorded, crashes (segfault, abort, general protection fault) from systemd, the kernel log and `coredumpctl`, systemd's automatic restarts, and the computer's own starts. The several records of one crash are shown as one entry.
+- **Notes** when the history is limited: LinBPQ in screen (clean stops and hand restarts leave no record; only crashes, the current start and the computer's starts are known), a system journal that isn't kept across restarts (history from the last boot only; `sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald` keeps it), or a service that isn't restarted after a crash (`Restart=no`).
+
+It uses a read-only helper, `/usr/local/sbin/bpq-dashboard-linbpq-status`, allowed by two lines in `www-data-tools.sudoers` (no arguments, or `console`). update.sh installs both where the admin pages' sudo rules are installed. Without them the page says so and how to add them.
+
 ### Audio Map (Admin → Audio Map, v1.5.57)
 
 One picture of how each LinBPQ radio port reaches its radio, worked out from what is running now:
@@ -1547,7 +1558,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 27. Known limitations in v1.5.93
+## 27. Known limitations in v1.5.94
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1618,11 +1629,12 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Log Viewer | `http://YOUR_SERVER/admin/log-viewer.html` | Admin |
 | System Audit | `http://YOUR_SERVER/admin/system-audit.html` | Admin |
 | Audio Map (v1.5.57) | `http://YOUR_SERVER/admin/audio-map.html` | Admin |
+| LinBPQ Status (v1.5.94) | `http://YOUR_SERVER/admin/linbpq-status.html` | Admin |
 | Install Check | `http://YOUR_SERVER/install-check.php` | Admin |
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.93-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.94-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
@@ -1649,7 +1661,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.93 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.5.94 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1664,6 +1676,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.93 — User Guide**
+**73 — BPQ Dashboard v1.5.94 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

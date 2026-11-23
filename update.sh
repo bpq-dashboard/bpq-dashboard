@@ -270,6 +270,10 @@ if [[ -f /etc/sudoers.d/www-data-tools && -f "$SRC/tools/audio-map-helper" ]] &&
    ! cmp -s "$SRC/tools/audio-map-helper" /usr/local/sbin/bpq-dashboard-audio-map; then
     say "Audio Map helper to install: /usr/local/sbin/bpq-dashboard-audio-map  (read-only, for Admin > Audio Map)"
 fi
+if [[ -f /etc/sudoers.d/www-data-tools && -f "$SRC/tools/linbpq-status-helper" ]] && ! kept /etc/sudoers.d/www-data-tools && \
+   ! cmp -s "$SRC/tools/linbpq-status-helper" /usr/local/sbin/bpq-dashboard-linbpq-status; then
+    say "LinBPQ Status helper to install: /usr/local/sbin/bpq-dashboard-linbpq-status  (read-only, for Admin > LinBPQ Status)"
+fi
 
 if (( ${#REPL[@]} + ${#ADD[@]} + ${#REMOVE[@]} == 0 )) && [[ $FORCE != y ]]; then
     echo; ok "Nothing to copy: every file already matches $NEW_VER."
@@ -486,6 +490,14 @@ if grep -qs 'bpq-dashboard-audio-map' /etc/sudoers.d/* && [[ -f "$SRC/tools/audi
     if ! cmp -s "$SRC/tools/audio-map-helper" "$H"; then
         if [[ -e "$H" ]]; then cp -p "$H" "$BK/etc/"; else echo "$H" >> "$BK/new-root-files.txt"; fi
         install -o root -g root -m 755 "$SRC/tools/audio-map-helper" "$H" && ok "Audio Map helper installed ($H)"
+    fi
+fi
+# v1.5.94: the LinBPQ Status page's read-only helper, where its sudo rule is in place
+if grep -qs 'bpq-dashboard-linbpq-status' /etc/sudoers.d/* && [[ -f "$SRC/tools/linbpq-status-helper" ]]; then
+    H=/usr/local/sbin/bpq-dashboard-linbpq-status
+    if ! cmp -s "$SRC/tools/linbpq-status-helper" "$H"; then
+        if [[ -e "$H" ]]; then cp -p "$H" "$BK/etc/"; else echo "$H" >> "$BK/new-root-files.txt"; fi
+        install -o root -g root -m 755 "$SRC/tools/linbpq-status-helper" "$H" && ok "LinBPQ Status helper installed ($H)"
     fi
 fi
 
