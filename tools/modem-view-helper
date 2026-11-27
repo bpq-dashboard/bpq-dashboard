@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+# =============================================================================
+# modem-view-helper — watch-only pictures of modem windows (v1.5.97)
+#
+# Installed root-owned as /usr/local/sbin/bpq-dashboard-modem-view and run by
+# the web server through two sudo rules (www-data-tools.sudoers):
+#
+#   bpq-dashboard-modem-view list
+#       JSON: the X desktops on this computer (TigerVNC, Xvnc, Xorg) and the
+#       modem windows on them (VARA HF/FM, flrig, QtSoundModem, ARDOP,
+#       Mercury, Data2G, Dire Wolf, fldigi), with size and whether shown.
+#   bpq-dashboard-modem-view snap <display> <window id>
+#       A PNG picture of that one window, on stdout. Only a window that
+#       `list` would show; anything else is refused.
+#
+# It only LOOKS: it reads the window's pixels (xwd), never sends a click, a
+# key or a window move, and never starts or stops anything. The X login
+# cookie is read from the X server's own "-auth FILE" argument.
+#
+# Needs xwininfo (x11-utils) and xwd (x11-apps). Python standard library
+# only: the picture is converted to PNG here (no ImageMagick).
+# =============================================================================
+import json, os, re, struct, subprocess, sys, zlib
+
+# Window titles we show, and what they are. Matched at the START of the
+# title (case ignored) so a browser tab or a terminal named after a modem
+# isn't picked up.
+KINDS = [
+    (re.compile(r'^VARA HF\b', re.I),       'vara',     'VARA HF'),
+    (re.compile(r'^VARA FM\b', re.I),       'varafm',   'VARA FM'),
+    (re.compile(r'^VARA SAT\b', re.I),      'varasat',  'VARA SAT'),
+    (re.compile(r'^VARA Chat\b', re.I),     None,       None),
+    (re.compile(r'^flrig\b', re.I),         'flrig',    'flrig'),
+    (re.compile(r'^QtSoundModem\b', re.I),  'qtsm',     'QtSoundModem'),
+    (re.compile(r'^ARDOP', re.I),           'ardop',    'ARDOP'),
+    (re.compile(r'^Mercury\b', re.I),       'mercury',  'Mercury'),
+    (re.compile(r'^Data2G\b', re.I),        'data2g',   'Data2G'),
+    (re.compile(r'^fldigi\b', re.I),        'fldigi',   'fldigi'),
+]
+X_NAMES = ('Xtigervnc', 'Xvnc', 'Xorg', 'X', 'Xvfb')
+ENV_BASE = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C'}
+MAX_PIXELS = 4096 * 4096
+
+
+def fail(msg, code=1):
+    sys.stderr.write(msg + '\n')
+    sys.exit(code)
+
+
+def x_servers():
+    """[(display, auth file or '', user)] from the running X servers."""
+    out = []
+    for pid in os.listdir('/proc'):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f'/proc/{pid}/comm') as f:
+                comm = f.read().strip()
+            if comm not in X_NAMES:
+                continue
+            with open(f'/proc/{pid}/cmdline', 'rb') as f:
+                args = [a.decode('utf-8', 'replace') for a in f.read().split(b'\0') if a]
+            uid = os.stat(f'/proc/{pid}').st_uid
+        except OSError:
+            continue
+        disp = next((a for a in args[1:] if re.fullmatch(r':\d{1,3}', a)), ':0' if comm in ('Xorg', 'X') else None)
+        if not disp:
+            continue
+        auth = ''
+        if '-auth' in args:
+            i = args.index('-auth')
+            if i + 1 < len(args):
+                auth = args[i + 1]
+        try:
+            import pwd
+            user = pwd.getpwuid(uid).pw_name
+        except Exception:
+            user = str(uid)
+        if not any(d == disp for d, _, _, _ in out):
+            out.append((disp, auth, user, comm))
+    return sorted(out)
+
+
+def x_env(disp, auth):
+    env = dict(ENV_BASE, DISPLAY=disp)
+    if auth and os.path.isfile(auth):
+        env['XAUTHORITY'] = auth
+    return env
+
+
+def run(cmd, env, timeout=8, binary=False):
+    try:
+        p = subprocess.run(cmd, env=env, capture_output=True, timeout=timeout)
+    except FileNotFoundError:
+        return None, f'{cmd[0]} is not installed'
+    except subprocess.TimeoutExpired:
+        return None, f'{cmd[0]} took too long'
+    if p.returncode != 0:
+        return None, (p.stderr.decode('utf-8', 'replace').strip().splitlines() or [f'{cmd[0]} failed'])[-1][:200]
+    return (p.stdout if binary else p.stdout.decode('utf-8', 'replace')), ''
+
+
+TREE_RE = re.compile(r'^\s+(0x[0-9a-f]+) "(.*)": \(.*?\)\s+(\d+)x(\d+)\+(-?\d+)\+(-?\d+)\s+\+(-?\d+)\+(-?\d+)')
+
+
+def windows(disp, auth):
+    txt, err = run(['xwininfo', '-root', '-tree'], x_env(disp, auth))
+    if txt is None:
+        return None, err
+    found, seen = [], set()
+    for line in txt.splitlines():
+        m = TREE_RE.match(line)
+        if not m:
+            continue
+        wid, title = m.group(1), m.group(2)
+        w, h = int(m.group(3)), int(m.group(4))
+        if w < 40 or h < 30:
+            continue
+        for rx, kind, label in KINDS:
+            if rx.search(title):
+                if kind and (kind, title) not in seen:
+                    seen.add((kind, title))
+                    found.append({'id': wid, 'title': title[:120], 'kind': kind, 'label': label,
+                                  'w': w, 'h': h, 'x': int(m.group(7)), 'y': int(m.group(8))})
+                break
+    # shown or minimised
+    for f in found:
+        info, _ = run(['xwininfo', '-id', f['id']], x_env(disp, auth), timeout=4)
+        f['viewable'] = bool(info and 'IsViewable' in info)
+    return found, ''
+
+
+def cmd_list():
+    out = {'ok': True, 'displays': []}
+    servers = x_servers()
+    if not servers:
+        out['note'] = 'no X desktop is running on this computer (VARA under Wine runs in one, e.g. TigerVNC)'
+    for disp, auth, user, comm in servers:
+        wins, err = windows(disp, auth)
+        out['displays'].append({'display': disp, 'user': user, 'server': comm,
+                                'windows': wins or [], 'error': err})
+    print(json.dumps(out))
+
+
+# ── XWD → PNG ────────────────────────────────────────────────────────────────
+def xwd_to_png(data):
+    if len(data) < 100:
+        raise ValueError('short picture')
+    hdr = struct.unpack('>25I', data[:100])
+    (hsize, version, fmt, depth, width, height, xoff, byte_order, unit, bit_order, pad,
+     bpp, bpl, vclass, rmask, gmask, bmask, bprgb, cmap_entries, ncolors) = hdr[:20]
+    if version != 7 or fmt != 2:
+        raise ValueError('unsupported picture format')
+    if width * height > MAX_PIXELS or width == 0 or height == 0:
+        raise ValueError('picture size out of range')
+    off = hsize + ncolors * 12
+    pix = data[off:off + bpl * height]
+    if len(pix) < bpl * height:
+        raise ValueError('picture cut short')
+    if bpp not in (24, 32) or not (rmask and gmask and bmask):
+        raise ValueError(f'{bpp}-bit pictures are not supported')
+    step = bpp // 8
+
+    def shift(mask):
+        s = 0
+        while not (mask >> s) & 1:
+            s += 1
+        return s
+    # byte index of each colour inside a pixel
+    def idx(mask):
+        b = shift(mask) // 8
+        return b if byte_order == 0 else step - 1 - b
+    ri, gi, bi = idx(rmask), idx(gmask), idx(bmask)
+    raw = bytearray()
+    row_bytes = width * step
+    for y in range(height):
+        row = pix[y * bpl: y * bpl + row_bytes]
+        out = bytearray(width * 3)
+        out[0::3] = row[ri::step]
+        out[1::3] = row[gi::step]
+        out[2::3] = row[bi::step]
+        raw += b'\0' + out
+
+    def chunk(t, d):
+        c = t + d
+        return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0))
+            + chunk(b'IDAT', zlib.compress(bytes(raw), 6)) + chunk(b'IEND', b''))
+
+
+def cmd_snap(disp, wid):
+    if not re.fullmatch(r':\d{1,3}', disp or '') or not re.fullmatch(r'0x[0-9a-f]{1,8}', wid or ''):
+        fail('bad arguments', 2)
+    server = next((s for s in x_servers() if s[0] == disp), None)
+    if not server:
+        fail('that desktop is not running', 3)
+    wins, err = windows(disp, server[1])
+    if wins is None:
+        fail(err, 4)
+    w = next((x for x in wins if x['id'] == wid), None)
+    if not w:
+        fail('not a modem window', 3)
+    if not w['viewable']:
+        fail('the window is minimised', 5)
+    data, err = run(['xwd', '-silent', '-id', wid], x_env(disp, server[1]), timeout=8, binary=True)
+    if data is None:
+        fail(err, 4)
+    try:
+        png = xwd_to_png(data)
+    except ValueError as e:
+        fail(str(e), 4)
+    sys.stdout.buffer.write(png)
+
+
+def main():
+    a = sys.argv[1:]
+    if a == ['list']:
+        cmd_list()
+    elif len(a) == 3 and a[0] == 'snap':
+        cmd_snap(a[1], a[2])
+    else:
+        fail('usage: bpq-dashboard-modem-view list | snap :N 0xID', 2)
+
+
+if __name__ == '__main__':
+    main()

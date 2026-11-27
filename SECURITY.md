@@ -85,6 +85,13 @@ internet without both.** In detail:
    on stdin and logs no secret. The page checks the current password first
    and locks for 15 minutes after 5 wrong tries. Leave the rule out of
    `/etc/sudoers.d/www-data-tools` if you'd rather change it over SSH.
+   The other helpers there only read: Audio Map, LinBPQ Status and (v1.5.97)
+   the Modems page's window pictures (`bpq-dashboard-modem-view`: `list` and
+   `snap` of a modem window it lists; xwd reads pixels, nothing is clicked or
+   typed). The Modems page never connects your browser to Mercury's or
+   Data2G's monitor (both also take commands): `bpq-modem-relay` on
+   127.0.0.1 reads them and sends them no command, and the Data2G monitor
+   password typed on the page goes to Data2G only and isn't stored.
 9. **Use different passwords** for the admin login, the BBS sysop account,
    the database and anything else on the network (Wi-Fi, router). LinBPQ's
    own Telnet logs record login lines; keep them out of the web root.

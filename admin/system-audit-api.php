@@ -342,7 +342,7 @@ foreach (array_filter([!empty($cfg['paths']['linbpq']) ? rtrim($cfg['paths']['li
 }
 $sens = [
     (int)($cfg['bbs']['port'] ?? 8010) => 'BPQ telnet (passwords in clear text)',
-    3306 => 'MariaDB', 23 => 'telnet', 8765 => 'bpq-telnet WebSocket', 8767 => 'bpq-vara WebSocket',
+    3306 => 'MariaDB', 23 => 'telnet', 8765 => 'bpq-telnet WebSocket', 8767 => 'bpq-vara WebSocket', 8769 => 'bpq-modem-relay',
     (int)($cfg['radio']['flrig_port'] ?? 12345) => 'flrig (radio control)',
 ];
 foreach (['HTTPPORT' => 'BPQ web management', 'TCPPORT' => 'BPQ telnet (passwords in clear text)', 'FBBPORT' => 'BPQ FBB port (passwords in clear text)'] as $k => $label) {
@@ -849,6 +849,41 @@ foreach ($daemons as [$u, $what, $hb, $maxAge, $optional]) {
         if ($u === 'bpq-telnet' && $data) $detail .= ' Open sessions: ' . (int)($data['active_sessions'] ?? 0) . '.';
         $findings[] = finding("svc-$u",'application',$st,"$u is running", $detail,
             $st === 'warn' ? "APRS details: sudo journalctl -u bpq-aprs -n 30 --no-pager; login and passcode are config.php 'aprs'." : '');
+    }
+}
+
+// v1.5.98: Admin > Modems' relay is started on request by its socket unit;
+// the service being stopped is normal (it exits after 10 idle minutes).
+[$sInst, $sAct, $sEn] = unit_state('bpq-modem-relay.socket');
+[$rInst, $rAct] = unit_state('bpq-modem-relay.service');
+if (!$sInst) {
+    $findings[] = finding('svc-bpq-modem-relay','application','info','bpq-modem-relay.socket not installed',
+        "Admin > Modems can't show Mercury's or Data2G's monitor without it (modem window pictures still work). update.sh installs it.",
+        "sudo sed 's|/var/www/bpq-dashboard|$WEB_ROOT|g' $WEB_ROOT/bpq-modem-relay.service | sudo tee /etc/systemd/system/bpq-modem-relay.service >/dev/null && sudo cp $WEB_ROOT/bpq-modem-relay.socket /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now bpq-modem-relay.socket");
+} elseif ($sAct !== 'active') {
+    $findings[] = finding('svc-bpq-modem-relay','application', $sEn === 'enabled' ? 'warn' : 'info', "bpq-modem-relay.socket is $sAct",
+        "Nothing is listening on 127.0.0.1:8769, so Admin > Modems can't show Mercury's or Data2G's monitor.",
+        'sudo systemctl enable --now bpq-modem-relay.socket; sudo journalctl -u bpq-modem-relay -n 20 --no-pager');
+} else {
+    $findings[] = finding('svc-bpq-modem-relay','application','ok','bpq-modem-relay ready',
+        'Listening on 127.0.0.1:8769 for Admin > Modems; the relay itself is ' . ($rAct === 'active' ? 'running (the page is or was just open).' : 'stopped until the page is opened.'));
+}
+
+// v1.5.99: Admin > Modems' window pictures, on a station with a desktop
+$xDesk = false;
+foreach ((array)@scandir('/proc') as $pid) {
+    if (ctype_digit((string)$pid) && in_array(trim((string)@file_get_contents("/proc/$pid/comm")), ['Xtigervnc', 'Xvnc', 'Xorg'], true)) { $xDesk = true; break; }
+}
+if ($xDesk) {
+    $hasHelper = is_file('/usr/local/sbin/bpq-dashboard-modem-view');
+    $hasX = is_executable('/usr/bin/xwininfo') && is_executable('/usr/bin/xwd');
+    if ($hasHelper && $hasX) {
+        $findings[] = finding('modems-pictures','application','ok','Modems page can picture modem windows',
+            'A desktop runs here; the helper /usr/local/sbin/bpq-dashboard-modem-view and xwininfo / xwd are installed.');
+    } else {
+        $findings[] = finding('modems-pictures','application','info','Modems page can\'t picture modem windows yet',
+            'A desktop runs here (e.g. VARA under Wine), but ' . (!$hasHelper ? 'the window-picture helper is not installed' : '') . (!$hasHelper && !$hasX ? ' and ' : '') . (!$hasX ? 'xwininfo / xwd are missing' : '') . '. Mercury, Data2G and sound-modem panels still work.',
+            !$hasX ? 'sudo apt install x11-utils x11-apps' : "sudo bash update.sh from the release folder (answer yes to the admin pages' sudo rules)");
     }
 }
 

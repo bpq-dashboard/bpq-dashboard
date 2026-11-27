@@ -1,6 +1,6 @@
 <?php
 /**
- * BPQ Dashboard v1.5.95 — Post-Installation Check
+ * BPQ Dashboard v1.6.0 — Post-Installation Check
  * Checks every component installed by bpq-dashboard-install.sh
  * Access: https://your.domain/install-check.php  (behind the admin login)
  *
@@ -73,6 +73,33 @@ if (fileOk("$BASE/config.php")) {
 require_once __DIR__ . '/includes/station-config.php';
 $pagesOn = bpq_pages();
 $varaRemote = !empty($cfg['vara_remote']['enabled']);
+
+// ═══════════════════════════════════════════════════════════════════
+// 0. THIS COMPUTER (v1.5.102) — recorded by tools/system-check.sh when
+//    install.sh / update.sh last ran (or: sudo bash tools/system-check.sh)
+// ═══════════════════════════════════════════════════════════════════
+$sysF = '/etc/bpq-dashboard/system.json';
+$sys = is_readable($sysF) ? json_decode((string)@file_get_contents($sysF), true) : null;
+if (!is_array($sys)) {
+    chkWarn('This Computer', 'System check', 'Not recorded yet (it is written by install.sh and update.sh from v1.5.102)', 'sudo bash /var/www/bpq-dashboard/tools/system-check.sh');
+} else {
+    $st = (string)($sys['status'] ?? '');
+    $stText = ['supported' => 'supported', 'older' => 'supported (older release)', 'newer' => 'newer than tested', 'interim' => 'interim release (9 months of updates)', 'eol' => 'OUT OF SUPPORT', 'unknown' => 'not recognised'][$st] ?? $st;
+    $osLine = trim(($sys['os'] ?? '?') . ' — based on ' . ($sys['based_on'] ?? '?') . ', ' . $stText);
+    if ($st === 'supported') chkPass('This Computer', 'Operating system', $osLine);
+    elseif ($st === 'eol') chkFail('This Computer', 'Operating system', $osLine . '. ' . ($sys['note'] ?? ''), 'Upgrade the OS (Debian 12/13, Ubuntu 24.04, Raspberry Pi OS Bookworm/Trixie, Linux Mint 22)');
+    else chkWarn('This Computer', 'Operating system', $osLine . ($sys['note'] ? '. ' . $sys['note'] : ''));
+    chkPass('This Computer', 'Programs', sprintf('PHP %s · Python %s · %s · %s · Dovecot %s',
+        $sys['php'] ?: '?', $sys['python'] ?: '?', $sys['database'] ?: 'no database', $sys['web'] ?: '?', ($sys['dovecot'] ?? '') !== '' ? $sys['dovecot'] : 'not installed'));
+    chkPass('This Computer', 'Platform', sprintf('%s · %s MB memory · %s MB free on /', $sys['arch'] ?? '?', $sys['memory_mb'] ?? '?', $sys['disk_free_mb'] ?? '?'));
+    $sec = (int)($sys['security_updates'] ?? 0); $all = (int)($sys['updates'] ?? 0);
+    chk('This Computer', 'Updates waiting', $sec === 0, "$all waiting, $sec of them security fixes", 'sudo apt update && sudo apt upgrade', true);
+    chk('This Computer', 'Automatic security updates', ($sys['auto_updates'] ?? '') === 'on',
+        ($sys['auto_updates'] ?? '') === 'on' ? 'On (unattended-upgrades)' : 'Off: security fixes wait until someone runs apt upgrade',
+        'sudo apt install unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades', true);
+    if (!empty($sys['reboot_needed'])) chkWarn('This Computer', 'Restart needed', 'Earlier updates finish after a restart', 'sudo reboot (when convenient)');
+    chkPass('This Computer', 'Checked', ($sys['checked_at'] ?? '?') . ' (by the last install or update; run tools/system-check.sh for a fresh look)');
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // 1. PHP ENVIRONMENT
@@ -265,6 +292,9 @@ $htmlFiles = [
     'admin/system-audit.html'    => 'System Audit',
     'admin/log-viewer.html'      => 'Log Viewer',
     'admin/audio-map.html'       => 'Audio Map',
+    'admin/linbpq-status.html'   => 'LinBPQ Status',
+    'admin/node-debug.html'      => 'Node Debug',
+    'admin/modems.html'          => 'Modems (v1.5.97)',
     'bpq-page.css'               => 'Shared page style (Messages, Traffic, Connects)',
 ];
 foreach ($htmlFiles as $f => $label) {
@@ -968,7 +998,7 @@ function renderPage($results,$pass,$fail,$warn,$score,$sc) {
 $total = $pass+$fail+$warn; ?>
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BPQ Dashboard v1.5.95 — Install Check</title>
+<title>BPQ Dashboard v1.6.0 — Install Check</title>
 <style>
 :root{--bg:#0d1117;--sur:#161b22;--bdr:#30363d;--txt:#e6edf3;--mut:#8b949e;
       --acc:#4a9eff;--grn:#3fb950;--red:#f85149;--org:#d29922;--pur:#bc8cff;}
@@ -1014,7 +1044,7 @@ h1{font-size:20px;color:var(--acc);margin-bottom:4px;}
         color:var(--org);font-size:12px;text-align:center;line-height:1.8;}
 .footer strong{color:var(--red);}
 </style></head><body>
-<h1>🔧 BPQ Dashboard v1.5.95 — Post-Installation Check</h1>
+<h1>🔧 BPQ Dashboard v1.6.0 — Post-Installation Check</h1>
 <p class="sub"><?=date('Y-m-d H:i:s T')?> · PHP <?=phpversion()?> · <?=htmlspecialchars(php_uname('n'))?></p>
 
 <div class="card">

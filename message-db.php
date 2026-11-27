@@ -256,6 +256,10 @@ function msgdb_save_message($message, $folder = 'Saved') {
     $savedAt = msgdb_to_mysql_datetime($message['savedAt'] ?? null);
 
     if ($existing) {
+        // v1.5.96: is_read only goes UP here. Filing (rules, retries,
+        // folder moves) sent this browser's idea of read, and a browser
+        // that hadn't seen the read reset it to unread for everyone.
+        // Only markUnread clears it.
         // body: only overwrite when the caller actually has one. Filing a
         // message whose body isn't loaded in that browser (e.g. rule-based
         // auto-filing, which runs before bodies are fetched) used to blank
@@ -263,7 +267,7 @@ function msgdb_save_message($message, $folder = 'Saved') {
         tprfn_execute($pdo, "UPDATE bpq_messages SET
                 client_id = ?, msg_date = ?, size_bytes = ?, to_call = ?,
                 subject = ?, body = COALESCE(NULLIF(?, ''), body), folder_id = ?, rule_matched = ?,
-                is_read = ?, saved_at = ?
+                is_read = GREATEST(is_read, ?), saved_at = ?
             WHERE id = ?", [
             $clientId,
             $message['date'] ?? date('d-M'),

@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================================
-#  BPQ Dashboard v1.5.95 — Guided Installer for Amateur Radio Operators
+#  BPQ Dashboard v1.6.0 — Guided Installer for Amateur Radio Operators
 #  ────────────────────────────────────────────────────────────────────────
 #  For Debian / Ubuntu / Raspberry Pi OS (apt-based systems only)
 #
@@ -92,7 +92,7 @@ clear
 cat << 'BANNER'
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║             BPQ Dashboard v1.5.95 — Guided Installer                  ║
+║             BPQ Dashboard v1.6.0 — Guided Installer                  ║
 ║              for Amateur Radio Packet Node Operators                 ║
 ║                                                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
@@ -101,6 +101,9 @@ cat << EOF
 
 Welcome! This installer will set up the BPQ Dashboard on your Linux
 server. It will:
+
+  ${BOLD}0.${NC} Check this computer first: the OS release, the program versions it
+       would install, memory and disk, and any updates waiting
 
   ${BOLD}1.${NC} Ask you a few questions about your station and node
   ${BOLD}2.${NC} Ask which web server to use (nginx or Apache) and its port.
@@ -137,6 +140,31 @@ EOF
 read -r -p "Press ENTER when ready (or Ctrl-C to quit)... "
 
 # ============================================================================
+hdr "Checking this computer"
+# ============================================================================
+# v1.5.102: before any question or change. Uses the OS's own packages (they get
+# security fixes for the release's life), so it checks what apt would install
+# rather than fetching newer versions from elsewhere. tools/system-check.sh.
+if [[ -f "$SCRIPT_DIR/tools/system-check.sh" ]]; then
+    # shellcheck source=tools/system-check.sh
+    source "$SCRIPT_DIR/tools/system-check.sh"
+    if ! system_check; then
+        echo
+        for _b in "${SC_BLOCK[@]}"; do echo "${RED}${BOLD}  ✗ $_b${NC}"; done
+        die "This computer isn't ready for BPQ Dashboard (above). Nothing has been changed.
+   Fix that first, then run sudo bash install.sh again.
+   To check again on its own:  sudo bash tools/system-check.sh"
+    fi
+    if [[ "$SC_STATUS" == unknown ]]; then
+        yesno "This OS isn't one the dashboard was tested on. Continue anyway?" Y || die "Stopped at your request. Nothing has been changed."
+    else
+        ok "This computer is ready ($SC_BASENAME)"
+    fi
+else
+    warn "tools/system-check.sh is missing from this folder: skipping the system check"
+fi
+
+# ============================================================================
 hdr "STEP 1 — Tell me about your station"
 # ============================================================================
 
@@ -157,6 +185,15 @@ explain "Shown on the dashboard's About page and station map popup."
 read -r INPUT_EMAIL
 INPUT_EMAIL="${INPUT_EMAIL:-sysop@example.com}"
 ok "Email: $INPUT_EMAIL"
+
+# v1.5.100: shown under the logo in the menu ("K1AJD-4 · affiliated with TPRFN")
+INPUT_NETWORK=""
+if yesno "Is this station affiliated with TPRFN?" N; then
+    INPUT_NETWORK="TPRFN"
+    ok "The menu will show: $INPUT_NODE · affiliated with TPRFN"
+else
+    ok "The menu will show: $INPUT_NODE"
+fi
 
 ask "Your station latitude in decimal degrees (e.g. 40.7128) [0.0]:"
 explain "Positive = North, negative = South. Use Google Maps if unsure."
@@ -353,6 +390,22 @@ if apt-get update -qq; then
 else
     warn "apt-get update reported a problem. Continuing anyway."
 fi
+# v1.5.102: waiting updates first (with the fresh index), then automatic security updates
+if declare -F sc_updates >/dev/null; then
+    sc_updates
+    sc_offer_updates
+    sc_offer_auto
+fi
+
+# v1.5.97: Admin > Modems reads modem windows with xwininfo (x11-utils) and
+# xwd (x11-apps). Installed only where an X desktop runs (VARA under Wine).
+x_desktop_tools() {
+    pgrep -x 'Xtigervnc|Xvnc|Xorg' >/dev/null 2>&1 || return 0
+    command -v xwininfo >/dev/null 2>&1 && command -v xwd >/dev/null 2>&1 && return 0
+    apt-get install -y -q x11-utils x11-apps >/dev/null 2>&1 \
+        && ok "x11-utils and x11-apps installed (Admin → Modems takes pictures of the modem windows)" \
+        || warn "Couldn't install x11-utils x11-apps: Admin → Modems can't show modem windows until they are (sudo apt install x11-utils x11-apps)"
+}
 
 # ============================================================================
 hdr "STEP 4 — Detect or install a web server"
@@ -1025,6 +1078,7 @@ return [
         'lon'      => $INPUT_LON,
         'grid'     => '$INPUT_GRID',   // public pages show the centre of this square only
         'hub'      => '',              // optional: your VARA HF hub SSID, e.g. $INPUT_CALL-7
+        'network'  => '$INPUT_NETWORK',   // network shown under the menu logo ("affiliated with ..."); '' = none
     ],
     'aprs' => [
         'callsign' => '$INPUT_CALL-1', // APRS-IS login
@@ -1713,6 +1767,19 @@ for svc in bpq-telnet bpq-chat bpq-aprs bpq-vara vara-validator; do
     fi
 done
 
+# v1.5.97/98: Admin > Modems' watch-only relay for the Mercury and Data2G
+# monitors. systemd listens on 127.0.0.1:8769 and starts it only when the
+# page asks; it exits after 10 idle minutes.
+if [[ -f "$WEB_ROOT/bpq-modem-relay.service" && -f "$WEB_ROOT/bpq-modem-relay.socket" ]]; then
+    sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|^User=www-data|User=$WEB_USER|; s|^Group=www-data|Group=$(id -gn "$WEB_USER" 2>/dev/null || echo www-data)|" \
+        "$WEB_ROOT/bpq-modem-relay.service" > /etc/systemd/system/bpq-modem-relay.service
+    cp "$WEB_ROOT/bpq-modem-relay.socket" /etc/systemd/system/bpq-modem-relay.socket
+    systemctl daemon-reload
+    systemctl enable --now bpq-modem-relay.socket >/dev/null 2>&1 \
+        && ok "bpq-modem-relay.socket listening (Admin → Modems: Mercury and Data2G monitors, watch-only, started on request)" \
+        || warn "bpq-modem-relay.socket didn't start — check: sudo journalctl -u bpq-modem-relay.socket -n 20"
+fi
+
 # VARA callsign check: installed, not started — BPQ's VARA port must point at it first
 if [[ "$PAGE_VALIDATOR" == "y" ]]; then
     say "VARA callsign check: change the VARA HF port in bpq32.cfg so BPQ connects to the"
@@ -1876,7 +1943,9 @@ if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
     explain "One more rule (v1.5.19) lets the Maintenance page change the admin"
     explain "login's password, through a small root-owned helper in /usr/local/sbin,"
     explain "and one (v1.5.57) lets Admin > Audio Map see which programs use the sound cards,"
-    explain "and one (v1.5.94) lets Admin > LinBPQ Status read LinBPQ's crashes, restarts and console."
+    explain "and one (v1.5.94) lets Admin > LinBPQ Status read LinBPQ's crashes, restarts and console,"
+    explain "and two (v1.5.97) let Admin > Modems take pictures of the modem windows (VARA HF, flrig)"
+    explain "on the station's desktop. They only look: no clicks, no keys."
     if yesno "Install those sudo rules (/etc/sudoers.d/www-data-tools)?" Y; then
         # The helper must be root-owned and outside the web folder (the web
         # user can write there, so a sudo rule pointing into it = root).
@@ -1891,6 +1960,11 @@ if [[ -f "$WEB_ROOT/www-data-tools.sudoers" ]]; then
         if [[ -f "$WEB_ROOT/tools/linbpq-status-helper" ]]; then  # v1.5.94: Admin > LinBPQ Status (read-only)
             install -o root -g root -m 755 "$WEB_ROOT/tools/linbpq-status-helper" /usr/local/sbin/bpq-dashboard-linbpq-status \
                 && ok "LinBPQ Status helper: /usr/local/sbin/bpq-dashboard-linbpq-status"
+        fi
+        if [[ -f "$WEB_ROOT/tools/modem-view-helper" ]]; then     # v1.5.97: Admin > Modems (window pictures, watch-only)
+            install -o root -g root -m 755 "$WEB_ROOT/tools/modem-view-helper" /usr/local/sbin/bpq-dashboard-modem-view \
+                && ok "Modems helper: /usr/local/sbin/bpq-dashboard-modem-view"
+            x_desktop_tools
         fi
         TMP_SUDO=$(mktemp)
         sed "s/^www-data /$WEB_USER /" "$WEB_ROOT/www-data-tools.sudoers" > "$TMP_SUDO"
@@ -1988,6 +2062,14 @@ fi
 hdr "DONE — Summary"
 # ============================================================================
 
+# v1.5.102: what this station now runs (also on Install Check)
+if declare -F system_check >/dev/null; then
+    say "What this station runs now:"
+    system_check >/dev/null 2>&1 || true
+    sc_summary
+    sc_record && ok "Recorded in /etc/bpq-dashboard/system.json (shown on Install Check)"
+fi
+
 # Get the server's primary IP for the "open this URL" message
 SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 [[ -z "$SERVER_IP" ]] && SERVER_IP="<your-server-ip>"
@@ -2043,7 +2125,10 @@ ${BOLD}Open your dashboard:${NC}
    ${CYN}/${NC}                           ← home (RF Connections page)
    ${CYN}/bpq-system-logs.html${NC}       ← live BPQ logs
    ${CYN}/nws-dashboard.html${NC}         ← NWS weather alerts$( [[ "$NWS_AUTO" == "y" ]] && echo " (auto-posting $NWS_STATE to $NWS_DEST)" )
-   ${CYN}/bbs-messages.html${NC}          ← BBS messages
+   ${CYN}$( [[ "$MAIL_DONE" == "y" ]] && echo "/admin/bbs-mail.html${NC}        ← Email (BBS Mail, admin login)" || echo "/bbs-messages.html${NC}          ← Email (BBS messages)" )
+   ${CYN}/admin/bpq-maintenance.html${NC} ← Maintenance: every admin tool (Audit, LinBPQ Status,
+                                  Node Debug, Modems, Logs, Firewall, Audio Map, backups) (admin login)
+   ${CYN}/admin/modems.html${NC}          ← Modems: VARA HF, Mercury, Data2G, sound modems, watch-only (admin login)
    ${CYN}/admin/system-audit.html${NC}    ← server health check (admin login)
    ${CYN}/install-check.php${NC}          ← installation self-test (admin login)
 
@@ -2067,8 +2152,8 @@ ${BOLD}Next steps:${NC}
    2. If pages load but charts are empty, give it 5 minutes for the
       helper daemons to gather data
    3. Open install-check.php (above) — every red line shows how to fix it
-   4. See USER-MANUAL.md, section 4 ("After installing"), for VARA HF,
-      APRS and the optional pages
+   4. See the Manual (USER-MANUAL.md / the Manual PDF), section 4 Part A,
+      Steps 7-10, for VARA HF, APRS and the optional pages
 
 73 and good luck with the dashboard!
 EOF

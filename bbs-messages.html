@@ -6,7 +6,7 @@
 // load the new one (once). Covers web servers whose site file doesn't yet
 // tell browsers to re-check pages (Cache-Control: no-cache, CHANGELOG 1.5.79).
 (function () {
-    var BPQ_PAGE_VERSION = '1.5.95';
+    var BPQ_PAGE_VERSION = '1.6.0';
     fetch('/VERSION', { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
         t = (t || '').trim();
         if (!/^\d+\.\d+\.\d+$/.test(t) || t === BPQ_PAGE_VERSION) return;
@@ -510,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </head>
 
 <body data-nav-page="bbs">
-<script src="bpq-nav-loader.js?v=2026-11-19-1"></script>
+<script src="bpq-nav-loader.js?v=2026-11-27-3"></script>
 <script src="bpq-send-once.js?v=1.5.76"></script>
 
 <!-- v1.5.75: this Email Client is for stations without the mail store;
@@ -554,6 +554,9 @@ document.addEventListener('DOMContentLoaded', function () {
     <input id="searchBox" type="text" placeholder="Search subject, from, body..." oninput="applySearch()">
     <button class="ctrl-btn secondary" onclick="openComposeModal()">
         <span>✏</span> Compose
+    </button>
+    <button class="ctrl-btn secondary" onclick="openDraftsModal()" title="Messages you started and haven't sent (v1.5.96)">
+        <span>📝</span> Drafts <span id="draftsCount" style="display:none; margin-left:4px; padding:0 7px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-size:11px; font-weight:700;">0</span>
     </button>
     <button class="ctrl-btn secondary" onclick="window.open('nts-forwarding-report.php', '_blank')"
             title="NTS traffic forwarding report — which stations each message was relayed to">
@@ -719,7 +722,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </label>
             <h2 id="listTitle" style="flex:1;">Personal &amp; Traffic</h2>
             <span class="meta" id="listMeta">0 messages</span>
-            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.5.95</span>
+            <span style="padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-size:10px; font-weight:700;">v1.6.0</span>
         </div>
         <!-- Selection toolbar — only visible when ≥1 message is selected.
              Bulk actions: Move-to-folder dropdown, Mark Read, Archive, Kill,
@@ -992,7 +995,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="modal-box" style="max-width: 640px;">
         <div class="modal-header">
             <h3 id="composeTitle">Compose Message</h3>
-            <button class="modal-close" onclick="closeModal('composeModal')">&times;</button>
+            <button class="modal-close" onclick="closeCompose()" title="Close (unsent text is kept as a draft)">&times;</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -1041,8 +1044,28 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
         <div class="modal-footer">
-            <button class="ctrl-btn secondary" onclick="closeModal('composeModal')">Cancel</button>
+            <span id="draftStatus" style="margin-right:auto; font-size:12px; color:var(--text-muted);"></span>
+            <button class="ctrl-btn secondary" onclick="discardCompose()" title="Close and throw this message away">Discard</button>
+            <button class="ctrl-btn secondary" onclick="saveDraftNow(true)" title="Keep it under Drafts to finish later">Save draft</button>
+            <button class="ctrl-btn secondary" onclick="closeCompose()" title="Close; anything typed is kept as a draft">Close</button>
             <button class="ctrl-btn" onclick="sendComposed()">Send</button>
+        </div>
+    </div>
+</div>
+
+<!-- v1.5.96: Drafts: messages started in Compose and not sent (kept on the server) -->
+<div id="draftsModal" class="modal-backdrop hidden">
+    <div class="modal-box" style="max-width:720px;">
+        <div class="modal-header">
+            <h3>Drafts</h3>
+            <button class="modal-close" onclick="closeModal('draftsModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Compose saves what you type every few seconds and when you close it. Open a draft to finish and send it; it's removed once sent.</div>
+            <div id="draftsList"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="ctrl-btn secondary" onclick="closeModal('draftsModal')">Close</button>
         </div>
     </div>
 </div>
@@ -1422,6 +1445,9 @@ let searchQuery = '';
 
 // Local-only state for messages we've read but haven't synced to BBS yet
 let localReadSet = new Set();
+// v1.5.96: numbers marked unread in THIS tab, so persistReadSet() can
+// merge with what other tabs saved without bringing these back as read.
+const localUnreadSet = new Set();
 
 // Address book — auto-populated from incoming personal/traffic messages.
 // Keyed by canonicalized callsign (uppercase, no SSID-stripping by default).
@@ -1809,10 +1835,35 @@ function persistSettings() {
     catch (e) { console.error('persistSettings failed', e); }
 }
 
+// v1.5.96: merge with the saved copy before writing. Each tab holds its
+// own localReadSet, and writing it whole let a second Email tab (or one
+// left open from earlier) wipe out reads made in another: those messages
+// came back unread on the next reload.
 function persistReadSet() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(CONFIG.storageKeys.readSet) || '[]');
+        if (Array.isArray(saved)) for (const n of saved) if (!localUnreadSet.has(n)) localReadSet.add(n);
+    } catch (e) { /* unreadable saved copy: just write ours */ }
     try { localStorage.setItem(CONFIG.storageKeys.readSet, JSON.stringify([...localReadSet])); }
     catch (e) { console.error('persistReadSet failed', e); }
 }
+
+// v1.5.96: a message read in another Email tab shows read here too.
+window.addEventListener('storage', e => {
+    if (e.key !== CONFIG.storageKeys.readSet || !e.newValue) return;
+    let nums;
+    try { nums = JSON.parse(e.newValue); } catch (_) { return; }
+    if (!Array.isArray(nums)) return;
+    let changed = false;
+    for (const n of nums) {
+        if (localUnreadSet.has(n) || localReadSet.has(n)) continue;
+        localReadSet.add(n);
+        for (const key of ['personal', 'nts', 'bulletins']) {
+            for (const m of (inboxes[key] || [])) if (m.number === n && m._unread) { m._unread = false; changed = true; }
+        }
+    }
+    if (changed) { try { renderSidebarBadges(); renderList(); } catch (_) {} }
+});
 
 function persistAddressBook() {
     try {
@@ -3718,11 +3769,34 @@ function updateAutocomplete() {
     const drop  = document.getElementById('composeAutocomplete');
     const q     = input.value.trim();
 
-    autocompleteEntries = suggestAddresses(q, 8);
+    // v1.5.96: saved contacts first, then LinBPQ's White Pages (every station the
+    // BBS has heard of, with its home BBS); a note instead of vanishing when
+    // nothing matches.
+    const key = q.toUpperCase();
+    const wpOk = q.length >= 2 && /^[A-Za-z0-9\/]+$/.test(q);
+    const local = suggestAddresses(q, 8);
+    const wp = wpOk ? wpCache[key] : null;
+    if (wpOk && !wp) {
+        clearTimeout(wpTimer);
+        const seq = ++wpSeq;
+        wpTimer = setTimeout(async () => {
+            const d = await safeFetchJson(`${CONFIG.apiUrl}?action=wp&q=${encodeURIComponent(key)}`);
+            wpCache[key] = d && d.success ? { entries: d.entries || [], note: d.note || '', total: d.total || 0 } : { entries: [], note: 'White Pages lookup failed' };
+            if (seq === wpSeq && document.getElementById('composeTo').value.trim().toUpperCase() === key) updateAutocomplete();
+        }, 250);
+    }
+    const have = new Set(local.map(e => e.callsign));
+    const wpEntries = wp ? wp.entries.filter(e => !have.has(e.callsign)).map(e => Object.assign({ wp: true }, e)) : [];
+    autocompleteEntries = local.concat(wpEntries).slice(0, 12);
     autocompleteIndex = -1;
 
     if (autocompleteEntries.length === 0) {
-        hideAutocomplete();
+        if (!q || q.includes('@')) { hideAutocomplete(); return; }   // typing a full address: stay out of the way
+        drop.innerHTML = `<div style="padding:9px 12px; font-size:12px; color:var(--text-muted);">`
+            + (wpOk && !wp ? 'Looking in the White Pages…'
+               : `No saved contact${wpOk ? ' or White Pages entry' : ''} starts with <b>${escapeHtml(key)}</b>. Type the full address, e.g. <span style="font-family:var(--font-mono)">CALL@BBS.#AREA.ST.USA.NOAM</span>` + (wp && wp.note ? `<br><span style="font-size:11px">${escapeHtml(wp.note)}</span>` : ''))
+            + `</div>`;
+        drop.style.display = 'block';
         return;
     }
 
@@ -3740,10 +3814,10 @@ function updateAutocomplete() {
                 </span>
             </span>
             <span style="color:var(--text-muted); font-size:11px; white-space:nowrap;">
-                ${relativeTime(e.lastSeen)}
+                ${e.wp ? '<span title="From LinBPQ\'s White Pages" style="padding:0 6px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-weight:700;">WP</span> ' : ''}${e.lastSeen ? relativeTime(e.lastSeen) : ''}
             </span>
         </div>
-    `).join('');
+    `).join('') + (wpOk && !wp ? `<div style="padding:6px 12px; font-size:11px; color:var(--text-muted);">Looking in the White Pages…</div>` : '');
     drop.style.display = 'block';
 }
 
@@ -4266,6 +4340,9 @@ function dbRowToInboxMessage(r) {
     // else. Some bulletins have a null/blank bbs_number; keep those
     // null rather than coercing to NaN or 0.
     const num = (r.number != null && r.number !== '') ? Number(r.number) : null;
+    // v1.5.96: read in the database (on another computer or browser, in
+    // BBS Mail, or in a mail app) counts as read here too.
+    if (r._read && num != null && !Number.isNaN(num) && !localUnreadSet.has(num)) localReadSet.add(num);
     return {
         number:       (num != null && !Number.isNaN(num)) ? num : null,
         date:         r.date || '',
@@ -4327,6 +4404,10 @@ function mergeArchiveIntoInbox(existing, dbRows) {
             // different folder there): applyRulesToInboxes() re-files it.
             else if (already._folder && already._folder !== dm._folder) already._needsFile = true;
             if (!already._archivedAt && dm._archivedAt) already._archivedAt = dm._archivedAt;
+            // v1.5.96: the database's read mark used to be ignored for any
+            // message already in this browser's cache, so mail read
+            // elsewhere stayed (or turned) unread here.
+            if (already._unread && !dm._unread) already._unread = false;
             continue;
         }
         merged.push(dm);
@@ -4380,6 +4461,7 @@ async function loadInboxesFromDatabase() {
             console.warn('[loadInboxesFromDatabase] no usable data from any type, staying on local cache');
             return;
         }
+        persistReadSet();
         persistInboxes();
         pruneExpiredLocalBulletins();   // no-op until the pin list has loaded
         applyRulesToInboxes();
@@ -5327,6 +5409,7 @@ function bulkMarkRead() {
         if (m._unread) {
             m._unread = false;
             localReadSet.add(m.number);
+            localUnreadSet.delete(m.number);
         }
     });
     persistInboxes();
@@ -5860,6 +5943,7 @@ function selectMsg(num) {
     if (msg._unread) {
         msg._unread = false;
         localReadSet.add(num);
+        localUnreadSet.delete(num);
         persistReadSet();
         persistInboxes();
         renderSidebarBadges();
@@ -6268,6 +6352,7 @@ function actMarkUnread() {
     if (!selectedMsg) return;
     selectedMsg._unread = true;
     localReadSet.delete(selectedMsg.number);
+    if (selectedMsg.number != null) localUnreadSet.add(selectedMsg.number);
     persistReadSet();
     persistInboxes();
     renderSidebarBadges();
@@ -6959,6 +7044,127 @@ function bodyWithSignature(body, kind) {
     return (body ? body.replace(/\s+$/, '') + '\n\n' : '\n\n') + sig;
 }
 
+// ── v1.5.96: Drafts ───────────────────────────────────────────
+let draftId = null, draftDirty = false, draftTimer = null, draftsCache = [], draftSaving = null;
+let wpCache = {}, wpTimer = null, wpSeq = 0;
+function draftWhen(t) { if (!t) return ''; const d = new Date(t * 1000); return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + (new Date().toDateString() === d.toDateString() ? '' : ' ' + d.toLocaleDateString()); }
+function setDraftStatus(t) { const el = document.getElementById('draftStatus'); if (el) el.textContent = t; }
+function setDraftsCount(n) { const el = document.getElementById('draftsCount'); if (!el) return; el.textContent = n; el.style.display = n ? 'inline-block' : 'none'; }
+function draftFields() {
+    return {
+        id: draftId, title: document.getElementById('composeTitle').textContent,
+        to: document.getElementById('composeTo').value, type: document.getElementById('composeType').value,
+        subject: document.getElementById('composeSubject').value, body: document.getElementById('composeBody').value,
+        smtp: document.getElementById('composeSmtp').checked,
+    };
+}
+function draftHasText(d) {
+    const sig = signatureBlock().trim();
+    const b = d.body.trim();
+    return !!(d.to.trim() || d.subject.trim() || (b && b !== sig));
+}
+function markDraftDirty() {
+    if (document.getElementById('composeModal').classList.contains('hidden')) return;
+    draftDirty = true;
+    setDraftStatus('Not saved yet');
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => saveDraftNow(false), 3000);
+}
+async function saveDraftNow(manual) {
+    clearTimeout(draftTimer);
+    if (draftSaving) { try { await draftSaving; } catch (e) {} }   // one save at a time, so a new draft gets one id
+    draftSaving = saveDraftOnce(manual);
+    try { return await draftSaving; } finally { draftSaving = null; }
+}
+async function saveDraftOnce(manual) {
+    const d = draftFields();
+    if (!draftHasText(d)) { if (manual) showToast('Nothing to save yet', 'info'); return true; }
+    if (!draftDirty && !manual && draftId) return true;
+    setDraftStatus('Saving draft…');
+    const r = await postToStorageApi('saveDraft', { draft: d });
+    if (r && r.success) {
+        draftId = r.id; draftDirty = false;
+        setDraftStatus('Draft saved ' + draftWhen(r.updated));
+        setDraftsCount(r.count);
+        if (manual) showToast('Saved under Drafts', 'success');
+        return true;
+    }
+    setDraftStatus('Draft not saved: ' + ((r && r.error) || 'error'));
+    if (manual) showToast('Draft not saved: ' + ((r && r.error) || 'error'), 'error');
+    return false;
+}
+async function closeCompose() {
+    const d = draftFields();
+    if (draftDirty && draftHasText(d)) {   // only what was typed: an untouched reply isn't kept
+        const ok = await saveDraftNow(false);
+        if (ok) showToast('Kept under Drafts', 'info');
+        else if (!confirm('The draft could not be saved. Close anyway and lose it?')) return;
+    }
+    clearTimeout(draftTimer); draftDirty = false;
+    closeModal('composeModal');
+}
+async function discardCompose() {
+    const d = draftFields();
+    if (draftHasText(d) && !confirm('Throw this message away?')) return;
+    clearTimeout(draftTimer); draftDirty = false;
+    if (draftId) { const r = await postToStorageApi('deleteDraft', { id: draftId }); if (r && r.success) setDraftsCount(r.count); draftId = null; }
+    closeModal('composeModal');
+}
+async function loadDrafts() {
+    const d = await safeFetchJson(`${CONFIG.storageApiUrl}?action=drafts`);
+    draftsCache = d && d.success ? (d.drafts || []) : [];
+    setDraftsCount(draftsCache.length);
+    return d && d.success;
+}
+async function openDraftsModal() {
+    document.getElementById('draftsList').innerHTML = '<div style="color:var(--text-muted)">Loading…</div>';
+    document.getElementById('draftsModal').classList.remove('hidden');
+    const ok = await loadDrafts();
+    renderDrafts(ok);
+}
+function renderDrafts(ok) {
+    const box = document.getElementById('draftsList');
+    if (!ok) { box.innerHTML = '<div style="color:var(--text-muted)">Couldn\'t load drafts. Try again in a moment.</div>'; return; }
+    if (!draftsCache.length) { box.innerHTML = '<div style="color:var(--text-muted); padding:12px 0;">No drafts. Anything you start in Compose and don\'t send is kept here.</div>'; return; }
+    box.innerHTML = draftsCache.map(d => `
+        <div style="display:flex; gap:10px; align-items:center; padding:9px 0; border-bottom:1px solid var(--border-soft);">
+            <div style="flex:1; min-width:0; cursor:pointer;" onclick="openDraft('${escapeHtml(d.id)}')" title="Open to finish and send">
+                <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(d.subject || '(no subject)')}</div>
+                <div style="font-size:12px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    <span style="font-family:var(--font-mono)">${escapeHtml(d.to || '(no recipient)')}</span> · ${escapeHtml(({ P: 'Personal', B: 'Bulletin', T: 'NTS traffic' })[d.type] || d.type)} · saved ${escapeHtml(draftWhen(d.updated))}
+                </div>
+                <div style="font-size:12px; color:var(--text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml((d.body || '').replace(/\s+/g, ' ').slice(0, 140))}</div>
+            </div>
+            <button class="ctrl-btn secondary" onclick="openDraft('${escapeHtml(d.id)}')">Open</button>
+            <button class="ctrl-btn secondary" onclick="deleteDraft('${escapeHtml(d.id)}', this)" title="Delete this draft">Delete</button>
+        </div>`).join('');
+}
+function openDraft(id) {
+    const d = draftsCache.find(x => x.id === id); if (!d) return;
+    closeModal('draftsModal');
+    openComposeModal({ draft: d });
+}
+async function deleteDraft(id, btn) {
+    if (btn && !btn.dataset.armed) { btn.dataset.armed = '1'; btn.textContent = 'Sure?'; setTimeout(() => { if (btn) { btn.dataset.armed = ''; btn.textContent = 'Delete'; } }, 3000); return; }
+    const r = await postToStorageApi('deleteDraft', { id });
+    if (r && r.success) { draftsCache = draftsCache.filter(x => x.id !== id); setDraftsCount(r.count); renderDrafts(true); if (draftId === id) draftId = null; }
+    else showToast('Couldn\'t delete: ' + ((r && r.error) || 'error'), 'error');
+}
+document.addEventListener('DOMContentLoaded', () => {
+    ['composeTo', 'composeSubject', 'composeBody'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', markDraftDirty); });
+    ['composeType', 'composeSmtp'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', markDraftDirty); });
+    loadDrafts();
+});
+// leaving or reloading the page with unsaved typing: one last save
+window.addEventListener('pagehide', () => {
+    const m = document.getElementById('composeModal');
+    if (!draftDirty || !m || m.classList.contains('hidden')) return;
+    const d = draftFields(); if (!draftHasText(d)) return;
+    try { fetch(CONFIG.storageApiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'saveDraft', draft: d }), keepalive: true }); } catch (e) {}
+});
+window.openDraftsModal = openDraftsModal; window.openDraft = openDraft; window.deleteDraft = deleteDraft;
+window.saveDraftNow = saveDraftNow; window.closeCompose = closeCompose; window.discardCompose = discardCompose;
+
 function openComposeModal(opts = {}) {
     document.getElementById('composeTitle').textContent = opts.title || 'Compose Message';
     document.getElementById('composeTo').value      = opts.to      || '';
@@ -6968,6 +7174,20 @@ function openComposeModal(opts = {}) {
     document.getElementById('composeSmtp').checked  = false;
     document.getElementById('composeTo').placeholder = 'CALL@CALL.STATE.USA.NOAM';
     document.getElementById('composeTo').style.textTransform = 'uppercase';
+    // v1.5.96: drafts. A draft re-opens with its own text (no second signature).
+    if (opts.draft) {
+        const d = opts.draft;
+        document.getElementById('composeTitle').textContent = d.title || 'Compose Message';
+        document.getElementById('composeTo').value      = d.to || '';
+        document.getElementById('composeType').value    = d.type || 'P';
+        document.getElementById('composeSubject').value = d.subject || '';
+        document.getElementById('composeBody').value    = d.body || '';
+        document.getElementById('composeSmtp').checked  = !!d.smtp;
+        if (d.smtp) toggleSmtpMode();
+    }
+    draftId = opts.draft ? opts.draft.id : null;
+    draftDirty = false; clearTimeout(draftTimer);
+    setDraftStatus(opts.draft ? 'Draft saved ' + draftWhen(opts.draft.updated) : '');
     // Render the quick-pick recents row and reset autocomplete state
     // every time the modal opens, so it reflects the freshest address
     // book (e.g. after a Get Mail run).
@@ -7035,6 +7255,8 @@ function sendComposed() {
         if (d.success) {
             showToast(d.repeat ? 'Sent (it had gone on the first try)' : 'Sent', 'success');
             setStatus('success', d.repeat ? 'Sent (first try)' : 'Sent');
+            clearTimeout(draftTimer); draftDirty = false;
+            if (draftId) { const id = draftId; draftId = null; postToStorageApi('deleteDraft', { id }).then(r => { if (r && r.success) setDraftsCount(r.count); }); }
             closeModal('composeModal');
             // Add to sent folder
             inboxes.sent = inboxes.sent || [];

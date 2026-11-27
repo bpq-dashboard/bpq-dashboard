@@ -33,6 +33,9 @@ if (!$pos && isset($s['lat'], $s['lon']) && ((float)$s['lat'] != 0.0 || (float)$
 echo json_encode([
     'callsign' => ($call !== '' && $call !== 'YOURCALL') ? $call : null,
     'node'     => isset($s['node']) ? strtoupper(trim((string)$s['node'])) : null,
+    // v1.5.100: the network this station is affiliated with (install question;
+    // config.php station 'network'), shown under the menu logo
+    'network'  => (($n = trim((string)($s['network'] ?? ''))) !== '' && preg_match('/^[A-Za-z0-9 ._-]{1,24}$/', $n)) ? $n : null,
     'grid'     => $grid !== '' ? $grid : null,
     'map_lat'  => $pos[0] ?? null,
     'map_lon'  => $pos[1] ?? null,

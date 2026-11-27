@@ -8,7 +8,7 @@
     <script>
         (function () { try { var s = localStorage.getItem('bpq-dark-mode'); var t = (s === 'dark' || s === 'light') ? s : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
     </script>
-    <link rel="stylesheet" href="/bpq-page.css?v=1.5.95">
+    <link rel="stylesheet" href="/bpq-page.css?v=1.6.0">
     <style>
         .nd-console { position: relative; background: #0B0F14; color: #C9D3DE; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; padding: 12px 16px; height: 520px; overflow: auto; white-space: pre-wrap; word-break: break-word; border-top: 1px solid var(--rf-line); }
         .nd-console .crit { color: #FF7B72; font-weight: 700; }
@@ -44,14 +44,14 @@
   today's log. Laid out like RF Connections.
 -->
 <body data-nav-page="nodedebug">
-<script src="/bpq-nav-loader.js?v=2026-11-19-1"></script>
+<script src="/bpq-nav-loader.js?v=2026-11-27-3"></script>
 
 <header class="rf-head">
     <div class="rf-wrap rf-head-row">
         <div class="rf-title">
             <div class="rf-title-line">
                 <h1>Node Debug</h1>
-                <span class="rf-ver">v1.5.95</span>
+                <span class="rf-ver">v1.6.0</span>
             </div>
             <div class="rf-sub">
                 <span id="dateRange">Loading…</span>
@@ -203,7 +203,7 @@
     const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     // restart reasons: [tag class, short name for counts]
-    const WHY = { watchdog: ['', 'watchdog'], 'watchdog?': ['', 'probably watchdog'], manual: ['good', 'by hand'], cron: ['', 'cron job'], reboot: ['', 'computer restart'],
+    const WHY = { watchdog: ['', 'watchdog'], 'watchdog?': ['', 'probably watchdog'], manual: ['good', 'by hand'], job: ['', 'scheduled job / backup'], cron: ['', 'cron job'], reboot: ['', 'computer restart'],
                   root: ['warn', 'root / script'], self: ['warn', 'LinBPQ closed itself'], crash: ['bad', 'crash'], unknown: ['warn', 'unknown'] };
     let range = 3;
     try { const r = parseInt(localStorage.getItem('bpq_nodedebug_range'), 10); if ([1, 3, 7].includes(r)) range = r; } catch (e) {}
@@ -232,7 +232,7 @@
         catch (e) { setStatus('bad', e.message); $('noData').classList.remove('hidden'); $('noData').textContent = e.message; return; }
         const any = D.files.some(f => f.present);
         $('noData').classList.toggle('hidden', any);
-        if (!any) $('noData').innerHTML = 'No <code>NodeDebuglog_YYMMDD.log</code> in the LinBPQ log folder for this period. LinBPQ writes it when node debug logging is on.';
+        if (!any) $('noData').innerHTML = 'No <code>NodeDebuglog_YYMMDD.log</code> in the LinBPQ log folder for this period. Not every LinBPQ build or setup writes this file (install.sh and update.sh say whether they found it).';
         render();
         setStatus(D.last_line && Date.now() / 1000 - D.last_line < 900 ? 'ok' : 'warn', D.last_line ? 'last line ' + fmt(D.last_line) + ' (' + ago(D.last_line) + ')' : 'no lines');
     }
@@ -327,7 +327,7 @@
             + '<td class="rf-small" style="white-space:nowrap">' + esc(ranFor(s.i)) + '</td></tr>').join('') : '<tr><td colspan="5" class="rf-empty">No starts in this period.</td></tr>';
         const src = D.restart_sources || {};
         $('startsMore').innerHTML = '<span>Click a start for the evidence and the lines LinBPQ wrote before it went down. Reasons come from '
-            + (src.system === 'ok' ? 'the system records (systemd, sudo, cron, kernel)' : '<b>this log only</b> (system records: ' + (src.system === 'missing' ? 'the LinBPQ Status helper isn\'t installed' : 'the web server may not run the LinBPQ Status helper') + '; run the update and answer yes to the admin pages\' sudo rules)')
+            + (src.system === 'ok' ? 'the system records (systemd, scheduled jobs, sudo, cron, kernel)' : '<b>this log only</b> (system records: ' + (src.system === 'missing' ? 'the LinBPQ Status helper isn\'t installed' : 'the web server may not run the LinBPQ Status helper') + '; run the update and answer yes to the admin pages\' sudo rules)')
             + (src.watchdog ? ' and the Connect Watchdog\'s log.' : '; the Connect Watchdog\'s log (' + esc(src.watchdog_file || '') + ') could not be read by the web server.') + ' <a class="rf-a" href="/admin/linbpq-status.html">LinBPQ Status</a> has the crash history.</span>';
         showTab(tab);
     }

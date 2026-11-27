@@ -165,6 +165,18 @@ try {
                 echo json_encode(['success' => true, 'unread' => msgdb_get_setting('unread', (object)[])]);
                 break;
 
+            case 'wp':   // v1.5.96: White Pages suggestions for BBS Mail's To field
+                require_once __DIR__ . '/includes/wp-lookup.php';
+                echo json_encode(wpLookup((string)($_GET['q'] ?? '')), JSON_INVALID_UTF8_SUBSTITUTE);
+                break;
+
+            case 'drafts':   // v1.5.96: unsent messages saved from Compose
+                $d = msgdb_get_setting('drafts', []);
+                $d = is_array($d) ? array_values($d) : [];
+                usort($d, fn($a, $b) => ($b['updated'] ?? 0) <=> ($a['updated'] ?? 0));
+                echo json_encode(['success' => true, 'drafts' => $d]);
+                break;
+
             case 'signature':   // v1.5.19 (N3MEL): signature line for new mail
                 echo json_encode(['success' => true, 'signature' => msgdb_get_setting('signature',
                     ['enabled' => false, 'text' => '', 'replies' => true, 'separator' => true])]);
@@ -334,6 +346,31 @@ try {
                         'replies' => !empty($sg['replies']), 'separator' => !empty($sg['separator'])];
                 msgdb_set_setting('signature', $sig);
                 echo json_encode(['success' => true, 'signature' => $sig]);
+                break;
+
+            case 'saveDraft':   // v1.5.96: one draft, created or updated (at most 50, 200 000 characters each)
+                $dr = $input['draft'] ?? null;
+                if (!is_array($dr)) apiError('Invalid draft');
+                $all = msgdb_get_setting('drafts', []);
+                if (!is_array($all)) $all = [];
+                $id = (string)($dr['id'] ?? '');
+                if (!preg_match('/^[a-z0-9]{8,32}$/', $id)) $id = bin2hex(random_bytes(8));
+                if (!isset($all[$id]) && count($all) >= 50) apiError('50 drafts saved already: delete some under Drafts');
+                $clean = fn($v, $n) => mb_substr(preg_replace('/[^\P{C}\n\t]/u', '', str_replace(["\r\n", "\r"], "\n", (string)$v)) ?? '', 0, $n);
+                $type = strtoupper((string)($dr['type'] ?? 'P'));
+                $all[$id] = ['id' => $id, 'to' => $clean($dr['to'] ?? '', 200), 'type' => in_array($type, ['P', 'B', 'T'], true) ? $type : 'P',
+                    'subject' => $clean($dr['subject'] ?? '', 200), 'body' => $clean($dr['body'] ?? '', 200000),
+                    'smtp' => !empty($dr['smtp']), 'title' => $clean($dr['title'] ?? '', 80), 'updated' => time()];
+                msgdb_set_setting('drafts', $all);
+                echo json_encode(['success' => true, 'id' => $id, 'updated' => $all[$id]['updated'], 'count' => count($all)]);
+                break;
+
+            case 'deleteDraft':   // v1.5.96
+                $all = msgdb_get_setting('drafts', []);
+                if (!is_array($all)) $all = [];
+                unset($all[(string)($input['id'] ?? '')]);
+                msgdb_set_setting('drafts', $all ?: (object)[]);
+                echo json_encode(['success' => true, 'count' => count($all)]);
                 break;
 
             case 'saveUnread':

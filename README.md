@@ -1,12 +1,54 @@
 # BPQ Dashboard
 
-**Version 1.5.95** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
+**Version 1.6.0** · A modern web interface for amateur radio packet nodes running LinBPQ / BPQ32
 
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 [![Platform: Debian / Ubuntu / Raspberry Pi](https://img.shields.io/badge/platform-Linux-orange.svg)]()
 [![PHP 8.x · Python 3.x](https://img.shields.io/badge/stack-PHP%208%20%C2%B7%20Python%203-brightgreen.svg)]()
 
-BPQ Dashboard turns your packet radio node into a friendly, browser-accessible operations suite. Monitor connections, manage email-style BBS messages, transfer files via YAPP, run VARA HF keyboard sessions, view APRS traffic, watch weather alerts, and audit system health — all from any device on your network.
+## Why it was created
+
+BPQ Dashboard was built so a sysop can see and run a whole BPQ station from one web page, on any device, without a terminal.
+
+LinBPQ is superb packet software, but looking after a node day to day means hopping between places: the telnet console, the BBS, log files, the VARA and sound-modem windows on the desktop, the rig control program, and the Linux command line. Answering simple questions (Who connected overnight? Did the forwarding to my partners run? Is VARA busy? How is the band?) often takes several logins and some digging.
+
+BPQ Dashboard started as a way to put all of that in one place. It grew page by page from what a working sysop actually needed, and from the reports of the sysops who tried it. The goal throughout has been the same: make running a BPQ station easier, and make the dashboard itself painless to install and keep up to date.
+
+## What it is
+
+BPQ Dashboard is a free, web-based control panel for LinBPQ, the Linux edition of John Wiseman G8BPQ's BPQ32 node, BBS and chat software. It runs on the same computer as LinBPQ, alongside it rather than in place of it. It reads LinBPQ's logs and talks to it over its telnet port, so your existing configuration stays as it is.
+
+You open it in any web browser: a desktop, a laptop, a tablet or a phone. Visitors can see the public pages. Sysop pages and anything that acts on the station sit behind an admin login.
+
+## What it offers
+
+The menu groups the pages by what a sysop does. Pages your station doesn't use, such as Rig control without flrig, can be switched off and drop out of the menu.
+
+| Menu | What you can do there |
+| --- | --- |
+| Station | See the node at a glance: who is connected, recent connections, the nodes and routes LinBPQ knows, and the reasons behind disconnects (Node Debug) |
+| Mail | Read and send BBS mail in a modern mail client (BBS Mail: folders, select-and-delete, a choice of fonts), follow forwarding and traffic reports, check NTS traffic and the White Pages |
+| On air | Use a telnet client with YAPP file transfers, BPQ Chat, and a VARA HF terminal from the browser; see RF connections from the VARA log |
+| Radio | Control the rig through flrig and watch RF power |
+| Weather | Local weather and conditions for the station |
+| Admin | Watch the VARA HF, Mercury, Data2G and QtSoundModem modems without going to the desktop (watch-only), run maintenance tasks with copy-and-paste commands, audit the system, manage the firewall, read the logs, and run Install Check and Health Check |
+
+An APRS map and beacon, and BBS mail through any standard mail app (IMAP), are there too if you want them.
+
+## Easy to install and keep current
+
+You don't need to be a Linux expert. A guided installer asks about a dozen plain questions (your callsign, node, location, telnet port and admin login) and does the rest, in about 15 to 30 minutes.
+
+- **It checks the computer first.** Before it changes anything, the installer confirms your Linux release is supported and its software is new enough. If it isn't, it says why and stops, leaving the system untouched.
+- **It keeps the system safe.** It offers to install waiting security updates and to turn on automatic security updates.
+- **Updates are one command.** `sudo bash update.sh` brings a station up to the new version and keeps its settings.
+- **It tells you when something is wrong.** Install Check and Health Check show what's working and what isn't, with the command to fix each problem.
+- **It's documented.** A User Guide and a full Manual come with every release, as web pages and PDFs.
+
+To get started, download the latest release from this repository's **Releases** page, unzip it, and run `sudo bash install.sh` (see *System requirements* below). Questions, ideas and bug reports are welcome. BPQ Dashboard has grown from sysops' feedback, and that's how it will keep improving.
+
+73, Tony K1AJD
+
 
 ## What's in the box
 
@@ -38,16 +80,21 @@ BPQ Dashboard turns your packet radio node into a friendly, browser-accessible o
 - **VHF paths** (v1.5.50) — hour-by-hour history of when watched stations were heard, with optional scheduled test connects; VHF packet connects listed beside the HF sessions (v1.5.51)
 - **Packet Live NetRom/Node Map** (v1.5.62) — the UK Packet Radio Network's live node map, in an RF Connections tab
 - **Audio Map** (v1.5.57) — Admin page that draws, from the running system, how each LinBPQ radio port reaches its radio: modem program, shared ALSA device (dmix/dsnoop), sound card with mixer levels, and what keys the transmitter
+- **LinBPQ Status** (v1.5.94) — Admin page: is LinBPQ running and how (systemd, screen), its starts, stops and crashes (segfaults, core dumps) over 30 days, and a live view of its console
+- **Node Debug** (v1.5.95–1.5.96) — Admin page that reads LinBPQ's `NodeDebuglog` for you: restarts and *why* each happened (Connect Watchdog, a backup or other job, a user or root login, a reboot or a crash, with troubleshooting for unknown ones), neighbour links dropped, internet and Winlink server outages, Winlink channel reports, known problems explained, and a live view of today's log
+- **Modems** (v1.5.97) — Admin page with each modem's own display without opening the station's desktop, watch-only: VARA HF, flrig and other modem windows as live pictures, Mercury's spectrum and waterfall, Data2G's waterfall, constellation, link and bursts
+- **HF Channel Quality per modem** (v1.5.96) — RF Connections cards per band for VARA, Data2G and Mercury
+- **White Pages addresses** (v1.5.96) — the To field in BBS Mail and the Email Client suggests any station your BBS knows from LinBPQ's White Pages, with its home BBS
 - **Radio settings for the Yaesu FTdx-3000** (v1.5.60) — on Rig Status, through flrig: live ALC / power / SWR / compression meters, and width, roofing filter, IPO, attenuator, AGC, noise blanker, noise reduction and notch, each with a hint for data use; changes need the sysop password and wait while a modem is transmitting. The card appears only when flrig reports an FTdx-3000
 
-See the [User Guide](BPQ-Dashboard-v1.5.95-User-Guide.pdf) for detailed feature walkthroughs.
+See the [User Guide](BPQ-Dashboard-v1.6.0-User-Guide.pdf) for detailed feature walkthroughs.
 
 ## Quick links
 
 | Document | What it covers |
 |---|---|
-| 📖 **[User Guide](BPQ-Dashboard-v1.5.95-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
-| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.5.95-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
+| 📖 **[User Guide](BPQ-Dashboard-v1.6.0-User-Guide.pdf)** | How to use every feature — for sysops, operators, visitors |
+| 🔧 **[Installation & Troubleshooting Manual](BPQ-Dashboard-v1.6.0-Manual.pdf)** | Setting up the dashboard from scratch + diagnosing issues |
 | 🧭 **[Installation guide](USER-MANUAL.md#4-installation--step-by-step)** | Step-by-step install for newcomers, plus manual install and updating |
 | ⚡ **[Phase 1 Deployment Guide](docs/PHASE-1-DEPLOYMENT.md)** | Background on the DB-backed RF Connections (done automatically by `install.sh`) |
 | ⚡ **[Traffic Report Deployment Guide](docs/TRAFFIC-STATS-DEPLOYMENT.md)** | Background on the DB-backed Traffic Report (done automatically by `install.sh`) |
@@ -62,8 +109,8 @@ On the computer that already runs LinBPQ:
 ```bash
 sudo apt update && sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.95.zip
-unzip bpq-dashboard.zip && cd bpq-dashboard-1.5.95
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.6.0.zip
+unzip bpq-dashboard.zip && cd bpq-dashboard-1.6.0
 sudo bash install.sh
 ```
 
@@ -91,7 +138,7 @@ Your settings, data, database and web-server config are kept, and every file it 
 
 ## System requirements
 
-- **OS:** Debian 11+ / Ubuntu 20.04+ / Raspberry Pi OS Bullseye+ (any recent Debian-based system)
+- **OS:** Debian 12 or 13, Ubuntu 22.04 or 24.04 LTS, Raspberry Pi OS Bookworm or Trixie, Linux Mint 21 / 22 / LMDE (or another system built on these). The installer checks the computer first (`sudo bash tools/system-check.sh` does it on its own) and stops on releases that are too old (Debian 11, Ubuntu 20.04)
 - **Hardware:** Raspberry Pi 3/4/5 or any modern x86 box. 1 GB RAM minimum, 2 GB recommended.
 - **LinBPQ:** Already installed and running (the dashboard reads its logs and connects via telnet)
 - **MariaDB** — installed for you by `install.sh`; required by the Email Client and the database-backed pages

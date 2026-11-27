@@ -323,6 +323,19 @@
         .rf-modem { border: 1px solid var(--rf-line); border-radius: 10px; padding: 12px 14px; font-size: 13px; }
         .rf-modem-name { font-weight: 700; margin-bottom: 4px; }
         /* v1.5.46: modem chip in Recent connections and the 7-day history */
+        /* v1.5.96: HF Channel Quality: a row per modem, compact cards */
+        .cq-group { margin-bottom: 18px; }
+        .cq-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin: 4px 0 8px; }
+        .cq-head b { font-size: 14px; color: var(--rf-text); }
+        .cq-head span.cq-note { font-size: 12px; color: var(--rf-muted); }
+        .cq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+        .cq-card { padding: 12px 14px !important; }
+        .cq-card .cq-kv { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-size: 12px; }
+        .cq-card .cq-kv > :nth-child(odd) { color: var(--rf-muted); }
+        .cq-card .cq-kv > :nth-child(even) { text-align: right; font-weight: 600; }
+        .cq-modes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-size: 11px; }
+        .cq-modes span { padding: 1px 6px; border-radius: 6px; background: var(--rf-line); color: var(--rf-text); border: 1px solid var(--rf-border); }
+        .cq-empty { font-size: 12px; color: var(--rf-muted); padding: 4px 0 8px; }
         .rf-modem-chip { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; background: var(--rf-line); color: var(--rf-muted); border: 1px solid var(--rf-border); white-space: nowrap; }
         .rf-modem-chip.rf-modem-merc { background: #CCFBF1; color: #115E59; border-color: #99F6E4; cursor: help; }
         [data-theme="dark"] .rf-modem-chip.rf-modem-merc { background: #134E4A; color: #99F6E4; border-color: #0F766E; }
@@ -435,7 +448,7 @@
     <!-- Shared navigation (loaded from _nav.html via bpq-nav-loader.js).
          Replaces the previously-duplicated <nav> block. The active link is
          driven by the data-nav-page attribute on <body>. -->
-    <script src="bpq-nav-loader.js?v=2026-11-19-1"></script>
+    <script src="bpq-nav-loader.js?v=2026-11-27-3"></script>
     <script src="rf-modem-report.js?v=1.5.83" defer></script>
 
     <!-- ═══ v1.5.44 RF Connections redesign ("layout A") ══════════════════════
@@ -457,7 +470,7 @@
             <div class="rf-title">
                 <div class="rf-title-line">
                     <h1>RF Connections</h1>
-                    <span class="rf-ver">v1.5.95</span>
+                    <span class="rf-ver">v1.6.0</span>
                 </div>
                 <div class="rf-sub">
                     <span id="dateRange">Loading...</span>
@@ -757,9 +770,9 @@
                 <canvas id="hourlyBandChart" style="display:none;"></canvas>
                 <div id="bandSummaryContainer" class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4"></div>
                 <div class="mb-6 sm:mb-10">
-                <h2 class="text-lg sm:text-2xl font-bold gradient-text mb-4 sm:mb-6">📡 VARA Channel Quality</h2>
-                <p class="text-xs text-gray-500 mb-3">Derived from observed VARA modem bitrates and S/N reports. Bitrate maps to modulation tier (BFSK→BPSK→4PSK→8QAM→16QAM→32QAM) — higher tiers require better propagation.</p>
-                <div id="varaChannelQualityContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4"></div>
+                <h2 class="text-lg sm:text-2xl font-bold gradient-text mb-2 sm:mb-3">📡 HF Channel Quality</h2>
+                <p class="text-xs text-gray-500 mb-3">How each modem did on each band in this period. <b>VARA</b>: the speed level it reached maps to its modulation (BFSK→BPSK→4PSK→8QAM→16QAM→32QAM); higher needs a better path. <b>Data2G</b>: its own delivered rate and S/N, and the modes it used. <b>Mercury</b> logs neither speed nor S/N, so its cards use <i>Effective</i> (bytes both ways × 8 ÷ time linked) and the modes it connected in. Effective is worked out the same way for every modem, so it is the fair comparison.</p>
+                <div id="varaChannelQualityContainer"></div>
                 <div id="varaChannelQualityEmpty" class="text-gray-400 text-center text-sm py-6 hidden">No bitrate or S/N data available yet</div>
             </div>
             </div>
@@ -5496,7 +5509,7 @@
             return 0.05;
         }
         
-        function createQualityGauge(avgBps, bandColor) {
+        function createQualityGauge(avgBps, bandColor, label, px) {
             const pos = bpsToGaugePos(avgBps);
             const w = 100, h = 68;
             const cx = 50, cy = 56;
@@ -5543,12 +5556,13 @@
             else if (pos >= 0.25) nc = '#d97706';
             else if (pos >= 0.12) nc = '#ef4444';
             const bpsText = avgBps >= 1000 ? (avgBps / 1000).toFixed(1) + 'k' : Math.round(avgBps);
-            return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100px;height:68px;overflow:visible">' +
+            px = px || 84;
+            return '<svg viewBox="0 0 '+w+' '+h+'" style="width:'+px+'px;height:'+Math.round(px*0.68)+'px;overflow:visible">' +
                 bgArcs + activeArcs + ticks +
                 '<polygon points="'+tip.x+','+tip.y+' '+nb1.x+','+nb1.y+' '+nb2.x+','+nb2.y+'" fill="'+nc+'"/>' +
                 '<circle cx="'+cx+'" cy="'+cy+'" r="3.5" fill="'+nc+'" stroke="white" stroke-width="1"/>' +
                 '<text x="'+cx+'" y="'+(cy-10)+'" text-anchor="middle" fill="#374151" font-family="monospace" font-size="10" font-weight="700">'+bpsText+'</text>' +
-                '<text x="'+cx+'" y="'+(cy-1)+'" text-anchor="middle" fill="#9ca3af" font-size="6">avg bps</text>' +
+                '<text x="'+cx+'" y="'+(cy-1)+'" text-anchor="middle" fill="#9ca3af" font-size="6">'+(label || 'avg bps')+'</text>' +
                 '</svg>';
         }
         
@@ -5575,12 +5589,16 @@
                     return freqOrder.indexOf(a) - freqOrder.indexOf(b);
                 });
             
-            if (bands.length === 0) {
+            // v1.5.96: Data2G and Mercury get their own rows (hfModemQualityGroup)
+            const extraGroups = ['data2g', 'mercury'].map(hfModemQualityGroup).join('');
+            if (bands.length === 0 && !extraGroups) {
                 container.innerHTML = '';
                 emptyEl.classList.remove('hidden');
                 return;
             }
             emptyEl.classList.add('hidden');
+            const varaHead = '<div class="cq-head"><span class="rf-modem-chip">VARA</span><span class="cq-note">speed level reached and S/N, per band</span></div>';
+            if (bands.length === 0) { container.innerHTML = '<div class="cq-group">' + varaHead + '<div class="cq-empty">No VARA sessions with speed or S/N in this period.</div></div>' + extraGroups; return; }
             
             const avg = arr => arr.length > 0 ? arr.reduce((a,b) => a+b, 0) / arr.length : null;
             const median = arr => {
@@ -5590,7 +5608,7 @@
                 return s.length % 2 ? s[mid] : (s[mid-1] + s[mid]) / 2;
             };
             
-            container.innerHTML = bands.map(band => {
+            container.innerHTML = '<div class="cq-group">' + varaHead + '<div class="cq-grid">' + bands.map(band => {
                 const bd = bandData[band];
                 // Infra failures (channel busy / port in session) — already
                 // tracked per-band by recalculateStats() for Band Summary;
@@ -5681,7 +5699,7 @@
                 const propTotal = totalConns - failInfra;
                 const propAvail = propTotal > 0 ? (bd.successful / propTotal * 100).toFixed(0) : '--';
                 
-                return `<div class="bg-white rounded-xl p-4 border-2 shadow-sm" style="border-color:${getBandColor(band)}">
+                return `<div class="bg-white rounded-xl cq-card border-2 shadow-sm" style="border-color:${getBandColor(band)}">
                     <div class="flex items-start gap-3 mb-2">
                         <div class="flex-shrink-0">${avgBps ? createQualityGauge(avgBps, getBandColor(band)) : ''}</div>
                         <div class="flex-1 min-w-0">
@@ -5717,7 +5735,74 @@
                     
                     ${multipathFlag}
                 </div>`;
+            }).join('') + '</div></div>' + extraGroups;
+        }
+
+        // ── v1.5.96: Data2G and Mercury channel quality, per band ─────────
+        // Data2G logs its own delivered rate (best minute), S/N and the modes
+        // it used; Mercury logs only the mode it connected in. Both get
+        // Effective (bytes both ways x 8 / time linked), comparable with VARA's.
+        function hfModemQualityGroup(modem) {
+            const all = modem === 'data2g' ? data2gConnections : mercuryConnections;
+            if (!all.length) return '';                       // station doesn't run this modem
+            const inHead = modem === 'data2g' ? data2gInHeadlines : mercuryInHeadlines;
+            const list = (inHead ? connections.filter(c => c.modem === modem) : all.filter(c => c._ts >= rangeCutoffTs))
+                .filter(c => c.band && c.band !== 'Unknown' && c.band !== 'WL2K');
+            const name = modem === 'data2g' ? 'Data2G' : 'Mercury';
+            const chip = '<span class="rf-modem-chip ' + (modem === 'data2g' ? 'rf-modem-d2g' : 'rf-modem-merc') + '">' + name + '</span>';
+            const note = modem === 'data2g' ? 'its own delivered rate, S/N and modes, per band' : 'Effective rate and connect modes, per band (Mercury logs no speed or S/N)';
+            const head = '<div class="cq-head">' + chip + '<span class="cq-note">' + note + '</span></div>';
+            if (!list.length) return '<div class="cq-group">' + head + '<div class="cq-empty">No ' + name + ' sessions in this period.</div></div>';
+            const order = ['160m','80m','60m','40m','30m','20m','17m','15m','12m','10m'];
+            const byBand = {};
+            list.forEach(c => (byBand[c.band] = byBand[c.band] || []).push(c));
+            const bands = Object.keys(byBand).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+            const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+            const med = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+            const fmtBps = v => v == null ? '--' : (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v)) + ' bps';
+            const cards = bands.map(band => {
+                const L = byBand[band], ok = L.filter(c => c.status === 'success');
+                const infra = L.filter(c => c.status !== 'success' && (c.failureType === 'portInSession' || c.failureType === 'channelBusy')).length;
+                const propTotal = L.length - infra;
+                const propAvail = propTotal > 0 ? Math.round(ok.length / propTotal * 100) : null;
+                const eff = ok.map(effBps).filter(v => v != null && v > 0);
+                const own = modem === 'data2g' ? ok.map(c => c.modemBps || 0).filter(v => v > 0) : [];
+                const rate = modem === 'data2g' && own.length ? own : eff;   // what the gauge shows
+                const snr = L.map(c => c.snr).filter(v => v !== undefined && v !== null && !isNaN(v));
+                const avgRate = avg(rate), avgSnr = avg(snr);
+                const cut = ok.filter(hfCutShort).length;
+                const modes = {};
+                ok.forEach(c => { if (c.linkMode) modes[c.linkMode] = (modes[c.linkMode] || 0) + 1; });
+                const modeList = Object.entries(modes).sort((a, b) => b[1] - a[1]).slice(0, 6);
+                let tier = ['No data', '#999', '#f3f4f6'];
+                if (avgRate) tier = avgRate >= 1500 ? ['Fast', '#059669', '#d1fae5'] : avgRate >= 500 ? ['Good', '#2563eb', '#dbeafe'] : avgRate >= 150 ? ['Fair', '#d97706', '#fef3c7'] : ['Slow', '#dc2626', '#fee2e2'];
+                const col = getBandColor(band);
+                const rows = [];
+                if (modem === 'data2g') {
+                    rows.push(['Median (own)', fmtBps(med(own))], ['Peak (own)', own.length ? fmtBps(Math.max(...own)) : '--']);
+                    rows.push(['Effective', fmtBps(med(eff))], ['Avg S/N', avgSnr !== null ? avgSnr.toFixed(1) + ' dB' : '--']);
+                } else {
+                    rows.push(['Effective median', fmtBps(med(eff))], ['Effective peak', eff.length ? fmtBps(Math.max(...eff)) : '--']);
+                }
+                rows.push(['Prop. avail.', propAvail == null ? '--' : '<span style="color:' + (propAvail >= 80 ? '#059669' : propAvail >= 50 ? '#d97706' : '#dc2626') + '">' + propAvail + '%</span>']);
+                rows.push(['Connections', '<span class="text-green-600">' + ok.length + '</span> / <span class="text-red-600">' + (L.length - ok.length) + '</span>']);
+                if (cut) rows.push(['Cut short', '<span title="' + HF_CUT_TEXT + '">' + cut + '</span>']);
+                return `<div class="bg-white rounded-xl cq-card border-2 shadow-sm" style="border-color:${col}">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0">${avgRate ? createQualityGauge(avgRate, col, modem === 'data2g' && own.length ? 'avg bps' : 'eff bps') : ''}</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="flex items-center gap-2"><span class="text-lg font-bold" style="color:${col}">${band}</span>
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:${tier[2]};color:${tier[1]}" title="From the ${modem === 'data2g' && own.length ? 'average delivered rate' : 'average Effective rate'}">${tier[0]}</span></div>
+                                <span class="text-xs text-gray-500">${L.length} session${L.length === 1 ? '' : 's'}</span>
+                            </div>
+                            <div class="cq-kv">${rows.map(r => '<div>' + r[0] + '</div><div>' + r[1] + '</div>').join('')}</div>
+                        </div>
+                    </div>
+                    ${modeList.length ? '<div class="cq-modes" title="Modes used on good sessions">' + modeList.map(([m, n]) => '<span>' + escapeHtmlRf(m) + ' <b>' + n + '</b></span>').join('') + '</div>' : ''}
+                </div>`;
             }).join('');
+            return '<div class="cq-group">' + head + '<div class="cq-grid">' + cards + '</div></div>';
         }
         
         // Builds the 6-slot x band aggregation recalculateStats() used to
@@ -7638,7 +7723,7 @@
                 </div>
                 
                 <p style="color: #666; font-size: 0.75rem; text-align: center; margin-top: 20px;">
-                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.5.95 | HF Efficiency Report
+                    Generated: ${new Date().toISOString()} | BPQ Dashboard v1.6.0 | HF Efficiency Report
                 </p>
             `;
             
@@ -8857,8 +8942,8 @@
         // ── keep the composed parts current ───────────────────────────────
         function refreshAll() {
             safe(renderVara); safe(renderFailBar); safe(markNowSlot); safe(renderStrip); safe(rfThemeLabel);
-            const c = $('messagesCountOld'), n = $('messagesCount');
-            if (c && n) n.textContent = c.textContent;
+            // (v1.5.96: no longer copies the retired hidden counter, which is always 0, over
+            //  the tab's count; the Forwarded messages table sets #messagesCount itself)
         }
         window.rfRefreshAll = refreshAll;
         document.addEventListener('DOMContentLoaded', () => {

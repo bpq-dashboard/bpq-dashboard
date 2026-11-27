@@ -1,0 +1,12 @@
+[Unit]
+Description=BPQ Dashboard - Admin > Modems relay, started on request (127.0.0.1:8769)
+
+[Socket]
+# systemd listens here and starts bpq-modem-relay.service on the first
+# request from Admin > Modems; the relay exits after 10 idle minutes.
+ListenStream=127.0.0.1:8769
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=sockets.target

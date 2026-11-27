@@ -48,3 +48,12 @@ www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-audio-map ""
 # and masks password / USER= lines.
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-linbpq-status ""
 www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-linbpq-status console
+
+# v1.5.97: Admin > Modems. Pictures of the modem windows (VARA HF, flrig,
+# QtSoundModem ...) on the station's desktop, read with xwininfo / xwd using
+# the X server's own login file. Root-owned copy in /usr/local/sbin (from
+# tools/modem-view-helper); only "list" and "snap :N 0xID" (checked by the
+# helper: a window it lists, nothing else). Watch-only: it never clicks,
+# types, moves a window or starts anything.
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-modem-view list
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-modem-view snap *

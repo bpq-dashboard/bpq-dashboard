@@ -250,10 +250,11 @@ unit_want() { sed "s|/var/www/bpq-dashboard|$WEB_ROOT|g; s|^User=www-data$|User=
 ours_unit() {   # $1 = unit name
     local live="/etc/systemd/system/$1"
     grep -q -- "$WEB_ROOT" "$live" 2>/dev/null && return 0
-    [[ "$1" == *.timer ]] && grep -q -- "$WEB_ROOT" "/etc/systemd/system/${1%.timer}.service" 2>/dev/null
+    [[ "$1" == *.timer ]] && grep -q -- "$WEB_ROOT" "/etc/systemd/system/${1%.timer}.service" 2>/dev/null && return 0
+    [[ "$1" == *.socket ]] && grep -q -- "$WEB_ROOT" "/etc/systemd/system/${1%.socket}.service" 2>/dev/null
 }
 PLAN_UNITS=()
-for unit in "$SRC"/*.service "$SRC"/*.timer; do
+for unit in "$SRC"/*.service "$SRC"/*.timer "$SRC"/*.socket; do
     u=$(basename "$unit"); [[ -f "/etc/systemd/system/$u" ]] || continue
     ours_unit "$u" || continue
     kept "/etc/systemd/system/$u" && { say "Kept (keep list): /etc/systemd/system/$u"; continue; }
@@ -274,6 +275,11 @@ if [[ -f /etc/sudoers.d/www-data-tools && -f "$SRC/tools/linbpq-status-helper" ]
    ! cmp -s "$SRC/tools/linbpq-status-helper" /usr/local/sbin/bpq-dashboard-linbpq-status; then
     say "LinBPQ Status helper to install: /usr/local/sbin/bpq-dashboard-linbpq-status  (read-only, for Admin > LinBPQ Status)"
 fi
+if [[ -f /etc/sudoers.d/www-data-tools && -f "$SRC/tools/modem-view-helper" ]] && ! kept /etc/sudoers.d/www-data-tools && \
+   ! cmp -s "$SRC/tools/modem-view-helper" /usr/local/sbin/bpq-dashboard-modem-view; then
+    say "Modems helper to install: /usr/local/sbin/bpq-dashboard-modem-view  (watch-only window pictures, for Admin > Modems)"
+fi
+[[ -f /etc/systemd/system/bpq-modem-relay.socket ]] || say "To install: bpq-modem-relay.socket  (Admin > Modems' relay, started only while the page is open; 127.0.0.1 only)"
 
 if (( ${#REPL[@]} + ${#ADD[@]} + ${#REMOVE[@]} == 0 )) && [[ $FORCE != y ]]; then
     echo; ok "Nothing to copy: every file already matches $NEW_VER."
@@ -419,7 +425,7 @@ fi
 # ── systemd units ──────────────────────────────────────────────────────────
 hdr "Services"
 UNITS_CHANGED=()
-for unit in "$SRC"/*.service "$SRC"/*.timer; do
+for unit in "$SRC"/*.service "$SRC"/*.timer "$SRC"/*.socket; do
     u=$(basename "$unit"); live="/etc/systemd/system/$u"
     [[ -f "$live" ]] || continue
     # Only units the dashboard's installer set up (they run from this folder)
@@ -439,6 +445,29 @@ if [[ "$(php_cfg vara_remote enabled)" == "1" && ! -f /etc/systemd/system/vara-r
     echo vara-remote.service >> "$BK/units-added.txt"; echo vara-remote.timer >> "$BK/units-added.txt"
     systemctl daemon-reload; systemctl enable --now vara-remote.timer >/dev/null 2>&1 && ok "vara-remote.timer installed (config.php vara_remote is on)"
 fi
+# v1.5.97/98: Admin > Modems' watch-only relay (Mercury and Data2G monitors).
+# Since 1.5.98 systemd listens on 127.0.0.1:8769 (bpq-modem-relay.socket) and
+# starts the relay on the first request; it exits after 10 idle minutes. A
+# 1.5.97 station had the service enabled on its own: switched over here.
+if [[ -f "$WEB_ROOT/bpq-modem-relay.socket" && ! -f /etc/systemd/system/bpq-modem-relay.socket ]] && \
+   ! kept /etc/systemd/system/bpq-modem-relay.service; then
+    if [[ -f /etc/systemd/system/bpq-modem-relay.service ]]; then
+        # 1.5.97 ran it all the time, listening on 8769 itself: stop it and
+        # remove its boot link (the refreshed unit has no [Install] to disable by)
+        systemctl stop bpq-modem-relay.service >/dev/null 2>&1
+        rm -f /etc/systemd/system/multi-user.target.wants/bpq-modem-relay.service
+        mkdir -p "$BK/etc/systemd"; cp -p /etc/systemd/system/bpq-modem-relay.service "$BK/etc/systemd/" 2>/dev/null
+    else
+        echo bpq-modem-relay.service >> "$BK/units-added.txt"
+    fi
+    unit_want "$WEB_ROOT/bpq-modem-relay.service" > /etc/systemd/system/bpq-modem-relay.service
+    cp "$WEB_ROOT/bpq-modem-relay.socket" /etc/systemd/system/bpq-modem-relay.socket
+    echo bpq-modem-relay.socket >> "$BK/units-added.txt"
+    systemctl daemon-reload
+    systemctl enable --now bpq-modem-relay.socket >/dev/null 2>&1 \
+        && ok "bpq-modem-relay.socket listening (Admin → Modems; the relay starts only when the page is open)" \
+        || warn "bpq-modem-relay.socket didn't start — check: sudo journalctl -u bpq-modem-relay.socket -n 20"
+fi
 # Restart a running helper only if its program, a module it uses, or its unit changed
 declare -A DEPS=(
     [bpq-telnet]="scripts/bpq-telnet-daemon.py scripts/yapp_protocol.py"
@@ -448,6 +477,7 @@ declare -A DEPS=(
     [vara-logger]="vara-logger.sh"
     [vara-validator]="scripts/vara-callsign-validator.py scripts/bpq_db_config.py"
     [rig-history-poller]="scripts/rig-history-poller.php vara-api.php"
+    [bpq-modem-relay]="scripts/bpq-modem-relay.py"
 )
 RESTARTED=()
 for svc in "${!DEPS[@]}"; do
@@ -501,6 +531,20 @@ if grep -qs 'bpq-dashboard-linbpq-status' /etc/sudoers.d/* && [[ -f "$SRC/tools/
     fi
 fi
 
+# v1.5.97: Admin > Modems' window-picture helper, where its sudo rule is in place
+if grep -qs 'bpq-dashboard-modem-view' /etc/sudoers.d/* && [[ -f "$SRC/tools/modem-view-helper" ]]; then
+    H=/usr/local/sbin/bpq-dashboard-modem-view
+    if ! cmp -s "$SRC/tools/modem-view-helper" "$H"; then
+        if [[ -e "$H" ]]; then cp -p "$H" "$BK/etc/"; else echo "$H" >> "$BK/new-root-files.txt"; fi
+        install -o root -g root -m 755 "$SRC/tools/modem-view-helper" "$H" && ok "Modems helper installed ($H)"
+    fi
+    # it reads windows with xwininfo / xwd: only where an X desktop runs (VARA under Wine)
+    if pgrep -x 'Xtigervnc|Xvnc|Xorg' >/dev/null 2>&1 && ! { command -v xwininfo && command -v xwd; } >/dev/null 2>&1; then
+        apt-get install -y -q x11-utils x11-apps >/dev/null 2>&1 && ok "x11-utils and x11-apps installed (Admin → Modems)" \
+            || warn "Couldn't install x11-utils x11-apps: Admin → Modems can't show modem windows until they are"
+    fi
+fi
+
 # ── Record the version ─────────────────────────────────────────────────────
 install -o "$WEB_USER" -g "$WEB_GROUP" -m 644 "$SRC/MANIFEST.md5" "$WEB_ROOT/MANIFEST.md5"
 [[ -f "$WEB_ROOT/VERSION" ]] || install -o "$WEB_USER" -g "$WEB_GROUP" -m 644 "$SRC/VERSION" "$WEB_ROOT/VERSION"
@@ -544,6 +588,47 @@ if [[ ! -f /etc/bpq-dashboard/bbs-mail.php && -f "$MAIL_SETUP" ]]; then
             say "Not set up, and not asked again. Any time later: sudo bash $MAIL_SETUP"
         fi
     fi
+fi
+
+# v1.5.100: the menu shows "<node> · affiliated with TPRFN" for TPRFN stations.
+# Asked once, on a station whose config.php has no station 'network' yet; the
+# answer is written into config.php (backed up first). Later: edit config.php.
+if ! php -r '$c = @include $argv[1]; exit(is_array($c) && array_key_exists("network", $c["station"] ?? []) ? 0 : 1);' -- "$WEB_ROOT/config.php" 2>/dev/null; then
+    NET=""
+    if [[ $YES != y && -t 0 ]]; then
+        hdr "TPRFN"
+        say "The new menu shows your node under the logo, and \"affiliated with TPRFN\" if it is."
+        read -r -p "  Is this station affiliated with TPRFN? [y/N]: " a
+        [[ "$a" =~ ^[Yy] ]] && NET="TPRFN"
+    fi
+    if [[ $YES != y && -t 0 ]] || [[ -n "$NET" ]]; then
+        cp -p "$WEB_ROOT/config.php" "$BK/config.php.before-network"
+        if php -r '
+            $f = $argv[1]; $net = $argv[2]; $s = file_get_contents($f);
+            $n = preg_replace("/(\x27station\x27\s*=>\s*(?:\[|array\s*\())/", "$1\n        \x27network\x27  => " . var_export($net, true) . ",   // shown under the menu logo (\"affiliated with ...\"); \x27\x27 = none", $s, 1, $cnt);
+            if ($cnt !== 1) exit(2);
+            $tmp = $f . ".tmp"; file_put_contents($tmp, $n);
+            $chk = @include $tmp; if (!is_array($chk) || !array_key_exists("network", $chk["station"] ?? [])) { unlink($tmp); exit(3); }
+            exit(rename($tmp, $f) ? 0 : 4);' -- "$WEB_ROOT/config.php" "$NET"; then
+            chown "$WEB_USER:$WEB_GROUP" "$WEB_ROOT/config.php"
+            ok "config.php: station 'network' => '$NET'$( [[ -n $NET ]] && echo " (menu: affiliated with $NET)" || echo " (menu: node callsign only)" )"
+        else
+            warn "Couldn't add 'network' to config.php by itself; add  'network' => 'TPRFN',  to its 'station' section by hand if this station is in TPRFN"
+        fi
+    fi
+fi
+
+# v1.5.102: the computer itself — OS still supported, versions, updates waiting,
+# automatic security updates. Reports only; nothing is installed here.
+if [[ -f "$SRC/tools/system-check.sh" ]]; then
+    hdr "System"
+    # shellcheck source=tools/system-check.sh
+    source "$SRC/tools/system-check.sh"
+    system_check || warn "This computer no longer meets the dashboard's needs (above): plan an OS upgrade"
+    sc_record
+    (( ${SC_UPD_SEC:-0} > 0 )) && warn "$SC_UPD_SEC security update(s) waiting for this computer: sudo apt update && sudo apt upgrade"
+    [[ "$SC_AUTO" != on ]] && say "Tip: security updates don't install by themselves here: sudo apt install unattended-upgrades && sudo dpkg-reconfigure -plow unattended-upgrades"
+    [[ "$SC_REBOOT" == yes ]] && warn "This computer needs a restart to finish earlier updates (sudo reboot when convenient)"
 fi
 
 # v1.5.95: Admin → Node Debug reads LinBPQ's NodeDebuglog_YYMMDD.log from its logs folder

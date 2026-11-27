@@ -18,6 +18,8 @@ return [
     'station' => [
         'callsign' => 'YOURCALL',           // Your FCC callsign (uppercase)
         'node'     => 'YOURCALL-4',         // Your BPQ node identifier (callsign-SSID)
+        'network'  => '',                   // v1.5.100: network shown under the menu logo, e.g. 'TPRFN'
+                                            //   ("YOURCALL-4 · affiliated with TPRFN"); '' = node only
         'hub'      => '',                   // Optional: your VARA HF hub SSID (e.g. YOURCALL-7) — enables
                                             //   band/frequency correlation from your own BBS log
         'grid'     => '',                   // Maidenhead grid (e.g. FN31PR). Public pages show the

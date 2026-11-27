@@ -336,7 +336,7 @@ def partner_events(lines, name, since):
             att['failmsg'] = True
         reached = kind == '<' and (RE_SID.match(text) or RE_PROTO.match(text) or RE_REACHED.search(text)
                                    or up.startswith('ALREADY CONNECTED'))
-        if kind == '<' and att and ('PORT IN USE' in up or 'CHANNEL BUSY' in up or 'PORT BUSY' in up):
+        if kind == '<' and att and ('PORT IN USE' in up or 'CHANNEL BUSY' in up or 'PORT BUSY' in up or 'PORT SUSPENDED' in up):   # v1.5.96: suspended too
             att['busy'] = True   # our side was busy: not the partner's fault
             continue
         if kind == '|' and up.endswith('DISCONNECTED'):

@@ -1377,6 +1377,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 // Every request below talks to the BBS: take the shared lock first, and
 // release it when PHP finishes (all paths end in echo/exit/apiError).
+require_once __DIR__ . '/includes/wp-lookup.php';   // v1.5.96: wpLookup()
+// v1.5.96: the White Pages lookup only reads WP.cfg: answer it before waiting
+// for the BBS telnet lock (which the background message download holds for
+// seconds at a time), so To-field suggestions come back at once.
+if (($_GET['action'] ?? '') === 'wp' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    if (!headers_sent()) header('Content-Type: application/json');
+    echo json_encode(wpLookup((string)($_GET['q'] ?? '')), JSON_INVALID_UTF8_SUBSTITUTE);
+    exit;
+}
+
 $bpqLock = bpqTelnetLock(40);
 if ($bpqLock === false) {
     logMessage("BBS busy: lock not free after 40 s");
@@ -1476,6 +1486,8 @@ $allowedActions = [
     'list_personal', 'list_traffic', 'list_bulletins',
     // v2.1 — combined-session listing (preferred for v2 client)
     'list_all',
+    // v1.5.96 — To-field suggestions from LinBPQ's White Pages (WP.cfg)
+    'wp',
 ];
 
 // Kill / Forward moved to POST (2026-10-20); say so instead of "Invalid action".
@@ -1498,6 +1510,10 @@ if (!headers_sent()) {
 }
 
 switch ($action) {
+    case 'wp':   // v1.5.96: White Pages lookup for the To field: callsigns starting with q
+        echo json_encode(wpLookup((string)($_GET['q'] ?? '')), JSON_INVALID_UTF8_SUBSTITUTE);
+        break;
+
     case 'read':
         if (!validateMsgNum($msgNum)) {
             apiError('Invalid message number');

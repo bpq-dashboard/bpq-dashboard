@@ -1,333 +1,194 @@
 <!--
-  _nav.html — Shared navigation partial for BPQ Dashboard
-  
+  _nav.html — Shared navigation partial for BPQ Dashboard (v1.5.100 menu)
   Loaded via fetch() by every page. Pages tag themselves with
-  <body data-nav-page="rf"> so the active link gets highlighted.
-  
+  <body data-nav-page="rf"> so the active link and its group light up.
   Structure:
-    Desktop:  brand | clocks | [13 daily links] [Admin ▾ dropdown]
-    Mobile:   brand | clocks | hamburger
-              ↓ tap hamburger
-              [13 daily links] [── Admin section header ──] [5 admin links]
-  
+    Desktop:  [meter logo] BPQ Dashboard / station line | Station ▾ Mail ▾ On air ▾ Radio ▾ Weather
+              | clocks ☀ ⚙ | Guide | Admin ▾ (two-column panel)
+    Mobile:   logo | clocks | hamburger → groups as an accordion, Admin last
+  Kept for other code: .bpq-nav, .bpq-nav-clocks (#navUtcClock, #navLocalClock,
+  #darkModeToggle; the settings gear is added there), a.bpq-nav-link-guide,
+  #bpqNavHamburger, #bpqNavLinks, #bpqNavAdmin / #bpqNavAdminBtn, and
+  .bpq-nav-link[data-page] (optional pages are hidden by that key).
   See bpq-nav-loader.js for fetch + inject + active-link + dropdown logic.
 -->
 <style>
-.bpq-nav {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-    border-bottom: 1px solid rgba(139, 92, 246, 0.3);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-    margin-bottom: 1rem;
-    position: sticky;
-    top: 0;
-    z-index: 50;
-}
-.bpq-nav-inner {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 0.75rem 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-.bpq-nav-brand {
-    font-size: 1.125rem;
-    font-weight: 700;
-    background: linear-gradient(90deg, #a78bfa 0%, #60a5fa 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    flex-shrink: 0;
-    text-decoration: none;
-}
-.bpq-nav-clocks {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-    font-size: 0.75rem;
-    flex-shrink: 0;
-}
-.bpq-nav-clock-utc {
-    padding: 0.3rem 0.6rem;
-    border-radius: 0.375rem;
-    background: linear-gradient(90deg, #7c3aed 0%, #2563eb 100%);
-    color: #ffffff;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-}
-.bpq-nav-clock-local {
-    padding: 0.3rem 0.6rem;
-    border-radius: 0.375rem;
-    background: #374151;
-    color: #d1d5db;
-    font-weight: 600;
-}
-.bpq-nav-theme-btn {
-    padding: 0.25rem 0.45rem;
-    border-radius: 0.375rem;
-    background: rgba(139, 92, 246, 0.15);
-    color: #e5e7eb;
-    border: 1px solid rgba(139, 92, 246, 0.3);
-    cursor: pointer;
-    font-size: 0.95rem;
-    line-height: 1;
-    transition: background 0.15s;
-}
-.bpq-nav-theme-btn:hover {
-    background: rgba(139, 92, 246, 0.3);
-}
-.bpq-nav-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    align-items: center;
-}
-.bpq-nav-link {
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
-    color: #d1d5db;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 0.85rem;
-    transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
-}
-.bpq-nav-link:hover {
-    background: rgba(139, 92, 246, 0.15);
-    color: #ffffff;
-}
-.bpq-nav-link.active {
-    background: rgba(139, 92, 246, 0.25);
-    color: #ffffff;
-    border: 1px solid rgba(139, 92, 246, 0.4);
-}
-
-/* User Guide link — visually distinct since it's reference docs,
-   not a dashboard page. Subtle gradient on hover to suggest "external" */
-.bpq-nav-link-guide {
-    border: 1px solid rgba(167, 139, 250, 0.25);
-    color: #c4b5fd;
-}
-.bpq-nav-link-guide:hover {
-    background: rgba(167, 139, 250, 0.2);
-    color: #ffffff;
-    border-color: rgba(167, 139, 250, 0.5);
-}
-
-/* Admin dropdown — desktop: hover or click. Mobile: inline section. */
-.bpq-nav-admin {
-    position: relative;
-}
-.bpq-nav-admin-btn {
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
-    color: #d1d5db;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: 0.85rem;
-    transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-.bpq-nav-admin-btn:hover {
-    background: rgba(139, 92, 246, 0.15);
-    color: #ffffff;
-}
-.bpq-nav-admin-btn.active {
-    background: rgba(139, 92, 246, 0.25);
-    color: #ffffff;
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    padding: calc(0.5rem - 1px) calc(0.75rem - 1px);  /* Account for border */
-}
-.bpq-nav-admin-caret {
-    font-size: 0.6rem;
-    margin-left: 0.1rem;
-    transition: transform 0.15s;
-}
-.bpq-nav-admin.open .bpq-nav-admin-caret {
-    transform: rotate(180deg);
-}
-.bpq-nav-admin-menu {
-    display: none;
-    position: absolute;
-    top: calc(100% + 0.25rem);
-    right: 0;
-    min-width: 180px;
-    background: #1f2937;
-    border: 1px solid rgba(139, 92, 246, 0.3);
-    border-radius: 0.5rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-    padding: 0.25rem;
-    z-index: 60;
-}
-.bpq-nav-admin.open .bpq-nav-admin-menu {
-    display: block;
-    animation: bpq-nav-slide 0.15s ease-out;
-}
-.bpq-nav-admin-menu .bpq-nav-link {
-    display: block;
-    padding: 0.6rem 0.75rem;
-    border-radius: 0.375rem;
-}
-
-.bpq-nav-hamburger {
-    display: none;
-    width: 44px;
-    height: 44px;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.5rem;
-    background: rgba(139, 92, 246, 0.15);
-    color: #d1d5db;
-    border: 1px solid rgba(139, 92, 246, 0.3);
-    cursor: pointer;
-    font-size: 1.5rem;
-    line-height: 1;
-    padding: 0;
-}
-.bpq-nav-hamburger:hover {
-    background: rgba(139, 92, 246, 0.25);
-    color: #ffffff;
-}
-
-/* Section divider for admin items in mobile drawer (desktop hides this) */
-.bpq-nav-section {
-    display: none;
-}
-
-@media (max-width: 767px) {
-    .bpq-nav-hamburger {
-        display: flex;
-    }
-    .bpq-nav-links {
-        display: none;
-        flex-direction: column;
-        align-items: stretch;
-        width: 100%;
-        margin-top: 0.5rem;
-        gap: 0.25rem;
-        padding-top: 0.5rem;
-        border-top: 1px solid rgba(139, 92, 246, 0.2);
-    }
-    .bpq-nav-links.open {
-        display: flex;
-        animation: bpq-nav-slide 0.2s ease-out;
-    }
-    .bpq-nav-link {
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
-        border-radius: 0.5rem;
-    }
-    .bpq-nav-clocks {
-        order: 1;
-        font-size: 0.7rem;
-    }
-    .bpq-nav-clock-utc, .bpq-nav-clock-local {
-        padding: 0.25rem 0.5rem;
-    }
-    /* On mobile, the desktop dropdown becomes flat: hide the button,
-       show admin items inline under a section divider */
-    .bpq-nav-admin {
-        display: contents;   /* let children flow into parent flex */
-    }
-    .bpq-nav-admin-btn {
-        display: none;
-    }
-    .bpq-nav-admin-menu {
-        display: contents;
-        position: static;
-        box-shadow: none;
-        background: none;
-        border: none;
-        padding: 0;
-    }
-    .bpq-nav-admin-menu .bpq-nav-link {
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
-        border-radius: 0.5rem;
-    }
-    .bpq-nav-section {
-        display: block;
-        padding: 0.5rem 0.5rem 0.25rem;
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: #9ca3af;
-        border-top: 1px solid rgba(139, 92, 246, 0.15);
-        margin-top: 0.5rem;
-    }
-}
-
-@keyframes bpq-nav-slide {
-    from { opacity: 0; transform: translateY(-8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
+.bpq-nav{background:#161b22;border-bottom:1px solid #30363d;margin-bottom:1rem;position:sticky;top:0;z-index:50;
+  font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;color:#e6edf3}
+.bpq-nav *{box-sizing:border-box}
+.bpq-nav-inner{max-width:1440px;margin:0 auto;padding:0 1rem;min-height:64px;display:flex;align-items:center;gap:1.25rem}
+.bpq-nav.compact .bpq-nav-clock-local,.bpq-nav.compact .bpq-nav-station{display:none}
+.bpq-nav.compact .bpq-nav-inner{gap:.75rem}
+.bpq-nav-brand{display:flex;align-items:center;gap:.7rem;flex-shrink:0;text-decoration:none;color:#e6edf3}
+.bpq-nav-brand svg{width:38px;height:38px;flex-shrink:0}
+.bpq-nav-brand-text{display:flex;flex-direction:column;line-height:1.15}
+.bpq-nav-brand-name{font-family:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;font-weight:700;font-size:1rem;letter-spacing:-.02em;color:#e6edf3}
+.bpq-nav-station{font-family:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;font-size:.7rem;color:#8b949e;white-space:nowrap}
+.bpq-nav-links{display:flex;align-items:center;gap:.4rem;flex:1 0 auto;order:2}
+.bpq-nav-groups{display:flex;align-items:center;gap:.15rem;flex:1 1 auto}
+.bpq-nav-group{position:relative}
+.bpq-nav-gbtn{font:500 .875rem/1 inherit;font-family:inherit;min-height:40px;padding:.5rem .7rem;border-radius:8px;cursor:pointer;
+  display:flex;align-items:center;gap:.45rem;color:#c9d1d9;background:transparent;border:1px solid transparent;white-space:nowrap;text-decoration:none}
+.bpq-nav-gbtn:hover,.bpq-nav-group.open>.bpq-nav-gbtn{background:#21262d;color:#fff;border-color:#30363d}
+.bpq-nav-gbtn.active{color:#fff;background:#1c2128;box-shadow:inset 0 -2px 0 var(--g,#3fb950)}
+.bpq-nav-dot{width:8px;height:8px;border-radius:50%;background:var(--g,#3fb950);flex-shrink:0}
+.bpq-nav-caret{width:12px;height:12px;transition:transform .15s}
+.bpq-nav-group.open .bpq-nav-caret{transform:rotate(180deg)}
+.bpq-nav-menu{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:270px;background:#161b22;border:1px solid #30363d;
+  border-radius:10px;padding:.5rem;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.bpq-nav-group.open .bpq-nav-menu{display:block;animation:bpq-nav-slide .15s ease-out}
+.bpq-nav-cap{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.68rem;color:#8b949e;text-transform:uppercase;letter-spacing:.08em;padding:.35rem .6rem .5rem}
+.bpq-nav-link{display:flex;flex-direction:column;padding:.55rem .65rem;border-radius:8px;color:#e6edf3;text-decoration:none;font-weight:600;font-size:.875rem;line-height:1.3}
+.bpq-nav-link small{font-weight:400;font-size:.75rem;color:#8b949e}
+.bpq-nav-link:hover{background:#21262d;color:#fff}
+.bpq-nav-link.active{background:#1c2a1f;color:#fff}
+.bpq-nav-right{display:flex;align-items:center;gap:.5rem;flex-shrink:0;order:3}
+.bpq-nav-clocks{display:flex;align-items:center;gap:.35rem;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.72rem}
+.bpq-nav-clock-utc{padding:.3rem .55rem;border-radius:6px;background:#0d2340;color:#79c0ff;font-weight:700;border:1px solid #1f6feb}
+.bpq-nav-clock-local{padding:.3rem .55rem;border-radius:6px;background:#21262d;color:#c9d1d9;border:1px solid #30363d}
+.bpq-nav-theme-btn{width:34px;height:34px;border-radius:8px;border:1px solid #30363d;background:transparent;color:#c9d1d9;cursor:pointer;font-size:.95rem;line-height:1}
+.bpq-nav-theme-btn:hover{background:#21262d}
+.bpq-nav-guide{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.8rem;padding:.5rem .7rem;border-radius:8px;border:1px solid #30363d;color:#58a6ff;text-decoration:none;white-space:nowrap}
+.bpq-nav-guide:hover{background:#0d2340;color:#79c0ff}
+.bpq-nav-admin{position:relative}
+.bpq-nav-admin-btn{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.8rem;font-weight:700;min-height:40px;padding:.5rem .75rem;border-radius:8px;
+  border:1px solid #d29922;background:#3d2b05;color:#f2cc60;cursor:pointer;display:flex;align-items:center;gap:.45rem;white-space:nowrap}
+.bpq-nav-admin-btn:hover,.bpq-nav-admin.open .bpq-nav-admin-btn,.bpq-nav-admin-btn.active{background:#5a3f08;color:#ffe08a}
+.bpq-nav-admin-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:60;width:480px;background:#161b22;border:1px solid #30363d;border-radius:10px;
+  padding:.5rem;box-shadow:0 12px 32px rgba(0,0,0,.45);grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}
+.bpq-nav-admin.open .bpq-nav-admin-menu{display:grid;animation:bpq-nav-slide .15s ease-out}
+.bpq-nav-hamburger{display:none;width:44px;height:44px;align-items:center;justify-content:center;border-radius:8px;background:#21262d;color:#e6edf3;
+  border:1px solid #30363d;cursor:pointer;font-size:1.4rem;line-height:1;padding:0;margin-left:auto}
+.bpq-nav-section{display:none}
+/* narrow: set by bpq-nav-loader.js when the full menu doesn't fit (or below 1100 px) */
+.bpq-nav.narrow .bpq-nav-inner{flex-wrap:wrap;padding:.5rem .75rem;gap:.5rem}
+.bpq-nav.narrow .bpq-nav-hamburger{display:flex}
+.bpq-nav.narrow .bpq-nav-station{display:none}
+.bpq-nav.narrow .bpq-nav-right{order:2}
+.bpq-nav.narrow .bpq-nav-hamburger{order:3;margin-left:0}
+.bpq-nav.narrow .bpq-nav-brand{margin-right:auto}
+.bpq-nav.narrow .bpq-nav-links{display:none;order:4;width:100%;flex-direction:column;align-items:stretch;border-top:1px solid #30363d;padding:.5rem 0}
+.bpq-nav.narrow .bpq-nav-links.open{display:flex;animation:bpq-nav-slide .2s ease-out}
+.bpq-nav.narrow .bpq-nav-groups{flex-direction:column;align-items:stretch;gap:0}
+.bpq-nav.narrow .bpq-nav-group{border-bottom:1px solid #21262d}
+.bpq-nav.narrow .bpq-nav-gbtn{width:100%;min-height:48px;font-size:1rem;font-weight:600;border:0;border-radius:0;justify-content:flex-start}
+.bpq-nav.narrow .bpq-nav-gbtn.active{box-shadow:none}
+.bpq-nav.narrow .bpq-nav-menu,.bpq-nav.narrow .bpq-nav-admin-menu{position:static;box-shadow:none;border:0;background:none;width:auto;min-width:0;padding:0 0 .5rem 1.4rem}
+.bpq-nav.narrow .bpq-nav-admin-menu{grid-template-columns:1fr}
+.bpq-nav.narrow .bpq-nav-cap{display:none}
+.bpq-nav.narrow .bpq-nav-link{min-height:44px;justify-content:center}
+.bpq-nav.narrow .bpq-nav-guide{order:5;text-align:left;border:0;padding:.85rem .7rem;font-size:1rem}
+.bpq-nav.narrow .bpq-nav-admin{order:6}
+.bpq-nav.narrow .bpq-nav-admin-btn{width:100%;min-height:48px;font-size:1rem;margin-top:.5rem}
+@media (max-width:520px){.bpq-nav-brand-name{font-size:.9rem}.bpq-nav-clocks .bpq-nav-clock-utc{display:none}}
+.bpq-nav.narrow .bpq-nav-clock-local{display:none}
+@keyframes bpq-nav-slide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+@media print{.bpq-nav{display:none}}
 </style>
 
-<nav class="bpq-nav">
+<nav class="bpq-nav" aria-label="Main menu">
     <div class="bpq-nav-inner">
-        <a href="/bpq-rf-connections.html" class="bpq-nav-brand">📡 BPQ Dashboard</a>
-        <div class="bpq-nav-clocks">
-            <span id="navUtcClock"   class="bpq-nav-clock-utc"   title="UTC / Zulu">--:--:-- Z</span>
-            <span id="navLocalClock" class="bpq-nav-clock-local" title="Local time">--:--:-- L</span>
-            <button id="darkModeToggle" type="button"
-                    class="bpq-nav-theme-btn"
-                    aria-label="Toggle day/night theme"
-                    title="Toggle day/night theme"
-                    onclick="if(window.toggleDarkMode)window.toggleDarkMode()">🌙</button>
+        <a href="/bpq-rf-connections.html" class="bpq-nav-brand" title="BPQ Dashboard: RF Connections">
+            <svg viewBox="0 0 170 170" aria-hidden="true">
+                <rect x="2" y="2" width="166" height="166" rx="36" fill="#0d1117" stroke="#30363d" stroke-width="4"/>
+                <path d="M38 120 A47 47 0 0 1 58 82" fill="none" stroke="#3fb950" stroke-width="14" stroke-linecap="round"/>
+                <path d="M64 76 A47 47 0 0 1 106 76" fill="none" stroke="#d29922" stroke-width="14" stroke-linecap="round"/>
+                <path d="M112 82 A47 47 0 0 1 132 120" fill="none" stroke="#58a6ff" stroke-width="14" stroke-linecap="round"/>
+                <line x1="85" y1="120" x2="110" y2="84" stroke="#e6edf3" stroke-width="7" stroke-linecap="round"/>
+                <circle cx="85" cy="120" r="10" fill="#e6edf3"/>
+                <path d="M68 44 A24 24 0 0 1 102 44" fill="none" stroke="#3fb950" stroke-width="6" stroke-linecap="round"/>
+                <path d="M58 32 A38 38 0 0 1 112 32" fill="none" stroke="#3fb950" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+            </svg>
+            <span class="bpq-nav-brand-text">
+                <span class="bpq-nav-brand-name">BPQ Dashboard</span>
+                <span id="bpqNavStation" class="bpq-nav-station"></span>
+            </span>
+        </a>
+
+        <div class="bpq-nav-right">
+            <div class="bpq-nav-clocks">
+                <span id="navUtcClock"   class="bpq-nav-clock-utc"   title="UTC / Zulu">--:--:-- Z</span>
+                <span id="navLocalClock" class="bpq-nav-clock-local" title="Local time">--:--:-- L</span>
+                <button id="darkModeToggle" type="button" class="bpq-nav-theme-btn"
+                        aria-label="Toggle day/night theme" title="Toggle day/night theme"
+                        onclick="if(window.toggleDarkMode)window.toggleDarkMode()">🌙</button>
+            </div>
         </div>
+
         <button id="bpqNavHamburger" class="bpq-nav-hamburger" type="button"
-                aria-label="Toggle navigation menu" aria-expanded="false">☰</button>
+                aria-label="Open the menu" aria-expanded="false" aria-controls="bpqNavLinks">☰</button>
+
         <div id="bpqNavLinks" class="bpq-nav-links">
-            <!-- Daily-use links (13 entries) -->
-            <a href="/bpq-rf-connections.html"  class="bpq-nav-link" data-page="rf">RF</a>
-            <a href="/bpq-traffic.html"          class="bpq-nav-link" data-page="traffic">Traffic</a>
-            <a href="/bpq-system-logs.html"      class="bpq-nav-link" data-page="system">System</a>
-            <a href="/bpq-connect-log.html"      class="bpq-nav-link" data-page="connects">Connects</a>
-            <a href="/bpq-email-monitor.html"    class="bpq-nav-link" data-page="messages">Messages</a>
-            <a href="/bbs-messages.html"         class="bpq-nav-link" data-page="bbs">Email</a>
-            <a href="/nws-dashboard.html"        class="bpq-nav-link" data-page="weather">Weather</a>
-            <a href="/bpq-chat.html"             class="bpq-nav-link" data-page="chat">Chat</a>
-            <a href="/bpq-aprs.html"             class="bpq-nav-link" data-page="aprs">APRS</a>
-            <a href="/bpq-vara.html"             class="bpq-nav-link" data-page="vara">VARA</a>
-            <a href="/bpq-telnet.html"           class="bpq-nav-link" data-page="telnet">Telnet</a>
-            <a href="/rig-status.html"           class="bpq-nav-link" data-page="rig">Rig</a>
-            <a href="/rf-power-monitor.html"     class="bpq-nav-link" data-page="rf-power">RF Power</a>
+            <div class="bpq-nav-groups">
+                <div class="bpq-nav-group" data-group="station" style="--g:#3fb950">
+                    <button type="button" class="bpq-nav-gbtn" aria-expanded="false"><span class="bpq-nav-dot"></span>Station
+                        <svg class="bpq-nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                    <div class="bpq-nav-menu">
+                        <div class="bpq-nav-cap">How the station is doing</div>
+                        <a href="/bpq-rf-connections.html" class="bpq-nav-link" data-page="rf">RF Connections<small>Sessions, partners, channel quality</small></a>
+                        <a href="/bpq-traffic.html"        class="bpq-nav-link" data-page="traffic">Traffic<small>Messages in and out by day</small></a>
+                        <a href="/bpq-system-logs.html"    class="bpq-nav-link" data-page="system">System Logs<small>Live BPQ logs, heard lists</small></a>
+                        <a href="/bpq-connect-log.html"    class="bpq-nav-link" data-page="connects">Connects<small>Who connected, and how</small></a>
+                    </div>
+                </div>
+                <div class="bpq-nav-group" data-group="mail" style="--g:#58a6ff">
+                    <button type="button" class="bpq-nav-gbtn" aria-expanded="false"><span class="bpq-nav-dot"></span>Mail
+                        <svg class="bpq-nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                    <div class="bpq-nav-menu">
+                        <div class="bpq-nav-cap">BBS mail</div>
+                        <a href="/bbs-messages.html"      class="bpq-nav-link" data-page="bbs">Email<small>Read and send BBS mail</small></a>
+                        <a href="/bpq-email-monitor.html" class="bpq-nav-link" data-page="messages">Messages<small>Forwarding and the queue</small></a>
+                    </div>
+                </div>
+                <div class="bpq-nav-group" data-group="onair" style="--g:#d29922">
+                    <button type="button" class="bpq-nav-gbtn" aria-expanded="false"><span class="bpq-nav-dot"></span>On air
+                        <svg class="bpq-nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                    <div class="bpq-nav-menu">
+                        <div class="bpq-nav-cap">Talk to other stations</div>
+                        <a href="/bpq-chat.html"   class="bpq-nav-link" data-page="chat">Chat<small>The chat network</small></a>
+                        <a href="/bpq-vara.html"   class="bpq-nav-link" data-page="vara">VARA<small>VARA HF terminal</small></a>
+                        <a href="/bpq-telnet.html" class="bpq-nav-link" data-page="telnet">Telnet<small>Node console</small></a>
+                        <a href="/bpq-aprs.html"   class="bpq-nav-link" data-page="aprs">APRS<small>Stations on the map</small></a>
+                    </div>
+                </div>
+                <div class="bpq-nav-group" data-group="radio" style="--g:#a855f7">
+                    <button type="button" class="bpq-nav-gbtn" aria-expanded="false"><span class="bpq-nav-dot"></span>Radio
+                        <svg class="bpq-nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                    <div class="bpq-nav-menu">
+                        <div class="bpq-nav-cap">The rig</div>
+                        <a href="/rig-status.html"       class="bpq-nav-link" data-page="rig">Rig<small>Frequency, mode, flrig</small></a>
+                        <a href="/rf-power-monitor.html" class="bpq-nav-link" data-page="rf-power">RF Power<small>TX power and SWR history</small></a>
+                    </div>
+                </div>
+                <div class="bpq-nav-group" data-group="weather" style="--g:#39d0d8">
+                    <button type="button" class="bpq-nav-gbtn" aria-expanded="false"><span class="bpq-nav-dot"></span>Weather
+                        <svg class="bpq-nav-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+                    <div class="bpq-nav-menu">
+                        <div class="bpq-nav-cap">NWS</div>
+                        <a href="/nws-dashboard.html" class="bpq-nav-link" data-page="weather">NWS alerts<small>Alerts and automatic bulletins</small></a>
+                    </div>
+                </div>
+            </div>
 
-            <!-- User Guide — opens the PDF in a new tab. Subtle visual
-                 differentiation via the 📖 icon since this is reference
-                 material, not a dashboard page. Target=_blank so it
-                 doesn't replace whatever the user was working on. -->
-            <a href="/BPQ-Dashboard-v1.5.95-User-Guide.pdf"
-               target="_blank"
-               rel="noopener"
-               class="bpq-nav-link bpq-nav-link-guide"
-               data-page="guide"
-               title="BPQ Dashboard User Guide (PDF)">📖 Guide</a>
+            <a href="/BPQ-Dashboard-v1.6.0-User-Guide.pdf" target="_blank" rel="noopener"
+               class="bpq-nav-guide bpq-nav-link-guide" data-page="guide"
+               title="BPQ Dashboard User Guide (PDF)">Guide</a>
 
-            <!-- Admin dropdown (5 entries grouped behind a desktop dropdown) -->
             <div class="bpq-nav-section">Admin</div>
             <div id="bpqNavAdmin" class="bpq-nav-admin">
-                <button id="bpqNavAdminBtn" class="bpq-nav-admin-btn" type="button"
-                        aria-haspopup="true" aria-expanded="false">
-                    Admin <span class="bpq-nav-admin-caret">▼</span>
+                <button id="bpqNavAdminBtn" class="bpq-nav-admin-btn" type="button" aria-haspopup="true" aria-expanded="false">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    Admin
                 </button>
                 <div class="bpq-nav-admin-menu">
-                    <a href="/admin/bpq-maintenance.html"  class="bpq-nav-link" data-page="maint">Maintenance</a>
-                    <a href="/admin/firewall-status.html"  class="bpq-nav-link" data-page="firewall">Firewall</a>
-                    <a href="/admin/log-viewer.html"       class="bpq-nav-link" data-page="logs">Logs</a>
-                    <a href="/admin/system-audit.html"     class="bpq-nav-link" data-page="audit">Audit</a>
-                    <a href="/admin/audio-map.html"        class="bpq-nav-link" data-page="audio">Audio Map</a>
-                    <a href="/admin/linbpq-status.html"    class="bpq-nav-link" data-page="linbpq">LinBPQ Status</a>
-                    <a href="/admin/node-debug.html"       class="bpq-nav-link" data-page="nodedebug">Node Debug</a>
+                    <a href="/admin/bpq-maintenance.html" class="bpq-nav-link" data-page="maint">Maintenance<small>Every admin tool, commands</small></a>
+                    <a href="/admin/system-audit.html"    class="bpq-nav-link" data-page="audit">System Audit<small>Server health check</small></a>
+                    <a href="/admin/linbpq-status.html"   class="bpq-nav-link" data-page="linbpq">LinBPQ Status<small>Starts, restarts, console</small></a>
+                    <a href="/admin/node-debug.html"      class="bpq-nav-link" data-page="nodedebug">Node Debug<small>Debug log, explained</small></a>
+                    <a href="/admin/modems.html"          class="bpq-nav-link" data-page="modems">Modems<small>VARA, Mercury, Data2G, watch-only</small></a>
+                    <a href="/admin/audio-map.html"       class="bpq-nav-link" data-page="audio">Audio Map<small>Which program uses which card</small></a>
+                    <a href="/admin/firewall-status.html" class="bpq-nav-link" data-page="firewall">Firewall<small>Ports and fail2ban</small></a>
+                    <a href="/admin/log-viewer.html"      class="bpq-nav-link" data-page="logs">Logs<small>Every log file</small></a>
                 </div>
             </div>
         </div>

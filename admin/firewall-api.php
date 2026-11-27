@@ -44,7 +44,7 @@ $LABELS = [
     445 => 'Samba SMB', 587 => 'SMTP submission', 631 => 'CUPS printing', 993 => 'IMAPS',
     3306 => 'MariaDB / MySQL', 3389 => 'RDP', 5432 => 'PostgreSQL',
     5900 => 'VNC', 5901 => 'VNC', 5902 => 'VNC', 5903 => 'VNC', 10000 => 'Webmin',
-    8765 => 'bpq-telnet WebSocket (dashboard)', 8767 => 'bpq-vara WebSocket (dashboard)',
+    8765 => 'bpq-telnet WebSocket (dashboard)', 8767 => 'bpq-vara WebSocket (dashboard)', 8769 => 'bpq-modem-relay (Admin > Modems, keep local)',
     8300 => 'VARA HF command', 8301 => 'VARA HF data',
     9025 => 'VARA validator command', 9026 => 'VARA validator data',
 ];

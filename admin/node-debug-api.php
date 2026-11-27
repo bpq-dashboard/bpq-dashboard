@@ -74,10 +74,10 @@ const KNOWN = [
         'Only worth a look if it keeps happening between restarts: check the MAP line for that station in bpq32.cfg.'],
     'forms' => ['/cant open forms dir/', 'info', "BPQ web forms folder missing",
         "BPQ's built-in web mail forms folder doesn't exist. Harmless unless you use BPQ's own web forms.",
-        'To silence it: create the folder named in the line (mkdir -p "<that folder>" as the LinBPQ user).'],
-    'rtsptt' => ['/RigControl Opening\s+for RTS PTT/', 'info', 'RTS keying set with no serial port',
-        "Rig control is asked to key with RTS but no serial port is named, so it opens nothing (the 'Error opening serial port' at every start). Keying through flrig still works.",
-        'Harmless. To tidy it, remove the RTS PTT setting from that radio port in bpq32.cfg.'],
+        'To silence it, create that folder exactly as the line names it: everything between "dir " and the two numbers at the end (those are an error code, not part of the name), e.g. mkdir -p /path/to/linbpq/Standard_Templates, then chown it to the LinBPQ user. Copy the name from the line rather than typing it (it has an underscore, not a space); put it in quotes if it does contain a space. LinBPQ notices at its next start.'],
+    'rtsptt' => ['/RigControl Opening\s+for RTS PTT/', 'info', 'Rig control start-up note (no serial PTT port)',
+        "Logged once each time LinBPQ starts, right after it reads a RADIO block that talks to flrig or hamlib over the network: there is no serial port to open for RTS keying, so the name is blank. Keying goes through flrig / hamlib (PTT CAT) and works.",
+        'Nothing to fix: it is not an error. (Removing RTS / DTR from the modem ports\' ADDR lines does not stop it; it comes from the RADIO block.)'],
     'tcpsend' => ['/TCP Send Failed/', 'info', 'Internet link send failed and was retried',
         'A send on a telnet / AXIP / internet link failed and LinBPQ queued the data again.', 'Occasional ones are normal.'],
     'deferred' => ['/Message \d+ deferred/', 'info', 'Forwarding offers deferred',
@@ -345,6 +345,18 @@ function system_events(array $d): array {
         }
     }
     if (!empty($d['boot']) && ($t = strtotime((string)$d['boot']))) $E[] = ['t' => $t, 'k' => 'boot', 'line' => 'current boot'];
+    foreach ((array)($d['root_logins'] ?? []) as $l) {             // v1.5.96: root sessions (last -F --time-format iso)
+        if (!preg_match('/^root\s+(\S+)\s+(\S+)?\s*(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:?\d\d)\s+(?:-\s+(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:?\d\d)|still logged in|-\s+\w+)/', (string)$l, $m)) continue;
+        $t0 = strtotime($m[3]); if (!$t0) continue;
+        $t1 = !empty($m[4]) ? strtotime($m[4]) : (stripos((string)$l, 'still logged in') !== false ? time() + 60 : $t0 + 1);
+        $from = preg_match('/^\d{1,3}(\.\d{1,3}){3}$|:/', (string)($m[2] ?? '')) ? 'SSH from ' . $m[2] : (preg_match('/^tty/', $m[1]) ? 'the console (' . $m[1] . ')' : $m[1] . (($m[2] ?? '') !== '' ? ' from ' . $m[2] : ''));
+        $E[] = ['t' => $t0, 'k' => 'rootlogin', 'end' => $t1, 'x' => $from, 'line' => trim((string)$l)];
+    }
+    foreach ((array)($d['jobs_at_stops'] ?? []) as $j) {           // v1.5.96: a job still running when LinBPQ was stopped
+        if (!is_array($j) || !($ts = strtotime((string)($j['stop'] ?? ''))) || !($t0 = strtotime((string)($j['started'] ?? '')))) continue;
+        $E[] = ['t' => $ts, 'k' => 'job', 'started' => $t0, 'unit' => preg_replace('/\.service$/', '', (string)($j['unit'] ?? '')), 'x' => (string)($j['desc'] ?? ''),
+                'line' => gmdate('Y-m-d H:i:s', $t0) . 'Z started ' . ($j['unit'] ?? '') . (($j['desc'] ?? '') !== '' ? ' (' . $j['desc'] . ')' : '') . ', still running when LinBPQ was stopped'];
+    }
     usort($E, fn($a, $b) => $a['t'] <=> $b['t']);
     return $E;
 }
@@ -393,6 +405,15 @@ function explain_starts(array &$S): void {
             $why = ['watchdog', 'Connect Watchdog', 'The Connect Watchdog restarted LinBPQ to change forwarding: ' . $w['what'] . '.'];
             $ev[] = 'connect-watchdog.log: ' . $fmt($w['t']) . ' Stopping LinBPQ (' . $w['what'] . ')';
         }
+        // 3b. a scheduled job (a backup, typically) still running when LinBPQ was stopped (v1.5.96)
+        if (!$why && ($x = $in($at - 300, $at + 5, ['job']))) {
+            $x = end($x);
+            $bk = preg_match('/backup|restic|borg|rsnapshot|snapshot|rsync|duplicity|timeshift/i', $x['unit'] . ' ' . $x['x']);
+            $why = ['job', ($bk ? 'Backup: ' : 'Job: ') . $x['unit'],
+                ($x['x'] !== '' ? $x['x'] . ' (' . $x['unit'] . ')' : $x['unit']) . ' started at ' . $fmt($x['started']) . ' and was still running when LinBPQ was stopped at ' . $fmt($x['t']) . '.'
+                . ($bk ? ' Backups stop LinBPQ for a few seconds so its BBS files are copied while nothing is writing to them; this is expected.' : ' That job most likely stopped it.')];
+            $ev[] = $x['line'];
+        }
         // 4. someone with sudo, 5. a cron job
         if (!$why && ($x = $in($at - 300, $at + 5, ['sudo']))) {
             $x = end($x);
@@ -406,6 +427,17 @@ function explain_starts(array &$S): void {
             $ev[] = $x['line'];
         }
         // 6. systemd was asked to stop it, by root with no sudo record
+        if (!$why && ($x = $in($at - 300, $at + 5, ['stopping', 'term']))) {
+            $x = end($x);
+            // v1.5.96: a root login open at that moment (a restart typed in a root shell leaves no sudo record)
+            $rl = array_values(array_filter($E, fn($e) => $e['k'] === 'rootlogin' && $e['t'] <= $x['t'] && $e['end'] >= $x['t'] - 2));
+            if ($rl) {
+                $r = end($rl);
+                $why = ['manual', 'Root login', 'Restarted from a root session: systemd was told to stop LinBPQ at ' . $fmt($x['t']) . ' while root was logged in (' . $r['x'] . ', since ' . $fmt($r['t'])
+                    . ($x['t'] - $r['t'] < 120 ? ', ' . ($x['t'] - $r['t']) . ' s earlier' : '') . '). Commands typed as root need no sudo, so nothing else records them.'];
+                $ev[] = $x['line']; $ev[] = 'last: ' . $r['line'];
+            }
+        }
         if (!$why && ($x = $in($at - 300, $at + 5, ['stopping', 'term']))) {
             $x = end($x);
             $rs = $in($at - 43200, $at, ['rootshell']); $r = $rs ? end($rs) : null;
@@ -435,7 +467,7 @@ function explain_starts(array &$S): void {
             $checked = [];
             $checked[] = $wd['readable'] ? "Connect Watchdog: no restart in its log then." : "Connect Watchdog: its log (" . $wd['file'] . ") couldn't be read.";
             if (($h['_state'] ?? '') === 'ok') {
-                $checked[] = 'System records: no crash, out-of-memory, sudo, cron, reboot or systemd stop for LinBPQ then.';
+                $checked[] = 'System records: no crash, out-of-memory, sudo, cron, reboot, scheduled job or systemd stop for LinBPQ then.';
                 if (empty($h['journal_persistent'])) $checked[] = 'The system journal isn\'t kept across reboots here, so older records may be gone.';
                 if (($h['how']['kind'] ?? '') !== 'systemd') $checked[] = 'LinBPQ isn\'t run by systemd here (' . ($h['how']['kind'] ?? 'unknown') . '), so there is no service record of stops and starts.';
             } else {
@@ -455,6 +487,7 @@ function explain_starts(array &$S): void {
                     ['Everything the system logged then', "sudo journalctl --utc --since \"$a\" --until \"$b2\" -o short-iso"],
                     ['LinBPQ\'s service then', "sudo journalctl --utc -u $unit --since \"$a\" --until \"$b2\" -o short-iso"],
                     ['Logins, reboots and shutdowns', 'last -x -F | head -25'],
+                    ['Root\'s typed commands (no times, newest last)', 'sudo grep -nE "systemctl.*bpq|linbpq|kill" /root/.bash_history | tail -8'],
                     ['Other jobs that could restart LinBPQ', 'sudo grep -rnE "bpq|linbpq" /etc/crontab /etc/cron.d /var/spool/cron/crontabs 2>/dev/null'],
                     ['Crash dumps and memory kills', 'coredumpctl list --no-pager 2>/dev/null | grep -i bpq; sudo dmesg -T | grep -iE "oom|killed process|segfault"'],
                 ],

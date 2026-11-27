@@ -5,8 +5,8 @@
  * Tabbed settings UI for the admin pages (2026-10-25: loaded only by
  * admin/*.html, which sit behind the admin login).
  * Injects a ⚙ gear icon into the nav bar, renders a full-screen modal
- * with 5 tabs: Station Info, Forwarding Partners, Prop Scheduler,
- * Storm Monitor, Paths & System.
+ * with 6 tabs: Station Info, Forwarding Partners, Prop Scheduler,
+ * Storm Monitor, Watchdog (v1.5.90), Paths & System.
  *
  * Usage: <script src="/shared/settings-modal.js"></script>
  * Requires: /settings-api.php in the web root.

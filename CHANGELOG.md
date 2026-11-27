@@ -4,6 +4,338 @@ All notable changes to BPQ Dashboard will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-27
+
+General release. No code changes beyond 1.5.102; the version moves to 1.6
+to mark the dashboard ready for any LinBPQ sysop.
+
+### Changed
+- README opens with an introduction (why it was created, what it is, what
+  each menu offers, installing and updating, written by K1AJD).
+- Manual *What's New* entry for 1.6.0; version 1.6.0 throughout (installer,
+  pages, docs, PDFs). update.sh compares versions with `sort -V`, so 1.6.0
+  is seen as newer than every 1.5.x.
+
+## [1.5.102] - 2026-11-27
+
+### Added (system check for installs and updates, K1AJD)
+- `tools/system-check.sh` (sourced by install.sh and update.sh; on its own
+  it only reports): identifies the OS from /etc/os-release, also when it is
+  built on Debian or Ubuntu (Raspberry Pi OS 32/64-bit via ID=raspbian or
+  /etc/rpi-issue, Linux Mint via UBUNTU_CODENAME, LMDE via DEBIAN_CODENAME,
+  Pop!_OS and others via ID_LIKE): supported (Debian 12/13, Ubuntu 24.04),
+  older (Ubuntu 22.04, until April 2027), newer than tested, interim
+  (non-LTS Ubuntu), out of support (Debian 11 / Ubuntu 20.04 and older:
+  blocks), not recognised (apt-based: asks), not apt-based (blocks).
+- Versions: installed (php, python3, mariadb/mysql incl. MariaDB 11's new
+  --version text, nginx/apache2, dovecot) else apt's candidate (php from
+  php-fpm's dependency); blocks below PHP 8.0, Python 3.8, MariaDB 10.3 /
+  MySQL 8.0; notes Dovecot below 2.3. The OS's own packages are used on
+  purpose (security fixes for the release's life); nothing from elsewhere.
+- Platform: ARM (VARA needs an x86 PC; ARM builds of Mercury/Data2G),
+  32-bit, memory < 900 MB, free disk < 2 GB (blocks < 500 MB).
+- Updates: waiting / security (apt-get -s upgrade), unattended-upgrades on
+  or off, restart pending. install.sh (step 3, after apt update) offers to
+  install waiting updates and to turn on automatic security updates (both
+  default yes; 20auto-upgrades).
+- install.sh: the check runs right after the welcome, before any question;
+  a blocking result stops with the reasons and nothing changed; the
+  summary at the end shows what the station runs. update.sh: a *System*
+  section (reports; warns on security updates waiting, an OS out of
+  support, a pending restart).
+- /etc/bpq-dashboard/system.json, shown by Install Check's new first
+  section *This Computer*.
+- Docs: Manual §3 *Supported systems* (table) and What's New, User Guide
+  §24, Maintenance *System check* section, README requirements.
+- Tested with stand-in os-release files and package versions for 18
+  systems (Debian 11/12/13/testing, Ubuntu 20.04/22.04/24.04/25.10/26.04,
+  Raspberry Pi OS 64/32-bit, Mint 21/22, LMDE 6, Pop!_OS, an unknown apt
+  system, installed Debian 12 / 13) under `set -u`.
+
+## [1.5.101] - 2026-11-27
+
+### Added (BBS Mail: select and delete several, fonts, K1AJD)
+- Message list: a tick-box column (first; added in front of saved column
+  layouts) and a select-all box in its header (all shown / none; partly
+  ticked shows a dash). A box toggles that message like Ctrl+click; Shift
+  + box selects the range. The boxes take no clicks themselves (the cell
+  does), so they always show the selection.
+- Toolbar **🗑 Delete** for the selection, *Delete (N)* with several,
+  greyed out with none.
+- Several selected: the message pane shows *N messages selected* with
+  *Delete N*, *Mark read*, *Mark unread*, *★ Star*, *Clear selection*.
+  Delete follows the existing rules (Trash, or for good from Trash with
+  the confirm and the BBS kill).
+- ≡ → Settings: *Message font* (fixed-width, Courier New, DejaVu Sans Mono,
+  sans-serif, Arial, Verdana, Georgia) and *Message text size* (11–20) with
+  a live sample, used for reading and Write; *Page text size* (Small to
+  Largest). Kept per browser (localStorage prefs); the old fixed-width
+  checkbox setting carries over. CSS variables --msg-font, --msg-size,
+  --ui-size.
+- Docs: User Guide BBS Mail (selecting, Settings), Manual What's New.
+
+## [1.5.100] - 2026-11-26
+
+### Changed (new menu and logo, K1AJD)
+- `_nav.html` rebuilt: the meter logo (logo concept A) and "BPQ Dashboard"
+  with the station line under it; the 13 page links grouped into Station
+  (RF Connections, Traffic, System Logs, Connects), Mail (Email, Messages),
+  On air (Chat, VARA, Telnet, APRS), Radio (Rig, RF Power) and Weather
+  (NWS alerts), each a click-to-open menu with a one-line description per
+  page; Guide; Admin as an amber two-column panel (8 pages); UTC / local
+  clocks and the theme button on the right (local clock hidden below
+  1240 px). The current page's group is underlined in its colour.
+- Phone and small tablet (≤ 1100 px): ☰ opens the groups as a list, the
+  current page's group unfolded, Admin last.
+- `bpq-nav-loader.js`: one menu open at a time (click outside / Esc
+  closes), active page → its group and Admin highlighted (`modems` added to
+  the Admin keys), groups whose pages are all switched off are hidden, the
+  station line filled from station-info.php, pages without a tab icon get
+  `/favicon.svg`. Menu cache 2026-11-27-3.
+- The menu always spans the whole window at the very top, also on pages
+  that put their content in a centred column with padding (the admin
+  pages, Email, Chat, System Logs, NWS …); there it had only the column's
+  width, and on a mid-size window the clocks slid over the groups and
+  Guide / the theme button were pushed out of sight (fitNav(), also on
+  resize). Checked on all 22 pages at 1366, 1150, 820 and 390 px.
+- The menu measures whether it fits instead of trusting fixed widths (the
+  browser's zoom, the station line and the admin pages' ⚙ button all change
+  it): full; else *compact* (station line and local clock hidden); else the
+  ☰ layout (always at 1100 px or less). Re-measured on resize and as the ⚙
+  button, station line and fonts arrive. Checked on 18 pages at 12 widths
+  from 1920 to 390 px (216 checks): no overlaps, nothing off-screen.
+- `favicon.svg` is the meter logo (also `logo.svg`).
+- Kept for other code: `.bpq-nav`, `.bpq-nav-clocks` with `#navUtcClock`,
+  `#navLocalClock`, `#darkModeToggle` (the settings gear joins it),
+  `a.bpq-nav-link-guide`, `#bpqNavHamburger`, `#bpqNavLinks`,
+  `#bpqNavAdmin(Btn)`, `.bpq-nav-link[data-page]`.
+
+### Added (TPRFN affiliation, K1AJD)
+- config.php `station` → `'network'` ('TPRFN' or ''); station-info.php
+  returns it as `network`. The menu shows "K1AJD-4 · affiliated with TPRFN",
+  or the node callsign alone.
+- install.sh step 1 asks *Is this station affiliated with TPRFN?* (default
+  No). update.sh asks once where config.php has no `network` yet (not with
+  `--yes` or without a terminal), backs config.php up to the update's
+  backup folder and adds the line, checking the result still loads.
+- config.php.example documents it. Docs: User Guide §2, Manual What's New
+  and the installer questions table.
+
+## [1.5.99] - 2026-11-26
+
+### Added (Admin → Modems: sound modems without a window, K1AJD)
+- On ARSSYSTEM QtSoundModem runs as `QtSoundModem64 nogui`: no window, so
+  nothing to picture. Each LinBPQ KISS-over-TCP port (`IPADDR` / `TCPPORT`)
+  now gets a status panel: the sound-modem program(s) running here
+  (QtSoundModem, soundmodem, Dire Wolf, ARDOP; options, user, start time,
+  "no window" for nogui; read from /proc, no sudo), the KISS address,
+  on air / LinBPQ not connected / modem not running / on another computer
+  (TCP states as RF Connections' VHF card), the last station heard and
+  every station heard today (net_mheard, UTC; connected in green).
+- `admin/modems-api.php` overview: `kiss` list (soundmodem_procs(),
+  kiss_modems()); works without the database (no heard list then).
+- Docs: User Guide §23 Modems, Manual What's New.
+
+### Documentation and installer review for the Modems page (K1AJD)
+- Maintenance: new *Modems page* section (window list as the web server
+  sees it, x11 tools, relay socket and log, overlap / minimised / remote
+  VARA notes), `bpq-modem-relay.socket` in the health check, the helper in
+  the sudo-rules paragraph, Key paths row, contents link.
+- System Audit: *Modems page can picture modem windows* where a desktop
+  runs (helper and xwininfo / xwd present, or the fix).
+- Install Check lists the LinBPQ Status, Node Debug and Modems pages.
+- install.sh explains the Modems sudo rules with the others and names the
+  Modems page in the closing summary.
+- User Guide: Admin menu (§2), Maintenance tiles, address table, Modems
+  messages in §27, Modems limits in §28. Manual: installer walkthrough
+  (relay socket), manual-install services step, pages table. SECURITY.md:
+  the read-only helpers and the relay.
+
+## [1.5.98] - 2026-11-26
+
+### Changed (Admin → Modems relay runs only on request, K1AJD)
+- New `bpq-modem-relay.socket`: systemd listens on 127.0.0.1:8769
+  (`IPAddressAllow=localhost`) and starts `bpq-modem-relay.service` on the
+  first request from Admin → Modems. The service has no [Install] of its
+  own any more (`Requires=` the socket, `Restart=on-failure`).
+- `scripts/bpq-modem-relay.py` takes the listening socket systemd passes
+  (LISTEN_FDS / LISTEN_PID) and exits after 10 minutes with no request
+  (it still drops a modem connection 30 s after the last look). Run by
+  hand it listens itself as before (`--port`).
+- install.sh installs both units and enables the socket. update.sh: the
+  unit refresh covers `.socket` files; a 1.5.97 station's always-on relay
+  is stopped, its boot link removed, and the socket enabled (undo removes
+  the socket again).
+- System Audit checks the socket (a stopped relay is normal); Admin →
+  Modems' and its API's messages name the socket.
+- Docs: User Guide §23 / §25, Manual What's New and services table.
+
+## [1.5.97] - 2026-11-26
+
+### Added (Admin → Modems, K1AJD)
+- New admin page `admin/modems.html` (Admin menu and a Maintenance tile):
+  each modem's own display without opening the station's desktop over VNC.
+  Watch-only: nothing on it can click, type into or change a modem.
+- **Modem windows** (VARA HF / FM / SAT, flrig, QtSoundModem, ARDOP,
+  Mercury and Data2G desktop programs, fldigi; matched by the start of the
+  window title): a picture of the window every 1.5 s while its panel is on
+  screen, 1:1 size and Pause. VARA HF's panel says whether LinBPQ's VARA
+  port is attached. Minimised windows are reported, not shown.
+- **Mercury:** spectrum and waterfall (0–3.1 kHz), S/N, bitrate, TX/RX,
+  sync, callsigns, bytes, live; no Connect click needed.
+- **Data2G:** waterfall (RX/TX colours), constellation, link, mode, RX/TX
+  bytes and speed, dial, PTT and BUSY lamps, bursts heard. Its monitor
+  password is typed once in the panel and passed to Data2G only; the
+  session token stays in that browser tab. Decoded payload text is not
+  passed on.
+- Panels only update while on screen and the tab is in front; each shows
+  the modem's status (running, LinBPQ attached, session, sound card).
+
+### How it stays watch-only
+- `tools/modem-view-helper`, installed root-owned as
+  `/usr/local/sbin/bpq-dashboard-modem-view`: `list` (modem windows on the
+  running X desktops: TigerVNC, Xvnc, Xorg) and `snap :N 0xID` (one listed
+  window, as PNG; xwd → PNG in Python, no ImageMagick). Reads pixels only,
+  using the X server's own `-auth` file. Two new lines in
+  `www-data-tools.sudoers`.
+- `scripts/bpq-modem-relay.py` + `bpq-modem-relay.service` (127.0.0.1:8769,
+  standard library only, `IPAddressAllow=localhost`): Mercury's `/websocket`
+  and Data2G's `/ws` also take commands, so the browser never connects to
+  them. The relay keeps the last waterfall rows (Mercury reduced to 512
+  bins, at most 8 rows/s) and status, and serves them to
+  `admin/modems-api.php` over HTTP. It sends Mercury nothing and Data2G only
+  its `hello`; it connects only while someone is watching and closes 30 s
+  after the last request (Mercury logs every monitor client).
+- `admin/modems-api.php`: overview, snap (one picture a second per window,
+  however many viewers), mercury, data2g, d2g_login / d2g_logout (POST,
+  same-site and X-BPQ-Dashboard header checks). Behind the admin login like
+  the rest of /admin/; no nginx change.
+
+### Installer and update
+- install.sh: installs the helper with the admin pages' sudo rules, and the
+  relay service (started); `x11-utils` / `x11-apps` where an X desktop runs.
+- update.sh: refreshes the sudo rules (two new lines), installs the helper,
+  installs and starts `bpq-modem-relay` once (undo removes it), restarts it
+  when the script changes; `x11-utils` / `x11-apps` where a desktop runs.
+- System Audit checks `bpq-modem-relay`; Firewall Status and System Audit
+  label port 8769.
+- Menu cache 2026-11-26-1 (Admin → Modems).
+
+### Docs
+- User Guide §23 *LinBPQ Status, Node Debug, Modems and Audio Map* (new
+  Modems section), §25 service and helper tables. Manual What's New, §11
+  (the helper and its rules), services table, §10.15 / §10.17 / §10.18
+  pointers, Quick Reference address, sudo-rules rows. README.
+
+## [1.5.96] - 2026-11-24
+
+### Fixed (Email: messages turning unread again, reported by Glenn N3MEL)
+- Read messages could turn unread again "at random", in the classic Email
+  page and, through the mail sync, in BBS Mail too. Three causes:
+  - each Email tab saved its whole list of read messages, so a second tab
+    (or one left open from earlier) wiped out reads made in another; tabs
+    now merge the list, and a read in one tab shows in the others;
+  - the page ignored the database's read marks for messages already in the
+    browser's cache, so mail read on another computer or browser, or in
+    BBS Mail, stayed unread there; the database's read mark now counts;
+  - filing a message (rules, retries, folder moves) sent that browser's view
+    of read/unread to the database, so a browser that had not seen the read
+    reset it to unread for everyone; filing can now only mark read, and
+    only "Mark unread" clears it (message-db.php).
+
+### Documentation and installer review (K1AJD)
+- Fresh install of 1.5.96 tested on a clean system: every admin page, the
+  Node Debug, LinBPQ Status, drafts and White Pages APIs, the three root
+  helpers and the sudo rules came up behind the admin login.
+- install.sh summary: lists BBS Mail as the Email page when the mail store
+  was set up, adds the Maintenance page (where every admin tool is), and
+  points to Manual §4 Part A Steps 7-10 (there is no "After installing").
+- User Guide: new chapter 23 *LinBPQ Status, Node Debug and Audio Map*
+  (they were filed under System Audit), later chapters and references
+  renumbered; contents no longer says "Known limitations in v1.5.25";
+  Maintenance chapter lists the tiles, every section and the Watchdog tab
+  of Dashboard Settings (and that connect-watchdog.py reads it); System
+  Audit lists the v1.5.93 flrig-stale-port and modem-started-before-USB
+  checks; HF Channel Quality per modem; Node Debug's Backup / Job / Root
+  login reasons; the RTS PTT note; the forms folder (as the line names it);
+  root helpers under "What runs behind the pages"; Admin → Logs (the menu
+  name); "Updated November 2026".
+- Manual: §11 documents the LinBPQ Status helper (also used by Node
+  Debug); pages table adds BBS Mail and Node Debug; Quick Reference adds
+  the admin pages, bbs-mail-sync.timer, bpq-backup.timer and the full
+  sudo-rules description; the update section explains the *Node debug
+  log* check; watchdog "not counted" includes Port Suspended; User Guide
+  references follow the new chapter numbers.
+- Node Debug: no longer says LinBPQ writes the file "when node debug
+  logging is on" (not known); the forms-folder advice: create the folder exactly
+  as the line names it (LinBPQ 6.0.26: Standard_Templates, underscore); the
+  two trailing numbers are an error code. Maintenance: watchdog text mentions Port
+  Suspended and that the attempts can be changed. README: LinBPQ Status,
+  Node Debug, per-modem channel quality, White Pages addresses.
+
+### Fixed (BBS Mail, K1AJD)
+- Write → To suggestions disappeared after a click: closeMenus() (run on
+  every mouse-down outside a menu, including the click into the To field)
+  removed every .cm element, the suggestion box (.cm.ac) included, and the
+  field kept drawing into a box no longer on the page. Menus now leave
+  .cm.ac alone, and the box re-attaches itself if anything removes it.
+- admin/bbs-mail.html loads bbs-mail.js?v=1.5.96 (was ?v=1.5.89), so browsers
+  fetch the new script instead of a copy cached for a day.
+
+### Added (BBS Mail, K1AJD)
+- Write → To: LinBPQ's White Pages after the contacts from the second
+  letter of a callsign (message-storage.php?action=wp), marked WP, and a
+  note when nothing matches instead of the list vanishing.
+- includes/wp-lookup.php: the White Pages reader shared by
+  message-storage.php (BBS Mail) and bbs-messages.php (Email Client);
+  bbs-messages.php answers action=wp before the BBS telnet lock.
+
+### Added (Email Client, K1AJD)
+- Compose → To: suggestions from LinBPQ's White Pages (WP.cfg in
+  paths.linbpq; bbs-messages.php?action=wp, callsigns with a home BBS,
+  parsed once per change of the file) after the saved contacts, marked WP.
+  When nothing matches, a note instead of the list vanishing (it used to
+  disappear at the second letter when no saved contact started with it).
+- Drafts: Compose saves to the server 3 s after typing stops, on Close / ×
+  and on leaving the page (message-storage.php saveDraft / deleteDraft /
+  drafts, kept in bpq_msg_settings, at most 50). Save draft, Discard, a
+  Drafts list with a count on the top bar; a sent draft is removed; an
+  untouched reply isn't kept.
+
+### Added (RF Connections, K1AJD)
+- Bands → HF Channel Quality (was VARA Channel Quality): a row per modem.
+  Data2G cards (per band): its own delivered rate (median, peak, gauge),
+  Effective, average S/N, propagation availability, connections, cut-short
+  sessions and the modes it used. Mercury cards: Effective median / peak
+  (gauge), availability, connections and connect modes (Mercury logs no
+  speed or S/N). Rows appear only for modems the station has. All cards
+  smaller, filling the width (3-4 across on a wide screen instead of 2).
+
+### Fixed
+- Node Debug: "RigControl Opening  for RTS PTT" explained as LinBPQ's start-up
+  note for a network rig (flrig / hamlib), nothing to fix; it said to remove
+  RTS PTT from bpq32.cfg, which doesn't stop it (K1AJD).
+- RF Connections: the Forwarded messages tab count showed the right number
+  for a moment, then 0. A refresh timer copied a retired hidden counter
+  (always 0) over it every 3 s, then every 30 s; removed (K1AJD).
+
+### Added (Node Debug: backups and other scheduled jobs, K1AJD)
+- A LinBPQ restart caused by a scheduled job now says so: "Backup: <name>"
+  (ars-backup, the dashboard's bpq-backup, restic/borg/rsync jobs...) or
+  "Job: <name>", with when the job started. The LinBPQ Status helper
+  reports, for each systemd stop of LinBPQ in the last 8 days, a one-shot
+  service that started in the 30 minutes before and had not finished
+  (finished jobs like message-bodies and long-running services ignored).
+  These were "Root / script" in 1.5.95.
+- Connect Watchdog: "Error - Port Suspended" (our own port held, e.g. just
+  after LinBPQ starts) is treated like "Port in use": not counted as the
+  partner failing.
+- A restart typed in a root shell (no sudo record) now says "Root login",
+  with where the session came from (SSH address or console) and when it
+  started: the helper adds root's sessions from the login records
+  (last -F --time-format iso root). Checked after the watchdog, backups /
+  jobs, sudo and cron. Unknown restarts also suggest root's shell history.
+
 ## [1.5.95] - 2026-11-23
 
 ### Added (Admin → Node Debug, K1AJD)

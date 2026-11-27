@@ -24,6 +24,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(LS + k, JSON.stringify(v));
 
 // ── state ──────────────────────────────────────────────────────
 const COLS = [
+    { id: 'chk',     title: '',  label: 'Select boxes',  w: 34,  fixed: true, sort: null },   // v1.5.101
     { id: 'flag',    title: '★', label: 'Star',          w: 28,  fixed: true, sort: null },
     { id: 'read',    title: '●', label: 'Read status',   w: 28,  fixed: true, sort: null },
     { id: 'subject', title: 'Subject',      label: 'Subject',      w: 0,   sort: 'subject' },
@@ -46,9 +47,12 @@ const S = {
     shown: null,            // message open in the message pane {folder, uid, m}
     addresses: [], signature: null, user: '',
     contacts: [], abReady: false,
-    prefs: Object.assign({ refreshMin: 2, notify: false, mono: true, names: true }, lsGet('prefs', {})),
+    prefs: Object.assign({ refreshMin: 2, notify: false, mono: true, names: true, msgFont: '', msgSize: 13, uiSize: 13 }, lsGet('prefs', {})),
 };
-for (const c of COLS) if (!S.cols.find(x => x.id === c.id)) S.cols.push({ id: c.id, w: c.w, on: true });
+for (const c of COLS) if (!S.cols.find(x => x.id === c.id)) {
+    if (c.id === 'chk') S.cols.unshift({ id: c.id, w: c.w, on: true });     // v1.5.101: select boxes go first
+    else S.cols.push({ id: c.id, w: c.w, on: true });
+}
 
 // ── tiny helpers ───────────────────────────────────────────────
 async function get(params) {
@@ -119,7 +123,9 @@ function drag(handle, move, start, axis) {
 }
 
 // ── context menus ──────────────────────────────────────────────
-function closeMenus() { document.querySelectorAll('.cm').forEach(m => m.remove()); }
+// v1.5.96: not the To-field suggestion boxes (.cm.ac): removing them on every click
+// left the To field drawing into a box no longer on the page, so suggestions vanished
+function closeMenus() { document.querySelectorAll('.cm:not(.ac)').forEach(m => m.remove()); }
 // items: [{label, key, act, off, danger, sub: [items]}] or '-'
 // v1.5.79: touch screens (iPad, phone) have no right-click: a long press
 // (half a second, finger still) opens the same menu as a right-click.
@@ -160,7 +166,7 @@ function menu(items, x, y, parent, fromRect) {
             const openSub = () => {
                 if (d.classList.contains('open')) return;
                 m.querySelectorAll(':scope > .cm-i.open').forEach(o => o.classList.remove('open'));
-                document.querySelectorAll('.cm').forEach(o => { if (o.dataset.lvl > (m.dataset.lvl || 0)) o.remove(); });
+                document.querySelectorAll('.cm:not(.ac)').forEach(o => { if (o.dataset.lvl > (m.dataset.lvl || 0)) o.remove(); });
                 d.classList.add('open');
                 const r = d.getBoundingClientRect();
                 const sm = menu(it.sub, r.right - 2, r.top - 4, m, r);
@@ -170,7 +176,7 @@ function menu(items, x, y, parent, fromRect) {
             d.addEventListener('click', openSub);   // touch screens have no hover (v1.5.78)
         } else {
             d.addEventListener('mouseenter', () => {
-                document.querySelectorAll('.cm').forEach(o => { if (+o.dataset.lvl > +(m.dataset.lvl || 0)) o.remove(); });
+                document.querySelectorAll('.cm:not(.ac)').forEach(o => { if (+o.dataset.lvl > +(m.dataset.lvl || 0)) o.remove(); });
                 m.querySelectorAll(':scope > .cm-i.open').forEach(o => o.classList.remove('open'));
             });
             d.addEventListener('click', () => { if (it.off) return; closeMenus(); it.act && it.act(); });
@@ -391,11 +397,13 @@ function renderHead() {
         const def = COLS.find(x => x.id === c.id);
         const title = c.id === 'corr' && S.folders.find(f => f.name === S.folder && f.special === 'sent') ? 'Recipient' : def.title;
         const sorted = def.sort && S.sort.by === def.sort;
+        if (c.id === 'chk') return `<div class="ch c-chk" data-c="chk" title="Select all / none"><input type="checkbox" id="chkAll" aria-label="Select all messages"></div>`;
         return `<div class="ch ${sorted ? 'sorted' : ''}" data-c="${c.id}" title="${esc(def.label)}${def.sort ? ' — click to sort' : ''}">${esc(title)}${sorted ? (S.sort.desc ? ' ▾' : ' ▴') : ''}${def.fixed || c.id === 'subject' ? '' : '<span class="rz"></span>'}</div>`;
     }).join('');
     h.querySelectorAll('.ch').forEach(el => {
         const id = el.dataset.c, def = COLS.find(x => x.id === id);
         el.addEventListener('click', ev => {
+            if (id === 'chk') { ev.preventDefault(); return selectAllToggle(); }
             if (ev.target.classList.contains('rz') || !def.sort || S.search) return;
             if (S.sort.by === def.sort) S.sort.desc = !S.sort.desc; else { S.sort.by = def.sort; S.sort.desc = def.sort === 'date' || def.sort === 'size'; }
             lsSet('sort', S.sort);
@@ -416,6 +424,7 @@ function renderHead() {
 }
 function cell(c, m) {
     switch (c.id) {
+        case 'chk': return `<div class="c-chk" data-act="chk" title="Select"><input type="checkbox" tabindex="-1" aria-label="Select this message" ${S.sel.has(keyOf(m)) ? 'checked' : ''}></div>`;
         case 'flag': return `<div class="c-flag" data-act="star" title="Star"><span class="star ${m.flagged ? 'on' : ''}">${m.flagged ? '★' : '☆'}</span></div>`;
         case 'read': return `<div class="c-read" data-act="read" title="${m.seen ? 'Mark as unread' : 'Mark as read'}"><span class="dot ${m.seen ? '' : 'on'}"></span></div>`;
         case 'subject': return `<div class="c-subject" title="${esc(m.subject)}">${esc(m.subject || '(no subject)')}${S.search ? `<span class="fl-name">${esc(prettyFolder(m.folder))}</span>` : ''}</div>`;
@@ -457,6 +466,7 @@ function renderRows(keepScroll) {
     if (S.msgs.length < S.total && !S.search) html += `<div id="listMore">${S.loading ? 'Loading…' : 'Scroll for more'}</div>`;
     box.innerHTML = html;
     if (keepScroll) box.scrollTop = st;
+    paintChecks();
 }
 // selection changes only touch classes, so a double-click's second click
 // still lands on the same row element
@@ -472,6 +482,32 @@ function paintSel() {
         r.classList.toggle('sel', S.sel.has(r.dataset.k));
         r.classList.toggle('cur', S.cur === r.dataset.k);
     });
+    paintChecks();
+}
+// v1.5.101: tick boxes, the select-all box and the toolbar Delete follow the selection
+function paintChecks() {
+    document.querySelectorAll('#rows .row').forEach(r => {
+        const c = r.querySelector('.c-chk input'); if (c) c.checked = S.sel.has(r.dataset.k);
+    });
+    const all = $('chkAll');
+    if (all) {
+        const n = S.msgs.filter(m => S.sel.has(keyOf(m))).length;
+        all.checked = n > 0 && n === S.msgs.length;
+        all.indeterminate = n > 0 && n < S.msgs.length;
+    }
+    const b = $('btnDel');
+    if (b) {
+        const n = S.sel.size;
+        b.disabled = !n;
+        b.querySelector('.lbl').textContent = n > 1 ? `Delete (${n})` : 'Delete';
+        b.title = n ? `Delete the ${n === 1 ? 'selected message' : n + ' selected messages'} (Del)` : 'Tick messages to delete them';
+    }
+}
+function selectAllToggle() {
+    const n = S.msgs.filter(m => S.sel.has(keyOf(m))).length;
+    if (n === S.msgs.length && n) { S.sel = new Set(); S.cur = null; }
+    else { S.sel = new Set(S.msgs.map(keyOf)); S.cur = S.cur || (S.msgs[0] && keyOf(S.msgs[0])); }
+    S.anchor = S.cur; paintSel(); showCurrent();
 }
 function msgByKey(k) { return S.msgs.find(m => keyOf(m) === k); }
 function selectedMsgs() { return S.msgs.filter(m => S.sel.has(keyOf(m))); }
@@ -489,6 +525,12 @@ function wireList() {
         const act = ev.target.closest('[data-act]');
         if (act && ev.button === 0) {
             const m = msgByKey(k);
+            if (act.dataset.act === 'chk') {          // v1.5.101: tick box = Ctrl+click (Shift+tick = range)
+                if (ev.shiftKey && S.anchor) { rangeTo(k); ev.preventDefault(); return; }
+                S.sel.has(k) ? S.sel.delete(k) : S.sel.add(k);
+                S.anchor = k; S.cur = S.sel.has(k) ? k : (S.sel.size ? [...S.sel][S.sel.size - 1] : null);
+                paintSel(); showCurrent(); ev.preventDefault(); return;
+            }
             if (act.dataset.act === 'star') setFlag([m], !m.flagged);
             else setSeen([m], !m.seen);
             ev.preventDefault();
@@ -541,7 +583,32 @@ function rangeTo(k) {
 }
 function showCurrent() {
     if (S.sel.size === 1) { const m = msgByKey([...S.sel][0]); if (m) return showMessage(m); }
-    showMessage(null, S.sel.size > 1 ? `${S.sel.size} messages selected` : '');
+    if (S.sel.size > 1) return showSelection();
+    showMessage(null, '');
+}
+// v1.5.101: several messages ticked — say how many, and offer what can be done to all of them
+function showSelection() {
+    ++showSeq; S.shown = null;
+    const ms = selectedMsgs(), n = ms.length, unread = ms.filter(m => !m.seen).length;
+    const pane = $('msgPane');
+    pane.innerHTML = `<div class="mv-empty sel-acts"><div class="sel-n">${n} messages selected</div>
+        <div class="sel-btns">
+          <button class="tbtn danger" data-sa="del">🗑 Delete ${n}</button>
+          <button class="tbtn" data-sa="read" ${unread ? '' : 'disabled'}>Mark read</button>
+          <button class="tbtn" data-sa="unread" ${unread === n ? 'disabled' : ''}>Mark unread</button>
+          <button class="tbtn" data-sa="star">★ Star</button>
+          <button class="tbtn" data-sa="none">Clear selection</button>
+        </div>
+        <div class="k">Tick more with the boxes on the left, or use the box at the top of the list to select every message shown.${ms.some(m => isTrash(m.folder)) ? ' Messages already in Trash are deleted for good.' : ' Deleted messages go to Trash.'}</div></div>`;
+    pane.querySelectorAll('[data-sa]').forEach(b => b.onclick = () => {
+        const a = b.dataset.sa, cur = selectedMsgs();
+        if (a === 'del') del(cur);
+        else if (a === 'read') setSeen(cur, true);
+        else if (a === 'unread') setSeen(cur, false);
+        else if (a === 'star') setFlag(cur, true);
+        else { S.sel = new Set(); S.cur = null; paintSel(); showCurrent(); }
+        if (a === 'read' || a === 'unread' || a === 'star') setTimeout(showSelection, 300);
+    });
 }
 function scrollCurIntoView() {
     const el = document.querySelector(`#rows .row[data-k="${CSS.escape(S.cur)}"]`);
@@ -898,6 +965,7 @@ function expandRecipients(text) {
     return { list: [...new Set(out)], bad };
 }
 // Thunderbird-like suggestions under the To field (the part after the last comma)
+const WP_CACHE = {};   // v1.5.96: White Pages answers, by what was typed
 function attachSuggest(input) {
     const box = document.createElement('div');
     box.className = 'cm ac'; box.style.display = 'none';
@@ -932,6 +1000,21 @@ function attachSuggest(input) {
         ? { value: k.display_name, html: `👥 <b>${esc(k.display_name)}</b> <span class="k">list · ${k.members.length}</span>` }
         : { value: nameOf(k) ? `${nameOf(k)} <${k.address || k.callsign}>` : (k.address || k.callsign),
             html: `<b class="mono">${esc(k.callsign)}</b>${nameOf(k) ? ' ' + esc(nameOf(k)) : ''} <span class="k">${esc(k.address || k.callsign)}</span>` };
+    // v1.5.96: LinBPQ's White Pages (every station the BBS has heard of, with its
+    // home BBS) after the contacts, from the second letter of a callsign; and a
+    // note when nothing matches instead of the list vanishing.
+    let wpTimer = null, wpSeq = 0;
+    const wpKey = q => (q.length >= 2 && /^[A-Za-z0-9\/]+$/.test(q)) ? q.toUpperCase() : '';
+    const wpFetch = key => {
+        clearTimeout(wpTimer);
+        const seq = ++wpSeq;
+        wpTimer = setTimeout(async () => {
+            let d = null;
+            try { d = await get({ action: 'wp', q: key }); } catch (e) {}
+            WP_CACHE[key] = d && d.success ? { entries: d.entries || [], note: d.note || '' } : { entries: [], note: 'White Pages lookup failed' };
+            if (seq === wpSeq && document.activeElement === input && wpKey(token().q) === key) show();
+        }, 250);
+    };
     const show = () => {
         const { q } = token();
         const ql = q.toLowerCase();
@@ -951,9 +1034,26 @@ function attachSuggest(input) {
             }).sort((a, b) => (b.toLowerCase().startsWith(ql)) - (a.toLowerCase().startsWith(ql)) || a.localeCompare(b));
             for (const a of extra) { if (items.length >= 10) break; items.push({ value: a, html: `${esc(a)} <span class="k">Email Client</span>` }); }
         }
-        if (!items.length) return hide();
-        idx = 0;
-        box.innerHTML = items.map((it, i) => `<div class="cm-i ${i === idx ? 'open' : ''}" data-i="${i}">${it.html}</div>`).join('');
+        // v1.5.96: White Pages
+        const key = wpKey(q);
+        const wp = key ? WP_CACHE[key] : null;
+        if (key && !wp) wpFetch(key);
+        if (wp) {
+            const have = items.map(i => i.value.toUpperCase());
+            for (const e of wp.entries) {
+                if (items.length >= 12) break;
+                if (have.some(v => v.includes(String(e.fullAddress).toUpperCase()) || v.split('@')[0].replace(/^.*</, '') === e.callsign)) continue;
+                items.push({ value: e.fullAddress, html: `<b class="mono">${esc(e.callsign)}</b>${e.displayName ? ' ' + esc(e.displayName) : ''} <span class="k">${esc(e.fullAddress)}</span> <span class="wp-tag" title="From LinBPQ's White Pages">WP</span>` });
+            }
+        }
+        let note = '';
+        if (key && !wp) note = 'Looking in the White Pages…';
+        else if (!items.length && q && !/[@<]/.test(q)) note = `No contact${key ? ' or White Pages entry' : ''} starts with <b>${esc(q.toUpperCase())}</b>. Type the full address, e.g. <span class="mono">CALL@BBS.#AREA.ST.USA.NOAM</span>` + (wp && wp.note ? `<br>${esc(wp.note)}` : '');
+        if (!items.length && !note) return hide();
+        if (!box.isConnected) document.body.appendChild(box);   // v1.5.96
+        idx = items.length ? 0 : -1;
+        box.innerHTML = items.map((it, i) => `<div class="cm-i ${i === idx ? 'open' : ''}" data-i="${i}">${it.html}</div>`).join('')
+            + (note ? `<div class="k" style="padding:6px 10px;font-size:12px">${note}</div>` : '');
         const r = input.getBoundingClientRect();
         Object.assign(box.style, { display: 'block', left: r.left + 'px', top: r.bottom + 2 + 'px', minWidth: Math.min(r.width, 480) + 'px' });
         box.querySelectorAll('[data-i]').forEach(el => el.addEventListener('mousedown', ev => { ev.preventDefault(); pick(items[+el.dataset.i]); }));
@@ -964,6 +1064,7 @@ function attachSuggest(input) {
     input.addEventListener('blur', () => setTimeout(hide, 150));
     input.addEventListener('keydown', ev => {
         if (box.style.display === 'none') return;
+        if (!items.length) { if (ev.key === 'Escape') { ev.stopPropagation(); hide(); } return; }   // just the note showing
         if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
             ev.preventDefault(); idx = (idx + (ev.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
             box.querySelectorAll('[data-i]').forEach((el, i) => el.classList.toggle('open', i === idx));
@@ -1328,6 +1429,7 @@ function wireToolbar() {
     $('btnGet').addEventListener('click', getMessages);
     $('btnWrite').addEventListener('click', () => compose('new'));
     $('btnAB').addEventListener('click', () => openAddressBook());
+    $('btnDel').addEventListener('click', () => del(selectedMsgs()));      // v1.5.101
     $('btnNts').addEventListener('click', () => window.open('/nts-forwarding-report.php', '_blank'));
     $('btnForms').addEventListener('click', () => window.open('/pktnet-forms/index.html', '_blank'));
     $('btnCheckIn').addEventListener('click', () => openCheckIn());
@@ -1363,7 +1465,7 @@ function wireToolbar() {
             { label: 'Quick Check-In…', act: () => openCheckIn() },
             { label: 'NTS Report', act: () => $('btnNts').click() },
             { label: 'PKTNET Forms', act: () => $('btnForms').click() },
-            { label: 'User Guide (§9)', act: () => window.open('/BPQ-Dashboard-v1.5.95-User-Guide.pdf', '_blank') },
+            { label: 'User Guide (§9)', act: () => window.open('/BPQ-Dashboard-v1.6.0-User-Guide.pdf', '_blank') },
         ], r.right - 220, r.bottom);
     });
 }
@@ -1889,7 +1991,10 @@ function openSettings() {
       <div class="ab-form">
         <label>Check for new mail</label><select data-p="refreshMin">${[1, 2, 5, 10, 0].map(v => `<option value="${v}" ${S.prefs.refreshMin === v ? 'selected' : ''}>${v ? 'every ' + v + ' minute' + (v > 1 ? 's' : '') : 'never (Get Messages only)'}</option>`).join('')}</select>
         <label>New mail</label><label class="ab-chk"><input type="checkbox" data-p="notify" ${S.prefs.notify ? 'checked' : ''}> Show a desktop notification (Inbox)</label>
-        <label>Message text</label><label class="ab-chk"><input type="checkbox" data-p="mono" ${S.prefs.mono ? 'checked' : ''}> Fixed-width font (keeps BBS tables lined up)</label>
+        <label>Message font</label><select data-ps="msgFont">${FONTS.map(f => `<option value="${f[0]}" ${msgFontId() === f[0] ? 'selected' : ''}>${esc(f[1])}</option>`).join('')}</select>
+        <label>Message text size</label><select data-p="msgSize">${[11, 12, 13, 14, 15, 16, 18, 20].map(v => `<option value="${v}" ${+S.prefs.msgSize === v ? 'selected' : ''}>${v}${v === 13 ? ' (standard)' : ''}</option>`).join('')}</select>
+        <label></label><div class="font-sample" id="fontSample">R:261127/0508Z 23084@GB7BED.#21.GBR.EU<br>73 de K1AJD — The quick brown fox 0123456789</div>
+        <label>Page text size</label><select data-p="uiSize">${[[12, 'Small'], [13, 'Standard'], [14, 'Large'], [16, 'Larger'], [18, 'Largest (tablets)']].map(([v, t]) => `<option value="${v}" ${+S.prefs.uiSize === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <label>Names</label><label class="ab-chk"><input type="checkbox" data-p="names" ${S.prefs.names ? 'checked' : ''}> Show address-book names next to callsigns</label>
         <label style="align-self:start;padding-top:4px">Signature</label><div><label class="ab-chk"><input type="checkbox" data-s="enabled" ${sig.enabled ? 'checked' : ''}> Add to new messages</label>
           <label class="ab-chk"><input type="checkbox" data-s="replies" ${sig.replies ? 'checked' : ''}> … and to replies and forwards</label>
@@ -1905,6 +2010,15 @@ function openSettings() {
     const close = () => dlg.remove();
     dlg.addEventListener('mousedown', ev => { if (ev.target === dlg) close(); });
     dlg.querySelector('[data-y="cancel"]').onclick = close;
+    // v1.5.101: show the chosen message font and size as it is picked
+    const sample = () => {
+        const fs = dlg.querySelector('[data-ps="msgFont"]'), sz = dlg.querySelector('[data-p="msgSize"]'), el = dlg.querySelector('#fontSample');
+        const f = FONTS.find(x => x[0] === fs.value) || FONTS[0], cs = getComputedStyle(document.documentElement);
+        el.style.fontFamily = f[2].replace('var(--tb-mono)', cs.getPropertyValue('--tb-mono')).replace('var(--tb-font)', cs.getPropertyValue('--tb-font'));
+        el.style.fontSize = sz.value + 'px';
+    };
+    dlg.querySelectorAll('[data-ps="msgFont"],[data-p="msgSize"]').forEach(i => i.addEventListener('change', sample));
+    sample();
     get({ action: 'msAccountsGet' }).then(d => {
         const i = dlg.querySelector('[data-acc]');
         if (i && d.success) { i.value = (d.accounts || []).map(a => a.call).join(', '); i.dataset.was = i.value; }
@@ -1925,6 +2039,7 @@ function openSettings() {
     });
     dlg.querySelector('[data-y="save"]').onclick = async () => {
         dlg.querySelectorAll('[data-p]').forEach(i => { S.prefs[i.dataset.p] = i.type === 'checkbox' ? i.checked : +i.value; });
+        dlg.querySelectorAll('[data-ps]').forEach(i => { S.prefs[i.dataset.ps] = i.value; });   // v1.5.101: text choices
         if (S.prefs.notify && 'Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
         if (S.prefs.notify && (!('Notification' in window) || Notification.permission !== 'granted')) { S.prefs.notify = false; toast('The browser did not allow notifications (they need https or this computer)', 'err'); }
         lsSet('prefs', S.prefs);
@@ -2106,8 +2221,25 @@ async function toolKills() {
             `<tr><td>${esc(tWhen(r.killed_on_bbs_at))}</td><td class="mono">${esc(r.bbs_number)}</td><td>${esc(tType(r.msg_type))}</td><td>${esc(r.from_call)}</td><td>${esc(r.subject)}</td></tr>`)) : '');
 }
 
+// v1.5.101: font choices for message text (and Write), and the page's text size
+const FONTS = [
+    ['mono',    'Fixed-width (keeps BBS tables lined up)', 'var(--tb-mono)'],
+    ['courier', 'Courier New (fixed-width)',               '"Courier New", Courier, "Liberation Mono", monospace'],
+    ['dejavu',  'DejaVu Sans Mono (fixed-width)',          '"DejaVu Sans Mono", "Liberation Mono", monospace'],
+    ['sans',    'Sans-serif (as the rest of the page)',    'var(--tb-font)'],
+    ['arial',   'Arial',                                   'Arial, Helvetica, "Liberation Sans", sans-serif'],
+    ['verdana', 'Verdana (wide, easy to read)',            'Verdana, Geneva, "DejaVu Sans", sans-serif'],
+    ['serif',   'Serif (Georgia)',                         'Georgia, "Times New Roman", "DejaVu Serif", serif'],
+];
+function msgFontId() { return FONTS.some(f => f[0] === S.prefs.msgFont) ? S.prefs.msgFont : (S.prefs.mono === false ? 'sans' : 'mono'); }
 function applyPrefs() {
-    document.body.classList.toggle('prop-font', !S.prefs.mono);
+    const f = FONTS.find(x => x[0] === msgFontId());
+    const root = document.documentElement.style;
+    root.setProperty('--msg-font', f[2]);
+    root.setProperty('--msg-size', Math.max(10, Math.min(24, +S.prefs.msgSize || 13)) + 'px');
+    root.setProperty('--ui-size', Math.max(11, Math.min(20, +S.prefs.uiSize || 13)) + 'px');
+    S.prefs.mono = ['mono', 'courier', 'dejavu'].includes(msgFontId());
+    document.body.classList.toggle('prop-font', false);
     clearInterval(S.refreshTimer);
     if (S.prefs.refreshMin > 0) S.refreshTimer = setInterval(() => { if (!document.hidden && S.tab === 'mail' && !S.loading) getMessages(true); }, S.prefs.refreshMin * 60000);
 }

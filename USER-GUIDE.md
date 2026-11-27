@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.95**
+**Version 1.6.0**
 **User Guide**
 *How to use every page of the dashboard*
 
@@ -8,7 +8,7 @@
 |---|---|
 | Companion document | See *User Manual & Installation Guide* (`USER-MANUAL.md`) for setup and troubleshooting |
 | Audience | Sysops, operators, visitors |
-| Updated | October 2026 |
+| Updated | November 2026 |
 | Repository | https://github.com/bpq-dashboard/bpq-dashboard |
 
 ---
@@ -64,16 +64,17 @@ Most sysops are all three. Read everything that applies to you.
 20. Firewall Status
 21. Log Viewer
 22. System Audit
-23. Install Check and Health Check
+23. LinBPQ Status, Node Debug, Modems and Audio Map
+24. Install Check and Health Check
 
 **Part 6 — Sysop Reference**
-24. What runs behind the pages
-25. Where your settings are kept
-26. Common messages and what they mean
-27. Known limitations in v1.5.25
-28. Keyboard shortcuts
-29. Page URL reference
-30. Getting help
+25. What runs behind the pages
+26. Where your settings are kept
+27. Common messages and what they mean
+28. Known limitations
+29. Keyboard shortcuts
+30. Page URL reference
+31. Getting help
 
 ---
 
@@ -118,21 +119,26 @@ The admin login is the one you chose during installation. Your browser remembers
 
 ## 2. The navigation bar
 
-Every page loads the same bar at the top.
+Every page loads the same bar at the top. Since v1.5.100 it has the meter logo and groups the pages by what they're for.
 
-![The navigation bar on a desktop browser with the Admin menu open: brand, the 13 page links, the Guide link, the UTC and local clocks, the theme button and the Admin menu](docs/screenshots/nav-bar.png)
+![The navigation bar on a desktop browser with the Admin panel open: the meter logo with the station line, the five page groups, Guide, Admin, the clocks and the theme button](docs/screenshots/nav-bar.png)
 
-- **📡 BPQ Dashboard** — returns to the home page, RF Connections.
-- **Page links** — RF, Traffic, System, Connects, Messages, Email, Weather, Chat, APRS, VARA, Telnet, Rig, RF Power. The page you're on is highlighted. **Email** opens BBS Mail, the Thunderbird-style page, where the BBS mail store is set up (v1.5.71), otherwise the Email Client (Section 9).
-- **📖 Guide** — opens this guide as a PDF in a new tab.
-- **Admin ▼** — Maintenance, Firewall, Logs (the Log Viewer), Audit, Audio Map (v1.5.57), LinBPQ Status (v1.5.94), Node Debug (v1.5.95). These ask for the admin login.
-- **Clocks** — UTC (purple, "Z") and your browser's local time ("L"), updated every second.
+- **Logo and name** — the meter logo and **BPQ Dashboard** return to the home page, RF Connections. Under the name is your node callsign, with **affiliated with TPRFN** after it when the installer was told the station is in TPRFN (config.php `station` → `'network' => 'TPRFN'`; `''` shows the node only). The logo is also the browser-tab icon.
+- **Groups** — click one to open it; each page has a one-line description. The group of the page you're on is underlined in its colour, and that page is highlighted in the list.
+  - **Station** (green): RF Connections, Traffic, System Logs, Connects
+  - **Mail** (blue): Email, Messages. **Email** opens BBS Mail, the Thunderbird-style page, where the BBS mail store is set up (v1.5.71), otherwise the Email Client.
+  - **On air** (amber): Chat, VARA, Telnet, APRS
+  - **Radio** (purple): Rig, RF Power
+  - **Weather** (cyan): NWS alerts
+- **Guide** — opens this guide as a PDF in a new tab.
+- **Admin** (amber, with a padlock) — a two-column panel: Maintenance, System Audit, LinBPQ Status, Node Debug, Modems, Audio Map, Firewall, Logs. These ask for the admin login.
+- **Clocks** — UTC ("Z") and your browser's local time ("L"), updated every second. On narrower screens only UTC is shown.
 - **Theme button** — 🌙 / ☀️ (Section 3).
 - **⚙** — on the admin pages only: *Dashboard Settings* for the forwarding tools (Section 19).
 
-On a phone (narrower than about 770 pixels) the links fold behind the **☰** button; the admin pages are listed under an *Admin* heading at the bottom of that menu.
+One group or the Admin panel is open at a time; click outside it or press Esc to close it. On a phone or small tablet (narrower than about 1100 pixels) the groups fold behind the **☰** button and open as a list, with the current page's group already unfolded and Admin at the bottom.
 
-**Optional pages** (v1.5.19): Telnet, Chat, APRS, VARA, Rig and RF Power appear only if your station uses them. The installer asks page by page (step 9); a page switched off is hidden from the menu, its helper service isn't installed, and its files stay, so it can be switched on later (Admin → Maintenance → *Optional pages*; the switches are `'pages'` and `'radio' => 'enabled'` in `config.php`). Opened by its address anyway, a hidden page still works and says it is switched off. Install Check and Health Check aren't in the menu; open them by address (Section 29).
+**Optional pages** (v1.5.19): Telnet, Chat, APRS, VARA, Rig and RF Power appear only if your station uses them; a group whose pages are all switched off (Radio without flrig) disappears. The installer asks page by page (step 9); a page switched off is hidden from the menu, its helper service isn't installed, and its files stay, so it can be switched on later (Admin → Maintenance → *Optional pages*; the switches are `'pages'` and `'radio' => 'enabled'` in `config.php`). Opened by its address anyway, a hidden page still works and says it is switched off. Install Check and Health Check aren't in the menu; open them by address (Section 30).
 
 > 🔧 After an update, press **Ctrl+Shift+R** (⌘+Shift+R on a Mac) once on any page. The menu is cached by the browser and only refreshes when its version number changes.
 
@@ -251,14 +257,14 @@ You need:
 
 - VARA HF running and a VARA HF port in `bpq32.cfg`
 - flrig running and connected to the radio
-- an FLRIG **`RADIO 2`** block in `bpq32.cfg` (Section 27: the dashboard currently retunes only `RADIO 2`)
+- an FLRIG **`RADIO 2`** block in `bpq32.cfg` (Section 28: the dashboard currently retunes only `RADIO 2`)
 - the **bpq-vara** service running. It logs in with `bbs.user` / `bbs.pass` from `config.php` and finds your VARA HF port in `bpq32.cfg` by itself; set `vara.bpq_port` if it picks the wrong one (*Installation Manual* §9)
 
 ### What you see
 
 - **Login box** — shows your node (`station.node`) and asks for the sysop password. *Request access from sysop* has the server e-mail the request to `station.email` in `config.php`; the address isn't shown on the page. It needs a working mail setup on the server — if sending fails, or no address is set, the page says so — and takes one request per address every 10 minutes.
 - **Top bar** — status (IDLE, LOGGING IN, ATTACHED, CONNECTED, BUSY, INCOMING), the remote call, bandwidth, S/N and frequency chips, session timer, Clear, Copy, **Logout**.
-- **Quick** frequency buttons — 80 m 3.596, 40 m 7.103, 30 m 10.148, 20 m 14.103 and 20 m 14.106 MHz (fixed in this release; Section 27).
+- **Quick** frequency buttons — 80 m 3.596, 40 m 7.103, 30 m 10.148, 20 m 14.103 and 20 m 14.106 MHz (a fixed list, not a setting yet; Section 28).
 - **Frequency (MHz)**, **Remote Callsign**, **Bandwidth** (BW500 default, BW2300, BW2750), **⚡ Connect**, **⏹ Disconnect**.
 - **Terminal (stays dark)** and the input line with **Send ↵**, **D** and **End Session**.
 
@@ -422,7 +428,7 @@ Messages are listed newest first by their date (since v1.5.32; before, a new mes
 - The listings take one BBS login. Since v1.5.21 the message texts are read up to 10 per login too (before, every message had its own login, which on a slow or RF-linked BBS added a few seconds each). A message that doesn't come back cleanly in a batch is read again on its own.
 - Separately, the server saves the text of new messages to the database every 5 minutes (`message-bodies.timer`), even when no browser is open. Which bulletins it saves is set by `messages.bulletin_text` in `config.php`: `all` (default), `pinned` (only 📌 groups) or `none`. To keep BPQ's BBS log small it lists bulletins with `LL 100` on most runs and the full list once a day (v1.5.40; `messages.bulletin_list_recent` / `bulletin_full_list_hours`).
 
-The dashboard logs in to the BBS with `bbs.user` / `bbs.pass` from `config.php`. It works whether BPQ's `USER=` line lands that login at the node (then it types `bbs`, or `bbs.alias`) or straight in the BBS, and whatever BPQ's greeting looks like (since v1.5.18; before that the greeting had to contain a `}`). If the login fails, the message says which step and shows the last line BPQ sent (Section 26).
+The dashboard logs in to the BBS with `bbs.user` / `bbs.pass` from `config.php`. It works whether BPQ's `USER=` line lands that login at the node (then it types `bbs`, or `bbs.alias`) or straight in the BBS, and whatever BPQ's greeting looks like (since v1.5.18; before that the greeting had to contain a `}`). If the login fails, the message says which step and shows the last line BPQ sent (Section 27).
 
 Only one session with the BBS runs at a time across the whole dashboard. If the BBS is busy (Get Mail in another browser, the text-saving job, the forwarding-queue check), the request waits; after 40 seconds it gives up with "BBS busy". Try again a moment later.
 
@@ -454,10 +460,12 @@ The search box filters the **folder you're in** by from, to, subject and message
 ### Composing
 
 1. Click **✏ Compose** (or Reply / Forward).
-2. **To:** a callsign, or a full address such as `CALL@BBS.STATE.USA.NOAM` for forwarded delivery. Matching Address Book entries are suggested as you type (↑ ↓ to pick, Enter to accept).
+2. **To:** a callsign, or a full address such as `CALL@BBS.STATE.USA.NOAM` for forwarded delivery. Matching Address Book entries are suggested as you type (↑ ↓ to pick, Enter to accept). From the second letter (v1.5.96), stations from LinBPQ's **White Pages** are listed too (marked **WP**), with their home BBS, so the full address is filled in for anyone your BBS has heard of; if nothing matches, the list says so: type the full address.
 3. **Type:** **Private (P)**, **Bulletin (B)** — the To field is then the distribution group, e.g. `WX@USA` — or **Traffic (T)** for NTS.
 4. **Subject** (BPQ keeps 60 characters) and **Body** (plain text).
 5. Click **Send**. The BBS stores the message and forwards it on its normal schedule.
+
+**Drafts** (v1.5.96): what you type in Compose is saved a few seconds after you stop typing and when you click **Close** or ×, so an interruption, a closed tab or a reload loses nothing. **Save draft** saves at once; **Discard** throws the message away. **📝 Drafts** on the top bar lists them (with a count); **Open** brings one back to finish and send, and it disappears from Drafts once sent. Drafts are kept on the server (up to 50), so any browser or device you use sees them. A reply you open and close without typing isn't kept.
 
 **If the connection drops while sending** (v1.5.76): sending takes a few seconds while the dashboard logs into the BBS. If the connection is lost before the answer comes back (a phone or iPad locking its screen or switching apps, Safari's *Load failed*, or a Wi-Fi drop), the page doesn't call it a failure. The status shows *Connection lost; checking with the server whether it went…*, then *Still sending on the BBS…*, and ends with **Sent** (*it had gone on the first try*), or sends it then if the first try never reached the server. Each message has a one-time id, so pressing Send again for the same text can't post a second copy. Only if the server can't be reached for about 2½ minutes does it say *Couldn't confirm whether it was sent*: check Sent or the BBS list before sending again.
 
@@ -565,6 +573,7 @@ Where the mail store is set up, **Email** in the menu opens **BBS Mail** (`/admi
 - **Tabs** along the top: the folder tab, each message opened in its own tab (double-click or Enter), and each message being written. Ctrl+W closes, Ctrl+Tab moves on.
 - **Write / Reply / Forward** open a tab: To (suggestions from the Email Client's address book), Type (Personal SP, Bulletin SB, or — v1.5.74 — NTS traffic ST, addressed `ZIP@NTSst` such as `30301@NTSGA`; the To field's hint changes with the type), Subject and text, with your signature from the Email Client's Preferences. **Send** (Ctrl+Enter) sends it over the BBS as the station; it shows in Sent once the BBS lists it. A dropped connection while sending is handled as in the Email Client (*If the connection drops while sending*, above, v1.5.76): it checks with the server, and the same text to the same address is never posted twice. Reply quotes the message (`> `), Forward puts it under *Forwarded Message*.
 - **Search all folders** (the box in the toolbar, Ctrl+K; Enter to search, Esc to go back) searches every folder but Trash. **Quick Filter** (Ctrl+Shift+K) filters the open folder: Unread, Starred, and text in Sender / Recipients / Subject / Body.
+- **Selecting several messages** (v1.5.101): tick the **box** at the left of each message, or the box at the top of the list to select every message shown (tick it again to clear). Shift+tick selects everything between. With a keyboard, Ctrl+click and Shift+click do the same. With several selected, the message pane shows how many, with buttons **Delete N**, *Mark read*, *Mark unread*, *★ Star* and *Clear selection*; the toolbar's **🗑 Delete** button reads *Delete (N)* and deletes all the selected messages (it's greyed out with nothing selected). Handy on a tablet, where there is no Ctrl key.
 - **Delete** moves to Trash; in Trash it deletes for good and kills the message on the BBS (as described below). Shift+Delete outside Trash also only moves to Trash.
 - **Get Messages** (F5) re-reads the mail store; it also does so every 2 minutes. New BBS mail reaches it within about 7 minutes (see above).
 - **Toolbar:** NTS Report, PKTNET Forms, **✅ Check-In**, ≡ (more, keyboard shortcuts). Until v1.5.74 there was also a *Classic view* button for the older Email Client; from v1.5.75 BBS Mail is the only Email page where the mail store is set up.
@@ -582,7 +591,7 @@ Where the mail store is set up, **Email** in the menu opens **BBS Mail** (`/admi
   - **Statistics**: messages the dashboard has seen by type (last day, 7 and 30 days, with text), what's in the mail store now, the busiest senders and bulletin groups over 30 days.
   - **Killed on the BBS**: messages that left the mail store's Trash and were (or are waiting to be) killed on the BBS, with how and the result; and messages kept in the archive after a kill.
 - **Other accounts** (v1.5.77, ≡ → Settings): other BBS users whose mail you also read here, for example a club or tactical call the BBS collects Winlink mail for (up to 10). Each gets its own folder, Inbox ▸ *CALL*, made at once; what they send goes in Sent. Mail already on the BBS for them is copied within a few minutes. Filters apply to them as to the Inbox.
-- **Settings** (≡ → *Settings…*): how often to check for new mail (1–10 minutes, or only with Get Messages), a **desktop notification** for new Inbox mail (the browser asks once; it needs the page open in a tab, and https or the station itself), fixed-width or ordinary font for message text, names next to callsigns, and the **signature** (shared with the Email Client). The browser tab shows the number of unread Inbox messages, like *(3) BBS Mail*.
+- **Settings** (≡ → *Settings…*): how often to check for new mail (1–10 minutes, or only with Get Messages), a **desktop notification** for new Inbox mail (the browser asks once; it needs the page open in a tab, and https or the station itself), the **message font** and **message text size** (v1.5.101: fixed-width, Courier New, DejaVu Sans Mono, sans-serif, Arial, Verdana or Georgia, 11 to 20; a sample shows the choice, and Write uses it too; fixed-width keeps BBS tables lined up), the **page text size** (Small to *Largest (tablets)*, for the folder list, message list and buttons), names next to callsigns, and the **signature** (shared with the Email Client). The browser tab shows the number of unread Inbox messages, like *(3) BBS Mail*.
 
 #### Message Filters and marking folders read (v1.5.73)
 
@@ -614,7 +623,7 @@ The clean-up runs once a day (`bbs-mail-sync.py`, after 04:00) by the message's 
 - **👥 List:** a name, a description and members (tick them). Writing to a list sends one BBS message to each member.
 - **⋯:** import the older Email Client's address book, import everyone who has written to you, import a vCard (.vcf) or CSV file (Thunderbird's exports work), export all as vCard or CSV.
 
-The address book also works in the rest of BBS Mail: names show next to callsigns in the message list and pane (Settings can turn that off); click the sender's name for *Add to Address Book* / *Edit Contact*, *Write*, *Search Messages*, *Copy Callsign*. In **Write**, the To field suggests contacts and lists as you type (↑ ↓ and Enter or Tab to pick). Since v1.5.89 callsigns that start with what you type come first, then names that start with it; the routing part of an address (`.#REGION.ST.USA.NOAM`) no longer matches single letters; clicking into an empty To box (or after a comma) lists your most used and starred contacts; several recipients go comma-separated (`Glenn <N3MEL@…>, Net members, K7EK`), and each gets its own BBS message (asks first, at most 25). A bulletin goes to one address.
+The address book also works in the rest of BBS Mail: names show next to callsigns in the message list and pane (Settings can turn that off); click the sender's name for *Add to Address Book* / *Edit Contact*, *Write*, *Search Messages*, *Copy Callsign*. In **Write**, the To field suggests contacts and lists as you type (↑ ↓ and Enter or Tab to pick). Since v1.5.89 callsigns that start with what you type come first, then names that start with it; the routing part of an address (`.#REGION.ST.USA.NOAM`) no longer matches single letters; clicking into an empty To box (or after a comma) lists your most used and starred contacts; from the second letter of a callsign (v1.5.96) stations from LinBPQ's **White Pages** are listed after your contacts, marked **WP**, with their home BBS, so the full address is filled in for anyone your BBS has heard of; if nothing matches, the list says so (type the full address); several recipients go comma-separated (`Glenn <N3MEL@…>, Net members, K7EK`), and each gets its own BBS message (asks first, at most 25). A bulletin goes to one address.
 
 ### 📬 Mail store in this Email Client (v1.5.68)
 
@@ -762,7 +771,7 @@ The previous layout (*Classic view*) was retired in v1.5.75; update.sh removes `
 - **The title line:**
   - the version;
   - the period loaded;
-  - the live status (how many connections; **"(DB)"** means the fast database path is in use, Section 26);
+  - the live status (how many connections; **"(DB)"** means the fast database path is in use, Section 27);
   - when the data was last updated;
   - a UTC clock.
 - **Today / 7 days / 30 days / 90 days** sets the range for everything on the page; Today is the default. Since v1.5.39 the page reads only the lines it needs from each day's BBS log (frequencies, failure reasons, message proposals), filtered and cached on the server in `cache/bbs-lines/`. The first time a day is opened it takes a moment while the server reads that day's log once; after that it's quick.
@@ -925,7 +934,11 @@ Connections (good and failed) and messages sent and received for each UTC hour i
 - **Bands and channel quality:**
   - the hourly band activity grid;
   - **Band Summary**: sessions, success and failures per band;
-  - **VARA Channel Quality**, per band: average, median and best bitrate, the modulation tier that bitrate implies (BFSK/BPSK up to 32QAM), average S/N, and whether they're rising or falling.
+  - **HF Channel Quality** (v1.5.96: a row per modem, smaller cards, 3–4 across on a wide screen), per band:
+    - **VARA:** average, median and best speed level, the modulation it implies (BFSK/BPSK up to 32QAM), average S/N, propagation availability and connections.
+    - **Data2G:** its own delivered rate (median, peak and the gauge), *Effective*, average S/N, availability, connections, sessions cut short, and the modes it used.
+    - **Mercury:** it logs neither speed nor S/N, so the gauge and median/peak are *Effective* (bytes both ways × 8 ÷ time linked), with availability, connections and its connect modes.
+    - Effective is worked out the same way for every modem, so it's the fair comparison. A modem's row appears only on stations that run it.
 - **Geomagnetic history:** any storm activity in the last 24 hours, the K-index for the last 3 days and the A-index for the last 30 days, colour-coded from quiet to major storm.
 - **Modem performance** (v1.5.63): how VARA HF, Mercury and Data2G have done over the last 7, 14 or 30 days (**Show**), from this station's own connection records and NOAA's daily geomagnetic data.
   - A line per modem (success rate, connections) and how quiet or disturbed the geomagnetic field was, then a card per modem: success rate, passed / attempted, median S/N of the good sessions, bytes moved, stations.
@@ -949,7 +962,7 @@ The page remembers the last tab you used, except the propagation report, which i
 
 ### Mercury calls on this page (v1.5.46)
 
-On stations running the Mercury HF modem (*Installation Manual* §10.17), every Mercury call is a row in the same table as the VARA sessions, read from Mercury's own log every 5 minutes by `scripts/parse-mercury-log.py` (Section 24).
+On stations running the Mercury HF modem (*Installation Manual* §10.17), every Mercury call is a row in the same table as the VARA sessions, read from Mercury's own log every 5 minutes by `scripts/parse-mercury-log.py` (Section 25).
 
 - **Where they show:** Recent connections (with **Mercury** in the Modem column), the partners' **Last good** time (v1.5.47) and 7-day blocks, the 7-day history panel and the hourly activity chart.
 - **Where they don't (by default):** the headline numbers (success rate, failures and their chips, average S/N, stations), Best band, Bands and channel quality and the propagation report. (The Station report has its own Modem choice since v1.5.85.) Mercury and VARA calls aren't alike (Mercury logs no S/N for the session and no bitrate, and its scan hops leave many short failed calls), so mixing them would change what those numbers mean. To count Mercury there too, set `'in_headlines' => true` in the `mercury` section of `config.php`.
@@ -962,7 +975,7 @@ On stations running the Mercury HF modem (*Installation Manual* §10.17), every 
 
 ### Data2G calls on this page (v1.5.56)
 
-On stations running the Data2G HF modem (*Installation Manual* §10.18), every Data2G call is a row in the same table, read from Data2G's log every 5 minutes by `scripts/parse-data2g-log.py` (Section 24). They show and stay out of the same places as Mercury's (above): an orange **Data2G** chip in Recent connections (Winlink users calling your gateway call show band **WL2K**, v1.5.91), the partners' **Last good** (· Data2G) and 7-day blocks, the 7-day history, the activity chart and the Station Map; not in the headline numbers unless `'in_headlines' => true` in the `data2g` section of `config.php`.
+On stations running the Data2G HF modem (*Installation Manual* §10.18), every Data2G call is a row in the same table, read from Data2G's log every 5 minutes by `scripts/parse-data2g-log.py` (Section 25). They show and stay out of the same places as Mercury's (above): an orange **Data2G** chip in Recent connections (Winlink users calling your gateway call show band **WL2K**, v1.5.91), the partners' **Last good** (· Data2G) and 7-day blocks, the 7-day history, the activity chart and the Station Map; not in the headline numbers unless `'in_headlines' => true` in the `data2g` section of `config.php`.
 
 - **What a Data2G row shows:** the frequency and bandwidth from LinBPQ's BBS log (as for Mercury), bytes each way from Data2G's session summary, the **S/N** (the average of the bursts heard from the other station) and Data2G's own **rate** (the data delivered over its best minute, shown as *Modem rate*; v1.5.64: not comparable with VARA's, use *Effective*). The time the link was up is stored too (`link_sec`), so Effective doesn't count the connect tries.
 - **The result in plain words:** ✓ **we hung up** (LinBPQ ended it: DISCONNECT, or ABORT once it was done), ✓ **the other station hung up**, ⚠ **traffic passed, link lost before sign-off** (v1.5.61: data moved and was acknowledged, then nothing more was heard, LINK_LOST, before the sign-off; counts as a success, but LinBPQ may offer the last message again), ✗ **turned away** (a call to us while we weren't listening or were busy; a caller's tries within 2 minutes are one row — hover for why), ✗ **no answer**, ✗ **busy** / **not listening** (the station we called), ✗ **nothing received** (hover: *nothing heard from the other station* when Data2G gave up waiting, LINK_LOST), ✗ **LinBPQ restarted** / **Data2G restarted**.
@@ -979,7 +992,7 @@ On stations running the Data2G HF modem (*Installation Manual* §10.18), every D
 
 Sessions come from the VARA log: VARA HF sends its session log to the server as syslog (the registered VARA HF's Syslog setting, *Installation Manual* §10.11), `vara-logger` keeps the lines in `logs/<callsign>.vara`, and `parse-vara-log.py` reads them into the database every 5 minutes; messages and frequencies from BPQ's BBS logs; the queue live from the BBS.
 
-**Winlink sessions and their frequency (v1.5.92).** A Winlink user calling your gateway call (K1AJD-10, say) goes to LinBPQ's Winlink gateway, not the BBS, so the BBS log has no line and no frequency for it. On VARA, Data2G and VHF alike, such a call shows band **WL2K** only when LinBPQ's gateway log (`CMSAccess_YYYYMMDD.log`) has that caller connecting to Winlink within a few minutes. Before v1.5.92 VARA marked every incoming call without a BBS line as WL2K. The frequency is the dial frequency the radio transmitted on during the call, from the rig history (`rig-history.jsonl`, read from flrig every 3 seconds while transmitting); it used to be taken from the nearest other call, which on a scanning radio could be another band. VHF calls show the port's frequency, from its WL2KREPORT line in `bpq32.cfg` or `'vhf' => ['freq_mhz' => 145.010]` in `config.php`. If a modem's radio isn't the one flrig reads, set `'rig_history' => false` in that modem's section (`vara` or `data2g`). To correct rows stored before v1.5.92, see Section 24 (`--backfill-freq`). Without the database the page falls back to reading the log files in your browser, which is much slower — see "(DB)" in Section 26. The page reloads its data every 15 minutes.
+**Winlink sessions and their frequency (v1.5.92).** A Winlink user calling your gateway call (K1AJD-10, say) goes to LinBPQ's Winlink gateway, not the BBS, so the BBS log has no line and no frequency for it. On VARA, Data2G and VHF alike, such a call shows band **WL2K** only when LinBPQ's gateway log (`CMSAccess_YYYYMMDD.log`) has that caller connecting to Winlink within a few minutes. Before v1.5.92 VARA marked every incoming call without a BBS line as WL2K. The frequency is the dial frequency the radio transmitted on during the call, from the rig history (`rig-history.jsonl`, read from flrig every 3 seconds while transmitting); it used to be taken from the nearest other call, which on a scanning radio could be another band. VHF calls show the port's frequency, from its WL2KREPORT line in `bpq32.cfg` or `'vhf' => ['freq_mhz' => 145.010]` in `config.php`. If a modem's radio isn't the one flrig reads, set `'rig_history' => false` in that modem's section (`vara` or `data2g`). To correct rows stored before v1.5.92, see Section 25 (`--backfill-freq`). Without the database the page falls back to reading the log files in your browser, which is much slower — see "(DB)" in Section 27. The page reloads its data every 15 minutes.
 
 ---
 
@@ -1045,7 +1058,7 @@ Laid out like RF Connections since v1.5.88.
 
 - **Port in Use** counts BBS log lines reading "Error - Port in use" (the radio port was busy with another session). It is one kind of RF failure only; the full count is on RF Connections. The two pages also default to different ranges (System Logs 7 days, RF Connections today), so set both to the same range when comparing.
 - The cards, charts, error breakdown, Most Active Stations, RMS/TCP panels and the MHeard/routing tables come from the database (`parse-system-logs.py`, every 5 minutes); "(DB)" in their status lines confirms it. The Live Log Viewer always reads the log files directly.
-- Since v1.5.41 the cards load first, straight from the database, and the Live Log Viewer fills in after. The viewer gets the newest 100,000 lines from the server, read from the end of the log files (`system-logs-api.php?action=lines`). It used to download whole daily logs, which on a busy hub are 40–50 MB each. If the oldest lines you need aren't there, use the log files themselves (Admin → Log Viewer, or `logs/` on the server).
+- Since v1.5.41 the cards load first, straight from the database, and the Live Log Viewer fills in after. The viewer gets the newest 100,000 lines from the server, read from the end of the log files (`system-logs-api.php?action=lines`). It used to download whole daily logs, which on a busy hub are 40–50 MB each. If the oldest lines you need aren't there, use the log files themselves (Admin → Logs, or `logs/` on the server).
 
 ---
 
@@ -1153,7 +1166,7 @@ Transmit power and SWR over time, read from the radio through flrig — the same
 
 - The history is written by the **rig-history-poller** service, so it fills in even when no browser is open. It samples about once a minute when idle and every 3 seconds while transmitting — fine for normal transmissions, coarser than a dedicated meter.
 - **Reflected power isn't measured** — flrig reports only SWR, so reflected watts are calculated from SWR and forward power.
-- The **Watt-hours** figures in Hourly Stats and the heatmap always read 0: flrig doesn't report energy (Section 27).
+- The **Watt-hours** figures in Hourly Stats and the heatmap always read 0: flrig doesn't report energy (Section 28).
 - An SWR jump during transmit means an antenna or feedline problem; high SWR on one band only means a mismatch on that band.
 
 When the page shows nothing, use §16's "When flrig is offline" — both pages depend on the same connection — and check `sudo systemctl status rig-history-poller`.
@@ -1209,6 +1222,7 @@ Commands use the installer's defaults (`/var/www/bpq-dashboard`, database `bpqda
 
 ### What's on the page
 
+- **Tiles at the top** open the other admin pages: **Firewall Status**, **System Audit**, **Log Viewer**, **Audio Map**, **LinBPQ Status** (v1.5.94), **Node Debug** (v1.5.95), **Modems** (v1.5.97), **Install Check** and the **Partners Editor**. All are also in the Admin menu.
 - **Health check** — one command that shows every dashboard service (nginx, PHP, MariaDB, LinBPQ, the helper daemons, vara-logger, rig-history-poller), what breaks when each is down, the bulletin clean-up timer, the parser schedule and listening ports.
 - **Admin login** — tests that the login is required, **Change admin password** (v1.5.19: current password, new one twice, 12 characters or more; it changes the login you opened the page with, and your browser then asks for the new one), adding or removing admin users over SSH, and a check that private files (`config.php`, `db-config.php`, `scripts/`, `data/`, backups, the journal) never download.
 - **Optional pages** (v1.5.19) — which `config.php` switch hides each optional page and the command that installs its helper, to add a page you left out at install time.
@@ -1230,14 +1244,15 @@ Commands use the installer's defaults (`/var/www/bpq-dashboard`, database `bpqda
 - **Firewall & Audit sudo rules, Chat, APRS map & beacon, callsign lookups** — installing and testing the read-only sudo rules, the chat daemon's status, APRS-IS / beacon status and the CARTO key, and the QRZ login test.
 - **Install check, updates & backups** — the installed version and the latest release (⟳ *Check for a new release*), and the three commands that update in place with `update.sh` (v1.5.19; `--dry-run` first, `--rollback` to undo).
 - **Web server & PHP, Permissions, updates & backups, disk** — including which nginx file is really live and why `set-permissions.sh` is for first installs only.
+- **Also on the page:** NWS automatic bulletins, the sound modem for VHF/UHF packet (QtSoundModem, Direwolf), Winlink mail (Poll RMS), forwarding schedule gaps, the geomagnetic data proxy, logs, disk and archives, the shared navigation bar, *Messages you can ignore* and *Key paths*.
 
 ### ⚙ Dashboard Settings
 
-On every admin page the menu bar has a **⚙** button. It opens *Dashboard Settings* for the optional forwarding tools, after the BBS password: tabs **Station**, **Partners**, **Prop Sched** (propagation scheduler weights and limits), **Storm Mon** (K-index thresholds) and **Paths** (linmail.cfg, LinBPQ stop/start commands, log and backup folders).
+On every admin page the menu bar has a **⚙** button. It opens *Dashboard Settings* for the optional forwarding tools, after the BBS password: tabs **Station**, **Partners**, **Prop Sched** (propagation scheduler weights and limits), **Storm Mon** (K-index thresholds), **Watchdog** (v1.5.90: the Connect Watchdog's failed attempts, pause length, restart sharing, never-pause list and BBS messages) and **Paths** (linmail.cfg, LinBPQ stop/start commands, log and backup folders).
 
 - It saves `data/settings.json`, which **overrides** the partners editor's `data/partners.json` (when it lists partners) and the scripts' own settings. Use one or the other for partners, not both.
 - **💾 Save All** writes every tab. Fill in Station and BBS before saving the first time; otherwise the defaults (`N0CALL`) are saved and the scheduler's BBS report can't log in. The Maintenance page has a check command that shows what `settings.json` overrides.
-- It changes nothing in the Email Client or the other pages; only `prop-scheduler.py` and `storm-monitor.py` read it.
+- It changes nothing in the Email Client or the other pages; only `prop-scheduler.py`, `storm-monitor.py` and (its Watchdog tab, v1.5.90) `connect-watchdog.py` read it.
 
 ---
 
@@ -1330,7 +1345,7 @@ Runs dozens of checks on this install and reports each one with what it found an
 
 **Logs & updates:** security updates waiting; /var/log size; log rotation for the dashboard's own logs; each log parser scheduled, running and error-free.
 
-**Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status (a service whose page is switched off in `config.php 'pages'` shows as *not in use*, v1.5.19); the VARA log download from the TPRFN server, when used (last good download under 30 minutes); APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering; recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry; forwarding scripts whose `TIMES` bands leave hours with no forwarding (v1.5.82, *Forwarding scripts with hours not covered*, read from `linmail.cfg`).
+**Application:** LinBPQ running (as `linbpq`, `linbpq64` or `pilinbpq`); each dashboard service (bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller) installed, running and writing its status (a service whose page is switched off in `config.php 'pages'` shows as *not in use*, v1.5.19); the VARA log download from the TPRFN server, when used (last good download under 30 minutes); APRS-IS login and BBS beacon; the message-text and bulletin clean-up timers and their last run; flrig answering, and (v1.5.93) whether it is still on the radio's **old serial port** after a USB drop (*flrig is still on the radio's old serial port*: critical; flrig needs Config → Setup → Transceiver → Init, or a restart); the data modems (Data2G, Mercury, QtSoundModem, VARA) that were **started before the radio's USB devices last came back** (a warning: restart that modem so it opens the sound card again); recent callsign-lookup failures; web root owner and writable cache/data folders; YAPP files; every page loading the current menu loader; SSL certificate expiry; forwarding scripts whose `TIMES` bands leave hours with no forwarding (v1.5.82, *Forwarding scripts with hours not covered*, read from `linmail.cfg`).
 
 ### Reading the results
 
@@ -1345,19 +1360,23 @@ Runs dozens of checks on this install and reports each one with what it found an
 - **Multi-domain SSL** — list your certificates in config.php `ssl_domains`; otherwise the address you opened the page on is checked.
 - Run it after an upgrade and once a month.
 
+## 23. LinBPQ Status, Node Debug, Modems and Audio Map
+
+Four admin pages (behind the admin login) for looking into LinBPQ and the station itself; each is also a tile on the Maintenance page.
+
 ### Node Debug (Admin → Node Debug, v1.5.95)
 
 LinBPQ's node debug log (`NodeDebuglog_YYMMDD.log` in the LinBPQ log folder) read for you, laid out like RF Connections. Choose **Today**, **3 days** or **7 days** (UTC).
 
 - **Status strip and headline cards:** LinBPQ starts (often = the Connect Watchdog or hand restarts), neighbour links dropped, internet / Winlink server (CMS) outages with when and how long, and the share of Winlink channel reports (WL2KREPORT) Winlink accepted.
 - **Neighbours:** each node link: sessions, data sent and received, links dropped while LinBPQ was running, links dropped during its own restarts (counted apart), last drop, and a block per day. Click one for details.
-- **Needs attention / Problems:** known lines explained, with what to do: a modem's **MISSING SOUNDCARD** (the radio's USB sound card dropped off), **Check CMS Failed** (Winlink servers unreachable), DNS failures, a chat link that keeps failing, AXIP packets from addresses LinBPQ has no MAP for, BPQ's web forms folder missing, RTS keying set without a serial port, and more. Anything else with "error" or "failed" is listed too.
-- **Why LinBPQ restarted (Starts tab):** each start says why: **Connect Watchdog** (and which partner it paused or resumed), **By *user*** (someone ran `sudo systemctl restart`), **Dashboard**, **Cron job**, **Computer restarted** (by whom, or after a power cut or hang), **Root / script** (stopped by root with no sudo record), **Crashed** (segfault, out of memory or an error exit), or **Unknown**. Click a start for the evidence, how long LinBPQ was down, whether it shut down normally, and the last lines it wrote. For an **Unknown** one it also lists what was checked, the likely causes and ready-to-copy commands for the system logs around that minute. Crashes and unknown restarts also appear under *Needs attention*. The reasons come from the Connect Watchdog's log and the system records read by the LinBPQ Status helper (the admin pages' sudo rules); without the helper, starts on the watchdog's 5-minute schedule show as *Probably Watchdog*.
+- **Needs attention / Problems:** known lines explained, with what to do: a modem's **MISSING SOUNDCARD** (the radio's USB sound card dropped off), **Check CMS Failed** (Winlink servers unreachable), DNS failures, a chat link that keeps failing, AXIP packets from addresses LinBPQ has no MAP for, BPQ's web forms folder missing (create the folder exactly as the line names it, e.g. `Standard_Templates` with an underscore; the two numbers after it are an error code, not part of the name), and more. "RigControl Opening for RTS PTT" is only a start-up note when the rig is reached through flrig or hamlib; nothing to fix. Anything else with "error" or "failed" is listed too.
+- **Why LinBPQ restarted (Starts tab):** each start says why: **Connect Watchdog** (and which partner it paused or resumed), **By *user*** (someone ran `sudo systemctl restart`), **Dashboard**, **Cron job**, **Computer restarted** (by whom, or after a power cut or hang), **Backup: *name*** / **Job: *name*** (a scheduled job, such as a nightly backup that stops LinBPQ for a few seconds, v1.5.96), **Root login** (typed in a root shell: SSH from *address* or the console, with when the session started, v1.5.96), **Root / script** (stopped by root with no sudo record or root session), **Crashed** (segfault, out of memory or an error exit), or **Unknown**. Click a start for the evidence, how long LinBPQ was down, whether it shut down normally, and the last lines it wrote. For an **Unknown** one it also lists what was checked, the likely causes and ready-to-copy commands for the system logs around that minute. Crashes and unknown restarts also appear under *Needs attention*. The reasons come from the Connect Watchdog's log and the system records read by the LinBPQ Status helper (the admin pages' sudo rules); without the helper, starts on the watchdog's 5-minute schedule show as *Probably Watchdog*.
 - **When things happened:** one square per UTC hour, coloured by the worst thing in it.
 - **Live log:** today's file, new lines every 5 seconds. VARA's routine busy / OK / alive lines and heartbeats are hidden (Everything shows them); *Problems only*; a filter box; Pause. Colours: red urgent, amber look at, brown LinBPQ shutting down, blue starting, green OK. **Search all days** (or Enter in the filter box) and the *Show … in the log* buttons on problems and neighbours search every day in the range you chose; a start's *Show the log around this start* opens the minutes before and after it. **Back to live log** returns to the live view.
 - Lines LinBPQ writes in the 30 seconds before it starts again (links dropped, "called without semaphore") are its own shutdown and are not counted as problems.
 
-LinBPQ writes the file when node debug logging is on. Behind the admin login (the log holds addresses and callsigns).
+Not every LinBPQ build or setup writes this file; install.sh and update.sh say whether they found it (*Node debug log*). Behind the admin login (the log holds addresses and callsigns).
 
 ### LinBPQ Status (Admin → LinBPQ Status, v1.5.94)
 
@@ -1369,6 +1388,21 @@ Is LinBPQ running, has it crashed or restarted, and what is it printing now. Ask
 - **Notes** when the history is limited: LinBPQ in screen (clean stops and hand restarts leave no record; only crashes, the current start and the computer's starts are known), a system journal that isn't kept across restarts (history from the last boot only; `sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald` keeps it), or a service that isn't restarted after a crash (`Restart=no`).
 
 It uses a read-only helper, `/usr/local/sbin/bpq-dashboard-linbpq-status`, allowed by two lines in `www-data-tools.sudoers` (no arguments, or `console`). update.sh installs both where the admin pages' sudo rules are installed. Without them the page says so and how to add them.
+
+### Modems (Admin → Modems, v1.5.97)
+
+Each modem's own display, without opening the station's desktop over VNC. Asked for by Tony, K1AJD. **Watch-only:** nothing on this page can click, type into or change a modem.
+
+- **VARA HF, flrig and other programs with a window** (VARA FM, QtSoundModem, ARDOP, fldigi, the Mercury and Data2G desktop programs): a picture of the window, taken on the station every 1.5 seconds while the panel is on screen. VARA HF's panel also says whether LinBPQ is attached to it. **1:1** shows the window at its real size; **Pause** stops the pictures. A window that is **minimised** can't be shown (restore it on the desktop). A window partly covered by another one on the desktop may show the other window's corner: keep the modem windows apart there. The pictures come from the desktop VARA runs in (e.g. the TigerVNC desktop of *Installation Manual* §10.15); a VARA on another computer can't be shown.
+- **Sound modems without a window** (v1.5.99): QtSoundModem started with `nogui`, Dire Wolf and other modems on a LinBPQ KISS-over-TCP port (`IPADDR` / `TCPPORT` in bpq32.cfg) have nothing to picture, so each such port gets a status panel: the modem program running on the station (with its options, user and start time; *no window* for `nogui`), the KISS address, whether LinBPQ is connected (*on air*), *LinBPQ not connected* or *modem not running*, the last station heard on that port, and every station heard there today (UTC; green = connected), as RF Connections' VHF Connections Status card shows them. When several sound-modem programs run, they are listed together (which one serves which port isn't readable without root).
+- **Mercury:** its spectrum and waterfall (0–3.1 kHz), S/N, bitrate, direction (TX in red), sync, the two callsigns and the bytes sent and received, live. Needs Mercury's own monitor switched on once (`sudo bash tools/mercury-monitor.sh`, Manual §10.17); the panel says so when it is off. Unlike Mercury's own page, you never have to click **Connect**.
+- **Data2G:** its waterfall (0–4 kHz, RX green-yellow, TX pink), the constellation of the last burst, the link (state, partner, bandwidth), mode, RX and TX bytes and speed, the dial frequency, PTT and BUSY lamps, and the last bursts heard with their S/N and result. Needs Data2G's monitor switched on once (`sudo bash tools/data2g-monitor.sh`, Manual §10.18). Its page has its own password: type it once in the panel. It goes to Data2G only and isn't kept by the dashboard; the browser tab keeps the session until it's closed (**Log out of Data2G** ends it). Decoded message text (the *Payloads* box of Data2G's own page) isn't shown here.
+- Each panel's header shows what the dashboard already knows about the modem: running, LinBPQ attached, in a session, sound-card trouble.
+- A panel only updates while it is on screen and the browser tab is in front, so an open page left in the background costs nothing.
+
+How it stays watch-only:
+- The pictures come from a small root helper, `/usr/local/sbin/bpq-dashboard-modem-view`, allowed by two lines in `www-data-tools.sudoers` (`list`, and `snap` of a window it lists). It reads the window's pixels with `xwininfo` and `xwd`; it never sends a click or a key. update.sh installs it, and `x11-utils` / `x11-apps` where a desktop runs.
+- Mercury's and Data2G's own monitor pages also take commands (Mercury's can change its audio, PTT and TX level; Data2G's can abort a session or change settings), so your browser is never connected to them. A small relay, **bpq-modem-relay** (127.0.0.1:8769), reads their displays and passes on only what the page draws; it sends Data2G nothing but its "hello" and Mercury nothing at all. It only connects to a modem while someone is watching (it lets go 30 seconds after the last look), so Mercury's log doesn't fill with monitor connections. Since v1.5.98 it doesn't run at all until the page is opened: systemd listens on that port (`bpq-modem-relay.socket`) and starts it on the first request, and it stops by itself after 10 minutes with nobody watching. The modems' monitor ports stay closed to the network.
 
 ### Audio Map (Admin → Audio Map, v1.5.57)
 
@@ -1390,7 +1424,7 @@ Below the picture: **Notes** (a modem port open to the network without a firewal
 
 ---
 
-## 23. Install Check and Health Check
+## 24. Install Check and Health Check
 
 **Pages:** `/install-check.php` and `/health-check.php` (behind the admin login; not in the menu)
 
@@ -1398,6 +1432,7 @@ Below the picture: **Notes** (a modem port open to the network without a firewal
 
 **Install Check** verifies the installation itself:
 
+- **This Computer** (v1.5.102, first section): the OS and whether it is still supported, the PHP, Python, database, web server and Dovecot versions, processor, memory and free disk, updates waiting (security ones counted apart), whether security updates install by themselves, and whether a restart is pending. It shows what the last install or update recorded; `sudo bash tools/system-check.sh` takes a fresh look (it only reports)
 - every dashboard page, API and script is in place
 - `config.php` values are filled in (no placeholders left), including the APRS, CARTO, CORS and radio settings
 - folders are readable/writable as needed (logs, cache, data, YAPP files)
@@ -1413,13 +1448,13 @@ It shows a score and a fix for each failure; work down the red items first. Some
 
 **Health Check** is a shorter diagnostic: PHP version and extensions, file permissions and folders, the config file, API endpoints, log files and a test login to the BBS. It also runs from the server's command line without the login: `sudo -u www-data php /var/www/bpq-dashboard/health-check.php`.
 
-Include the Install Check result (score and red items) when you ask for help (Section 30).
+Include the Install Check result (score and red items) when you ask for help (Section 31).
 
 ---
 
 # Part 6 — Sysop Reference
 
-## 24. What runs behind the pages
+## 25. What runs behind the pages
 
 The pages are only the front. These parts on the server do the work; when a page looks empty or stale, find it here.
 
@@ -1432,6 +1467,7 @@ The pages are only the front. These parts on the server do the work; when a page
 | `bpq-chat` | The station's permanent chat connection | Chat Client |
 | `bpq-aprs` | APRS-IS connection, station cache, BBS beacon | APRS Map |
 | `bpq-vara` | VARA HF session bridge (WebSocket, port 8767 on 127.0.0.1) | VARA HF Terminal |
+| `bpq-modem-relay` | Watch-only relay for Mercury's and Data2G's monitors (HTTP, port 8769 on 127.0.0.1). Since v1.5.98 started on request by `bpq-modem-relay.socket` and stopped after 10 idle minutes, so it's normally not running | Modems (v1.5.97) |
 | `vara-logger` | Writes the VARA log the RF parser reads (when VARA HF sends its syslog to this server) | RF Connections |
 | `vara-validator` (optional) | Checks callsigns of VARA connections; runs as the web user, settings in `config.php 'vara_validator'` (v1.5.19) | — (log in the Log Viewer) |
 | `rig-history-poller` (flrig installs) | Records power/SWR every minute (3 s during TX) | RF Power Monitor |
@@ -1484,6 +1520,17 @@ These edit `linmail.cfg` and restart LinBPQ, so they run as root, and only if yo
 
 Their logs are in `/var/log/bpq-dashboard/` and in the Log Viewer under *Forwarding tools*.
 
+### Root helpers for the admin pages (the admin pages' sudo rules)
+
+Small root-owned programs in `/usr/local/sbin`, each allowed by one exact rule in `/etc/sudoers.d/www-data-tools` (install.sh installs them; update.sh refreshes them when the rules are there). Each one prints nothing secret.
+
+| Helper | Used by | What it does |
+|---|---|---|
+| `bpq-dashboard-set-admin-password` | Maintenance → *Change admin password* | Changes the password of an existing admin login (password on stdin, never logged) |
+| `bpq-dashboard-audio-map` | Audio Map | Reads which programs have the sound cards open and the mixer levels (read-only) |
+| `bpq-dashboard-linbpq-status` | LinBPQ Status, Node Debug | Reads how LinBPQ runs, its console, and the system's records of its starts, stops, crashes, reboots, sudo / cron / root logins and running jobs (read-only, passwords masked) |
+| `bpq-dashboard-modem-view` | Modems | Lists the modem windows on the station's desktop and takes a picture of one (read-only: never clicks or types) |
+
 ### Read straight from BPQ's files
 
 Connect Log (`ConnectLog_*.log`), Messages (`log_*_BBS.txt`, `log_*_TCP.txt`), the System Logs viewer and fallbacks read BPQ's log folder directly, through the `logs` link in the web root.
@@ -1494,7 +1541,7 @@ APRS-IS (APRS Map), api.weather.gov (NWS), NOAA SWPC and HamQSL (geomagnetic dat
 
 ---
 
-## 25. Where your settings are kept
+## 26. Where your settings are kept
 
 Some choices follow you to every browser; others stay in the browser where you made them.
 
@@ -1512,7 +1559,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 
 ---
 
-## 26. Common messages and what they mean
+## 27. Common messages and what they mean
 
 | You see | Meaning | What to do |
 |---|---|---|
@@ -1522,7 +1569,7 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"needs the dashboard admin login, and the web server didn't ask for it"* | The web-server config is older than the dashboard files | Re-run `install.sh` or update the site file; Install Check shows what's missing |
 | *"No power switch is set up"* (Rig Status) | `config.php` has no `smartplug` host | Add the section (*Installation Manual* §10.7) if you have a switch; otherwise ignore |
 | *"Could not send the e-mail …"* / *"No sysop e-mail is set …"* (Chat or VARA access request) | The server has no working mail setup, or `station.email` is empty or an example address | Set `station.email`; set up mail on the server (e.g. a sendmail-compatible relay), or contact the sysop another way |
-| **(DB)** missing from a status line | The page couldn't use the database and is reading log files in your browser (slower, less history) | Check the parsers (Section 24) and the database (System Audit) |
+| **(DB)** missing from a status line | The page couldn't use the database and is reading log files in your browser (slower, less history) | Check the parsers (Section 25) and the database (System Audit) |
 | *"BBS busy"* (Email Client) | Another BBS session is running; the dashboard allows one at a time | Wait a moment and retry |
 | *"Login refused: check bbs.user / bbs.pass …"* (Email Client, message-bodies, forwarding queue) | BPQ answered the password with an error or asked again | Make `bbs.user` / `bbs.pass` in `config.php` match the `USER=` line in `bpq32.cfg` |
 | *"Login failed: nothing came back after the password"* / *"No BBS prompt after 'bbs'"* | BPQ went silent after the login, or the BBS application has another name | Check LinBPQ is running and `bbs.alias` in `config.php` is your BBS's application name (`APPLICATION` line in `bpq32.cfg`) |
@@ -1569,10 +1616,17 @@ Clearing a browser's site data resets the right-hand column for that browser onl
 | *"Set config.php nws.auto_post.area to your 2-letter state code"* | Turned on, but no state chosen | Set `'area'` in `config.php` `nws` → `auto_post` |
 | *"FAILED (BBS not reachable; will retry next run)"* (NWS auto-post log) | BPQ wasn't answering on its telnet port | Nothing if BPQ is back; the alert goes out on the next run while it's still in force |
 | *"api.weather.gov fetch failed"* (NWS auto-post log) | The server couldn't reach NWS | Retried every 5 minutes; check the server's internet connection |
+| Modems: *"The window is minimised on the station's desktop"* (v1.5.97) | The modem's window is minimised, so there is nothing to picture | Restore it on the desktop (over VNC) |
+| Modems: a picture shows part of another window | The two windows overlap on the station's desktop | Move them apart there |
+| Modems: *"…sudo rule is missing"* / *"helper … isn't installed"* | The window-picture helper or its two sudo rules aren't installed | `sudo bash update.sh` from the release folder (answer yes to the admin pages' sudo rules) |
+| Modems: *"xwininfo is not installed"* | The tools that take the pictures are missing (the desktop was set up after installing) | `sudo apt install x11-utils x11-apps` |
+| Modems: *"Nothing answers for the watch-only Mercury / Data2G relay"* | `bpq-modem-relay.socket` isn't running | `sudo systemctl enable --now bpq-modem-relay.socket` |
+| Modems, Mercury or Data2G: *"not listening (monitor switched off, or the modem is not running)"* | The modem's own monitor port isn't open | Switch the monitor on (`tools/mercury-monitor.sh`, `tools/data2g-monitor.sh`) or start the modem |
+| Modems, Data2G: *"Data2G ended the session … log in again"* | Data2G restarted, or its monitor password changed | Type the monitor password again |
 
 ---
 
-## 27. Known limitations in v1.5.95
+## 28. Known limitations in v1.6.0
 
 These affect what you see in this release. Each says what to do meanwhile.
 
@@ -1587,11 +1641,12 @@ These affect what you see in this release. Each says what to do meanwhile.
 - **Traffic Report's Messages card** leaves out NTS traffic (Section 13).
 - **The NWS page doesn't know which alerts were posted automatically**, so it can't stop you posting one again by hand.
 - **Behind a reverse proxy** (dashboard on its own port, v1.5.19), the dashboard sees every visitor as 127.0.0.1: per-address limits (wrong-password lock-outs) then count all visitors together. Its own host name or port is needed; a sub-path (`/dashboard/`) doesn't work, because the pages use absolute links.
+- **Modems page pictures** (v1.5.97): a window covered in part by another on the station's desktop can show the other window's corner (the VNC desktop has no compositor), a minimised window can't be shown, and a modem on another computer (e.g. VARA HF on a Windows PC) can't be pictured from the dashboard; its panel says so. QtSoundModem with `nogui` and Dire Wolf have no window: they get a status panel instead (v1.5.99), and with several sound-modem programs running the page can't tell which serves which port.
 - **Home folders:** on Ubuntu 21.04+ / Mint 21+ a LinBPQ folder inside `/home/<user>` needs the access fix the installer offers (Maintenance → *LinBPQ in a home folder*); `bpq32.cfg` stays unreadable to the dashboard on purpose, so Install Check's bpq32.cfg rows are skipped there.
 
 ---
 
-## 28. Keyboard shortcuts
+## 29. Keyboard shortcuts
 
 | Page | Shortcut | Action |
 |---|---|---|
@@ -1618,7 +1673,7 @@ These affect what you see in this release. Each says what to do meanwhile.
 | Any page | `Ctrl+Shift+R` | Hard refresh (bypass cache) — do this after an update |
 | Any page | `F11` | Full screen |
 
-## 29. Page URL reference
+## 30. Page URL reference
 
 Replace `YOUR_SERVER` with your server's address. Use `https://` once the server has a certificate — the admin login should only be sent over HTTPS.
 
@@ -1645,15 +1700,16 @@ Replace `YOUR_SERVER` with your server's address. Use `https://` once the server
 | Audio Map (v1.5.57) | `http://YOUR_SERVER/admin/audio-map.html` | Admin |
 | LinBPQ Status (v1.5.94) | `http://YOUR_SERVER/admin/linbpq-status.html` | Admin |
 | Node Debug (v1.5.95) | `http://YOUR_SERVER/admin/node-debug.html` | Admin |
+| Modems (v1.5.97) | `http://YOUR_SERVER/admin/modems.html` | Admin |
 | Install Check | `http://YOUR_SERVER/install-check.php` | Admin |
 | Health Check | `http://YOUR_SERVER/health-check.php` | Admin |
 | NTS Report | `http://YOUR_SERVER/nts-forwarding-report.php` (also from the Email Client) | Admin login |
 | PKTNET Forms | `http://YOUR_SERVER/pktnet-forms/` | None |
-| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.5.95-User-Guide.pdf` | None |
+| This guide (PDF) | `http://YOUR_SERVER/BPQ-Dashboard-v1.6.0-User-Guide.pdf` | None |
 
 If the dashboard runs on its own port (v1.5.19, e.g. next to another web site), add it to every address: `http://YOUR_SERVER:8080/...`.
 
-## 30. Getting help
+## 31. Getting help
 
 ### Documentation
 
@@ -1676,7 +1732,7 @@ From v1.5.19 a new release updates your install in place: unzip it and run `sudo
 ### When asking for help
 
 Include:
-1. Dashboard version (e.g. 1.5.95 — on the title page of this guide and on each page's badge)
+1. Dashboard version (e.g. 1.6.0 — on the title page of this guide and on each page's badge)
 2. Your platform (Debian 12, Ubuntu 24.04, Raspberry Pi OS, etc.) and web server
 3. The Install Check result (score and any red items)
 4. PHP version (`php --version`)
@@ -1691,6 +1747,6 @@ BPQ Dashboard is a front end for other people's work: **LinBPQ / BPQ32** by John
 
 ---
 
-**73 — BPQ Dashboard v1.5.95 — User Guide**
+**73 — BPQ Dashboard v1.6.0 — User Guide**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*

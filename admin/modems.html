@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modems - BPQ Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--border:#21262d;--border2:#30363d;
+    --text:#e6edf3;--muted:#7d8590;--green:#3fb950;--green-dim:#1a4428;
+    --amber:#d29922;--amber-dim:#3d2b05;--blue:#58a6ff;--blue-dim:#0d2340;
+    --red:#f85149;--red-dim:#3d0c0a;--purple:#bc8cff;--purple-dim:#1e1040;
+    --cyan:#39d0d8;--cyan-dim:#0c2d30;--orange:#f0883e;--orange-dim:#3a1d06;
+    --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+  }
+  [data-theme="light"] {
+    --bg:#f6f8fa;--surface:#ffffff;--surface2:#f6f8fa;--border:#d0d7de;--border2:#afb8c1;
+    --text:#1f2328;--muted:#656d76;
+    --green:#1a7f37;--green-dim:#dcfce7;--amber:#9a6700;--amber-dim:#fff8c5;
+    --blue:#0969da;--blue-dim:#ddf4ff;--red:#cf222e;--red-dim:#ffebe9;
+    --purple:#8250df;--purple-dim:#fbefff;--cyan:#0d7d8a;--cyan-dim:#e0f7f9;
+    --orange:#bc4c00;--orange-dim:#fff1e5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.6;padding:32px 24px 64px;max-width:1500px;margin:0 auto;}
+  header{border-bottom:1px solid var(--border2);padding-bottom:20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+  header h1{font-family:var(--mono);font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;}
+  header h1 span{color:var(--green);}
+  header .meta{font-family:var(--mono);font-size:0.72rem;color:var(--muted);text-align:right;line-height:1.8;}
+  .nav-back{font-family:var(--mono);font-size:0.75rem;color:var(--blue);text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;opacity:0.8;}
+  .nav-back:hover{opacity:1;}
+  .auth-gate{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:32px;max-width:440px;margin:80px auto;text-align:center;}
+  .auth-gate h2{font-family:var(--mono);font-size:1rem;margin-bottom:8px;color:var(--amber);}
+  .auth-gate p{color:var(--muted);font-size:0.85rem;}
+  .loading{font-family:var(--mono);color:var(--muted);text-align:center;padding:60px 0;}
+  .intro{color:var(--muted);font-size:0.85rem;margin-bottom:18px;max-width:980px;}
+  .btn{font-family:var(--mono);font-size:0.72rem;font-weight:600;padding:4px 11px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;}
+  .btn:hover{border-color:var(--blue);color:var(--blue);}
+  .btn[aria-pressed="true"]{border-color:var(--blue);color:var(--blue);}
+  .notes{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:6px;padding:8px 12px;font-size:0.85rem;}
+  .note.warn{border-left-color:var(--amber);} .note.bad{border-left-color:var(--red);}
+  .mono,code{font-family:var(--mono);font-size:0.76rem;}
+  code{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0 5px;}
+  .muted{color:var(--muted);}
+  .pill{display:inline-block;font-family:var(--mono);font-size:0.66rem;padding:1px 8px;border-radius:9px;border:1px solid var(--border2);margin:1px 3px 1px 0;white-space:nowrap;color:var(--muted);}
+  .pill.ok{color:var(--green);border-color:var(--green);} .pill.warn{color:var(--amber);border-color:var(--amber);}
+  .pill.bad{color:var(--red);border-color:var(--red);} .pill.tx{color:#fff;background:var(--red);border-color:var(--red);}
+  .pill.info{color:var(--blue);border-color:var(--blue);}
+  /* Modems (v1.5.97) */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:16px;align-items:start;}
+  .panel{background:var(--surface);border:1px solid var(--border2);border-radius:10px;overflow:hidden;}
+  .panel.wide{grid-column:1/-1;}
+  .ph{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;border-bottom:1px solid var(--border);background:var(--surface2);}
+  .ph h2{font-family:var(--mono);font-size:0.9rem;font-weight:700;}
+  .ph h2 small{font-weight:400;color:var(--muted);font-size:0.72rem;margin-left:6px;}
+  .pb{padding:12px 14px;}
+  .pf{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 14px 10px;font-family:var(--mono);font-size:0.68rem;color:var(--muted);}
+  .shot{background:#0a0d12;border-radius:6px;border:1px solid var(--border);display:flex;justify-content:center;align-items:center;min-height:120px;overflow:auto;}
+  .shot img{display:block;max-width:100%;height:auto;image-rendering:auto;}
+  .shot.actual img{max-width:none;}
+  .shot .msg{color:var(--muted);font-family:var(--mono);font-size:0.75rem;padding:30px;text-align:center;}
+  .wf-wrap{position:relative;background:#000;border-radius:6px;overflow:hidden;border:1px solid var(--border);}
+  canvas.wf{display:block;width:100%;height:220px;image-rendering:pixelated;}
+  canvas.spec{display:block;width:100%;height:110px;background:#10131c;border-radius:6px;border:1px solid var(--border);margin-bottom:6px;}
+  .axis{position:relative;height:16px;font-family:var(--mono);font-size:0.62rem;color:var(--muted);}
+  .axis span{position:absolute;transform:translateX(-50%);}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-top:10px;}
+  .stat{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 9px;}
+  .stat .k{font-family:var(--mono);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
+  .stat .v{font-family:var(--mono);font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lamp{display:inline-block;font-family:var(--mono);font-size:0.66rem;font-weight:700;padding:1px 8px;border-radius:4px;border:1px solid var(--border2);color:var(--muted);margin-left:4px;}
+  .lamp.lit.ptt{background:var(--red);border-color:var(--red);color:#fff;} .lamp.lit.busy{background:var(--amber);border-color:var(--amber);color:#000;}
+  .d2g-row{display:grid;grid-template-columns:1fr 150px;gap:10px;}
+  canvas.cons{width:150px;height:150px;background:#000;border-radius:6px;border:1px solid var(--border);display:block;}
+  table.bursts{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:0.7rem;margin-top:10px;}
+  table.bursts th,table.bursts td{text-align:left;padding:3px 8px;border-bottom:1px solid var(--border);}
+  table.bursts th{color:var(--muted);font-size:0.6rem;text-transform:uppercase;}
+  .res-ok{color:var(--green);} .res-fail,.res-bad{color:var(--red);}
+  .login{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;}
+  .login input{font-family:var(--mono);font-size:0.8rem;padding:5px 9px;border-radius:5px;border:1px solid var(--border2);background:var(--bg);color:var(--text);min-width:220px;}
+  .live{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;}
+  .dot.off{background:var(--muted);} .dot.bad{background:var(--red);}
+  @media(max-width:700px){body{padding:20px 12px 48px;} .grid{grid-template-columns:1fr;} header .meta{text-align:left;} .d2g-row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body data-nav-page="modems">
+<script src="/bpq-nav-loader.js?v=2026-11-27-3"></script>
+
+<a href="bpq-maintenance.html" class="nav-back">← BPQ Maintenance Reference</a>
+
+<header>
+  <h1>📻 BPQ Dashboard <span>//</span> Modems <span style="font-size:0.45em; vertical-align:middle; padding:2px 8px; background:linear-gradient(90deg,#a855f7 0%,#3b82f6 100%); color:#fff; border-radius:9999px; font-weight:700;">v1.6.0</span></h1>
+  <div class="meta">VARA HF, Mercury, Data2G and the other modems, as they look now<br>Watch-only: nothing here can change a modem</div>
+</header>
+
+<div id="auth-gate" class="auth-gate" style="display:none;"><h2>🔒 Admin login needed</h2><p id="auth-msg"></p></div>
+<div id="loading" class="loading">Looking for the modems…</div>
+
+<div id="main" style="display:none;">
+  <p class="intro">Each modem's own display, without opening the station's desktop. VARA HF, flrig and the other programs with a window are shown as a picture of that window, taken on the station once a second or two; you can look but not click. Sound modems that run without a window (QtSoundModem with <code>nogui</code>, Dire Wolf) get a status panel: the program, whether LinBPQ is connected, and the stations heard today. Mercury's and Data2G's monitors are redrawn here from what the modem sends, through a watch-only relay that passes no command back. A panel only updates while it is on screen.</p>
+  <div id="notes" class="notes"></div>
+  <div id="grid" class="grid"></div>
+  <div class="pf" style="padding:14px 0 0;"><span id="stamp"></span><button class="btn" id="refresh">⟳ Look again</button></div>
+</div>
+
+<script>
+const API = 'modems-api.php';
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+let OV = null;                         // last overview
+const panels = new Map();              // key -> {el, kind, timer, ...}
+const SHOT_MS = 1500, FEED_MS = 400, OVERVIEW_MS = 20000;
+let D2G_TOKEN = '';
+try { D2G_TOKEN = sessionStorage.getItem('bpq-d2g-session') || ''; } catch (e) {}
+
+function api(params, opts = {}) {
+  const q = new URLSearchParams(params); q.set('t', Date.now());
+  return fetch(API + '?' + q, Object.assign({ cache: 'no-store' }, opts)).then(r => r.text().then(t => {
+    let d = null; try { d = JSON.parse(t); } catch (e) {}
+    if (r.status === 401 || (r.status === 403 && d && d.code === 'login_required')) { const e = new Error('auth'); e.detail = d && d.error; throw e; }
+    if (!d) throw new Error('HTTP ' + r.status);
+    return d;
+  }));
+}
+function post(action, body) {
+  return api({ action }, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-BPQ-Dashboard': '1' }, body: JSON.stringify(body) });
+}
+function fail(err) {
+  $('loading').style.display = 'block';
+  if (err.message === 'auth') {
+    $('loading').style.display = 'none'; $('auth-gate').style.display = 'block';
+    $('auth-msg').textContent = err.detail || 'Reload the page and log in.';
+  } else $('loading').innerHTML = '⚠️ ' + esc(err.message);
+}
+const visible = el => !document.hidden && el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < innerHeight;
+function ago(t) { if (!t) return ''; const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 2 ? 'just now' : s + ' s ago'; }
+
+// ── colour maps (as Data2G's own monitor) ────────────────────────────────────
+function ramp(stops) {
+  const out = [];
+  for (let i = 0; i < 256; i++) {
+    const x = i / 255; let k = 0;
+    while (k + 2 < stops.length && x > stops[k + 1][0]) k++;
+    const [a, lo] = stops[k], [b, hi] = stops[k + 1], t = (x - a) / (b - a);
+    out.push(lo.map((c, j) => Math.round(c + t * (hi[j] - c))));
+  }
+  return out;
+}
+const RX_MAP = ramp([[0, [0, 0, 0]], [.25, [0, 0, 140]], [.5, [0, 170, 90]], [.75, [245, 235, 40]], [1, [255, 255, 255]]]);
+const TX_MAP = ramp([[0, [0, 0, 0]], [.25, [70, 0, 90]], [.5, [200, 30, 140]], [.75, [255, 140, 200]], [1, [255, 255, 255]]]);
+
+function wfRow(canvas, b64, tx) {
+  const bins = atob(b64), ctx = canvas.getContext('2d');
+  if (canvas.width !== bins.length) { canvas.width = bins.length; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+  ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height - 1, 0, 1, canvas.width, canvas.height - 1);
+  const img = ctx.createImageData(bins.length, 1), map = tx ? TX_MAP : RX_MAP;
+  for (let i = 0; i < bins.length; i++) { const c = map[bins.charCodeAt(i)]; img.data.set([c[0], c[1], c[2], 255], i * 4); }
+  ctx.putImageData(img, 0, 0);
+  return bins;
+}
+function axisHtml(topHz) {
+  let h = '';
+  for (let f = 500; f < topHz; f += 500) h += `<span style="left:${f / topHz * 100}%">${f % 1000 ? '' : f / 1000 + 'k'}${f % 1000 ? '·' : ''}</span>`;
+  return h;
+}
+
+// ── window pictures (VARA HF, flrig, QtSoundModem …) ─────────────────────────
+function windowPanel(disp, w, varaPorts) {
+  const key = 'win:' + disp + ':' + w.id;
+  let p = panels.get(key);
+  if (!p) {
+    const el = document.createElement('section'); el.className = 'panel';
+    el.innerHTML = `<div class="ph"><h2>${esc(w.label)}<small>${esc(w.title)}</small></h2><span class="hp"></span></div>
+      <div class="pb"><div class="shot"><div class="msg">Taking a picture…</div></div></div>
+      <div class="pf"><span class="live"><span class="dot"></span><span class="st"></span></span>
+        <span><button class="btn b-size" aria-pressed="false" title="Show at the window's real size">1:1</button>
+        <button class="btn b-pause">⏸ Pause</button></span></div>`;
+    p = { el, kind: 'win', disp, id: w.id, paused: false, last: 0, busy: false };
+    el.querySelector('.b-pause').onclick = e => { p.paused = !p.paused; e.target.textContent = p.paused ? '▶ Resume' : '⏸ Pause'; el.querySelector('.dot').className = 'dot' + (p.paused ? ' off' : ''); };
+    el.querySelector('.b-size').onclick = e => { const on = e.target.getAttribute('aria-pressed') !== 'true'; e.target.setAttribute('aria-pressed', on); el.querySelector('.shot').classList.toggle('actual', on); };
+    panels.set(key, p);
+  }
+  p.seen = true; p.viewable = w.viewable; p.title = w.title;
+  let hp = '';
+  if (w.kind === 'vara') {
+    for (const v of varaPorts) {
+      hp += v.attached ? `<span class="pill ok">LinBPQ port ${v.num} attached</span>`
+          : v.local && v.listening ? `<span class="pill warn">port ${v.num}: VARA waiting for LinBPQ</span>`
+          : v.local ? `<span class="pill bad">port ${v.num}: VARA not on ${v.tnc_port}</span>` : '';
+    }
+  }
+  hp += w.viewable ? '' : '<span class="pill warn">minimised</span>';
+  p.el.querySelector('.hp').innerHTML = hp;
+  if (!w.viewable) p.el.querySelector('.shot').innerHTML = '<div class="msg">The window is minimised on the station\'s desktop, so there is nothing to show. Restore it there (it can stay behind nothing else).</div>';
+  return p;
+}
+function shoot(p) {
+  if (p.paused || p.busy || !p.viewable || !visible(p.el)) return;
+  p.busy = true;
+  const url = API + '?' + new URLSearchParams({ action: 'snap', d: p.disp, id: p.id, t: Date.now() });
+  fetch(url, { cache: 'no-store' }).then(r => {
+    if (r.headers.get('Content-Type') === 'image/png') return r.blob().then(b => {
+      const box = p.el.querySelector('.shot'); let img = box.querySelector('img');
+      if (!img) { box.innerHTML = ''; img = document.createElement('img'); img.alt = p.title; box.appendChild(img); }
+      const old = img.src; img.src = URL.createObjectURL(b); if (old.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(old), 2000);
+      p.last = Date.now(); p.el.querySelector('.dot').className = 'dot';
+    });
+    return r.json().then(d => {
+      p.el.querySelector('.dot').className = 'dot bad';
+      p.el.querySelector('.shot').innerHTML = `<div class="msg">${d.error === 'minimised' ? 'The window is minimised on the station\'s desktop.' : 'No picture: ' + esc(d.error || 'HTTP ' + r.status)}</div>`;
+    });
+  }).catch(() => {}).finally(() => { p.busy = false; });
+}
+
+// ── Mercury ──────────────────────────────────────────────────────────────────
+function mercuryPanel(m) {
+  let p = panels.get('mercury');
+  if (!p) {
+    const el = document.createElement('section'); el.className = 'panel';
+    el.innerHTML = `<div class="ph"><h2>Mercury<small class="ver"></small></h2><span class="hp"></span></div>
+      <div class="pb body"></div>
+      <div class="pf"><span class="live"><span class="dot off"></span><span class="st"></span></span><button class="btn b-pause">⏸ Pause</button></div>`;
+    p = { el, kind: 'mercury', since: 0, paused: false, busy: false, last: 0 };
+    el.querySelector('.b-pause').onclick = e => { p.paused = !p.paused; e.target.textContent = p.paused ? '▶ Resume' : '⏸ Pause'; };
+    panels.set('mercury', p);
+  }
+  p.seen = true;
+  p.el.querySelector('.ver').textContent = m.version || '';
+  p.el.querySelector('.hp').innerHTML = statusPills(m);
+  const body = p.el.querySelector('.body');
+  p.on = !!(m.monitor && m.monitor.on);
+  if (!p.on) {
+    body.innerHTML = `<div class="note warn">Mercury's own monitor is switched off, so there is no waterfall to show. Switch it on once with <code>sudo bash &lt;web root&gt;/tools/mercury-monitor.sh</code> (Maintenance → Mercury, Installation Manual §10.17). Its port stays closed to the network.</div>`;
+    p.built = false;
+  } else if (!p.built) {
+    body.innerHTML = `<canvas class="spec" width="512" height="110"></canvas>
+      <div class="wf-wrap"><canvas class="wf" width="512" height="220"></canvas></div>
+      <div class="axis">${axisHtml(3100)}</div>
+      <div class="stats">
+        <div class="stat"><div class="k">S/N</div><div class="v" data-k="snr">--</div></div>
+        <div class="stat"><div class="k">Bitrate</div><div class="v" data-k="bitrate">--</div></div>
+        <div class="stat"><div class="k">Direction</div><div class="v" data-k="dir">--</div></div>
+        <div class="stat"><div class="k">Sync</div><div class="v" data-k="sync">--</div></div>
+        <div class="stat"><div class="k">Stations</div><div class="v" data-k="calls">--</div></div>
+        <div class="stat"><div class="k">TX / RX bytes</div><div class="v" data-k="bytes">--</div></div>
+      </div>`;
+    p.built = true; p.since = 0;
+  }
+  return p;
+}
+function drawSpec(canvas, bins) {
+  const ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
+  ctx.fillStyle = '#10131c'; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#2a3142'; ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { const y = Math.round(h * i / 4) + .5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  ctx.beginPath();
+  for (let i = 0; i < bins.length; i++) { const x = i / (bins.length - 1) * w, y = h - bins.charCodeAt(i) / 255 * h; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.strokeStyle = '#58d68d'; ctx.lineWidth = 1.2; ctx.stroke();
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fillStyle = 'rgba(88,214,141,.15)'; ctx.fill();
+}
+function feedMercury(p) {
+  if (!p.on || p.paused || p.busy || !visible(p.el)) return;
+  p.busy = true;
+  api({ action: 'mercury', since: p.since }).then(d => {
+    const st = p.el.querySelector('.st'), dot = p.el.querySelector('.dot');
+    if (!d.ok) { dot.className = 'dot bad'; st.textContent = d.error === 'monitor_off' ? 'monitor switched off' : (d.error || 'no data'); return; }
+    if (d.error) { dot.className = 'dot bad'; st.textContent = d.error; }
+    else { dot.className = d.connected ? 'dot' : 'dot off'; st.textContent = d.connected ? 'live' : 'connecting…'; }
+    const wf = p.el.querySelector('canvas.wf');
+    let last = null;
+    for (const r of d.rows || []) { last = wfRow(wf, r.b, r.tx); p.since = Math.max(p.since, r.s); }
+    if (d.seq < p.since) p.since = 0;                       // the relay restarted
+    if (last) drawSpec(p.el.querySelector('canvas.spec'), last);
+    const s = d.state || {};
+    const set = (k, v) => { const e = p.el.querySelector(`[data-k="${k}"]`); if (e) e.textContent = v; };
+    if (s.t) {
+      set('snr', s.snr != null ? Number(s.snr).toFixed(1) + ' dB' : '--');
+      set('bitrate', s.bitrate != null ? s.bitrate + ' bps' : '--');
+      const dEl = p.el.querySelector('[data-k="dir"]'); dEl.textContent = s.direction ? s.direction.toUpperCase() : '--';
+      dEl.style.color = s.direction === 'tx' ? 'var(--red)' : '';
+      set('sync', s.sync ? 'On' : 'Off');
+      set('calls', (s.user_callsign || '--') + (s.dest_callsign ? ' → ' + s.dest_callsign : ''));
+      set('bytes', (s.bytes_transmitted ?? 0) + ' / ' + (s.bytes_received ?? 0));
+    }
+  }).catch(e => { if (e.message === 'auth') fail(e); }).finally(() => { p.busy = false; });
+}
+
+// ── Data2G ───────────────────────────────────────────────────────────────────
+function data2gPanel(g) {
+  let p = panels.get('data2g');
+  if (!p) {
+    const el = document.createElement('section'); el.className = 'panel';
+    el.innerHTML = `<div class="ph"><h2>Data2G<small class="ver"></small></h2><span class="hp"></span></div>
+      <div class="pb body"></div>
+      <div class="pf"><span class="live"><span class="dot off"></span><span class="st"></span></span>
+        <span><button class="btn b-logout" style="display:none" title="End this browser's Data2G monitor session">Log out of Data2G</button>
+        <button class="btn b-pause">⏸ Pause</button></span></div>`;
+    p = { el, kind: 'data2g', since: 0, paused: false, busy: false, mode: '' };
+    el.querySelector('.b-pause').onclick = e => { p.paused = !p.paused; e.target.textContent = p.paused ? '▶ Resume' : '⏸ Pause'; };
+    el.querySelector('.b-logout').onclick = () => { post('d2g_logout', { token: D2G_TOKEN }).catch(() => {}); setToken(''); data2gPanel(OV.data2g); };
+    panels.set('data2g', p);
+  }
+  p.seen = true;
+  p.el.querySelector('.ver').textContent = g.version ? 'v' + String(g.version).replace(/^v/, '') : '';
+  p.el.querySelector('.hp').innerHTML = statusPills(g);
+  const body = p.el.querySelector('.body');
+  p.on = !!(g.monitor && g.monitor.port);
+  p.el.querySelector('.b-logout').style.display = p.on && D2G_TOKEN ? '' : 'none';
+  const want = !p.on ? 'off' : D2G_TOKEN ? 'live' : 'login';
+  if (want === p.mode) return p;
+  p.mode = want; p.since = 0;
+  if (want === 'off') {
+    body.innerHTML = `<div class="note warn">Data2G's own monitor is switched off (the service runs <code>data2g-host</code>), so there is no waterfall to show. Switch it on once with <code>sudo bash &lt;web root&gt;/tools/data2g-monitor.sh</code> (Installation Manual §10.18). It listens on this computer only.</div>`;
+  } else if (want === 'login') {
+    body.innerHTML = `<div class="note">Data2G's monitor has its own password (set with <code>tools/data2g-monitor.sh</code>). Type it once: it goes to Data2G only and isn't kept anywhere; this browser tab keeps the session until you close it.</div>
+      <form class="login"><input type="password" autocomplete="current-password" placeholder="Data2G monitor password"><button class="btn" type="submit">Show the monitor</button><span class="lmsg muted mono"></span></form>`;
+    body.querySelector('form').onsubmit = ev => {
+      ev.preventDefault();
+      const inp = body.querySelector('input'), msg = body.querySelector('.lmsg'); msg.textContent = 'checking…';
+      post('d2g_login', { password: inp.value }).then(d => {
+        inp.value = '';
+        if (d.ok && d.token) { setToken(d.token); data2gPanel(OV.data2g); } else msg.textContent = d.error || 'not accepted';
+      }).catch(e => { msg.textContent = e.message; });
+    };
+  } else {
+    body.innerHTML = `<div class="d2g-row">
+        <div><div class="wf-wrap"><canvas class="wf" width="512" height="220"></canvas></div><div class="axis">${axisHtml(4000)}</div></div>
+        <div><canvas class="cons" width="150" height="150" title="Constellation of the last burst"></canvas><div class="muted mono" style="font-size:0.62rem;margin-top:3px" data-k="cmode"></div></div>
+      </div>
+      <div class="stats">
+        <div class="stat" style="grid-column:span 2"><div class="k">Link</div><div class="v" data-k="link">--</div></div>
+        <div class="stat"><div class="k">Mode</div><div class="v" data-k="mode">--</div></div>
+        <div class="stat"><div class="k">RX</div><div class="v" data-k="rx">--</div></div>
+        <div class="stat"><div class="k">TX</div><div class="v" data-k="tx">--</div></div>
+        <div class="stat" style="grid-column:span 2"><div class="k">Radio</div><div class="v"><span data-k="dial">--</span><span class="lamp" data-k="ptt">PTT</span><span class="lamp" data-k="busy">BUSY</span></div></div>
+      </div>
+      <table class="bursts"><thead><tr><th>Time</th><th>Burst</th><th>S/N</th><th>Result</th></tr></thead><tbody></tbody></table>`;
+  }
+  return p;
+}
+function setToken(t) { D2G_TOKEN = t; try { t ? sessionStorage.setItem('bpq-d2g-session', t) : sessionStorage.removeItem('bpq-d2g-session'); } catch (e) {} }
+function linkText(l) {
+  if (!l) return '--';
+  switch (String(l.state || '').toLowerCase()) {
+    case 'listen': return 'listening';
+    case 'connecting': return 'connecting to ' + l.peer;
+    case 'connected': return `connected to ${l.peer} (BW${l.bw})`;
+    case 'disconnecting': return 'disconnecting from ' + l.peer;
+    default: return l.state || '--';
+  }
+}
+const bytes = n => n == null ? '--' : n < 10000 ? n + ' B' : (n / 1000).toFixed(1) + ' kB';
+function drawCons(canvas, plot) {
+  const cx = canvas.getContext('2d'), side = canvas.width, mid = side / 2;
+  cx.fillStyle = '#000'; cx.fillRect(0, 0, side, side);
+  if (!plot || !plot.points) return;
+  const P = plot.points, S = plot.symbols || [];
+  let reach = 0; for (let i = 0; i < P.length; i++) reach = Math.max(reach, Math.abs(P[i]));
+  const scale = side / 2 / (reach > 0 ? 1.5 * reach : 1.5), X = re => mid + re * scale, Y = im => mid - im * scale;
+  cx.strokeStyle = '#3c3c3c'; cx.beginPath(); cx.moveTo(mid, 0); cx.lineTo(mid, side); cx.moveTo(0, mid); cx.lineTo(side, mid); cx.stroke();
+  const n = S.length / 2;
+  for (let i = 0; i < n; i++) { const t = plot.tones && n > 1 ? i / (n - 1) : 1; cx.fillStyle = `rgba(0,${Math.round(120 + 135 * t)},${Math.round(255 - 135 * t)},.6)`; cx.fillRect(X(S[2 * i]) - .75, Y(S[2 * i + 1]) - .75, 1.5, 1.5); }
+  cx.strokeStyle = '#ff5050'; cx.beginPath();
+  for (let i = 0; i < P.length; i += 2) { const x = X(P[i]), y = Y(P[i + 1]); cx.moveTo(x - 3, y); cx.lineTo(x + 3, y); cx.moveTo(x, y - 3); cx.lineTo(x, y + 3); }
+  cx.stroke();
+}
+function feedData2g(p) {
+  if (p.mode !== 'live' || p.paused || p.busy || !visible(p.el)) return;
+  p.busy = true;
+  api({ action: 'data2g', since: p.since }, { headers: { 'X-Data2G-Session': D2G_TOKEN } }).then(d => {
+    const st = p.el.querySelector('.st'), dot = p.el.querySelector('.dot');
+    if (!d.ok) { dot.className = 'dot bad'; st.textContent = d.error === 'monitor_off' ? 'monitor switched off' : (d.error || 'no data'); return; }
+    if (d.error === 'log in') { setToken(''); data2gPanel(OV.data2g); p.el.querySelector('.lmsg') && (p.el.querySelector('.lmsg').textContent = 'Data2G ended the session (restarted, or the password changed): log in again'); return; }
+    if (d.error) { dot.className = 'dot bad'; st.textContent = d.error; }
+    else { dot.className = d.connected ? 'dot' : 'dot off'; st.textContent = d.connected ? 'live' : 'connecting…'; }
+    if (d.seq < p.since) p.since = 0;
+    const wf = p.el.querySelector('canvas.wf');
+    for (const r of d.rows || []) { wfRow(wf, r.b, r.tx); p.since = Math.max(p.since, r.s); }
+    const s = d.state || {}, set = (k, v) => { const e = p.el.querySelector(`[data-k="${k}"]`); if (e) e.textContent = v; };
+    if (s.link) {
+      const l = s.link;
+      set('link', linkText(l));
+      set('mode', !l.mode ? '--' : l.mode_hz != null ? `${l.mode}, ${l.mode_hz} Hz` : l.mode);
+      set('rx', `${bytes(l.rx_bytes)}, ${l.rx_bps ?? 0} bps`);
+      set('tx', `${bytes(l.tx_bytes)}, ${l.tx_bps ?? 0} bps`);
+    }
+    set('dial', s.dial == null ? '--' : (s.dial / 1e6).toFixed(4) + ' MHz');
+    p.el.querySelector('[data-k="ptt"]').className = 'lamp ptt' + (s.ptt ? ' lit' : '');
+    p.el.querySelector('[data-k="busy"]').className = 'lamp busy' + (s.busy ? ' lit' : '');
+    if (s.constellation) { drawCons(p.el.querySelector('canvas.cons'), s.constellation); set('cmode', (s.constellation.mode || '') + (s.constellation.live ? ' (live)' : '')); }
+    const tb = p.el.querySelector('table.bursts tbody');
+    tb.innerHTML = (d.bursts || []).slice().reverse().slice(0, 12).map(b => {
+      const t = b.t ? new Date(b.t).toISOString().slice(11, 19) + 'Z' : '';
+      const res = String(b.result || ''); return `<tr><td>${t}</td><td>${esc(b.mode)}</td><td>${b.snr == null ? '-' : Number(b.snr).toFixed(1)}</td><td class="res-${esc(res.split(' ')[0])}">${esc(res)}</td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="muted">No bursts heard since this page opened.</td></tr>';
+  }).catch(e => { if (e.message === 'auth') fail(e); }).finally(() => { p.busy = false; });
+}
+
+// ── sound modems without a window (QtSoundModem nogui, Dire Wolf …), v1.5.99 ──
+function kissPanel(k, nPorts) {
+  const key = 'kiss:' + k.port;
+  let p = panels.get(key);
+  if (!p) {
+    const el = document.createElement('section'); el.className = 'panel';
+    el.innerHTML = `<div class="ph"><h2></h2><span class="hp"></span></div><div class="pb body"></div>
+      <div class="pf"><span class="st"></span><span class="muted">status only: this modem has no window to show</span></div>`;
+    p = { el, kind: 'kiss' };
+    panels.set(key, p);
+  }
+  p.seen = true;
+  const progs = k.programs || [];
+  const label = progs.length === 1 ? progs[0].name.replace(/64$/, '') : 'Sound modem';
+  p.el.querySelector('h2').innerHTML = `${esc(label)}<small>LinBPQ port ${esc(k.port)} · ${esc(k.name)}</small>`;
+  const S = { up: ['ok', 'on air: LinBPQ connected'], nolink: ['warn', 'LinBPQ not connected'], down: ['bad', 'modem not running'],
+    remote: ['', 'on another computer'], unknown: ['', 'status unknown'] };
+  const st = S[k.status] || ['', k.status];
+  p.el.querySelector('.hp').innerHTML = `<span class="pill ${st[0]}">${esc(st[1])}</span>`;
+  const when = t => t ? String(t).slice(11, 16) + 'Z' : '';
+  const progHtml = !k.local ? '<span class="muted">runs on another computer (' + esc(k.kiss) + ')</span>'
+    : progs.length ? progs.map(x => `<code>${esc(x.name)}${x.args ? ' ' + esc(x.args) : ''}</code> <span class="muted">pid ${x.pid}${x.user ? ', ' + esc(x.user) : ''}${x.since ? ', since ' + esc(x.since.slice(0, 16).replace('T', ' ')) + 'Z' : ''}${x.gui ? '' : ', no window'}</span>`).join('<br>')
+    : '<span class="muted">no QtSoundModem, Dire Wolf, soundmodem or ARDOP program found running here</span>';
+  const heard = k.heard_today || [];
+  p.el.querySelector('.body').innerHTML = `
+    <div class="stats">
+      <div class="stat" style="grid-column:1/-1"><div class="k">${progs.length > 1 && nPorts > 1 ? 'Sound-modem programs on this computer' : 'Program'}</div><div class="v" style="white-space:normal;font-weight:400;font-size:0.75rem">${progHtml}</div></div>
+      <div class="stat"><div class="k">KISS</div><div class="v">${esc(k.kiss)}</div></div>
+      <div class="stat"><div class="k">Last heard</div><div class="v">${k.last_call ? esc(k.last_call) + ' ' + when(k.last_heard) : (k.db ? '--' : 'no database')}</div></div>
+      <div class="stat"><div class="k">Heard today (UTC)</div><div class="v">${heard.length}</div></div>
+    </div>
+    <div style="margin-top:10px;font-family:var(--mono);font-size:0.72rem;line-height:1.9">${heard.length
+      ? heard.map(h => `<span class="pill ${h.connected ? 'ok' : ''}" title="${h.connected ? 'connected' : 'heard'} ${esc(h.at)}Z">${esc(h.call)} ${when(h.at)}</span>`).join('')
+      : '<span class="muted">No station heard on this port today.</span>'}</div>`;
+  p.el.querySelector('.st').textContent = 'as of ' + new Date().toISOString().slice(11, 19) + 'Z';
+  return p;
+}
+
+function statusPills(m) {
+  const S = { up: ['ok', 'running, LinBPQ attached'], session: ['info', 'in a session'], down: ['bad', 'not running'],
+    nolink: ['warn', 'LinBPQ not attached'], audio: ['bad', 'sound card problem'], noport: ['bad', 'started but its port never opened'], unknown: ['', 'status unknown'] };
+  const s = S[m.status] || ['', m.status || ''];
+  return `<span class="pill ${s[0]}">${esc(s[1])}</span>` + (m.bpq_port ? `<span class="pill">LinBPQ port ${esc(m.bpq_port.num)}</span>` : '');
+}
+
+// ── overview ─────────────────────────────────────────────────────────────────
+function render(o) {
+  OV = o;
+  const notes = [];
+  const grid = $('grid');
+  for (const p of panels.values()) p.seen = false;
+  const order = [];
+  const w = o.windows || {};
+  if (w.ok === false) notes.push(['bad', esc(w.error)]);
+  else {
+    if (w.note) notes.push(['', esc(w.note)]);
+    for (const d of w.displays || []) {
+      if (d.error) notes.push(['warn', `Desktop ${esc(d.display)} (${esc(d.user)}): ${esc(d.error)}` + (/not installed/.test(d.error) ? ' — install it with <code>sudo apt install x11-utils x11-apps</code>' : '')]);
+      const wins = (d.windows || []).slice().sort((a, b) => (a.kind === 'vara' ? 0 : 1) - (b.kind === 'vara' ? 0 : 1));
+      for (const win of wins) order.push(windowPanel(d.display, win, o.vara_ports || []));
+    }
+    const hasVara = (w.displays || []).some(d => (d.windows || []).some(x => x.kind === 'vara'));
+    const localVara = (o.vara_ports || []).filter(v => v.local);
+    if (!hasVara && localVara.length) notes.push(['warn', `LinBPQ has a VARA port on this computer (port ${localVara.map(v => v.num).join(', ')}), but no VARA HF window was found on a desktop here${(w.displays || []).length ? '' : ' (no desktop is running)'}. VARA under Wine shows here when it runs in the station's desktop, e.g. TigerVNC (Installation Manual §10.15).`]);
+    if ((o.vara_ports || []).some(v => !v.local)) notes.push(['', 'A VARA port in bpq32.cfg points at another computer: its window can only be shown from that computer.']);
+  }
+  for (const k of o.kiss || []) order.push(kissPanel(k, (o.kiss || []).length));
+  if (o.mercury && o.mercury.enabled) order.push(mercuryPanel(o.mercury));
+  if (o.data2g && o.data2g.enabled) order.push(data2gPanel(o.data2g));
+  if (((o.mercury || {}).enabled || (o.data2g || {}).enabled) && o.relay && !o.relay.up)
+    notes.push(['bad', 'Nothing answers for the watch-only Mercury / Data2G relay on 127.0.0.1:8769: <code>sudo systemctl enable --now bpq-modem-relay.socket</code> (it starts the relay when this page asks).']);
+  if (!order.length && !notes.length) notes.push(['', 'No modem was found on this computer: no modem window on a desktop here, no sound modem on a LinBPQ KISS port, and no Mercury or Data2G.']);
+  for (const [k, p] of [...panels]) if (!p.seen) { p.el.remove(); panels.delete(k); }
+  order.forEach(p => grid.appendChild(p.el));
+  $('notes').innerHTML = notes.map(([c, h]) => `<div class="note ${c}">${h}</div>`).join('');
+  $('stamp').textContent = 'Looked ' + new Date().toISOString().slice(11, 19) + 'Z · windows every ' + SHOT_MS / 1000 + ' s, waterfalls live';
+  $('loading').style.display = 'none'; $('main').style.display = 'block';
+}
+function loadOverview() { return api({ action: 'overview' }).then(o => { if (!o.ok) throw new Error(o.error || 'failed'); render(o); }).catch(fail); }
+
+$('refresh').onclick = loadOverview;
+loadOverview().then(() => {
+  setInterval(() => { for (const p of panels.values()) if (p.kind === 'win') shoot(p); }, SHOT_MS);
+  setInterval(() => { for (const p of panels.values()) { if (p.kind === 'mercury') feedMercury(p); if (p.kind === 'data2g') feedData2g(p); } }, FEED_MS);
+  setInterval(() => { if (!document.hidden) loadOverview(); }, OVERVIEW_MS);
+  setInterval(() => { for (const p of panels.values()) if (p.kind === 'win' && p.last) { const s = p.el.querySelector('.st'); if (s) s.textContent = p.paused ? 'paused' : 'picture ' + ago(p.last); } }, 1000);
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) for (const p of panels.values()) if (p.kind === 'win') shoot(p); });
+</script>
+</body>
+</html>

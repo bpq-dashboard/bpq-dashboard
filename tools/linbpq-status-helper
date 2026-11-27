@@ -208,6 +208,55 @@ def journal(args, limit=None):
     return run(cmd, timeout=25).splitlines()
 
 
+SVC_LINE = re.compile(r'^(\S+)\s+\S+\s+systemd\[1\]:\s+(?:(Starting|Started|Finished|Stopped|Stopping) ([\w@.:-]+\.service)(?: - (.*?))?\.*$|([\w@.:-]+\.service): (Deactivated successfully|Failed with result|Main process exited)|Failed to start ([\w@.:-]+\.service))')
+
+
+def iso_ts(s):
+    try:
+        return dt.datetime.strptime(s, '%Y-%m-%dT%H:%M:%S%z').timestamp()
+    except ValueError:
+        return None
+
+
+def jobs_at_stops(unit_lines, unit):
+    stops = [iso_ts(l.split()[0]) for l in unit_lines if re.search(r'\bStopping\b', l)]
+    stops = [t for t in stops if t and t > time.time() - 8 * 86400]
+    if not stops:
+        return []
+    ev = {}                                       # service -> [(ts, what, desc)]
+    for line in journal(['--since', '-8d', '_PID=1']):
+        m = SVC_LINE.match(line)
+        if not m:
+            continue
+        t = iso_ts(m.group(1))
+        if t is None:
+            continue
+        if m.group(3):
+            ev.setdefault(m.group(3), []).append((t, m.group(2), m.group(4) or ''))
+        elif m.group(5):
+            ev.setdefault(m.group(5), []).append((t, 'Finished', ''))
+        elif m.group(7):
+            ev.setdefault(m.group(7), []).append((t, 'Finished', ''))
+    own = (unit or '').strip()
+    out = []
+    for T in stops:
+        best = None
+        for svc, lst in ev.items():
+            if svc == own:
+                continue
+            for i, (t, what, desc) in enumerate(lst):
+                if what != 'Starting' or not (T - 1800 <= t <= T + 1):
+                    continue
+                ended = any(t <= t2 <= T and w2 in ('Started', 'Finished', 'Stopped') for t2, w2, _ in lst[i + 1:])
+                if not ended and (best is None or t > best['t']):
+                    best = {'t': t, 'unit': svc, 'desc': desc}
+        if best:
+            out.append({'stop': dt.datetime.fromtimestamp(T, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        'started': dt.datetime.fromtimestamp(best['t'], dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                        'unit': best['unit'], 'desc': mask(best['desc'])[:120]})
+    return out[-200:]
+
+
 def coredumps():
     out = run(['coredumpctl', 'list', '--no-pager', '--since', '-30d'], timeout=15)
     rows = []
@@ -291,5 +340,12 @@ if MODE == 'all':
     adm = journal(['--since', '-30d', '_COMM=sudo', '+', '_COMM=su', '+', '_COMM=cron', '+', 'SYSLOG_IDENTIFIER=systemd-logind'])
     adm = [re.sub(r'\s*PWD=[^;]*;', '', mask(l)) for l in adm if ADMIN.search(l) and 'connect-watchdog' not in l]
     result['admin_events'] = adm[-400:]
+    # v1.5.96: a scheduled job (a backup, say) still running when systemd was told to stop
+    # LinBPQ: a one-shot service that started in the 30 min before and had not finished
+    result['jobs_at_stops'] = jobs_at_stops(starts, unit)
+    # v1.5.96: root logins (SSH / console) from the login records, so a restart typed in a
+    # root shell (no sudo) can be put down to that session
+    lg = run(['last', '-F', '-w', '--time-format', 'iso', '-n', '300', 'root'], timeout=10).splitlines()
+    result['root_logins'] = [mask(l) for l in lg if l.startswith('root ')][:300]
 
 print(json.dumps(result))

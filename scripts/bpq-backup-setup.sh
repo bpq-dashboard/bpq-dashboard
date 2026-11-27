@@ -1,6 +1,6 @@
 #!/bin/bash
 # bpq-backup-setup.sh — set up nightly backups of this station (OPTIONAL)
-# BPQ Dashboard v1.5.95 — Installation Manual §10.16
+# BPQ Dashboard v1.6.0 — Installation Manual §10.16
 #
 #   sudo bash <web root>/scripts/bpq-backup-setup.sh
 #

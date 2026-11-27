@@ -1,0 +1,24 @@
+[Unit]
+Description=BPQ Dashboard - watch-only relay for the Mercury and Data2G monitors (Admin > Modems)
+# v1.5.98: started on request by bpq-modem-relay.socket (127.0.0.1:8769),
+# exits by itself after 10 minutes with nobody watching. Not enabled on its own.
+Requires=bpq-modem-relay.socket
+After=bpq-modem-relay.socket
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/python3 /var/www/bpq-dashboard/scripts/bpq-modem-relay.py
+Restart=on-failure
+RestartSec=10
+# Talks to 127.0.0.1 only (the modems' monitors, and the dashboard's PHP)
+IPAddressDeny=any
+IPAddressAllow=localhost
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bpq-modem-relay

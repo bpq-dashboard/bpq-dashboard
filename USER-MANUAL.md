@@ -1,6 +1,6 @@
 # BPQ Dashboard
 
-**Version 1.5.95**
+**Version 1.6.0**
 **User Manual & Installation Guide**
 *Amateur Radio Packet Node Operations Suite*
 
@@ -9,7 +9,7 @@
 | Platform | Linux — Debian / Ubuntu / Raspberry Pi |
 | Requirements | LinBPQ running · nginx or Apache · PHP 8.x |
 | Target audience | Amateur radio operators — no prior Linux experience needed |
-| Updated | October 2026 |
+| Updated | November 2026 |
 | Repository | https://github.com/bpq-dashboard/bpq-dashboard |
 
 ---
@@ -88,6 +88,43 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 
 ## 2. What's New
 
+### In v1.6.0 — general release
+
+- **First general release.** v1.6.0 gathers everything from v1.5.96 to v1.5.102 (below): the system check before installing, BBS Mail selection and fonts, the new menu and logo, Admin → Modems, and the fixes for read messages turning unread. Stations on any 1.5.x update with `sudo bash update.sh` as usual; nothing extra to do.
+- The README now opens with an introduction: why BPQ Dashboard was created and what it offers a LinBPQ sysop.
+
+### In v1.5.102
+
+- **System check before installing** (`tools/system-check.sh`): the installer first identifies the OS and release (Debian, Ubuntu, Raspberry Pi OS, Linux Mint / LMDE and other systems built on them) and checks that the PHP, Python and MariaDB it would install are new enough. It stops, having changed nothing, on Debian 11 / Ubuntu 20.04 and older, or with less than 500 MB of free disk. It notes ARM computers (VARA needs an x86 PC), low memory and interim releases. It offers to install waiting updates and to turn on automatic security updates. update.sh runs the same check (reports only), and Install Check shows the result under *This Computer*. See *Supported systems* in §3.
+
+### In v1.5.101
+
+- **BBS Mail:** tick boxes for selecting messages (and one to select all), a toolbar **Delete** for everything selected, and Delete / Mark read / Mark unread / Star buttons when several are selected — easy on a tablet. **≡ → Settings** gains a message font and size (also used in Write) and a page text size; each browser keeps its own.
+
+### In v1.5.100
+
+- **New menu and logo:** the meter logo (also the browser-tab icon) with your node callsign under it, and the pages grouped into Station, Mail, On air, Radio and Weather, plus Guide and an Admin panel. On a phone the groups open as a list.
+- **TPRFN affiliation:** install.sh asks *Is this station affiliated with TPRFN?*; with yes the menu shows "K1AJD-4 · affiliated with TPRFN". It is config.php `station` → `'network' => 'TPRFN'` (`''` = node only). update.sh asks once on a station whose config.php doesn't have the setting yet, backs config.php up and adds it.
+
+### In v1.5.99
+
+- **Admin → Modems:** sound modems that run without a window (QtSoundModem with `nogui`, Dire Wolf) now get a status panel per LinBPQ KISS port: the program running, whether LinBPQ is connected, the last station heard and everyone heard today.
+
+### In v1.5.98
+
+- **Admin → Modems' relay only runs while it's needed:** systemd now listens on 127.0.0.1:8769 (`bpq-modem-relay.socket`) and starts `bpq-modem-relay` when the page first asks; the relay stops by itself after 10 minutes with nobody watching. On a station without Mercury or Data2G, or where nobody opens the page, it never runs. update.sh switches a 1.5.97 station over.
+
+### In v1.5.97
+
+- **Admin → Modems** (new): each modem's own display without opening the station's desktop, watch-only. VARA HF, flrig and other modem windows as a picture of the window every 1.5 seconds; Mercury's spectrum and waterfall with S/N, bitrate and direction; Data2G's waterfall, constellation, link, PTT / BUSY and the bursts heard. Nothing on the page can change a modem: the pictures come from a read-only helper (`/usr/local/sbin/bpq-dashboard-modem-view`, two new sudo rules, see §11), and Mercury and Data2G come through a new watch-only relay service, `bpq-modem-relay` (127.0.0.1:8769), that passes no command to them. update.sh installs both, and `x11-utils` / `x11-apps` where a desktop runs.
+
+### In v1.5.96
+
+- **BBS Mail and Email Client:** the To field also suggests stations from LinBPQ's White Pages (marked WP) with their home BBS, and says so when nothing matches instead of the list vanishing (BBS Mail's suggestions also no longer disappear after a click). **Drafts** (classic Email page): Compose saves what you type (a few seconds after you stop, and when you close it), with Save draft, Discard and a 📝 Drafts list; drafts are kept on the server, so any device sees them.
+- **RF Connections → Bands:** **HF Channel Quality** has a row per modem: Data2G (its own rate, S/N, modes) and Mercury (Effective rate, connect modes) beside VARA, with smaller cards. The Forwarded messages tab count no longer drops to 0.
+- **Node Debug:** restarts caused by a backup or other scheduled job say **Backup: name** / **Job: name**; a restart typed in a root shell says **Root login** with where the session came from. "RigControl Opening for RTS PTT" is explained as a harmless start-up note.
+- **Connect Watchdog:** "Port Suspended" (our own port held) no longer counts against a partner.
+
 ### In v1.5.95
 
 - **Admin → Node Debug**: LinBPQ's node debug log (`NodeDebuglog_YYMMDD.log`) read and explained, laid out like RF Connections: LinBPQ starts, neighbour links (drops while running told apart from LinBPQ's own restarts), internet and Winlink server outages, Winlink channel reports accepted, **why each restart happened** (Connect Watchdog, by a user, a reboot, a crash, or unknown with help to track it down), a list of problems with what each means and what to do, and a live view of today's log with VARA's routine chatter hidden.
@@ -103,7 +140,7 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 
 ### In v1.5.92
 
-- **Winlink calls reported accurately on VARA and VHF too.** As for Data2G in v1.5.91: a call is labelled **WL2K** only when LinBPQ's gateway log confirms it, and its frequency is the one the radio transmitted on (rig history), not one taken from another call. VHF rows show the port's frequency from its WL2KREPORT line. One-time fixes for stored rows: User Guide §24.
+- **Winlink calls reported accurately on VARA and VHF too.** As for Data2G in v1.5.91: a call is labelled **WL2K** only when LinBPQ's gateway log confirms it, and its frequency is the one the radio transmitted on (rig history), not one taken from another call. VHF rows show the port's frequency from its WL2KREPORT line. One-time fixes for stored rows: User Guide §25.
 
 ### In v1.5.91
 
@@ -287,7 +324,7 @@ How to use each page is in the **User Guide** (`USER-GUIDE.md`, and the 📖 Gui
 
 ### In v1.5.57
 
-- **Admin → Audio Map**: a picture of how each LinBPQ radio port reaches its radio, read from the running system: LinBPQ port → modem program (VARA, Mercury, Data2G, QtSoundModem, Direwolf …) → the ALSA device it uses (shared dmix/dsnoop, or the card directly) → sound card (with mixer levels) → radio (keyed by LinBPQ through flrig/Hamlib, or by the modem). Notes point out a modem port open to the network, a LinBPQ port with no modem, a card one program has to itself. Names for the radios: config.php `audio_map.cards` (User Guide §22, *Audio Map*).
+- **Admin → Audio Map**: a picture of how each LinBPQ radio port reaches its radio, read from the running system: LinBPQ port → modem program (VARA, Mercury, Data2G, QtSoundModem, Direwolf …) → the ALSA device it uses (shared dmix/dsnoop, or the card directly) → sound card (with mixer levels) → radio (keyed by LinBPQ through flrig/Hamlib, or by the modem). Notes point out a modem port open to the network, a LinBPQ port with no modem, a card one program has to itself. Names for the radios: config.php `audio_map.cards` (User Guide §23, *Audio Map*).
   - It uses a new **read-only helper**, `/usr/local/sbin/bpq-dashboard-audio-map` (from `tools/audio-map-helper`), and one more line in `www-data-tools.sudoers`. update.sh adds both where the admin pages' sudo rules are installed; otherwise the page shows what it can and says what's missing (§11).
 - **Data2G on RF Connections:** the mode column shows the data waveform a call used (`qpsk-r1/3`), not the robust mode of its control bursts; calls Data2G ends with **LINK_LOST** say "nothing heard from the other station".
 - §10.18: the Data2G monitor's Settings tab may show the sound card empty although the service's shared device is in use; nothing needs choosing there. Transmit level and keying delay found on K1AJD's FTdx-3000: `--output-volume -16`, `--ptt-on-delay-ms 300`.
@@ -558,7 +595,7 @@ The biggest changes since v1.5.6:
 - **Hub Operations** — REMOVED (was vestigial).
 
 ### Operations & infrastructure
-- **Daemons monitored** — Maintenance and System Audit cover nginx, PHP-FPM, LinBPQ, bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator and rig-history-poller (and, since 2026-10-25, the message-bodies and bulletin-retention timers).
+- **Daemons monitored** — Maintenance and System Audit cover nginx, PHP-FPM, LinBPQ, bpq-telnet, bpq-chat, bpq-aprs, bpq-vara, vara-logger, vara-validator, rig-history-poller and (v1.5.97) bpq-modem-relay, checked by its socket since v1.5.98 (and, since 2026-10-25, the message-bodies and bulletin-retention timers).
 - **Firewall page rewrite** — accurate port categorization (Public / LAN Only / IP Restricted / Blocked / Localhost), proper source IP display, per-jail fail2ban cards.
 - **Multi-domain SSL cert monitoring** — System Audit can check any number of certificates via the `ssl_domains` config setting.
 - **Light-mode support** on every page (Maintenance, Firewall, System Audit, Rig Status, VARA, Telnet, RF Power Monitor, Log Viewer all now respond to the toggle).
@@ -573,11 +610,34 @@ The biggest changes since v1.5.6:
 
 ### What you need
 
-- A Linux computer running LinBPQ — Raspberry Pi 3/4/5, Ubuntu 20.04+, Debian 11+, or any Debian-based system
+- A Linux computer running LinBPQ, on one of the systems below (a Raspberry Pi 3/4/5 or any x86 PC)
 - An internet connection. The installer adds everything else, including the MariaDB database the Email Client needs
 - LinBPQ already installed, configured and running. If you can telnet to your node it is ready.
 - SSH access to your Linux computer, or a keyboard and monitor attached to it
 - About 15 to 30 minutes with the guided installer
+
+### Supported systems (v1.5.102)
+
+The installer checks the computer first, before it asks anything or changes anything (`tools/system-check.sh`). It uses the programs your OS ships, which get security fixes for as long as the release is supported, rather than newer versions from other sources. It checks those are new enough (PHP 8.0, Python 3.8, MariaDB 10.3 or MySQL 8.0 at least).
+
+| System | Built on | Status | PHP · MariaDB · Python · Dovecot |
+|---|---|---|---|
+| Debian 12, Raspberry Pi OS Bookworm, LMDE 6 | Debian 12 | Supported | 8.2 · 10.11 · 3.11 · 2.3 |
+| Debian 13, Raspberry Pi OS Trixie, LMDE 7 | Debian 13 | Supported | 8.4 · 11.8 · 3.13 · 2.4 |
+| Ubuntu 24.04 LTS, Linux Mint 22 (and other 24.04-based systems) | Ubuntu 24.04 | Supported | 8.3 · 10.11 · 3.12 · 2.3 |
+| Ubuntu 22.04 LTS, Linux Mint 21 | Ubuntu 22.04 | Supported, older (updates until April 2027) | 8.1 · 10.6 · 3.10 · 2.3 |
+| Newer Debian or Ubuntu releases | — | Allowed, "newer than tested" | checked when you install |
+| Ubuntu interim releases (e.g. 25.10) | — | Allowed, with a note (9 months of updates) | checked when you install |
+| Debian 11, Ubuntu 20.04 and older | — | **Stopped:** PHP 7.4 is too old | — |
+
+- **Raspberry Pi / ARM:** the dashboard runs fine. VARA HF itself needs an x86 PC (it runs under Wine), so on a Pi run VARA on another computer and point LinBPQ's VARA port at it. Prefer the 64-bit Raspberry Pi OS.
+- **Memory and disk:** about 1 GB of memory and 2 GB of free disk are recommended. The installer stops below 500 MB free.
+- **Updates:** the installer offers to install updates already waiting (security ones are counted apart), and to turn on **automatic security updates** (unattended-upgrades). Both default to yes and can be declined.
+- **Check a computer on its own,** before installing or at any time (reports only, changes nothing):
+  ```bash
+  sudo bash tools/system-check.sh
+  ```
+- update.sh runs the same check at each update, and warns if the OS has gone out of support, security updates are waiting, or a restart is needed. The result is shown on Install Check (*This Computer*).
 
 > **Important:** BPQ Dashboard does NOT install or configure LinBPQ. LinBPQ must already be working before you start. The dashboard reads LinBPQ log files and connects to it via telnet — it does not replace it.
 
@@ -653,14 +713,14 @@ Open a terminal on the LinBPQ computer and run these four lines:
 sudo apt update
 sudo apt install -y wget unzip
 cd ~
-wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.5.95.zip
+wget -O bpq-dashboard.zip https://github.com/bpq-dashboard/bpq-dashboard/archive/refs/tags/v1.6.0.zip
 ```
 
 Then unpack it and go into the new folder:
 
 ```bash
 unzip bpq-dashboard.zip
-cd bpq-dashboard-1.5.95
+cd bpq-dashboard-1.6.0
 ```
 
 > If you downloaded the zip with a web browser instead, it is probably in your Downloads folder. Use `cd ~/Downloads` before the `unzip` line.
@@ -690,8 +750,9 @@ Some questions are **yes/no**. The capital letter is the default:
 | Use the Telnet Client / Chat / APRS map / VARA HF Terminal / VARA callsign check page? | **Y** for the pages you use. **N** hides a page and skips its helper; add it later (Maintenance → *Optional pages*) |
 | Set up flrig now (for Rig Status / RF Power Monitor)? | **Y** if you use flrig, then answer whether it runs on this server. **n** hides the Rig Status and RF Power Monitor pages (both need flrig); everything else, including BPQ's own CAT control of the radio, works without it |
 | Apply that fix now (setfacl)? *(only if the web server can't reach your LinBPQ folder)* | **Y** — gives the web server read access to the LinBPQ folder and its logs only (§12, *LinBPQ in a home folder*) |
-| Start the page helpers now (and at every boot)? | **Y** |
-| Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need, plus the Maintenance page's *Change admin password* helper and the read-only helpers for Audio Map (v1.5.57) and LinBPQ Status (v1.5.94) |
+| Is this station affiliated with TPRFN? *(v1.5.100; default No)* | **y** for TPRFN stations: the menu shows your node with "affiliated with TPRFN" (config.php `station` → `network`) |
+| Start the page helpers now (and at every boot)? | **Y**. Admin → Modems' relay socket is turned on without asking (v1.5.98; the relay only runs while that page is open) |
+| Install those sudo rules (/etc/sudoers.d/www-data-tools)? | **Y** — read-only rules the Firewall Status and System Audit pages need, plus the Maintenance page's *Change admin password* helper and the read-only helpers for Audio Map (v1.5.57) LinBPQ Status (v1.5.94; also used by Node Debug to explain restarts) and Modems (v1.5.97, window pictures) |
 | Set up a basic firewall (ufw) now? *(default No)* | **N** to do it later; **y** runs `tools/setup-firewall.sh` (§11) |
 | Set up BBS Mail now? *(optional, default No; v1.5.76)* | **y** to install the mail store now (§10.19): it installs Dovecot, opens port 993 to your home network only and asks you to type a mail password. Then Email opens BBS Mail, the Thunderbird-style page, and Thunderbird or a phone can read the BBS mail. **N** keeps the older Email Client; run `tools/bbs-mail-setup.sh` any time later. A No is remembered, so updates don't ask again |
 | Set up nightly backups now? *(optional, recommended; default No)* | **y** only if a backup drive is already formatted and mounted; it runs `scripts/bpq-backup-setup.sh`. Otherwise **N**, prepare the drive, and run it later (§10.16) |
@@ -753,6 +814,7 @@ Small background programs power the live pages. Since v1.5.19 the installer inst
 | `bpq-chat` | Chat page | `sudo systemctl enable --now bpq-chat` |
 | `bpq-aprs` | APRS map | `sudo systemctl enable --now bpq-aprs` |
 | `bpq-vara` | VARA HF Terminal page | `sudo systemctl enable --now bpq-vara` |
+| `bpq-modem-relay.socket` | Admin → Modems: Mercury's and Data2G's monitors, watch-only (v1.5.97). Since v1.5.98 the socket is what's enabled; it starts `bpq-modem-relay` on request, so the service being stopped is normal | `sudo systemctl enable --now bpq-modem-relay.socket` |
 | `vara-logger` | Records VARA HF activity for the RF Connections page when VARA HF sends its syslog to this server (see §10.11) | `sudo systemctl enable --now vara-logger` |
 | `vara-remote.timer` | Downloads your VARA log from the TPRFN server instead (§10.11) | `sudo systemctl enable --now vara-remote.timer` |
 | `rig-history-poller` *(flrig installs)* | Records power and SWR for the RF Power Monitor | `sudo systemctl enable --now rig-history-poller` |
@@ -858,6 +920,8 @@ Since v1.5.19 every release has **`update.sh`**, which updates your dashboard in
 **Files you edited on the server** (from v1.5.19 on it can tell, using the installed `MANIFEST.md5`) are listed before it starts; they are replaced with the new version and your copy stays in the backup. To keep them instead, run it with `--keep-local`. Files you always run in your own version go in a keep list, `/etc/bpq-dashboard/update-keep.txt` (one path per line relative to the dashboard folder, e.g. `callsign-lookup.php` or `scripts/wp_*.py`; `#` starts a comment): they are never replaced or removed, and every plan lists them so you can compare them with the CHANGELOG. The same list can name a hand-tuned unit or the sudo rules file to keep: `/etc/systemd/system/bpq-chat.service`, `/etc/sudoers.d/www-data-tools`.
 
 **Undo:** the last lines it prints include the exact command, e.g. `sudo bash update.sh --rollback /root/bpq-dashboard-update-20261115-101500`. It puts back every file, unit and sudo rule as it was. Database updates stay (they only add tables and columns, which the older version ignores).
+
+**Checks it prints at the end** include **Node debug log** (v1.5.95; the installer prints it too): whether LinBPQ's `NodeDebuglog_YYMMDD.log` is in its logs folder for Admin → Node Debug. *Found* (with how many days are kept); *not found* is only a note (that LinBPQ doesn't write one, and nothing else depends on it); a warning if the web server can't read it or nothing has been written for 48 hours.
 
 **When the web-server template changed** (`nginx-bpq-dashboard.conf`, `bpq-dashboard.conf`), `update.sh` says so but doesn't touch your live site file; the CHANGELOG says what to add.
 
@@ -1100,6 +1164,14 @@ sudo systemctl enable --now bpq-telnet bpq-chat bpq-aprs bpq-vara vara-logger   
 sudo systemctl enable --now rig-history-poller                  # only with flrig
 ```
 
+Admin → Modems (v1.5.97–99) also needs its relay socket (it starts the relay only while the page is open), and, for pictures of modem windows, the helper and its sudo rules from §11 plus `x11-utils` / `x11-apps` where a desktop runs:
+
+```bash
+sudo cp $W/bpq-modem-relay.service $W/bpq-modem-relay.socket /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now bpq-modem-relay.socket
+sudo apt install x11-utils x11-apps                              # only on a station with a desktop (VARA under Wine)
+```
+
 The service files run the daemons from `$W/scripts/` (`vara-logger` runs `$W/vara-logger.sh` as root, because it reads `/var/log/syslog`). Don't copy the scripts elsewhere. Edit `$W/vara-logger.sh` so `OUTPUT_FILE` names your `<callsign>.vara` file. The Telnet and VARA pages need the `/ws/telnet` and `/ws/vara` blocks from `nginx-bpq-dashboard.conf` (Part A, Step 9 explains what they do).
 
 **10. Check** with `install-check.php`, as in Part A, Step 8.
@@ -1143,7 +1215,8 @@ The **User Guide** describes every page in detail. In short, with what each need
 | Telnet Client | `/bpq-telnet.html` | admin + your BPQ login | `bpq-telnet`; `bpq-nodes-api.php` for the nodes list (`bbs` login, `station.node`) |
 | Rig Status | `/rig-status.html` | none (controls: BBS password) | flrig; optional `smartplug` |
 | RF Power Monitor | `/rf-power-monitor.html` | none | flrig, `rig-history-poller` |
-| Maintenance, Firewall Status, Log Viewer, System Audit, Audio Map, LinBPQ Status | `/admin/…` | admin | sudo rules (§11) for Firewall/Audit, *Change admin password*, the Audio Map's program list and LinBPQ Status |
+| BBS Mail (the Email page where the mail store is set up) | `/admin/bbs-mail.html` | admin | the mail store (§10.19), `bbs-mail-sync.timer` |
+| Maintenance, Firewall Status, Log Viewer, System Audit, Audio Map, LinBPQ Status, Node Debug, Modems | `/admin/…` | admin | sudo rules (§11) for Firewall/Audit, *Change admin password*, the Audio Map's program list, LinBPQ Status and the Modems page's window pictures; Modems also uses `bpq-modem-relay.socket` and, for pictures, `x11-utils` / `x11-apps` |
 | Install Check, Health Check | `/install-check.php`, `/health-check.php` | admin | — |
 
 Chat, APRS Map, VARA HF Terminal, Telnet Client, Rig Status and RF Power Monitor are **optional pages** (v1.5.19): switched off in `config.php 'pages'` (or `'radio' => 'enabled'`) they are hidden from the menu and their helper isn't needed.
@@ -1267,7 +1340,7 @@ Built-in profiles (each sets the right data mode for VARA): **Yaesu** FTdx3000, 
 - **Which partners:** the ones on RF Connections → **RF Forwarding Partners** (`data/stations/partners.json`). Each partner's call is matched to its forwarding block in `linmail.cfg` by name: `N3MEL-2` uses the block `N3MEL` (or `N3MEL-2` if that's what the block is called). A partner with no matching block isn't watched.
 - **What counts as a failed attempt:** in BPQ's BBS log, an outgoing attempt starts at `Connecting to BBS N3MEL` and includes the `ELSE` steps of the same ConnectScript. It **succeeded** if the partner answered (its SID such as `[BPQ-6.0.24.1-B1FWIHJM$]`, the B2/FBB lines `FS` / `FF` / `FQ` / `FA` / `FC`, or `Connected to …`), even when there was no mail to pass. It **failed** only if it really went on the air and got no answer: a failure message from the modem or node (`VARA} Failure with N3MEL-2`, *Can't connect*, *Timeout*…), or the connect command went out and 20 seconds or more passed with no answer (v1.5.38).
 - **Not counted (v1.5.38):** `Connecting to BBS N4SFL` followed by `N4SFL Disconnected` in the same second. The ConnectScript had nothing to do at that time (for example, outside its `TIMES` window) or LinBPQ had just started, so nothing went on the air.
-- **Not counted (v1.5.37):** an attempt that only failed because your own port was busy (`Error - Port in use`, typically while another partner's session is ending) or the channel was busy. That isn't the partner's fault, so it counts neither for nor against it.
+- **Not counted (v1.5.37):** an attempt that only failed because your own port was busy (`Error - Port in use`, typically while another partner's session is ending; since v1.5.96 also `Error - Port Suspended`, e.g. just after LinBPQ starts) or the channel was busy. That isn't the partner's fault, so it counts neither for nor against it.
 - **The partner calling you counts as good:** BPQ logs those sessions under the partner's full call (`KK4DIV-1`, `N4SD-11`). The watchdog matches them on the base call, so a hub that keeps calling you in isn't paused just because your calls to it missed.
 - **What it does:** after **2 failed attempts in a row** it sets `Enabled = 0` for that partner (BPQ stops calling it; its mail waits in the queue) for **6 hours** (the default; set in ⚙ Dashboard Settings → Watchdog since v1.5.90), then `Enabled = 1` again, and counting starts over. A good session, whether you called the partner or it called you, resets the count. You get a BBS message on each pause and resume.
 - **Back early (v1.5.38):** if a paused partner has a good session with you during the pause (usually it calls you), the pause ends at the next run, within 5 minutes, with a *"forwarding resumed early"* message.
@@ -1860,7 +1933,7 @@ radio -- USB interface (sound card + CAT serial port) -- this server
    TimeoutStartSec=180
    ```
    If another sound driver setting exists (`grep -rn snd-usb-audio /etc/modprobe.d/`), comment it out: a later file overrides the card numbers. And after changing flrig's setup, check `~/.flrig/<RIG>.prefs` for a garbled `sep_serial_port` (flrig 2.0.10 can leave part of an old long path after "NONE"; it then fails with *Cannot access NONE…*): it must read exactly `sep_serial_port:NONE`.
-7. **Test on the air.** Start a forward to a partner on the current band: flrig follows the script's `RADIO` command, the radio keys and releases in bursts, the session completes, and `tail -4 logs/<call>.vara` shows the session (S/N, bytes, speed) — RF Connections lists it at the next parse. Then restart the desktop (`sudo systemctl restart tigervncserver@:3`) and check flrig and VARA come back and LinBPQ reconnects.
+7. **Test on the air.** Start a forward to a partner on the current band: flrig follows the script's `RADIO` command, the radio keys and releases in bursts, the session completes, and `tail -4 logs/<call>.vara` shows the session (S/N, bytes, speed) — RF Connections lists it at the next parse. Then restart the desktop (`sudo systemctl restart tigervncserver@:3`) and check flrig and VARA come back and LinBPQ reconnects. To watch VARA HF and flrig without a VNC viewer, open **Admin → Modems** (v1.5.97): it shows both windows, refreshed every 1.5 seconds, watch-only.
 
 **Way back:** put the two backed-up files back, restart LinBPQ, close VARA and flrig on the server, move the USB cable to the Windows PC and start them there.
 
@@ -2103,7 +2176,7 @@ sudo bash /var/www/<dashboard>/tools/mercury-monitor.sh     # port 8403; --port 
 - **Firewall first.** Mercury serves these pages on every network interface with no password, so the script blocks the port from the network (`iptables … ! -i lo --dport 8403 -j DROP`, saved) before anything else.
 - **Port.** It sets `ui_enabled = true`, `ui_port = 8403` and `waterfall_enabled` in `[main]` of `/etc/mercury/mercury.ini`. Mercury's default port, 10000, is often Webmin's. A backup of the file goes in `/root`.
 - **Restart.** It restarts Mercury, after waiting for a session in progress to end. LinBPQ reconnects by itself, and the script checks that it has.
-- **Desktop launcher.** It puts a **Mercury Monitor** launcher on the desktop of the user Mercury runs as. Open it on the station's own desktop (for example over VNC), where the address is `http://127.0.0.1:8403/waterfall.html`.
+- **Desktop launcher.** It puts a **Mercury Monitor** launcher on the desktop of the user Mercury runs as. Open it on the station's own desktop (for example over VNC), where the address is `http://127.0.0.1:8403/waterfall.html`. Since v1.5.97 the same waterfall is also on **Admin → Modems** in the dashboard, watch-only, with no VNC and no Connect click.
 - **Watch only, not the full page.** `waterfall.html` only shows; it sends nothing to Mercury. The full page, `mercury.html`, can change Mercury's audio devices, PTT and TX level, which would undo a shared sound-card setup or the TX level your partners set with you. Leave it alone while LinBPQ drives Mercury.
 - **CPU.** The waterfall costs some CPU; `--no-waterfall` keeps the S/N and TX/RX line only.
 - System Audit warns if the monitor port is reachable from the network, and the Firewall page labels it.
@@ -2222,7 +2295,7 @@ Restart LinBPQ. Data2G's log then shows `command: MYCALL …` (your node and BBS
 - builds `data2g-web` from `/usr/local/src/data2g` (adds `qt6-websockets-dev`; on Debian 12's Qt 6.4 it applies a one-line fix Data2G needs before Qt 6.5);
 - asks for the page's **password** at the terminal, typed twice (stored as a salted hash in the service user's `~/.config/Data2G/data2g.conf`, made private). Change it later with `--password`;
 - waits for a session to end, switches the service to `data2g-web` with the same options plus `--web-listen 127.0.0.1 --web-port 8520` (and `TZ=UTC` if missing; backup in /root), restarts it, and checks LinBPQ attaches again;
-- puts a **Data2G Monitor** launcher on that user's desktop; open it over VNC and log in.
+- puts a **Data2G Monitor** launcher on that user's desktop; open it over VNC and log in. Since v1.5.97 **Admin → Modems** shows its monitor in the dashboard too (watch-only; log in once with the same password).
 
 The **Monitor tab only watches**; its *Abort* button ends a session. The **Settings tab changes Data2G** (callsign, levels, audio): some at once, the rest at the next start, though the service's own options win at every start. Leave it alone while LinBPQ drives Data2G. `--off` puts the service back to `data2g-host`.
 
@@ -2410,6 +2483,36 @@ sudo install -o root -g root -m 755 /var/www/bpq-dashboard/tools/audio-map-helpe
 ```
 
 Without it the Audio Map still shows the cards, `/etc/asound.conf` and LinBPQ's ports, and says what's missing.
+
+**Admin → LinBPQ Status (v1.5.94) and Node Debug's restart reasons (v1.5.95–96)** use a third root-owned, **read-only** helper, `/usr/local/sbin/bpq-dashboard-linbpq-status` (from `tools/linbpq-status-helper`). It finds how LinBPQ runs (systemd, screen, tmux), copies its console, and reads the system's records about it: the service's starts and stops, kernel crash and out-of-memory lines, core dumps, the list of boots, sudo / su / cron / shutdown lines that concern LinBPQ or a reboot, root's logins (`last`), and scheduled jobs that were running when LinBPQ was stopped. It sends nothing to LinBPQ, masks password and `USER=` lines, and drops working folders from sudo lines. Two rules, with the only arguments allowed:
+
+```
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-linbpq-status ""
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-linbpq-status console
+```
+
+install.sh installs it; update.sh installs or refreshes it when those rules are in `/etc/sudoers.d/www-data-tools` (answer yes to the admin pages' sudo rules). By hand:
+
+```bash
+sudo install -o root -g root -m 755 /var/www/bpq-dashboard/tools/linbpq-status-helper /usr/local/sbin/bpq-dashboard-linbpq-status
+```
+
+Without it LinBPQ Status says so, and Node Debug still explains restarts from its own log and the Connect Watchdog's (*Probably Watchdog* / *Unknown*, with troubleshooting steps).
+
+**Admin → Modems (v1.5.97)** uses a fourth root-owned helper, `/usr/local/sbin/bpq-dashboard-modem-view` (from `tools/modem-view-helper`). It lists the modem windows (VARA HF / FM, flrig, QtSoundModem, ARDOP, Mercury, Data2G, fldigi, matched by the start of their title) on the X desktops running on the station, and takes a picture of one with `xwininfo` and `xwd`, using the X server's own login file. It only reads pixels: no click, key, window move or program start. Two rules; the helper accepts only a window it lists:
+
+```
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-modem-view list
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/bpq-dashboard-modem-view snap *
+```
+
+It needs `x11-utils` and `x11-apps` (`sudo apt install x11-utils x11-apps`; install.sh and update.sh add them where a desktop runs). install.sh installs the helper; update.sh installs or refreshes it when those rules are in `/etc/sudoers.d/www-data-tools`. By hand:
+
+```bash
+sudo install -o root -g root -m 755 /var/www/bpq-dashboard/tools/modem-view-helper /usr/local/sbin/bpq-dashboard-modem-view
+```
+
+Mercury and Data2G on the same page don't use sudo: the `bpq-modem-relay` service reads their own monitors on 127.0.0.1 (Mercury's `ui_port`, §10.17; Data2G's `--web-port`, §10.18) and sends them no command.
 
 > Both `status` and `status *` lines are needed: in sudoers `*` needs at least one argument, so it doesn't cover bare `status` (the jail list).
 >
@@ -2690,7 +2793,7 @@ Hard-refresh the page (Ctrl+Shift+R). If still no response, clear the `bpq-dark-
 | `/var/log/bpq-dashboard/` | Parser logs |
 | `/etc/nginx/sites-available/bpq-dashboard` | The installer's web-server site |
 | `/etc/nginx/.bpq-mgmt-auth` | Admin login password file |
-| `/etc/sudoers.d/www-data-tools` | Read-only sudo rules for Firewall Status and System Audit |
+| `/etc/sudoers.d/www-data-tools` | The admin pages' sudo rules: read-only commands for Firewall Status and System Audit, and the root-owned helpers in `/usr/local/sbin` (*Change admin password*, Audio Map, LinBPQ Status / Node Debug, Modems) (§11) |
 
 ### Service management
 
@@ -2726,6 +2829,8 @@ tail -50 /var/log/bpq-dashboard/bpq-telnet-daemon.log
 | bulletin-retention.timer | Daily 14-day bulletin clean-up | Email Client |
 | nws-auto-post.timer *(optional)* | Posts new NWS Warnings/Watches for your state every 5 minutes | Automatic NWS bulletins (§10.4) |
 | vara-remote.timer *(optional, v1.5.19)* | Downloads the VARA log from the TPRFN server every 5 minutes | RF Connections on TPRFN stations (§10.11) |
+| bbs-mail-sync.timer *(optional, v1.5.67)* | Copies new BBS mail into the mail store every 2 minutes | BBS Mail, mail apps (§10.19) |
+| bpq-backup.timer *(optional)* | Nightly backup to a separate drive; stops LinBPQ for a few seconds | Backups (§10.16) |
 
 ### Complete crontab reference
 
@@ -2772,13 +2877,18 @@ Replace `YOUR_SERVER_IP` with your server's actual IP or hostname.
 | Firewall Status | `http://YOUR_SERVER_IP/admin/firewall-status.html` |
 | Log Viewer | `http://YOUR_SERVER_IP/admin/log-viewer.html` |
 | System Audit | `http://YOUR_SERVER_IP/admin/system-audit.html` |
+| LinBPQ Status | `http://YOUR_SERVER_IP/admin/linbpq-status.html` |
+| Node Debug | `http://YOUR_SERVER_IP/admin/node-debug.html` |
+| Modems | `http://YOUR_SERVER_IP/admin/modems.html` |
+| Audio Map | `http://YOUR_SERVER_IP/admin/audio-map.html` |
+| BBS Mail | `http://YOUR_SERVER_IP/admin/bbs-mail.html` (with the mail store) |
 | Install Check | `http://YOUR_SERVER_IP/install-check.php` (admin login) |
 | Health Check | `http://YOUR_SERVER_IP/health-check.php` (admin login) |
 | NTS Report | `http://YOUR_SERVER_IP/nts-forwarding-report.php` (admin login) |
-| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.5.95-User-Guide.pdf` |
+| User Guide (PDF) | `http://YOUR_SERVER_IP/BPQ-Dashboard-v1.6.0-User-Guide.pdf` |
 
 ---
 
-**73 — BPQ Dashboard v1.5.95 — Amateur Radio Packet Node Operations Suite**
+**73 — BPQ Dashboard v1.6.0 — Amateur Radio Packet Node Operations Suite**
 
 *Open source · https://github.com/bpq-dashboard/bpq-dashboard*
